@@ -1,6 +1,7 @@
 import configparser
 import os
 from math import isnan
+import numpy as np
 
 """
 Code do deal with legacy decisions, constraits, objectives style files. 
