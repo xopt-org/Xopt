@@ -145,10 +145,7 @@ def opt_params_from_opt_config(filePath):
 
 
   return opt_params  
-  
-  
-  
-  
+    
   
 def parse_docs(dir, dname='decisions', cname='constraints', oname='objectives', suffix=''):
     """
@@ -159,7 +156,6 @@ def parse_docs(dir, dname='decisions', cname='constraints', oname='objectives', 
     d.update(parse_objectives(os.path.join(dir, oname+suffix)))
     d.update(parse_variables(os.path.join(dir, dname+suffix)))
     return d  
-  
   
   
 # ------ Output evaluation--------
@@ -230,8 +226,8 @@ def toolbox_params(variable_dict={}, objective_dict={}, constraint_dict={}):
   """
   Returns a dict of parameters intended for a DEAP toolbox
   """
-  params={}
-  params['WEIGHTS'] = tuple([objective_dict[k] for k in sorted_names(objective_dict)])
+  params={} 
+  params['WEIGHTS'] = tuple([objective_weight[objective_dict[k]] for k in sorted_names(objective_dict)])
 
   mins = var_mins(variable_dict)
   maxs = var_maxs(variable_dict)
