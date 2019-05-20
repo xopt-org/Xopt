@@ -203,6 +203,25 @@ def evaluate_constraints(constraint_dict, output):
     elif op == 'LESS_THAN':      # x < d -> d-x > 0
       eval.append( d-x )
   return eval
+  
+def constraint_satisfaction(constraint_dict, output):
+    """
+    Returns a dictionary of constraint names, and a bool with their satisfaction. 
+    """
+    vals = evaluate_constraints(constraint_dict, output)
+    keys = sorted_names(constraint_dict)
+    d = {}
+    for k, v in zip(keys, vals):
+        if v > 0:
+            satisfied = True
+        else:
+            satisfied = False
+        d[k] =  satisfied
+    return d
+
+def n_constraints_satistfied(constraint_dict, output):
+    vals = np.array(evaluate_constraints(constraint_dict, output))
+    return len(np.where(vals > 0)[0])
 
 def evaluate_constraints_inverse(constraint_dict, eval):
   """
