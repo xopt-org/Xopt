@@ -216,13 +216,22 @@ def params_from_config(nsga2_config):
 def main(toolbox, output_dir = '', checkpoint=None, seed=None,
          max_generations = 2, population_size = 4, checkpoint_frequency = 1,
          crossover_probability = 0.9, do_history=False, abort_file='', 
-         skip_checkpoint_eval=False):
+         verbose=False,
+         skip_checkpoint_eval=False, 
+         do_archive=False):
     '''
     Main loop for a NSGA-II optimization
     
     returns final population and logbook
     '''
     random.seed(seed)
+    
+    # Verbose print helper
+    def vprint(*a):
+        if verbose:
+            print(*a)   
+            # Flush for mpi printing
+            sys.stdout.flush() 
     
     # History
     if do_history:
@@ -255,7 +264,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         #halloffame = cp['halloffame']
         logbook = cp['logbook']
         random.setstate(cp['rndstate'])
-        ### logger.info('Loaded checkpoint: '+checkpoint)
+        vprint('Loaded checkpoint: '+checkpoint)
     else:
         # Start a new evolution
         population = toolbox.population(n=MU)
@@ -267,8 +276,8 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population] #Reevaluate all if not ind.fitness.valid]
         
-    ### logger.info('_________________________________')
-    ### logger.info(str(len(invalid_ind))+' fitness calculations for initial generation...')
+    vprint('_________________________________')
+    vprint(str(len(invalid_ind))+' fitness calculations for initial generation...')
     if not skip_checkpoint_eval:
         evaluate_result = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, evaluate_result):
@@ -278,7 +287,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
             # Allow for additional info to be saved (for example, a dictionary of properties)
             if len(fit) > 2:
                 ind.fitness.info = fit[2]
-    ### logger.info(str(len(invalid_ind))+' fitness calculations for initial generation...DONE')
+    vprint(str(len(invalid_ind))+' fitness calculations for initial generation...DONE')
         write_txt_population(population, os.path.join(output_dir, 'initial_pop.txt') ) 
     
       
@@ -296,7 +305,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
 
     # Begin the generational process
     for gen in range(start_gen, NGEN):
-
+        
         if os.path.exists(abort_file):
             print('abort_file detected: ', abort_file)
             return population, logbook
@@ -319,7 +328,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
                
                
-        ### logger.info(str(len(invalid_ind))+' fitness calculations for generation '+str(gen)+' ...')
+        vprint(str(len(invalid_ind))+' fitness calculations for generation '+str(gen)+' ...')
         tstart = time.time()
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
@@ -329,10 +338,13 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
             # Allow for additional info to be saved (for example, a dictionary of properties)
             if len(fit) > 2:
               ind.fitness.info = fit[2]
+              
+              
+              
         tend = time.time()
-        ### logger.info(str(len(invalid_ind))+' fitness calculations for generation '+str(gen)+' DONE, time = '+str(tend-tstart)+' s')
+        vprint(str(len(invalid_ind))+' fitness calculations for generation '+str(gen)+' DONE, time = '+str(tend-tstart)+' s')
         
-        ### logger.info('Population selection for generation '+str(gen)+' ...')
+        vprint('Population selection for generation '+str(gen)+' ...')
         # Select the next generation population
         population = toolbox.select(population + offspring, MU)
         
@@ -342,7 +354,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         record = stats.compile(population)
         logbook.record(gen=gen, evals=len(invalid_ind), **record)
         print(logbook.stream)
-        ### logger.info('Population selection for generation '+str(gen)+' DONE')
+        vprint('Population selection for generation '+str(gen)+' DONE')
 
         gen_name = 'pop_'+str(gen)
         write_txt_population(population, os.path.join(output_dir, gen_name+'.txt') ) 
@@ -354,8 +366,8 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         if gen % CHECKPOINT_FREQUENCY == 0:
             filename = gen_name+'.pkl'
             write_checkpoint(os.path.join(output_dir, filename), population=population, generation=gen, logbook=logbook)
-            ### logger.info('_________________________________')
-            ### logger.info('Checkpoint '+filename+' written')
+            vprint('_________________________________')
+            vprint('Checkpoint '+filename+' written')
             
     return population, logbook
         
