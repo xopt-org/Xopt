@@ -287,7 +287,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
             # Allow for additional info to be saved (for example, a dictionary of properties)
             if len(fit) > 2:
                 ind.fitness.info = fit[2]
-    vprint(str(len(invalid_ind))+' fitness calculations for initial generation...DONE')
+        vprint(str(len(invalid_ind))+' fitness calculations for initial generation...DONE')
         write_txt_population(population, os.path.join(output_dir, 'initial_pop.txt') ) 
     
       
