@@ -3,6 +3,8 @@
 # Adapted from DEAP's NSGA-II example
 
 
+
+import h5py
 import array
 import random
 import time
@@ -218,7 +220,9 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
          crossover_probability = 0.9, do_history=False, abort_file='', 
          verbose=False,
          skip_checkpoint_eval=False, 
-         do_archive=False):
+         do_archive=False,
+         archive_prefix='archive_'
+         ):
     '''
     Main loop for a NSGA-II optimization
     
@@ -232,6 +236,12 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
             print(*a)   
             # Flush for mpi printing
             sys.stdout.flush() 
+    
+    # Archiving
+    if do_archive:
+        assert 'archive' in dir(toolbox), 'Toolbox must contain archive method'
+    
+    
     
     # History
     if do_history:
@@ -261,6 +271,10 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         cp = pickle.load(open(checkpoint, 'rb'))
         population = cp['population']
         start_gen = cp['generation'] + 1
+        
+        # id of last individual
+        id = cp['generation']*len(population)
+        
         #halloffame = cp['halloffame']
         logbook = cp['logbook']
         random.setstate(cp['rndstate'])
@@ -269,6 +283,10 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         # Start a new evolution
         population = toolbox.population(n=MU)
         start_gen = 0
+        
+        # 
+        id = 0 
+        
         #halloffame = tools.HallOfFame(maxsize=1)
         logbook = tools.Logbook()
         logbook.header = 'gen', 'evals', 'std', 'min', 'avg', 'max'
@@ -280,13 +298,16 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
     vprint(str(len(invalid_ind))+' fitness calculations for initial generation...')
     if not skip_checkpoint_eval:
         evaluate_result = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, evaluate_result):
+        for ind, fit in zip(invalid_ind, evaluate_result):   
+            id += 1
+            ind.id = id
             ind.fitness.values = fit[0]
             ind.fitness.cvalues = fit[1]
             ind.fitness.n_constraints = len(ind.fitness.cvalues)
             # Allow for additional info to be saved (for example, a dictionary of properties)
             if len(fit) > 2:
                 ind.fitness.info = fit[2]
+
         vprint(str(len(invalid_ind))+' fitness calculations for initial generation...DONE')
         write_txt_population(population, os.path.join(output_dir, 'initial_pop.txt') ) 
     
@@ -331,13 +352,29 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         vprint(str(len(invalid_ind))+' fitness calculations for generation '+str(gen)+' ...')
         tstart = time.time()
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        
+    
+        if do_archive:
+            archive_name = archive_prefix+str(gen)+'.h5'
+            h5 = h5py.File(archive_name, 'w')
+        
         for ind, fit in zip(invalid_ind, fitnesses):
+            id += 1
+            ind.id = id        
             ind.fitness.values = fit[0]
             ind.fitness.cvalues = fit[1]
             ind.fitness.n_constraints = len(ind.fitness.cvalues)
             # Allow for additional info to be saved (for example, a dictionary of properties)
             if len(fit) > 2:
-              ind.fitness.info = fit[2]
+                ind.fitness.info = fit[2]
+                id += 1
+            # Optional archiving of individuals
+            if do_archive:
+                toolbox.archive(h5, ind)
+                
+        if do_archive:
+            h5.close()    
+            vprint('Archived new evaluations in file ', archive_name)            
               
               
               
