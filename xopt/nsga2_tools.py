@@ -240,7 +240,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
     # Archiving
     if do_archive:
         assert 'archive' in dir(toolbox), 'Toolbox must contain archive method'
-    
+        vprint('Will write archive files with prefix', archive_prefix)
     
     
     # History
