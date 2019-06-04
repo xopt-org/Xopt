@@ -215,6 +215,32 @@ def params_from_config(nsga2_config):
     
 
 
+def evaluate_all(individuals, toolbox, 
+    archive_filePath=None):
+    
+    fitnesses = toolbox.map(toolbox.evaluate, individuals)
+    
+    if archive_filePath:
+        assert 'archive' in dir(toolbox), 'Toolbox must contain archive method'
+        h5 = h5py.File(archive_filePath, 'w')
+    
+    for ind, fit in zip(individuals, fitnesses):    
+        ind.fitness.values = fit[0]
+        ind.fitness.cvalues = fit[1]
+        ind.fitness.n_constraints = len(ind.fitness.cvalues)
+        # Allow for additional info to be saved (for example, a dictionary of properties)
+        if len(fit) > 2:
+            ind.fitness.info = fit[2]
+        # Optional archiving of individuals
+        if archive_filePath:
+            toolbox.archive(h5, ind)
+            
+            
+    if do_archive:
+        h5.close()    
+        vprint('Archive file', archive_name, 'written')         
+
+
 def main(toolbox, output_dir = '', checkpoint=None, seed=None,
          max_generations = 2, population_size = 4, checkpoint_frequency = 1,
          crossover_probability = 0.9, do_history=False, abort_file='', 
@@ -253,7 +279,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
     MU =  population_size  
     CXPB = crossover_probability
 
-    assert ( MU % 4 == 0) # Must be multiple of 4
+    assert  MU % 4 == 0, 'Population size must be multiple of 4'
     
     CHECKPOINT_FREQUENCY = checkpoint_frequency
 
@@ -374,7 +400,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
                 
         if do_archive:
             h5.close()    
-            vprint('Archived new evaluations in file ', archive_name)            
+            vprint('Archive file', archive_name, 'written')            
               
               
               
