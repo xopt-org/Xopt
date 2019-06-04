@@ -393,7 +393,6 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
             # Allow for additional info to be saved (for example, a dictionary of properties)
             if len(fit) > 2:
                 ind.fitness.info = fit[2]
-                id += 1
             # Optional archiving of individuals
             if do_archive:
                 toolbox.archive(h5, ind)
