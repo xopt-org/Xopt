@@ -4,6 +4,18 @@ import numpy as np
 import json
 
 
+
+xopt_logo = """                 _   
+                | |  
+__  _____  _ __ | |_ 
+\ \/ / _ \| '_ \| __|
+ >  < (_) | |_) | |_ 
+/_/\_\___/| .__/ \__|
+          | |        
+          |_|        
+"""
+
+
 #--------------------------------
 # VOCS utilities
 def save_vocs(vocs_dict, filePath=None):
