@@ -299,7 +299,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         start_gen = cp['generation'] + 1
         
         # id of last individual
-        id = cp['generation']*len(population)
+        id = (cp['generation']+1)*len(population)
         
         #halloffame = cp['halloffame']
         logbook = cp['logbook']
