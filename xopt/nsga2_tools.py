@@ -319,11 +319,12 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
      
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population] #Reevaluate all if not ind.fitness.valid]
+    vecs = [list(ind) for ind in population] # Fixes a problem with mpi4py and with starting from checkpoints
         
     vprint('_________________________________')
     vprint(str(len(invalid_ind))+' fitness calculations for initial generation...')
     if not skip_checkpoint_eval:
-        evaluate_result = toolbox.map(toolbox.evaluate, invalid_ind)
+        evaluate_result = toolbox.map(toolbox.evaluate, vecs)
         for ind, fit in zip(invalid_ind, evaluate_result):   
             id += 1
             ind.id = id
