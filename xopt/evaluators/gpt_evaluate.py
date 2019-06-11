@@ -204,7 +204,7 @@ def evaluate_gpt(individual, **options):
     # Add constants
     settings.update(options['constants'])
     
-    output = gpt_merit(settings, template_dir=options['template_dir'], verbose=options['verbose'], workdir=options['workdir'], timeout=options['timeout']) 
+    output = xopt_gpt_distgen_eval(settings, template_dir=options['template_dir'], verbose=options['verbose'], workdir=options['workdir'], timeout=options['timeout']) 
     #print(output)
     scalars = output['merits']['scalars']
     run = output['run']
