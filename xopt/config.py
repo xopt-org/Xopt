@@ -3,19 +3,11 @@ Tools to configure an xopt run
 
 """
 
-from xopt import legacy
 from xopt.tools import load_vocs
 from xopt.nsga2_tools import nsga2_toolbox
 
 from configparser import ConfigParser
 import os
-
-
-
-
-
-
-
 
 
 XOPT_CONFIG_DEFAULTS = {
@@ -45,6 +37,9 @@ def load_config(filePath):
     for k in ['do_archive', 'skip_checkpoint_eval']:
         d['xopt_config'][k]  = xopt.getboolean(k)
         
+    # Parse vocs    
+    d['xopt_config']['vocs'] = load_vocs(config['xopt_config']['vocs_file'])
+        
     #---------------------------      
     # gpt_config
     if 'gpt_config' in config:
@@ -62,13 +57,3 @@ def load_config(filePath):
     return d
     
     
-    
-def configure(config):
-    vocs = load_vocs(config['xopt_config']['vocs_file'])
-    
-    # Create the toolbox
-    toolbox_params = legacy.toolbox_params(variable_dict=vocs['variables'], constraint_dict = vocs['constraints'], objective_dict = vocs['objectives'])
-    toolbox = nsga2_toolbox(**toolbox_params)
-    
-    
-    return {'toolbox':toolbox, 'vocs':vocs}    

@@ -26,7 +26,7 @@ from deap import benchmarks
 from deap.benchmarks.tools import diversity, convergence
 from deap import creator
 from deap import tools
-from xdeap import fitness_with_constraints
+from xopt import fitness_with_constraints
 
 
 def uniform(low, up, size=None):
@@ -186,6 +186,7 @@ def nsga2_toolbox(N_DIM=1, WEIGHTS = (1), N_CONSTRAINTS = 0, BOUND_LOW = [0.0], 
     toolbox.register('select', tools.selNSGA2)
 
     return toolbox
+
 
 # NSGA2 config
 def params_from_config(nsga2_config):
