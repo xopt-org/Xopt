@@ -11,6 +11,8 @@ import os
 from tempfile import TemporaryDirectory
 from shutil import rmtree
 
+from xopt.tools import decode1
+
 
 #******************************************************************************************
 # This is the user defined MERIT function (Objectives, Constraints), edit here 
