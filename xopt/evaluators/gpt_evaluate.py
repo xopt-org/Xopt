@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from shutil import rmtree
 
 from xopt.tools import decode1
+from xopt import legacy
 
 
 #******************************************************************************************
