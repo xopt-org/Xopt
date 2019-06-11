@@ -7,6 +7,7 @@ import platform
 import h5py
 import time
 import json
+import sys
 import os
 from tempfile import TemporaryDirectory
 from shutil import rmtree
