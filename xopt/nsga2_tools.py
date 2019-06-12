@@ -434,7 +434,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         write_txt_population(population, os.path.join(output_dir, gen_name+'.txt') ) 
         
         if do_history:
-            pickle.dump(dict(history=history), open( , 'history.pkl'), 'wb'))
+            pickle.dump(dict(history=history), open(os.path.join(output_dir, 'history.pkl'), 'wb'))
         
         #  CHECKPOINT
         if gen % CHECKPOINT_FREQUENCY == 0:
