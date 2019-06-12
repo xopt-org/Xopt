@@ -269,6 +269,9 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         assert 'archive' in dir(toolbox), 'Toolbox must contain archive method'
         vprint('Will write archive files with prefix', archive_prefix)
     
+    # Info
+    vprint('output_dir:', os.path.abspath(output_dir)
+    
     
     # History
     if do_history:
@@ -384,8 +387,11 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
     
         if do_archive:
             archive_name = archive_prefix+str(gen)+'.h5'
+            # Prepend output dir
+            os.path.join(output_dir, archive_name)
             # Open temporary file, in case something goes wrong. 
             temp_archive_name = 'temp_'+archive_name
+            temp_archive_name = os.path.join(output_dir, temp_archive_name)
             h5 = h5py.File(temp_archive_name, 'w')
         
         for ind, fit in zip(invalid_ind, fitnesses):
@@ -428,7 +434,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         write_txt_population(population, os.path.join(output_dir, gen_name+'.txt') ) 
         
         if do_history:
-            pickle.dump(dict(history=history), open(os.path.join(output_dir, 'history.pkl'), 'wb'))
+            pickle.dump(dict(history=history), open( , 'history.pkl'), 'wb'))
         
         #  CHECKPOINT
         if gen % CHECKPOINT_FREQUENCY == 0:

@@ -52,7 +52,9 @@ def load_config(filePath):
     """
     Load INI style config file for xopt. 
     
+    Does no processing (doens't load vocs_file, etc.). 
     
+    Returns a dict. 
     
     """
     config = ConfigParser()
