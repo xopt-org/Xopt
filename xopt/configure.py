@@ -85,7 +85,8 @@ def load_config(filePath):
             'skip_checkpoint_eval':c.getboolean('skip_checkpoint_eval', False),
             'population_size':c.getint('population_size', 0), # 0 is intended to be automatiaclly adjusted. 
             'max_generations':c.getint('max_generations', 100),
-            'checkpoint_frequency':c.getint('checkpoint_frequency', 1)
+            'checkpoint_frequency':c.getint('checkpoint_frequency', 1),
+            'verbose':c.getboolean('verbose', True)
         }
     
         
