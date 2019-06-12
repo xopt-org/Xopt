@@ -41,6 +41,10 @@ def load_config(filePath):
     """
     Load INI style config file for xopt and nsga2. 
     
+    Will add defaults. Otherewise, there is no processing. 
+    
+    Returns a dict.
+    
     """
     config = ConfigParser()
     ##config['DEFAULT'] =  XOPT_CONFIG_DEFAULTS
@@ -55,7 +59,6 @@ def load_config(filePath):
     'vocs_file':c.get('vocs_file', 'vocs.json'),
     'output_dir':c.get('output_dir', '.')
     }
-    print(d['xopt_config'])
     
     #---------------------------      
     # gpt_config
@@ -88,5 +91,32 @@ def load_config(filePath):
         
     return d
 #c1 = load_config('xopt.in')
+    
+    
+    
+def configure(config):
+    """"
+    Processes config dict, adding vocs and full paths. 
+    """
+    
+    c = {}
+    c.update(config)
+    
+    # xopt_config
+    c['xopt_config']['vocs_file'] = full_path(config['xopt_config']['vocs_file'])
+    c['xopt_config']['output_dir'] = full_path(config['xopt_config']['output_dir'])
+    
+    c['vocs'] = load_vocs( config['xopt_config']['vocs_file'])    
+    
+    c['vocs']['template_dir'] =  full_path(c['vocs']['template_dir'])
+    
+    # Binary paths
+    # Prepend to $PATH
+    if 'gpt_config' in c:
+        c['gpt_config']['gpt_path'] = add_to_path( config['gpt_config']['gpt_path'] )
+    if 'distgen_config' in c:
+        c['distgen_config']['distgen_path'] =  add_to_path(config['distgen_config']['distgen_path'])
+    
+    return c
     
     
