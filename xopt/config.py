@@ -68,7 +68,7 @@ def load_config(filePath):
     # distgen_config
     if 'distgen_config' in config:
         c = config['distgen_config']
-        d['disgtgen_config'] = {'distgen_path':c['distgen_path']}   
+        d['distgen_config'] = {'distgen_path':c['distgen_path']}   
     
     #---------------------------       
     # nsga2_config
