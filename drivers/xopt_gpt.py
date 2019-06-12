@@ -8,7 +8,7 @@ xopt GPT driver
 
 Basic usage:
 
-mpirun -n 64 python -m mpi4py.futures  xopt_gpt.py
+mpirun -n 64 python -m mpi4py.futures xopt_gpt.py xopt.in
 
 
 
