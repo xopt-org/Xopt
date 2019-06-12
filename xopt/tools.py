@@ -2,7 +2,7 @@
 
 import numpy as np
 import json
-
+import os
 
 
 xopt_logo = """                 _   
