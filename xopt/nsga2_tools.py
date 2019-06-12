@@ -270,7 +270,7 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
         vprint('Will write archive files with prefix', archive_prefix)
     
     # Info
-    vprint('output_dir:', os.path.abspath(output_dir)
+    vprint('output_dir:', os.path.abspath(output_dir))
     
     
     # History
