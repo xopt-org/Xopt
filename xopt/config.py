@@ -10,17 +10,49 @@ from configparser import ConfigParser
 import os
 
 
+XOPT_EXAMPLE_CONFIGFILE = """
+Load INI style config file for xopt. 
+
+
+Example: 
+
+[xopt_config]
+vocs_file            : cbetaDL_measurement.json
+abort_file           :  __jbooty
+skip_checkpoint_eval :True 
+checkpoint : pop_432.pkl
+do_archive  :True
+
+[gpt_config]
+timeout: 400
+gpt_path: /global/homes/c/cmayes/GitHub/xgpt/gpt321-rhel7/bin/
+
+[distgen_config]
+distgen_path: /global/homes/c/cmayes/cori/distgen/bin/
+
+[nsga2_config]
+population_size: 60
+
+"""
+
+
+
 XOPT_CONFIG_DEFAULTS = {
     'checkpoint'           : '',
     'max_generations'      : '2',
     'population_size'      : '100',
     'checkpoint_frequency' : '1',
     'do_archive'           : 'false',
+    'output_dir'           : '.',
     'abort_file'           : '__jbooty' # Named for historical reasons
                      }
+
+
 def load_config(filePath):
     """
-    Load INI style config file for xopt and nsga2. 
+    Load INI style config file for xopt. 
+    
+    
     
     """
     config = ConfigParser()
@@ -37,15 +69,22 @@ def load_config(filePath):
     for k in ['do_archive', 'skip_checkpoint_eval']:
         d['xopt_config'][k]  = xopt.getboolean(k)
         
-    # Parse vocs    
-    d['xopt_config']['vocs'] = load_vocs(config['xopt_config']['vocs_file'])
         
     #---------------------------      
     # gpt_config
     if 'gpt_config' in config:
-        gpt = config['gpt_config']
-        d['gpt_config'] = {'timeout':gpt.getint('timeout', None)
+        c = config['gpt_config']
+        d['gpt_config'] = {'timeout':c.getint('timeout', None),
+                           'workdir':c.get('workdir', None),
+                           'verbose':c.getint('workdir', 0),
+                           'gpt_path':c['gpt_path']                  
         }
+        
+    #---------------------------      
+    # distgen_config
+    if 'distgen_config' in config:
+        c = config['distgen_config']
+        d['disgtgen_config'] = {'distgen_path':c['distgen_path']}   
     
     #---------------------------       
     # nsga2_config   
@@ -55,5 +94,6 @@ def load_config(filePath):
         d['nsga2_config'][k] = config.getint('nsga2_config', k)
         
     return d
+#c1 = load_config('xopt.in')
     
     
