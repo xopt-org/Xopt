@@ -50,8 +50,11 @@ def load_config(filePath):
     d = {}
     #---------------------------
     # xopt_config (required)
-    xopt = config['xopt_config']
-    d['xopt_config'] = dict(xopt)
+    c = config['xopt_config']
+    d['xopt_config'] = {
+    'vocs_file':c.get('vocs_file', 'vocs.json'),
+    'output_dir':c.get('output_dir', '.')
+    }
     print(d['xopt_config'])
     
     #---------------------------      
