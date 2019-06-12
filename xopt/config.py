@@ -37,28 +37,13 @@ population_size: 60
 
 
 
-XOPT_CONFIG_DEFAULTS = {
-    'checkpoint'           : '',
-    'max_generations'      : '2',
-    'population_size'      : '100',
-    'checkpoint_frequency' : '1',
-    'do_archive'           : 'false',
-    'output_dir'           : '.',
-    'abort_file'           : '__jbooty' # Named for historical reasons
-                     }
-
-
 def load_config(filePath):
     """
-    Load INI style config file for xopt. 
-    
-    Does no processing (doens't load vocs_file, etc.). 
-    
-    Returns a dict. 
+    Load INI style config file for xopt and nsga2. 
     
     """
     config = ConfigParser()
-    config['DEFAULT'] =  XOPT_CONFIG_DEFAULTS
+    ##config['DEFAULT'] =  XOPT_CONFIG_DEFAULTS
     assert os.path.exists(filePath), 'xopt input file does not exist: '+filePath
     config.read(filePath)
     
@@ -67,11 +52,8 @@ def load_config(filePath):
     # xopt_config (required)
     xopt = config['xopt_config']
     d['xopt_config'] = dict(xopt)
-    # Bools
-    for k in ['do_archive', 'skip_checkpoint_eval']:
-        d['xopt_config'][k]  = xopt.getboolean(k)
-        
-        
+    print(d['xopt_config'])
+    
     #---------------------------      
     # gpt_config
     if 'gpt_config' in config:
@@ -89,11 +71,17 @@ def load_config(filePath):
         d['disgtgen_config'] = {'distgen_path':c['distgen_path']}   
     
     #---------------------------       
-    # nsga2_config   
-    d['nsga2_config'] = dict(config['nsga2_config'])
-    # ints
-    for k in ['population_size', 'max_generations', 'checkpoint_frequency']:
-        d['nsga2_config'][k] = config.getint('nsga2_config', k)
+    # nsga2_config
+    if 'nsga2_config' in config:
+        c = config['nsga2_config']
+        d['nsga2_config'] = {
+            'do_archive':c.getboolean('do_archive', True),
+            'skip_checkpoint_eval':c.getboolean('skip_checkpoint_eval', False),
+            'population_size':c.getint('population_size', 0), # 0 is intended to be automatiaclly adjusted. 
+            'max_generations':c.getint('max_generations', 100),
+            'checkpoint_frequency':c.getint('checkpoint_frequency', 1)
+        }
+    
         
     return d
 #c1 = load_config('xopt.in')
