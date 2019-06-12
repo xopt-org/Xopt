@@ -16,6 +16,8 @@ __  _____  _ __ | |_
 """
 
 
+
+
 #--------------------------------
 # VOCS utilities
 def save_vocs(vocs_dict, filePath=None):
@@ -72,3 +74,32 @@ def decode1(vec, labels):
 # encode dict to vector
 def encode1(d, labels):
     return [d[key] for key in labels]    
+    
+
+#--------------------------------
+# Paths
+    
+def full_path(path, ensure_exists=True):
+    """
+    Makes path abolute. Can ensure exists. 
+    """
+    p = os.path.expandvars(path)
+    p = os.path.abspath(p)
+    if ensure_exists:
+        assert os.path.exists(p), 'path does not exist: '+p
+    return p
+
+def add_to_path(path, prepend=True):
+    """
+    Add path to $PATH
+    """
+    p = full_path(path)
+    
+    if prepend:
+        os.environ['PATH']  = p+os.pathsep+os.environ['PATH']
+    else:
+        # just append
+        os.environ['PATH']  += os.pathsep+p
+    return p    
+    
+    
