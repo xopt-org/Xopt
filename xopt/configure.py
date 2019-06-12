@@ -3,7 +3,7 @@ Tools to configure an xopt run
 
 """
 
-from xopt.tools import load_vocs
+from xopt.tools import load_vocs, full_path, add_to_path
 from xopt.nsga2_tools import nsga2_toolbox
 
 from configparser import ConfigParser
