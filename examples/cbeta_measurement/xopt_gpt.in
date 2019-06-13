@@ -1,0 +1,18 @@
+[xopt_config]
+vocs_file            : cbetaDL_measurement.json
+output_dir           : temp/
+
+[gpt_config]
+timeout: 400
+gpt_path: $HOME/Code/xgpt/gpt321MacOSX/bin/
+
+[distgen_config]
+distgen_path: $HOME/Code/distgen/bin/
+
+[nsga2_config]
+population_size: 60
+max_generations: 2000
+skip_checkpoint_eval : false
+#checkpoint : pop_432.pkl
+do_archive  :True
+

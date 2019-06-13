@@ -5,17 +5,12 @@
 """
 xopt GPT driver
 
-
 Basic usage:
 
 mpirun -n 64 python -m mpi4py.futures xopt_gpt.py xopt.in
 
 
-
-
 """
-
-
 
 from xopt import nsga2_tools, legacy
 from xopt.tools import xopt_logo, load_vocs, full_path, add_to_path
@@ -42,14 +37,12 @@ else:
     mpi_size = 1
 
 
-
-
+ARGS = [sys.argv[-1]]
 #ARGS = 'xopt.in'.split()
-
 
 parser = argparse.ArgumentParser(description='Configure xopt')
 parser.add_argument('input_file', help='input_file')
-args = parser.parse_args()
+args = parser.parse_args(ARGS)
 infile = args.input_file
 
 assert os.path.exists(infile)
@@ -108,3 +101,4 @@ elif __name__ == "__main__":
     pop.sort(key=lambda x: x.fitness.values)   
     print('------------ final stats ------------')
     print(stats)        
+
