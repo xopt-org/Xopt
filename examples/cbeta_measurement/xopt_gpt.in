@@ -1,0 +1,17 @@
+[xopt_config]
+vocs_file            : cbetaDL_measurement.json
+output_dir           : output
+
+[gpt_config]
+timeout: 400
+gpt_path: $GPT_DIR
+
+[distgen_config]
+distgen_path: $DISTGEN_DIR
+
+[nsga2_config]
+population_size: 60
+max_generations: 2000
+skip_checkpoint_eval : false
+#checkpoint : pop_432.pkl
+do_archive  :True
