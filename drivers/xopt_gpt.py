@@ -101,3 +101,4 @@ elif __name__ == "__main__":
     pop.sort(key=lambda x: x.fitness.values)   
     print('------------ final stats ------------')
     print(stats)        
+
