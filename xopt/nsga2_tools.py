@@ -387,11 +387,11 @@ def main(toolbox, output_dir = '', checkpoint=None, seed=None,
     
         if do_archive:
             archive_name = archive_prefix+str(gen)+'.h5'
+            temp_archive_name = 'temp_'+archive_name
             # Prepend output dir
             archive_name = os.path.join(output_dir, archive_name)
-            # Open temporary file, in case something goes wrong. 
-            temp_archive_name = 'temp_'+archive_name
             temp_archive_name = os.path.join(output_dir, temp_archive_name)
+            # Open temporary file, in case something goes wrong. 
             h5 = h5py.File(temp_archive_name, 'w')
         
         for ind, fit in zip(invalid_ind, fitnesses):
