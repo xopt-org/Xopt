@@ -1,0 +1,16 @@
+[xopt_config]
+vocs_file            : kekgun_vocs.json 
+output_dir           : .
+
+[astra_config]
+timeout: 400
+astra_bin : $ASTRA_BIN
+generator_bin : $GENERATOR_BIN
+
+
+[nsga2_config]
+population_size: 124
+max_generations: 2000
+skip_checkpoint_eval : false
+#checkpoint : pop_432.pkl
+do_archive  :True
