@@ -1,0 +1,18 @@
+Variable Number	 Variable Name  	 	Range
+0		 Sigma xy (mm)  		[0.05,1]
+1		 Pulse duration (ns)		[0.005, 0.07]
+2		 Gun Gradient MV/m		[20, 50]
+3		 Gun Phase in degrees		[-30, 30]
+4		 Solenoid #1 Field (T)		[0,0.4]
+5		 9 Cell Capture Field MV/m	[0,32]
+6		 9 Cell Capture in degrees	[-180,180]
+7		 Capture Cavity offset (m)	[0,2]
+8		 Solenoid #2 Field (T)		[0,0.3]
+9		 Solenoid #2 Offset (m)		[0,1.5]
+10		 Cryo Module offset (m)		[0,3]
+11		 Cavity #1 field MV/m		[0,32]
+12		 Cavity #2 field MV/m		[0, 32]
+13		 Cavity #1 phase in degrees	[-90,90]
+14		 Cavity #2 phase in degrees	[-90,90]
+15		 Cavity #4 phase in degrees	[-90,90 ]
+

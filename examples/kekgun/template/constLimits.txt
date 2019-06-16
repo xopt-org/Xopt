@@ -1,0 +1,6 @@
+Constraint			 Value
+max end z rms			 1.5 mm
+max end x emittance		 0.9 mm mrad
+max end Energy rms 		 200 keV
+max Higher order Energy Spread	 5 keV
+min end Energy			 90 MeV
