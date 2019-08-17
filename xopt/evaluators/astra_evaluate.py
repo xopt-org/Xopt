@@ -124,6 +124,7 @@ def evaluate_astra_with_generator(settings, **options):
         
     except Exception as ex:
         print('Exception in evaluate_astra_with_generator:', ex)
+        print('Settings:', settings)
         error = True
         merits = {'error':True}
     finally:
@@ -234,6 +235,15 @@ def xopt_archive_astra_h5(h5, individual):
     """
     run_id = individual.id
     name = 'ind_'+str(run_id)
+    
+    if not 'fitness' in dir(individual):
+        print('Individual has no fitness. id:', run_id)
+        return
+    
+    if not 'info' in dir(individual.fitness):
+        print('Individual has nothing to archive. id:', run_id)
+        return
+    
     output = individual.fitness.info
     
     # Overwrite this
