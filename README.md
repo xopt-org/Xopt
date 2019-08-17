@@ -27,3 +27,19 @@ http://pulsar.nl/gpt/index.html
 
 
 
+
+## Cori (NERSC) setup
+
+```
+conda create -n xopt python=3 numpy scipy matplotlib h5py 
+conda activate xopt
+conda install -c conda-forge deap
+```
+Follow instructions to build mpi4py:
+https://docs.nersc.gov/programming/high-level-environments/python/
+Note that there is a bug in Jupyterhub terminals. Type:
+```
+module swap PrgEnv-gnu PrgEnv-gnu
+```
+to get the C compiler activated. 
+
