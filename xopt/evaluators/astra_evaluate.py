@@ -160,6 +160,10 @@ def xopt_evaluate_astra_with_generator(individual, **options):
     settings = decode1(vec,legacy.sorted_names(options['variables']))
     # Add constants
     settings.update(options['constants'])
+    # Add linked variables
+    if 'linked_variables' in options:
+        for k, v in options['linked_variables'].items():
+            settings[k] = settings[v]
     
     # Actual eval
     output = evaluate_astra_with_generator(settings, **options)
