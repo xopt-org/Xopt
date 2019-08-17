@@ -46,7 +46,7 @@ def load_vocs(filePath):
     
 
 
-def random_settings(vocs, include_constants=False):
+def random_settings(vocs, include_constants=True, include_linked_variables=True):
     """
     Uniform sampling of the variables described in vocs['variables'] = min, max.
     Returns a dict of settings. 
@@ -58,9 +58,17 @@ def random_settings(vocs, include_constants=False):
         a, b = val
         x = np.random.random()
         settings[key] = x*a + (1-x)*b
+        
+    # Constants    
     if include_constants:
-        for key, val in vocs['constants'].items():
-            settings[key] = val
+        settings.update(vocs['constants'])
+        
+    # Handle linked variables
+    if include_linked_variables and 'linked_variables' in vocs:
+        for k, v in vocs['linked_variables'].items():
+            settings[k] = settings[v]
+        
+        
     return settings    
 
 
