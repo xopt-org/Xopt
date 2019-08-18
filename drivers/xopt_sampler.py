@@ -31,6 +31,7 @@ from pprint import pprint
 import argparse
 import os
 import sys
+import time
 
 
 # In[3]:
@@ -52,7 +53,7 @@ else:
 np.random.seed(np.random.randint(np.iinfo(np.uint32).min,np.iinfo(np.uint32).max)+mpi_rank)
 
 
-# In[6]:
+# In[5]:
 
 
 ARGS = [sys.argv[-1]]
@@ -67,7 +68,7 @@ infile = args.input_file
 assert os.path.exists(infile)
 
 
-# In[7]:
+# In[6]:
 
 
 # Load config
@@ -79,13 +80,13 @@ N_SAMPLES = config['sampler_config']['max_samples']
 CHUNK_SIZE = config['sampler_config']['chunk_size']
 
 
-# In[8]:
+# In[7]:
 
 
 config
 
 
-# In[9]:
+# In[8]:
 
 
 # needs VOCS, plus some Astra eval options
@@ -94,7 +95,7 @@ evaluate_options.update(config['vocs'])
 evaluate_options.update(config['astra_config'])
 
 
-# In[10]:
+# In[9]:
 
 
 def calc1(i):
@@ -105,7 +106,7 @@ def calc1(i):
     return output
 
 
-# In[11]:
+# In[10]:
 
 
 ROOT = config['xopt_config']['output_dir']
@@ -116,7 +117,7 @@ def get_h5_name(i, prefix='astra_samples_'):
 #get_h5_name(0)
 
 
-# In[12]:
+# In[11]:
 
 
 
@@ -151,6 +152,8 @@ if __name__ == "__main__" and USE_MPI:
         
         h5 = h5py.File(temp_archive_name, 'w')
         
+        t0 = time.time()
+        t1 = t0
         # Map
         output = executor.map(calc1, range(N_SAMPLES), unordered=True )
         
@@ -167,8 +170,14 @@ if __name__ == "__main__" and USE_MPI:
                 h5.close()
                 fname = new_filename()
                 os.rename(temp_archive_name, fname) 
+                
+                t2 = time.time() 
+                dt = t2 - t1
+                t1 = t2
+                
                 print('total samples:', ii)
-                print('archiving',CHUNK_SIZE, 'samples in', fname)
+                print('archiving',CHUNK_SIZE, 'samples in', fname, 'time', dt)
+                print('Average time per sample', dt/CHUNK_SIZE)
                 sys.stdout.flush()
                 h5 = h5py.File(temp_archive_name, 'w')
                 
