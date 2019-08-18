@@ -111,3 +111,27 @@ def add_to_path(path, prepend=True):
     return p    
     
     
+#--------------------------------
+# h5 utils
+
+def write_attrs(h5, group_name, data):
+    """
+    Simple function to write dict data to attribues in a group with name
+    """
+    g = h5.create_group(group_name)
+    for key in data:
+        g.attrs[key] = data[key]
+    return g
+
+
+
+def write_attrs_nested(h5, name, data):
+    """
+    Recursive routine to write nested dicts to attributes in a group with name 'name'
+    """
+    if type(data) == dict:
+        g = h5.create_group(name)
+        for k, v in data.items():
+            write_attrs_nested(g, k, v)
+    else:
+        h5.attrs[name] = data    

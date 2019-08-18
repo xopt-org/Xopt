@@ -4,7 +4,7 @@ Tools to configure an xopt run
 """
 
 from xopt.tools import load_vocs, full_path, add_to_path
-from xopt.nsga2_tools import nsga2_toolbox
+#from xopt.nsga2_tools import nsga2_toolbox
 
 from configparser import ConfigParser
 import os
@@ -32,6 +32,10 @@ distgen_path: /global/homes/c/cmayes/cori/distgen/bin/
 
 [nsga2_config]
 population_size: 60
+
+[sampler_config]
+chunk_size: 100
+max_samples: 1000000
 
 """
 
@@ -103,6 +107,15 @@ def load_config(filePath):
             'checkpoint_frequency':c.getint('checkpoint_frequency', 1),
             'verbose':c.getboolean('verbose', True)
         }
+    
+    #---------------------------      
+    # sampler_config
+    if 'sampler_config' in config:
+        c = config['sampler_config']
+        d['sampler_config'] = {
+            'chunk_size':c.getint('chunk_size', 100),
+            'max_samples':c.getint('max_samples', 100000000)
+        }    
     
         
     return d
