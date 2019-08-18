@@ -177,7 +177,6 @@ if __name__ == "__main__" and USE_MPI:
                 
                 print('total samples:', ii)
                 print('archiving',CHUNK_SIZE, 'samples in', fname, 'time', dt)
-                print('Average time per sample', dt/CHUNK_SIZE)
                 sys.stdout.flush()
                 h5 = h5py.File(temp_archive_name, 'w')
                 
