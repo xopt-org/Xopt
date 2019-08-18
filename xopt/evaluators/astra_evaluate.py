@@ -1,6 +1,6 @@
 
 from xopt import legacy
-from xopt.tools import decode1
+from xopt.tools import decode1, write_attrs
 
 
 from astra import run_astra_with_generator, writers
@@ -187,16 +187,6 @@ def xopt_evaluate_astra_with_generator(individual, **options):
 
 #----------------------------------------
 # Archiving
-
-def write_attrs(h5, group_name, data):
-    """
-    Simple function to write dict data to attribues in a group with name
-    """
-    g = h5.create_group(group_name)
-    for key in data:
-        g.attrs[key] = data[key]
-    return g
-
 
 def archive_astra_h5(h5, output, name=None):  
     """
