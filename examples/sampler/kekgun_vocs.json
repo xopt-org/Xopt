@@ -62,7 +62,7 @@
   "constants": {
     "ipart": 1000,
     "lspch": true,
-    "zstop": 16.54
+    "zstop": 1.0
   },
   "objectives": {
     "end_x_coreemit_95percent": "MINIMIZE",

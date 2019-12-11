@@ -89,7 +89,7 @@ def evaluate_astra_with_generator(settings, **options):
     # Defaults
     run_options = {
         'merit_fun': default_astra_merit,
-        'workdir':'/tmp',
+        'workdir':None,
         'verbose':False,
         'timeout':None,
         'astra_bin':'$ASTRA_BIN',

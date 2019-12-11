@@ -1,3 +1,11 @@
 
+
+
+devel/*
 .DS_Store
 *.pyc
+
+
+
+# Jupyter Notebook
+.ipynb_checkpoints
