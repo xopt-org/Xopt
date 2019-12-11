@@ -399,7 +399,7 @@ def cnsga(executor,
     if population:
         pop = pop_init(vocs, population['variables'])
         if 'generation' in population:
-            generation = population['generation']
+            generation = population['generation']+1
         else:
             generation=0
         MU = len(pop)
@@ -415,13 +415,19 @@ def cnsga(executor,
     
     # Initial population
     futures = [executor.submit(toolbox.evaluate, vec) for vec in vecs] 
+    vprint('____________________________________________________')
+    vprint(f'{MU} fitness calculations for initial generation')
     
     # Clear pop 
     pop = []
     for future in futures:
         res = future.result()
+        vprint('.', end='')
         ind = form_ind(res)
         pop.append(ind)
+    vprint('done.')
+    vprint('Submitting first batch of children')
+    save(pop, 'initial_pop_', generation)
     
     # This is just to assign the crowding distance to the individuals
     # no actual selection is done
@@ -438,6 +444,7 @@ def cnsga(executor,
     new_offspring = []
        
     # Continuous loop
+    t0 = time.time()
     done = False
     while not done:
         # Check the status of all futures
@@ -450,10 +457,15 @@ def cnsga(executor,
                 res = fut.result()
                 ind = form_ind(res)
                 new_offspring.append(ind)   
-                
+                vprint('.', end='')
                 # Refill inputs and save
                 if len(new_vecs) == 0:
-                    vprint(f'Generation {generation} completed')
+                    t1 = time.time()
+                    dt = t1-t0
+                    t0 = t1
+                    vprint('done.')
+                    vprint('__________________________________________________________')
+                    vprint(f'Generation {generation} completed in {dt/60:0.5f} minutes')
                     generation += 1
                     
                     save(new_offspring, 'gen_', generation)
