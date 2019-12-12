@@ -6,6 +6,8 @@ from deap import algorithms, base, tools
 import numpy as np
 import json
 
+
+from pprint import pprint
 import time
 import array
 import random
@@ -15,6 +17,27 @@ import os, sys
 Continuous NSGA-II, NSGA-III
 
 """
+
+cnsga_logo = """
+
+
+ ▄████▄   ███▄    █   ██████   ▄████  ▄▄▄      
+▒██▀ ▀█   ██ ▀█   █ ▒██    ▒  ██▒ ▀█▒▒████▄    
+▒▓█    ▄ ▓██  ▀█ ██▒░ ▓██▄   ▒██░▄▄▄░▒██  ▀█▄  
+▒▓▓▄ ▄██▒▓██▒  ▐▌██▒  ▒   ██▒░▓█  ██▓░██▄▄▄▄██ 
+▒ ▓███▀ ░▒██░   ▓██░▒██████▒▒░▒▓███▀▒ ▓█   ▓██▒
+░ ░▒ ▒  ░░ ▒░   ▒ ▒ ▒ ▒▓▒ ▒ ░ ░▒   ▒  ▒▒   ▓▒█░
+  ░  ▒   ░ ░░   ░ ▒░░ ░▒  ░ ░  ░   ░   ▒   ▒▒ ░
+░           ░   ░ ░ ░  ░  ░  ░ ░   ░   ░   ▒   
+░ ░               ░       ░        ░       ░  ░
+░                                              
+
+
+Continous Non-dominated Sorting Genetic Algorithm
+
+"""
+
+
 
 
 def uniform(low, up, size=None):
@@ -368,6 +391,8 @@ def cnsga(executor,
             print(*a, **k)
             sys.stdout.flush()
     
+    vprint(cnsga_logo)
+    
     # Setup saving to file
     if output_path:
         path = full_path(output_path)
@@ -385,15 +410,15 @@ def cnsga(executor,
         # Dummy save
         def save(pop, prefix, generation):
             pass
-       
-    
     
     # Toolbox
     if not toolbox:
         vprint('Creating toolbox from vocs.')
         toolbox = cnsga_toolbox(vocs, selection=selection, verbose=verbose)
         toolbox.register('evaluate', cnsga_evaluate, evaluate_f=evaluate_f, vocs=vocs)
-
+        if verbose:
+            print('vocs:')
+            pprint(vocs) # Pretty print dict
         
     # Initial pop
     if population:
