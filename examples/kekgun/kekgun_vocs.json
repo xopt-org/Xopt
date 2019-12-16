@@ -1,9 +1,10 @@
 {
   "name": "kekgun",
   "description": "Test case",
+  "simulation": "astra_with_generator",
   "templates": {
-    "astra": "$XOPT_DIR/examples/kekgun/template/kekgun.in",
-    "generator": "$XOPT_DIR/examples/kekgun/template/dist004.in"
+    "astra_input_file": "$XOPT_DIR/examples/kekgun/template/kekgun.in",
+    "generator_input_file": "$XOPT_DIR/examples/kekgun/template/dist004.in"
   },
   "variables": {
     "sig_x": [
