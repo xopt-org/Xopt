@@ -1,0 +1,14 @@
+
+name: TNK_test
+description: null
+simulation: test_TNK
+templates: null
+variables:
+  x1: [0, 3.14159]
+  x2: [0, 3.14159]
+objectives: {y1: MINIMIZE, y2: MINIMIZE}
+constraints:
+  c1: [GREATER_THAN, 0]
+  c2: [GREATER_THAN, 0]
+linked_variables: {x9: x1}
+constants: {a: dummy_constant}

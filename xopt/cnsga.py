@@ -1,5 +1,5 @@
 from xopt import creator, vocs_tools, fitness_with_constraints
-from xopt.tools import full_path
+from xopt.tools import full_path, random_settings_arrays
 
 from deap import algorithms, base, tools
 
@@ -155,14 +155,12 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     """
     
     result = {}
-    
     try:
-        
+
+            #f.write(str(vec))   
         if vocs:
             # labeled inputs -> labeled outputs evaluate_f
-            inputs = vocs_tools.inputs_from_vec(vec, vocs=vocs)
-    
-            
+            inputs = vocs_tools.inputs_from_vec(vec, vocs=vocs)    
     
             # Evaluation
             outputs = evaluate_f(inputs)
@@ -240,6 +238,13 @@ def pop_init(vocs, data):
     
     return pop
 
+
+def pop_init_random(vocs, n):
+    """
+    Returns a random population of size n. 
+    """
+    data = random_settings_arrays(vocs, n)
+    return  pop_init(vocs, data)
 
 
 def pop_to_data(vocs, pop, generation=0):
@@ -410,7 +415,7 @@ def cnsga(executor,
         # Dummy save
         def save(pop, prefix, generation):
             pass
-    
+        
     # Toolbox
     if not toolbox:
         vprint('Creating toolbox from vocs.')
@@ -430,7 +435,8 @@ def cnsga(executor,
         MU = len(pop)
     else:
         generation = 0
-        pop = toolbox.population(n=MU)   
+        #pop = toolbox.population(n=MU)   
+        pop = pop_init_random(vocs, n=MU)
         
     assert MU % 4 == 0, f'Population size (here {MU}) must be a multiple of 4'        
         

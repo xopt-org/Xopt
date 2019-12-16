@@ -167,7 +167,7 @@ def inputs_from_vec(vec, vocs=None):
         inputs.update(vocs['constants'])
         
     # Handle linked variables
-    if 'linked_variables' in vocs:
+    if 'linked_variables' in vocs and vocs['linked_variables']:
         for k, v in vocs['linked_variables'].items():
             inputs[k] = inputs[v]    
     
@@ -206,7 +206,7 @@ def random_inputs(vocs, n=None, include_constants=True, include_linked_variables
         inputs.update(vocs['constants'])
         
     # Handle linked variables
-    if include_linked_variables and 'linked_variables' in vocs:
+    if include_linked_variables and 'linked_variables' in vocs and vocs['linked_variables']:
         for k, v in vocs['linked_variables'].items():
             inputs[k] = inputs[v]
          
