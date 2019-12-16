@@ -1,4 +1,6 @@
 from .xopt import Xopt
+from .tools import xopt_logo
+
 
 import os
 # Used to access examples directory

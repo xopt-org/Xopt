@@ -1,6 +1,0 @@
-xopt: {output_path: null, verbose: true,
-  algorithm: cnsga}
-cnsga: {max_generations: 5, population_size: 8, crossover_probability: 0.9, mutation_probability: 1.0,
-  selection: auto, verbose: true}
-#vocs: vocs.yaml
-vocs: /Users/chrisonian/Code/GitHub/xopt/examples/kekgun/kekgun_vocs.json

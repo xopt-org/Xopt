@@ -51,6 +51,7 @@ ALL_DEFAULTS = {
 
 
 
+
 class Xopt:
     """
     
@@ -195,7 +196,15 @@ class Xopt:
 
     #--------------------------
     # Run
+    
+    def run(self, executor=None):
+        alg = self.algorithm
         
+        if alg == 'cnsga':
+            self.run_cnsga(executor=executor)
+        else:
+            raise Exception(f'Unknown algorithm {alg}')
+    
         
     def run_cnsga(self, executor=None):
         """Run the CNSGA algorithm with an executor"""

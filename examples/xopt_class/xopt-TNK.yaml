@@ -1,5 +1,0 @@
-xopt: {output_path: null, verbose: true,
-  algorithm: cnsga}
-cnsga: {max_generations: 50, population_size: 64, crossover_probability: 0.9, mutation_probability: 1.0,
-  selection: auto, verbose: true}
-vocs: vocs-TNK.yaml
