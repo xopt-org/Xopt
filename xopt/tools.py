@@ -34,15 +34,16 @@ def load_config(source, verbose=False):
         return source
     
     if isinstance(source, str):
-
+        file = full_path(source)
+        assert os.path.exists(file), f'File does not exist: {file}'
         if source.endswith('json'):
             if verbose:
-                print(f'Loading {source} as JSON ')
-            return json.load(open(source))
+                print(f'Loading {file} as JSON ')
+            return json.load(open(file))
         elif source.endswith('yaml'):
             if verbose:
-                print(f'Loading {source} as YAML ')
-            return yaml.safe_load(open(source))
+                print(f'Loading {file} as YAML ')
+            return yaml.safe_load(open(file))
     else:
         raise Exception(f'Do not know how to load {source}')
         
