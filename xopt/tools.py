@@ -30,6 +30,9 @@ def load_config(source, verbose=False):
     
     """    
     
+    if not source:
+        return source
+    
     if isinstance(source, dict):
         return source
     

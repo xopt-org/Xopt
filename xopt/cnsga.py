@@ -433,11 +433,12 @@ def cnsga(executor,
         else:
             generation=0
         MU = len(pop)
+        vprint(f'Initializing with existing population, size {MU}')
     else:
         generation = 0
         #pop = toolbox.population(n=MU)   
         pop = pop_init_random(vocs, n=MU)
-        
+        vprint(f'Initializing with a new population, size {MU}')
     assert MU % 4 == 0, f'Population size (here {MU}) must be a multiple of 4'        
         
     
