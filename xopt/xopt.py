@@ -32,6 +32,7 @@ VOCS_DEFAULTS = {
 
 # Algorithms
 CNSGA_DEFAULTS= {
+    'population':None,
     'max_generations':2,
     'population_size': 4,
     'crossover_probability':0.9,
@@ -164,8 +165,10 @@ class Xopt:
     def configure_algorithm(self):
         alg = self.algorithm
         if alg == 'cnsga':
-            self.population = None
             fill_defaults(self.config['cnsga'], CNSGA_DEFAULTS)
+            # Load population into object and remove from config
+            self.population = load_config(self.config['cnsga']['population'], self.verbose)
+            self.config['cnsga'].pop('population')
             
     def configure(self):
         """
