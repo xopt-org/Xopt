@@ -11,7 +11,9 @@ The complete configuration of a simulation optimization is given by a proper YAM
 ```yaml
 xopt: {output_path: null, verbose: true, algorithm: cnsga}
 
-cnsga: {max_generations: 50, population_size: 128, crossover_probability: 0.9, mutation_probability: 1.0,
+algorithm:
+  name: cnsga
+  options: {max_generations: 50, population_size: 128, crossover_probability: 0.9, mutation_probability: 1.0,
   selection: auto, verbose: true, population: null}
   
 simulation: 
