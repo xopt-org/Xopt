@@ -1,6 +1,6 @@
 from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings
 from .cnsga import cnsga
-from .configure import configure_simulation
+from .configure import configure_algorithm, configure_simulation
 import pprint
 from copy import deepcopy
 import yaml
@@ -12,6 +12,29 @@ XOPT_DEFAULTS = {
     'output_path':'.',
     'verbose':True,
     'algorithm':'cnsga'
+}
+
+# Algorithms
+ALGORITHM_DEFAULTS= {
+    'name':'cnsga',
+    'function': 'xopt.cnsga.cnsga',
+    'options':{
+        'population':None,
+        'max_generations':2,
+        'population_size': 4,
+        'crossover_probability':0.9,
+        'mutation_probability':1.0,
+        'selection':'auto',
+        'verbose':True
+    }
+}    
+
+
+
+SIMULATION_DEFAULTS = {
+    'name':None,
+    'evaluate':None,
+    'options':None
 }
 
 VOCS_DEFAULTS = {
@@ -26,31 +49,14 @@ VOCS_DEFAULTS = {
     'constants':None
 }
 
-SIMULATION_DEFAULTS = {
-    'name':None,
-    'evaluate':None,
-    'options':None
-}
 
-
-# Algorithms
-CNSGA_DEFAULTS= {
-    'population':None,
-    'max_generations':2,
-    'population_size': 4,
-    'crossover_probability':0.9,
-    'mutation_probability':1.0,
-    'selection':'auto',
-    'verbose':True
-}    
 
 ALL_DEFAULTS = {
     'xopt':XOPT_DEFAULTS,
-    'cnsga':CNSGA_DEFAULTS,
+    'algorithm':ALGORITHM_DEFAULTS,
     'simulation':SIMULATION_DEFAULTS,
     'vocs':VOCS_DEFAULTS
 }
-
 
 
 
@@ -62,13 +68,12 @@ class Xopt:
     
     xopt:
     
-    vocs:
-        
-        
-    [algorithm]:    
-        
-    [simulation]:
+    algorithm:  
     
+    simulation:
+    
+    vocs:
+          
     """
     
     
@@ -107,7 +112,8 @@ class Xopt:
     # Conveniences
     @property
     def algorithm(self):
-        return self.config['xopt']['algorithm']
+        return self.config['algorithm']
+    
     @property
     def vocs(self):
         return self.config['vocs']
@@ -121,13 +127,24 @@ class Xopt:
         fill_defaults(self.config['xopt'], XOPT_DEFAULTS)
 
     def configure_algorithm(self):
-        alg = self.algorithm
-        if alg == 'cnsga':
-            fill_defaults(self.config['cnsga'], CNSGA_DEFAULTS)
-            # Load population into object and remove from config
-            self.population = load_config(self.config['cnsga']['population'], self.verbose)
-            self.config['cnsga'].pop('population')
-            
+        alg = configure_algorithm(self.config['algorithm'])
+        
+        # Register run function
+        self.run_f = alg['function']
+        options = alg['options']
+        
+        # Special
+        if alg['name'] == 'cnsga':
+            # Remove these from options. The class will provide these. 
+            population = options.pop('population')
+            self.population = load_config(population, self.verbose)
+            for k in ['vocs', 'evaluate_f', 'output_path', 'toolbox']: # toolbox isn't needed
+                options.pop(k)
+                
+        # update actual options
+        self.config['algorithm'].update(options)
+        
+
     def configure_simulation(self):
         self.simulation = configure_simulation(self.config['simulation'])                  
             
@@ -172,7 +189,7 @@ class Xopt:
     def run(self, executor=None):
         alg = self.algorithm
         
-        if alg == 'cnsga':
+        if alg['name'] == 'cnsga':
             self.run_cnsga(executor=executor)
         else:
             raise Exception(f'Unknown algorithm {alg}')
@@ -183,12 +200,13 @@ class Xopt:
         assert self.configured, 'Not configured.'
         
         assert executor, 'Must provide an executor'
-        
-        cnsga_config = self.config['cnsga']
+        alg = self.algorithm
+        assert alg['name'] == 'cnsga'
+        options = alg['options']
         output_path = self.config['xopt']['output_path']
         
-        self.population = cnsga(executor, vocs=self.vocs, population=self.population, evaluate_f=self.evaluate,
-            output_path=output_path, **cnsga_config)  
+        self.population = self.run_f(executor, vocs=self.vocs, population=self.population, evaluate_f=self.evaluate,
+            output_path=output_path, **options)  
 
         
     #--------------------------
@@ -243,13 +261,6 @@ Config as YAML:
     def __str__(self):
         s = f''
         return s
-    
-
-
-
-
-
-
     
 
 
