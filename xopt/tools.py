@@ -212,7 +212,7 @@ def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True,
         if any([k2.endswith(x) for x in suffixes]):
             if not v:
                 if verbose:
-                    print(f'Warning: Path {v} does not exist for key {k}')        
+                    print(f'Warning: No path set for key {k}')        
                 continue
             file = full_path(v, ensure_exists=ensure_exists)
             if os.path.exists(file):

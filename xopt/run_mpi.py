@@ -7,7 +7,7 @@ xopt MPI driver
 
 Basic usage:
 
-mpirun -n 4 python -m mpi4py.futures $XOPT_DIR/drivers/xopt_mpi.py xopt.yaml
+mpirun -n 4 python -m mpi4py.futures -m xopt.run_mpi xopt.yaml
 
 
 """
@@ -37,16 +37,13 @@ infile = args.input_file
 assert os.path.exists(infile), f'Input file does not exist: {infile}'
 
 
-X = Xopt(infile)
-
-
 if __name__ == "__main__":
     print(xopt_logo)
     print('_________________________________')
     print('Parallel execution with', mpi_size, 'workers')   
-#    print('Configuration:')  
-#    pprint(config)
+
+    X = Xopt(infile)
+    print(X)
     sys.stdout.flush() 
-    
     with MPIPoolExecutor() as executor:
         X.run(executor=executor)
