@@ -4,6 +4,8 @@ from hashlib import blake2b
 import yaml
 import json
 from copy import deepcopy
+import importlib
+import inspect
 import os
 
 
@@ -335,7 +337,7 @@ def update_nested_dict(d, settings, verbose=False):
 
 #--------------------------------
 # adding defaults to dicts
-def fill_defaults(dict1, defaults):
+def fill_defaults(dict1, defaults, strict=True):
     """
     Fills a dict with defaults in a defaults dict. 
     
@@ -346,10 +348,58 @@ def fill_defaults(dict1, defaults):
     """
     # start with defaults
     for k in dict1:
-        if k not in defaults:
-            raise Exception(f'Extraneous key {k}')
+        if k not in defaults and strict:
+            raise Exception(f'Extraneous key: {k}. Allowable keys: '+', '.join(list(defaults)))
     for k, v in defaults.items():
         if k not in dict1:
             dict1[k] =  deepcopy(v)
             
             
+            
+#--------------------------------        
+# Function manipulation
+
+
+def get_function(name):
+    """
+    Returns a function from a fully qualified name or global name.
+    """
+    if name in globals(): 
+        if callable(globals()[name]):
+            f = globals()[name]
+        else:
+            raise ValueError(f'global {name} is not callable')
+    else:
+        # try to import
+        m_name, f_name = name.rsplit('.', 1)
+        module = importlib.import_module(m_name)
+        f = getattr(module, f_name)
+    
+    return f           
+
+def get_function_defaults(f):
+    """
+    Returns a dict of the non-empty POSITIONAL_OR_KEYWORD arguments.
+    
+    See the `inspect` documentation for detauls.
+    """
+    defaults = {}
+    for k, v in inspect.signature(f).parameters.items():
+        if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            #print(k, v.default, v.kind)
+            if v.default != inspect.Parameter.empty:
+                defaults[k] = v.default
+    return defaults
+
+
+
+def get_n_required_fuction_arguments(f):
+    """
+    Counts the number of required function arguments using the `inspect` module.
+    """
+    n = 0
+    for k, v in inspect.signature(f).parameters.items():
+        if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            if v.default == inspect.Parameter.empty:
+                n += 1
+    return n

@@ -1,5 +1,6 @@
 from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings
 from .cnsga import cnsga
+from .configure import configure_simulation
 import pprint
 from copy import deepcopy
 import yaml
@@ -25,9 +26,11 @@ VOCS_DEFAULTS = {
     'constants':None
 }
 
-# Simulation goes here
-# astra_with_generator = {}
-
+SIMULATION_DEFAULTS = {
+    'name':None,
+    'evaluate':None,
+    'options':None
+}
 
 
 # Algorithms
@@ -44,10 +47,9 @@ CNSGA_DEFAULTS= {
 ALL_DEFAULTS = {
     'xopt':XOPT_DEFAULTS,
     'cnsga':CNSGA_DEFAULTS,
+    'simulation':SIMULATION_DEFAULTS,
     'vocs':VOCS_DEFAULTS
-    
 }
-
 
 
 
@@ -82,11 +84,7 @@ class Xopt:
         self.executor = None  
         self.verbose=verbose
         self.configured = False
-        
-        # These will need to be set to run an optimization
-        self.sim_evaluate = None
-        self.evaluate_options = None
-        
+                
         if config:
             self.config = load_config(config, verbose=self.verbose)  
             self.configure()
@@ -105,8 +103,7 @@ class Xopt:
     def save(self, file):
         """Save config to file (JSON or YAML)"""
         save_config(self.config, file)
-                
-    
+                    
     # Conveniences
     @property
     def algorithm(self):
@@ -114,11 +111,6 @@ class Xopt:
     @property
     def vocs(self):
         return self.config['vocs']
-    @property
-    def simulation(self):
-        return self.config['vocs']['simulation']  
-    
-    
     
     #--------------------------
     # Configure 
@@ -128,40 +120,6 @@ class Xopt:
         self.config['xopt'] = load_config(self.config['xopt'])
         fill_defaults(self.config['xopt'], XOPT_DEFAULTS)
 
-    def configure_vocs(self):
-        # Allows for .json or .yaml filenames as values. 
-        self.config['vocs'] = load_config(self.config['vocs'])
-        fill_defaults(self.config['vocs'], VOCS_DEFAULTS)
-        
-             
-    def configure_simulation(self, simulation=None):
-
-        if simulation:
-            sim = simulation
-        else:
-            sim = self.simulation
-        
-        if not sim:
-            print('no simulation to configure')
-            self.configured=False
-            return
-
-        
-        #--------------------------
-        # astra, astra_with_generator, astra_with_distgen
-        if sim in ['astra', 'astra_with_generator', 'astra_with_distgen']:
-            configure_astra(self, sim)    
-            
-        elif sim ==  'test_TNK':
-            from xopt.evaluators import test_TNK
-            self.sim_evaluate = test_TNK.evaluate_TNK
-            
-        else:
-            raise Exception(f'unknown simulation {sim}')
-        
-        self.vprint(f'Simulation {sim} configured')
-        self.configured = True
-        
     def configure_algorithm(self):
         alg = self.algorithm
         if alg == 'cnsga':
@@ -170,6 +128,23 @@ class Xopt:
             self.population = load_config(self.config['cnsga']['population'], self.verbose)
             self.config['cnsga'].pop('population')
             
+    def configure_simulation(self):
+        self.simulation = configure_simulation(self.config['simulation'])                  
+            
+    def configure_vocs(self):
+        # Allows for .json or .yaml filenames as values. 
+        self.config['vocs'] = load_config(self.config['vocs'])
+        fill_defaults(self.config['vocs'], VOCS_DEFAULTS)
+        
+        sim_name = self.vocs['simulation']
+        if sim_name:
+            assert sim_name == self.simulation['name'], f'VOCS simulation: {sim_name} has not been configured in xopt.'
+        
+        # Fill in these as options. TODO: Better logic?
+        if self.vocs['templates']:
+            self.simulation['options'].update(self.vocs['templates'])
+                            
+            
     def configure(self):
         """
         Configure everything
@@ -177,25 +152,19 @@ class Xopt:
         Configuration order:
         xopt
         algorithm
-        vocs, which contains the simulation string
-        [simulation]
-       
-        
-        
+        simulation
+        vocs, which contains the simulation name, and templates
+   
         """
         self.configure_xopt()
         self.configure_algorithm()
+        self.configure_simulation()
         self.configure_vocs()
-        if self.simulation:
-            self.configure_simulation()
-            
-        else:
-            self.vprint('Warning: no simulation specified. Not configured')
-            self.configured = False
         
         # expand all paths
         self.config = expand_paths(self.config, ensure_exists=True)
    
+        self.configured = True
 
     #--------------------------
     # Run
@@ -234,11 +203,13 @@ class Xopt:
         
     def evaluate(self, inputs):
         """Evaluate should take one argument: A dict of inputs. """
-        options = self.evaluate_options
+        options = self.simulation['options']
+        evaluate_f = self.simulation['evaluate_f']
+        
         if options:
-            return self.sim_evaluate(inputs, **options)
+            return evaluate_f(inputs, **options)
         else:
-            return self.sim_evaluate(inputs)
+            return evaluate_f(inputs)
     
     
     
@@ -273,37 +244,16 @@ Config as YAML:
         s = f''
         return s
     
-# Custom configs   
-    
-#--------------------------
-# astra, astra_with_generator, astra_with_distgen
 
-def configure_astra(xopt, sim):    
-    """
-    Configures astra for an xopt instance.
-    
-    """
-    # Use lume-astra function directly
-    from astra.evaluate import configure_astra_evaluate
-    
-    if sim not in xopt.config:
-        xopt.config[sim] = {} # TEST
-     
-    # Allows for .json or .yaml filenames as value.
-    xopt.config[sim] = load_config(xopt.config[sim])
-    
-    # Add template input files
-    if xopt.vocs['templates']:
-        xopt.config[sim].update(xopt.vocs['templates'])                
-    
-    d = configure_astra_evaluate(simulation=sim, config=xopt.config[sim])
-    fill_defaults(xopt.config[sim], d['options'])
 
-    xopt.config[sim] = expand_paths(xopt.config[sim])
+
+
+
+
     
-    xopt.sim_evaluate = d['evaluate_f']
-    xopt.evaluate_options = d['options']    
-    
+
+
+
 
 
 
