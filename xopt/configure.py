@@ -6,6 +6,58 @@ Tools to configure an xopt run
 from xopt import tools
 
 
+#-----------------------
+#-----------------------
+# Algorithm
+
+KNOWN_ALGORITHMS = {
+    'cnsga':'xopt.cnsga.cnsga'
+}
+
+
+def configure_algorithm(config):
+    """
+    Configures a simulation config dict. The dict should have:
+    
+    'name': <string that VOCS refers to>
+    'function': <fully qualified function name>
+    'options': <any options. Default is empty {}> 
+    
+    Example:
+        
+    """
+    
+    name = config['name'] # required
+    
+    if 'function' not in config or not config['function']:
+        if name in KNOWN_ALGORITHMS:
+            f_name = KNOWN_ALGORITHMS[name]
+        else:
+            raise ValueError(f'Algorthm {name} must provide its fully qualified function name.')
+    else:
+        f_name = config['function']
+    
+    f = tools.get_function(f_name)
+    
+    if 'options' in config:
+        options = config['options']
+    else:
+        options = {}
+    
+    defaults = tools.get_function_defaults(f)
+
+    tools.fill_defaults(options, defaults, strict=False)
+    
+    return {'name':config['name'], 'function':f, 'options':options}
+    
+    
+
+
+
+#-----------------------
+#-----------------------
+# Simulation
+
 def configure_simulation(config):
     """
     Configures a simulation config dict. The dict should have:
@@ -21,7 +73,9 @@ def configure_simulation(config):
      'options': {'archive_path': '.', 'merit_f': None}}
         
     """
-    print(config)
+    
+    name = config['name'] # required
+
     f_name = config['evaluate']
     f = tools.get_function(f_name)
     
@@ -37,7 +91,4 @@ def configure_simulation(config):
 
     tools.fill_defaults(options, defaults, strict=False)
     
-    return {'name':config['name'], 'evaluate_f':f, 'options':options}
-    
-
-    
+    return {'name':name, 'evaluate_f':f, 'options':options}
