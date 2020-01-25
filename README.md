@@ -76,6 +76,20 @@ http://pulsar.nl/gpt/index.html
 
 
 
+Developers
+===============
+
+Install dependencies:
+`conda install numpy pyyaml deap mpi4py`
+
+Clone this repository:
+`git clone https://github.com/ChristopherMayes/xopt.git`
+
+Install as editable:
+`pip install -e .`
+
+
+
 ## Cori (NERSC) setup
 
 ```
