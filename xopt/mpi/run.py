@@ -7,7 +7,7 @@ xopt MPI driver
 
 Basic usage:
 
-mpirun -n 4 python -m mpi4py.futures -m xopt.run_mpi xopt.yaml
+mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 
 
 """
