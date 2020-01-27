@@ -3,7 +3,7 @@ Simulation optimization, based on **DEAP** https://deap.readthedocs.io
 
 Example MPI run, with `xopt.yaml` as the only user-defined file:
 ```
-mpirun -n 64 python -m mpi4py.futures -m xopt.run_mpi xopt.yaml
+mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 ```
 
 The complete configuration of a simulation optimization is given by a proper YAML file:
