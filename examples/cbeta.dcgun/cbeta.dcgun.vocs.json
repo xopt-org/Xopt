@@ -1,0 +1,28 @@
+{
+    "constants": {
+        "gun_voltage": 375
+    },
+    "constraints": {
+        "end_t_rms": [
+            "LESS_THAN",
+            0.0015
+        ]
+    },
+    "description": "Test case",
+    "name": "CBETA DC GUN",
+    "objectives": {
+        "end_x_coreemit_95percent": "MINIMIZE",
+        "end_z_rms": "MINIMIZE"
+    },
+    "simulation": "gpt_with_distgen",
+    "templates": {
+        "distgen_input_file": "/Users/colwyngulliford/Documents/GitHub/xopt/examples/cbeta.dcgun/template/cbeta.dcgun.distgen.in.json",
+        "gpt_input_file": "/Users/colwyngulliford/Documents/GitHub/xopt/examples/cbeta.dcgun/template/cbeta.dcgun.gpt.in"
+    },
+    "variables": {
+        "sol_1_current": [
+            0,
+            5
+        ]
+    }
+}

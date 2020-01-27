@@ -1,0 +1,142 @@
+#--------------------------------------------------------------------------
+# L0E Gun + 1st Solenoid
+# 
+#--------------------------------------------------------------------------
+
+#--------------------------------------------------------------------------
+# MACHINE SETTINGS:
+#--------------------------------------------------------------------------
+data_dump = 0;
+Master_RF = 1.3e9;
+MTE = 120.0;  
+gun_voltage = 300.0;  
+sol_1_current = 3.32107;  
+#--------------------------------------------------------------------------
+
+
+#--------------------------------------------------------------------------
+# SWITCHES:
+#--------------------------------------------------------------------------
+auto_phase=0;
+single_particle = 0;
+space_charge=1.0;
+space_charge_type = 1;
+viewscreens_on=1.0;
+kill_backwards_particles =1;
+optimize_on =0;
+#--------------------------------------------------------------------------
+
+
+#--------------------------------------------------------------------------
+# INITIAL CONDITIONS
+#--------------------------------------------------------------------------
+xoffset=0;
+yoffset=0;
+
+if (auto_phase == 1 || single_particle == 1) {
+
+	setparticles("beam", 10, me, qe, 0);
+#	setxoffset("beam",xoffset);
+#	setyoffset("beam",yoffset);
+
+	mc2 = m*c*c/abs(qe);
+	KE = MTE/2000.0;
+        #pp(KE);
+	G  = 1+KE/mc2 ;
+
+	setGdist( "beam", "u", G, 0) ;
+
+} else {
+
+    setfile("beam", "distgen_gpt_particles.gdf");
+
+}
+#--------------------------------------------------------------------------
+
+
+#--------------------------------------------------------------------------
+# ACCURACY AND INTEGRATION PARAMETERS
+#--------------------------------------------------------------------------
+RadiusMax = 0.04;
+GBacc =5.5;
+xacc  =6.5;
+accuracy(GBacc, xacc);
+dtmin =1e-16;
+dtmax =1e-10;
+#--------------------------------------------------------------------------
+
+
+#--------------------------------------------------------------------------
+# A1 SECTION
+#--------------------------------------------------------------------------
+ZSLA01 = 0.344;
+ZCTB01 = 0.746;
+ZSLA02 = 1.160;
+
+# DC GUN
+Zdcgun = 0.15;
+Maxdcgun  = 500.0;
+Edcgun    = gun_voltage / Maxdcgun;
+Map2D_E("wcs", "z", Zdcgun, "fields/gun_0mm.gdf", "R", "Z", "Er", "Ez", Edcgun);
+
+# SOL1
+SLAPolarity = -1;
+
+LSLA01 = 0.6;
+XSLA01 = 0.0;
+YSLA01 = 0.0;
+THXSLA01 = 0.0; # Radian
+BSLA01 = sol_1_current * SLAPolarity;
+
+Map2D_B("wcs", XSLA01,YSLA01,ZSLA01,  cos(THXSLA01),0,sin(THXSLA01), 0,1,0, "fields/solenoid_SLA_L60.gdf", "R", "Z", "Br", "Bz", BSLA01);
+
+
+#-----------------------------------------------------------------------
+# VIEWSCREENS:
+#-----------------------------------------------------------------------
+IA1SDR01_z = 0.922; 
+screen("wcs","I",IA1SDR01_z); # "A1 Viewscreen"
+ZSTOP = 1.5;
+#-----------------------------------------------------------------------
+
+
+#--------------------------------------------------------------------------
+# Spacecharge Parameters
+#--------------------------------------------------------------------------
+Alpha  =1;# 1.0    (manual default is 1.0), (bigger is better)
+Fn     =0.5;# 0.5   (manual default is 0.5), (smaller is better)
+verror =0.005;# 0.005  (manual default is 0.01), (smaller is better)
+Nstd   =5;# 5     (manual default is 5), (bigger is better)
+
+tree_code_theta = 1.0;
+tree_code_R = 1.0e-6;
+
+if (space_charge == 1) {
+    if (space_charge_type == 1) {
+        spacecharge3Dmesh("Cathode", "MeshNfac", Alpha, "MeshAdapt", Fn, "SolverAcc", verror, "MeshBoxSize", Nstd);
+    }
+    if (space_charge_type == 2) {
+	    setrmacrodist("beam","u",tree_code_R,0) ;
+        spacecharge3Dtree(tree_code_theta) ;
+    }
+}
+#--------------------------------------------------------------------------
+
+
+#--------------------------------------------------------------------------
+# OUTPUT PARAMETERS
+#--------------------------------------------------------------------------
+Ntout = 50.0;  
+tmax = 10e-9;  
+
+ZSTART = -0.005;
+zminmax("wcs","I",ZSTART,ZSTOP);
+
+if(!auto_phase && !single_particle) {
+   tout(0,tmax,tmax/Ntout);
+}
+
+#if (kill_backwards_particles == 1) {
+#  GBzmin("wcs", "I", 5.0e-10, 0.0); # kill particles going backwards (gamma*beta < 0.0) after t=5e-10 s
+#}
+#--------------------------------------------------------------------------
