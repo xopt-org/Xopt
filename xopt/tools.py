@@ -369,6 +369,11 @@ def get_function(name):
     """
     Returns a function from a fully qualified name or global name.
     """
+    
+    # Check if already a function
+    if callable(name):
+        return name
+    
     if name in globals(): 
         if callable(globals()[name]):
             f = globals()[name]
@@ -413,6 +418,12 @@ def get_n_required_fuction_arguments(f):
 # Dummy executor
 
 class DummyExecutor(Executor):
+    """
+    Dummy executor. 
+    
+    From: https://stackoverflow.com/questions/10434593/dummyexecutor-for-pythons-futures
+    
+    """
 
     def __init__(self):
         self._shutdown = False
