@@ -84,9 +84,6 @@ class Xopt:
         
         # Main configuration is in this nested dict
         self.config = None
-
-        
-        self.executor = None  
         self.verbose=verbose
         self.configured = False
                 
@@ -187,25 +184,22 @@ class Xopt:
     # Run
     
     def run(self, executor=None):
-        alg = self.algorithm
+        assert self.configured, 'Not configured to run.'      
         
-        if alg['name'] == 'cnsga':
+        alg = self.algorithm['name'] 
+        
+        if alg == 'cnsga':
             self.run_cnsga(executor=executor)
         else:
             raise Exception(f'Unknown algorithm {alg}')
     
-        
     def run_cnsga(self, executor=None):
         """Run the CNSGA algorithm with an executor"""
-        assert self.configured, 'Not configured.'
-        
-        assert executor, 'Must provide an executor'
-        alg = self.algorithm
-        assert alg['name'] == 'cnsga'
-        options = alg['options']
+        options = self.algorithm['options']
+        print(options)
         output_path = self.config['xopt']['output_path']
         
-        self.population = self.run_f(executor, vocs=self.vocs, population=self.population, evaluate_f=self.evaluate,
+        self.population = self.run_f(executor=executor, vocs=self.vocs, population=self.population, evaluate_f=self.evaluate,
             output_path=output_path, **options)  
 
         
