@@ -1,5 +1,5 @@
 from xopt import creator, vocs_tools, fitness_with_constraints
-from xopt.tools import full_path, random_settings_arrays
+from xopt.tools import full_path, random_settings_arrays, DummyExecutor
 
 from deap import algorithms, base, tools
 
@@ -382,6 +382,9 @@ def cnsga(executor,
     
     
     """
+
+    
+    
     random.seed(seed)
     MU = population_size
     CXPB = crossover_probability
@@ -395,8 +398,15 @@ def cnsga(executor,
         if verbose:
             print(*a, **k)
             sys.stdout.flush()
+            
+            
     
     vprint(cnsga_logo)
+    
+    if not executor:
+        executor = DummyExecutor()
+        vprint('No executor given. Running in serial mode.')
+    
     
     # Setup saving to file
     if output_path:
@@ -529,9 +539,6 @@ def cnsga(executor,
             
     return final_population
 
-
-#with PoolExecutor() as executor:
-#    pop = cnsga(executor, evaluate_f=F)
 
 
 

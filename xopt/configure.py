@@ -77,7 +77,11 @@ def configure_simulation(config):
     name = config['name'] # required
 
     f_name = config['evaluate']
-    f = tools.get_function(f_name)
+    
+    if f_name:
+        f = tools.get_function(f_name)
+    else:
+        f = None
     
     if 'options' in config:
         options = config['options']
