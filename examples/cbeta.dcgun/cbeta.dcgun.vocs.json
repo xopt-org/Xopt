@@ -3,7 +3,7 @@
         "gun_voltage": 375
     },
     "constraints": {
-        "end_t_rms": [
+        "end_std_t": [
             "LESS_THAN",
             0.0015
         ]
