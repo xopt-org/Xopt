@@ -1,0 +1,33 @@
+{
+  "name": "TNK_test",
+  "variables": {
+    "x1": [
+      0,
+      3.14159
+    ],
+    "x2": [
+      0,
+      3.14159
+    ]
+  },
+  "objectives": {
+    "y1": "MINIMIZE",
+    "y2": "MINIMIZE"
+  },
+  "constraints": {
+    "c1": [
+      "GREATER_THAN",
+      0
+    ],
+    "c2": [
+      "GREATER_THAN",
+      0
+    ]
+  },
+  "constants": {
+    "a": "dummy_constant"
+  },
+  "linked_variables": {
+    "x9": "x1"
+  }
+}

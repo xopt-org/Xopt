@@ -11,9 +11,16 @@ from xopt import tools
 # Algorithm
 
 KNOWN_ALGORITHMS = {
-    'cnsga':'xopt.cnsga.cnsga'
+    'cnsga':'xopt.cnsga.cnsga',
+    'random_sampler':'xopt.sampler.random_sampler'
 }
 
+
+ALGORITHM_DEFAULTS = {
+    'name':'cnsga',
+    'function':'xopt.cnsga.cnsga',
+    'options':{}
+}
 
 def configure_algorithm(config):
     """
@@ -27,6 +34,10 @@ def configure_algorithm(config):
         
     """
     
+    for k in config:
+        if k not in ALGORITHM_DEFAULTS:
+            raise ValueError(f'unknown algoritm key: {k}, allowed: {list(ALGORITHM_DEFAULTS)}')
+    
     name = config['name'] # required
     
     if 'function' not in config or not config['function']:
@@ -37,18 +48,15 @@ def configure_algorithm(config):
     else:
         f_name = config['function']
     
+    # Make sure this works, and get the options. This
     f = tools.get_function(f_name)
-    
+    options = {}
     if 'options' in config:
-        options = config['options']
-    else:
-        options = {}
-    
+        options.update(config['options'])   
     defaults = tools.get_function_defaults(f)
-
     tools.fill_defaults(options, defaults, strict=False)
-    
-    return {'name':config['name'], 'function':f, 'options':options}
+
+    return {'name':config['name'], 'function':f_name, 'options':options}
     
     
 
@@ -95,4 +103,27 @@ def configure_simulation(config):
 
     tools.fill_defaults(options, defaults, strict=False)
     
-    return {'name':name, 'evaluate_f':f, 'options':options}
+    return {'name':name, 'evaluate':f_name, 'options':options}
+
+
+#-----------------------
+#-----------------------
+# VOCS
+
+VOCS_DEFAULTS = {
+    'name':None,
+    'description':None,
+    'simulation':None,
+    'templates':None,
+    'variables':None,
+    'objectives':None,
+    'constraints':None,
+    'linked_variables':None,
+    'constants':None
+}
+
+def configure_vocs(config):
+        # Allows for .json or .yaml filenames as values. 
+        vocs = tools.load_config(config)
+        tools.fill_defaults(vocs, VOCS_DEFAULTS)
+        return vocs

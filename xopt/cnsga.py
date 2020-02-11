@@ -132,7 +132,7 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
     
     
     
-def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=True, verbose=False):
+def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=True, verbose=True):
     """
     Evaluation function wrapper for use with cngsa. Returns dict with:
         'vec', 'obj', 'con', 'err'
@@ -156,7 +156,6 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     
     result = {}
     try:
-
             #f.write(str(vec))   
         if vocs:
             # labeled inputs -> labeled outputs evaluate_f
@@ -178,11 +177,11 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
             obj_eval, con_eval = evaluate_f(vec)
         
         err = False
-        
-        
-    except Exception as ex:
+    
+    except TypeError:
+    #except Exception as ex:
         if verbose:
-            print('Exception caught in cnsga_evaluate:', ex)
+            print('XException caught in cnsga_evaluate:', ex)
 
         # Dummy output
         err = True
@@ -254,15 +253,17 @@ def pop_to_data(vocs, pop, generation=0):
     Returns a dict with
         'variables': dict with lists of input variable values
         'errors': corresponding error of these. 
+        'vocs': the vocs used
         
     If inds had inputs and outputs, also returns:
         'inputs'
         'outputs'
-    Constant arrays will be reduced to length 1 arrays. 
+    
+    
     
     """
     
-    data = {'variables':{}, 'generation':generation}
+    data = {'variables':{}, 'generation':generation, 'vocs':vocs}
 
     vlist =  vocs_tools.skeys(vocs['variables']) # get the correct order
     for i, v in enumerate(vlist):
@@ -271,44 +272,10 @@ def pop_to_data(vocs, pop, generation=0):
     if not all([ind.fitness.valid for ind in pop]):
         return data
     
-    data['errors'] = [ind.error for ind in pop]
-    
-    # Append inputs and outputs that had no errors. 
-    # Inputs and outputs
-    # Get list of all keys
-    input_keys = set()
-    output_keys = set()
-    for ind in pop:
-        if ('inputs' in dir(ind) and 'outputs' in dir(ind)):
-            for k in list(ind.inputs):
-                input_keys.add(k)
-            for k in list(ind.outputs):
-                output_keys.add(k)       
-    
-    # Prepare lists
-    data['inputs'] = {k:[] for k in input_keys}
-    data['outputs'] = {k:[] for k in output_keys}
-    
-    for ind in pop:
-        if ind.error:
-            continue
-            
-        for k in input_keys:
-            data['inputs'][k].append(ind.inputs[k])
-    
-        for k in output_keys:
-            data['outputs'][k].append(ind.outputs[k])    
-               
-                
-    # cleanup constants
-    for k in input_keys:
-        d = data['inputs'][k]
-        if len(set(d))==1:
-            data['inputs'][k] = [d[0]]
-    for k in output_keys:
-        d = data['outputs'][k]
-        if len(set(d))==1:
-            data['outputs'][k] = [d[0]]
+    #
+    data['error'] = [ind.error for ind in pop]
+    data['inputs'] = [ind.inputs for ind in pop]
+    data['outputs'] = [ind.outputs for ind in pop]
                 
     return data
     
@@ -384,7 +351,6 @@ def cnsga(executor,
     """
 
     
-    
     random.seed(seed)
     MU = population_size
     CXPB = crossover_probability
@@ -430,7 +396,7 @@ def cnsga(executor,
     if not toolbox:
         vprint('Creating toolbox from vocs.')
         toolbox = cnsga_toolbox(vocs, selection=selection, verbose=verbose)
-        toolbox.register('evaluate', cnsga_evaluate, evaluate_f=evaluate_f, vocs=vocs)
+        toolbox.register('evaluate', cnsga_evaluate, evaluate_f=evaluate_f, vocs=vocs, verbose=verbose)
         if verbose:
             print('vocs:')
             pprint(vocs) # Pretty print dict
@@ -454,7 +420,7 @@ def cnsga(executor,
     
     # Individuals that need evaluating
     vecs = [get_vec(ind) for ind in pop if not ind.fitness.valid]
-    
+
     # Initial population
     futures = [executor.submit(toolbox.evaluate, vec) for vec in vecs] 
     vprint('____________________________________________________')

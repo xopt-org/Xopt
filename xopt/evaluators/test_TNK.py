@@ -46,6 +46,10 @@ def evaluate_TNK(inputs, extra_option='abc', **params):
     
     info = {'some':'info', 'about':['the', 'run']}
     ind = [inputs['x1'], inputs['x2']]
+    
+    if ind[0]>BOUND_UP[0]:
+        raise ValueError(f'Input greater than {BOUND_UP[0]} ')
+    
     objectives, constraints = TNK(ind)    
     outputs = {'y1':objectives[0], 'y2':objectives[1], 'c1':constraints[0], 'c2':constraints[1]}
     

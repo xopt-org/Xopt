@@ -1,6 +1,7 @@
-from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings
+from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function
 from .cnsga import cnsga
-from .configure import configure_algorithm, configure_simulation
+from .sampler import random_sampler
+from .configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
 import pprint
 from copy import deepcopy
 import yaml
@@ -13,6 +14,15 @@ XOPT_DEFAULTS = {
     'verbose':True,
     'algorithm':'cnsga'
 }
+
+
+SIMULATION_DEFAULTS = {
+    'name':None,
+    'evaluate':None,
+    'options':None
+}
+
+
 
 # Algorithms
 ALGORITHM_DEFAULTS= {
@@ -28,26 +38,6 @@ ALGORITHM_DEFAULTS= {
         'verbose':True
     }
 }    
-
-
-
-SIMULATION_DEFAULTS = {
-    'name':None,
-    'evaluate':None,
-    'options':None
-}
-
-VOCS_DEFAULTS = {
-    'name':None,
-    'description':None,
-    'simulation':None,
-    'templates':None,
-    'variables':None,
-    'objectives':None,
-    'constraints':None,
-    'linked_variables':None,
-    'constants':None
-}
 
 
 
@@ -112,6 +102,10 @@ class Xopt:
         return self.config['algorithm']
     
     @property
+    def simulation(self):
+        return self.config['simulation']
+    
+    @property
     def vocs(self):
         return self.config['vocs']
     
@@ -124,10 +118,8 @@ class Xopt:
         fill_defaults(self.config['xopt'], XOPT_DEFAULTS)
 
     def configure_algorithm(self):
-        alg = configure_algorithm(self.config['algorithm'])
+        alg = self.config['algorithm'] = configure_algorithm(self.config['algorithm'])
         
-        # Register run function
-        self.run_f = alg['function']
         options = alg['options']
         
         # Special
@@ -135,20 +127,19 @@ class Xopt:
             # Remove these from options. The class will provide these. 
             population = options.pop('population')
             self.population = load_config(population, self.verbose)
-            for k in ['vocs', 'evaluate_f', 'output_path', 'toolbox']: # toolbox isn't needed
+             # These will be put in later. toolbox isn't needed
+            for k in ['vocs', 'evaluate_f', 'output_path', 'toolbox']:
                 options.pop(k)
                 
-        # update actual options
-        self.config['algorithm'].update(options)
-        
+        elif alg['name'] == 'random_sampler':
+             for k in ['vocs', 'evaluate_f', 'output_path']:
+                options.pop(k)   
 
     def configure_simulation(self):
-        self.simulation = configure_simulation(self.config['simulation'])                  
+        self.config['simulation'] = configure_simulation(self.config['simulation'])                  
             
     def configure_vocs(self):
-        # Allows for .json or .yaml filenames as values. 
-        self.config['vocs'] = load_config(self.config['vocs'])
-        fill_defaults(self.config['vocs'], VOCS_DEFAULTS)
+        self.config['vocs'] = configure_vocs(self.config['vocs'])
         
         sim_name = self.vocs['simulation']
         if sim_name:
@@ -178,6 +169,10 @@ class Xopt:
         # expand all paths
         self.config = expand_paths(self.config, ensure_exists=True)
    
+        # Get the actual functions
+        self.run_f = get_function(self.algorithm['function'])  
+        self.evaluate_f = get_function(self.simulation['evaluate'])
+
         self.configured = True
 
     #--------------------------
@@ -185,18 +180,25 @@ class Xopt:
     
     def run(self, executor=None):
         assert self.configured, 'Not configured to run.'      
-        
+ 
         alg = self.algorithm['name'] 
-        
+
         if alg == 'cnsga':
             self.run_cnsga(executor=executor)
+            
+        elif alg == 'random_sampler':
+            self.population = self.run_f(executor=executor,
+                              vocs=self.vocs, 
+                              evaluate_f=self.evaluate,
+                              output_path= self.config['xopt']['output_path'], **self.algorithm['options']) 
+            
         else:
             raise Exception(f'Unknown algorithm {alg}')
     
     def run_cnsga(self, executor=None):
         """Run the CNSGA algorithm with an executor"""
         options = self.algorithm['options']
-        print(options)
+     
         output_path = self.config['xopt']['output_path']
         
         self.population = self.run_f(executor=executor, vocs=self.vocs, population=self.population, evaluate_f=self.evaluate,
@@ -209,15 +211,31 @@ class Xopt:
     def random_inputs(self):
         return random_settings(self.vocs)
     
-    def random_evaluate(self):
+    def random_evaluate(self, check_vocs=True):
+        """
+        Makes random inputs and runs evaluate.
+        
+        If check_vocs, will check that all keys in vocs constraints and objectives are in output.
+        """
         inputs = self.random_inputs()
-        return self.evaluate(inputs)
+        outputs = self.evaluate(inputs)
+        if check_vocs:
+            err_keys = []
+            for k in self.vocs['objectives']:
+                if k not in outputs:
+                    err_keys.append(k)
+            for k in self.vocs['constraints']:
+                if k not in outputs:
+                    err_keys.append(k)        
+            assert len(err_keys)==0, f'Required keys not found in output: {err_keys}'      
+           
+        return outputs
         
     def evaluate(self, inputs):
         """Evaluate should take one argument: A dict of inputs. """
         options = self.simulation['options']
-        evaluate_f = self.simulation['evaluate_f']
-        
+        #evaluate_f = get_function(self.simulation['evaluate'])
+        evaluate_f = self.evaluate_f
         if options:
             return evaluate_f(inputs, **options)
         else:
@@ -253,8 +271,7 @@ Config as YAML:
         return s + yaml.dump(self.config, default_flow_style=None, sort_keys=False)
     
     def __str__(self):
-        s = f''
-        return s
+        return self.__repr__()
     
 
 

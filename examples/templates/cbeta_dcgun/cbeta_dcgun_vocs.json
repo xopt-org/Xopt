@@ -3,7 +3,7 @@
         "gun_voltage": 375
     },
     "constraints": {
-        "end_t_rms": [
+        "end_std_t": [
             "LESS_THAN",
             0.0015
         ]
@@ -16,8 +16,8 @@
     },
     "simulation": "gpt_with_distgen",
     "templates": {
-        "distgen_input_file": "/Users/colwyngulliford/Documents/GitHub/xopt/examples/cbeta.dcgun/template/cbeta.dcgun.distgen.in.json",
-        "gpt_input_file": "/Users/colwyngulliford/Documents/GitHub/xopt/examples/cbeta.dcgun/template/cbeta.dcgun.gpt.in"
+        "distgen_input_file": "$HOME/Code/GitHub/xopt/examples/cbeta.dcgun/template/cbeta.dcgun.distgen.in.json",
+        "gpt_input_file": "$HOME/Code/GitHub/xopt/examples/cbeta.dcgun/template/cbeta.dcgun.gpt.in"
     },
     "variables": {
         "beam:params:sigma_xy:value": [

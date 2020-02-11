@@ -5,6 +5,7 @@ import numpy as np
 from concurrent.futures import Future, Executor
 from threading import Lock
 
+from datetime import date
 from hashlib import blake2b
 import yaml
 import json
@@ -31,7 +32,7 @@ __  _____  _ __ | |_
 
 def load_config(source, verbose=False):
     """
-    Returns a dict loaded from a JSON or YAML file. 
+    Returns a dict loaded from a JSON or YAML file, or string. 
     
     If source is already a dict, just returns the same dict.
     
@@ -44,18 +45,14 @@ def load_config(source, verbose=False):
         return source
     
     if isinstance(source, str):
-        file = full_path(source)
-        assert os.path.exists(file), f'File does not exist: {file}'
-        if source.endswith('json'):
-            if verbose:
-                print(f'Loading {file} as JSON ')
-            return json.load(open(file))
-        elif source.endswith('yaml'):
-            if verbose:
-                print(f'Loading {file} as YAML ')
-            return yaml.safe_load(open(file))
+        if os.path.exists(source):
+            return yaml.safe_load(open(source))
+        else:
+            return yaml.safe_load(source)
     else:
         raise Exception(f'Do not know how to load {source}')
+
+        
         
 def save_config(data, filename, verbose=True):
     """
@@ -230,6 +227,30 @@ def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True,
 
 
 #--------------------------------
+# filenames
+def new_date_filename(prefix='', suffix='.json', path=''):
+    """
+    Gets a filename that doesn't exist based on the date
+    
+    
+    Example: 
+        new_date_filename('sample-', '.json', '.')
+    Returns:
+        './sample-2020-02-09-1.json'
+    
+    """
+    counter=1
+    while True:
+        name = f'{prefix}{date.today()}-{counter}{suffix}'
+        file = os.path.join(path, name)
+        if os.path.exists(file):
+            counter  += 1
+        else:
+            break
+    return file
+
+
+#--------------------------------
 # h5 utils
 
 def write_attrs(h5, group_name, data):
@@ -373,6 +394,9 @@ def get_function(name):
     # Check if already a function
     if callable(name):
         return name
+    
+    if not isinstance(name, str):
+        raise ValueError(f'{name} must be callable or a string.')
     
     if name in globals(): 
         if callable(globals()[name]):
