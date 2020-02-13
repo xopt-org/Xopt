@@ -77,6 +77,8 @@ class Xopt:
         self.verbose=verbose
         self.configured = False
                 
+        self.population = None    
+            
         if config:
             self.config = load_config(config, verbose=self.verbose)  
             self.configure()
@@ -119,21 +121,13 @@ class Xopt:
 
     def configure_algorithm(self):
         alg = self.config['algorithm'] = configure_algorithm(self.config['algorithm'])
-        
         options = alg['options']
         
-        # Special
-        if alg['name'] == 'cnsga':
-            # Remove these from options. The class will provide these. 
-            population = options.pop('population')
-            self.population = load_config(population, self.verbose)
-             # These will be put in later. toolbox isn't needed
-            for k in ['vocs', 'evaluate_f', 'output_path', 'toolbox']:
+        # Reserved keys
+        for k in ['vocs', 'evaluate_f', 'output_path', 'toolbox']:
+            if k in options:
                 options.pop(k)
-                
-        elif alg['name'] == 'random_sampler':
-             for k in ['vocs', 'evaluate_f', 'output_path']:
-                options.pop(k)   
+        
 
     def configure_simulation(self):
         self.config['simulation'] = configure_simulation(self.config['simulation'])                  
@@ -198,10 +192,14 @@ class Xopt:
     def run_cnsga(self, executor=None):
         """Run the CNSGA algorithm with an executor"""
         options = self.algorithm['options']
-     
         output_path = self.config['xopt']['output_path']
         
-        self.population = self.run_f(executor=executor, vocs=self.vocs, population=self.population, evaluate_f=self.evaluate,
+        if options['population']:
+            population = load_config(options.pop('population'), verbose=self.verbose)
+        else:
+            poulation=self.population    
+        
+        self.population = self.run_f(executor=executor, vocs=self.vocs, population=population, evaluate_f=self.evaluate,
             output_path=output_path, **options)  
 
         
