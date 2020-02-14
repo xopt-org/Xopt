@@ -42,12 +42,18 @@ def load_config(source, verbose=False):
         return source
     
     if isinstance(source, dict):
+        if verbose:
+            print('Loading config as dict.')
         return source
     
-    if isinstance(source, str):
-        if os.path.exists(source):
+    if isinstance(source, str):        
+        if os.path.exists(source):   
+            if verbose:
+                print(f'Loading from file: {source}')
             return yaml.safe_load(open(source))
         else:
+            if verbose:
+                print('Loading config as text')           
             return yaml.safe_load(source)
     else:
         raise Exception(f'Do not know how to load {source}')

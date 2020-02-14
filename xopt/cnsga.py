@@ -276,7 +276,7 @@ def pop_to_data(vocs, pop, generation=0):
     
     if not all([ind.fitness.valid for ind in pop]):
         return data
-    
+        
     #
     data['error'] = [ind.error for ind in pop]
     data['inputs'] = [ind.inputs for ind in pop]
@@ -358,6 +358,7 @@ def cnsga(executor,
     CXPB = crossover_probability
     MUTPB = mutation_probability
     
+    
 
     # Initial population
 
@@ -366,9 +367,8 @@ def cnsga(executor,
         if verbose:
             print(*a, **k)
             sys.stdout.flush()
-            
-            
-    
+                        
+    # Logo
     vprint(cnsga_logo)
     
     if not executor:
@@ -405,6 +405,8 @@ def cnsga(executor,
         
     # Initial pop
     if population:
+        assert 'variables' in population, 'Population must have key: variables'
+        
         pop = pop_init(vocs, population['variables'])
         if 'generation' in population:
             generation = population['generation']+1
@@ -418,6 +420,8 @@ def cnsga(executor,
         pop = pop_init_random(vocs, n=MU)
         vprint(f'Initializing with a new population, size {MU}')
     assert MU % 4 == 0, f'Population size (here {MU}) must be a multiple of 4'        
+        
+    vprint(f'Maximum generations: {max_generations}')    
         
     
     # Individuals that need evaluating

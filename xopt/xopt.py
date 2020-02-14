@@ -194,10 +194,14 @@ class Xopt:
         options = self.algorithm['options']
         output_path = self.config['xopt']['output_path']
         
-        if 'population' in options:
-            options['population'] = load_config(options['population'], verbose=self.verbose)
-        else:
+        # This takes priority
+        if self.population:
             options['population'] = self.population
+        elif 'population' not in options:
+            print('Warning. Population not found in options.')
+            options['population'] = None
+        else:
+            options['population'] = load_config(options['population'], verbose=self.verbose)  
 
         self.population = self.run_f(executor=executor, vocs=self.vocs, evaluate_f=self.evaluate,
             output_path=output_path, **options)  
