@@ -155,23 +155,21 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     """
     
     result = {}
-    try:
-            #f.write(str(vec))   
-        if vocs:
-            # labeled inputs -> labeled outputs evaluate_f
-            inputs = vocs_tools.inputs_from_vec(vec, vocs=vocs)    
     
+    if vocs:
+        # labeled inputs -> labeled outputs evaluate_f
+        inputs = vocs_tools.inputs_from_vec(vec, vocs=vocs) 
+    
+    try:
+    
+        if vocs:
+            
             # Evaluation
             outputs = evaluate_f(inputs)
         
             obj_eval = vocs_tools.evaluate_objectives(vocs['objectives'], outputs)
             con_eval = vocs_tools.evaluate_constraints(vocs['constraints'], outputs)
             
-            # Add these to result
-            if include_inputs_and_outputs:
-                result['inputs'] = inputs
-                result['outputs'] = outputs
-        
         else:
         # Pure number function
             obj_eval, con_eval = evaluate_f(vec)
@@ -182,12 +180,19 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     except Exception as ex:
         if verbose:
             print('Exception caught in cnsga_evaluate:', ex)
-
+        outputs = {'Exception':  ex}
+        
         # Dummy output
         err = True
         obj_eval = [0.0]*len(vocs['objectives'])
         con_eval = [-666.0]*len(vocs['constraints'])
     
+    finally:
+         # Add these to result
+        if include_inputs_and_outputs:
+            result['inputs'] = inputs
+            result['outputs'] = outputs
+        
     
     result['vec'] = vec
     result['obj'] = obj_eval

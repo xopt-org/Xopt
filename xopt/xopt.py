@@ -194,13 +194,12 @@ class Xopt:
         options = self.algorithm['options']
         output_path = self.config['xopt']['output_path']
         
-        if options['population']:
-            population = load_config(options.pop('population'), verbose=self.verbose)
+        if 'population' in options:
+            options['population'] = load_config(options['population'], verbose=self.verbose)
         else:
-            options.pop('population')
-            population=self.population    
-        
-        self.population = self.run_f(executor=executor, vocs=self.vocs, population=population, evaluate_f=self.evaluate,
+            options['population'] = self.population
+
+        self.population = self.run_f(executor=executor, vocs=self.vocs, evaluate_f=self.evaluate,
             output_path=output_path, **options)  
 
         
