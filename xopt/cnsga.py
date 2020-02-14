@@ -297,9 +297,6 @@ def form_ind(res):
     ind.fitness.cvalues = con
     ind.error = err
     
-    if err:
-        return ind
-    
     if 'inputs' in res:
         ind.inputs = res['inputs']
     
