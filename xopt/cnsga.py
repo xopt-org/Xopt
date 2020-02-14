@@ -178,10 +178,10 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
         
         err = False
     
-    except TypeError:
-    #except Exception as ex:
+    
+    except Exception as ex:
         if verbose:
-            print('XException caught in cnsga_evaluate:', ex)
+            print('Exception caught in cnsga_evaluate:', ex)
 
         # Dummy output
         err = True
