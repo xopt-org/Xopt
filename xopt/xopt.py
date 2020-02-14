@@ -197,7 +197,8 @@ class Xopt:
         if options['population']:
             population = load_config(options.pop('population'), verbose=self.verbose)
         else:
-            poulation=self.population    
+            options.pop('population')
+            population=self.population    
         
         self.population = self.run_f(executor=executor, vocs=self.vocs, population=population, evaluate_f=self.evaluate,
             output_path=output_path, **options)  
