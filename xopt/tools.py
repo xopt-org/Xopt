@@ -54,9 +54,16 @@ def load_config(source, verbose=False):
     
     if isinstance(source, str):        
         if os.path.exists(source):   
-            if verbose:
-                print(f'Loading from file: {source}')
-            return yaml.safe_load(open(source))
+
+            if source.endswith('.json'):
+                if verbose:
+                    print(f'Loading as JSON file: {source}')
+                return json.load(open(source))
+            else:
+                if verbose:
+                    print(f'Loading as YAML file: {source}')                
+                
+                return yaml.safe_load(open(source))
         else:
             if verbose:
                 print('Loading config as text')           
