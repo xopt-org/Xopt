@@ -1,5 +1,5 @@
 from xopt import creator, vocs_tools, fitness_with_constraints
-from xopt.tools import full_path, random_settings_arrays, DummyExecutor
+from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config
 
 from deap import algorithms, base, tools
 
@@ -405,9 +405,14 @@ def cnsga(executor,
         
     # Initial pop
     if population:
+        
+        # Load JSON
+        population = load_config(population, verbose=verbose)
+        
         assert 'variables' in population, 'Population must have key: variables'
         
         pop = pop_init(vocs, population['variables'])
+        
         if 'generation' in population:
             generation = population['generation']+1
         else:
