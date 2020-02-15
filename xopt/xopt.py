@@ -202,7 +202,14 @@ class Xopt:
             options['population'] = None
         else:
             options['population'] = load_config(options['population'], verbose=self.verbose)  
-
+        
+        # Clean up
+        if options['population']:
+            for k in list(options['population']):
+                if k not in ['variables', 'generation']:
+                    print(f'removing {k}')
+                    options['population'].pop(k)
+                
         self.population = self.run_f(executor=executor, vocs=self.vocs, evaluate_f=self.evaluate,
             output_path=output_path, **options)  
 
