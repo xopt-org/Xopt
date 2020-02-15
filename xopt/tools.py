@@ -12,6 +12,7 @@ import json
 from copy import deepcopy
 import importlib
 import inspect
+import datetime
 import os
 
 
@@ -26,6 +27,11 @@ __  _____  _ __ | |_
 """
 
 
+
+
+"""UTC to ISO 8601 with Local TimeZone information without microsecond"""
+def isotime():
+    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).astimezone().replace(microsecond=0).isoformat()
 
 #--------------------------------
 # Config utilities

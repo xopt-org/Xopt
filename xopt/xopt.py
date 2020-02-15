@@ -1,4 +1,4 @@
-from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function
+from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function, isotime
 from .cnsga import cnsga
 from .sampler import random_sampler
 from .configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
@@ -175,6 +175,8 @@ class Xopt:
     def run(self, executor=None):
         assert self.configured, 'Not configured to run.'      
  
+        self.vprint(f'Starting at time {isotime()}')
+
         alg = self.algorithm['name'] 
 
         if alg == 'cnsga':
