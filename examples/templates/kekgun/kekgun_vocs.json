@@ -76,7 +76,7 @@
     ],
     "end_core_emit_95percent_x": [
       "LESS_THAN",
-      9.e-07
+      9.0e-07
     ],
     "end_sigma_energy": [
       "LESS_THAN",
