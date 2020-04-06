@@ -213,7 +213,7 @@ def add_to_path(path, prepend=True):
         os.environ['PATH']  += os.pathsep+p
     return p    
     
-def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True, sep='::', ensure_exists=False):
+def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True, sep=' : ', ensure_exists=False):
     """
     Crawls through a nested dict and expands the path of any key that ends 
     with characters in the suffixes list. 
@@ -235,6 +235,10 @@ def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True,
                 if verbose:
                     print(f'Warning: No path set for key {k}')        
                 continue
+            if not isinstance(v, str):
+                # Not a path
+                continue
+                
             file = full_path(v, ensure_exists=ensure_exists)
             if os.path.exists(file):
                 d[k] = file

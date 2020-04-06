@@ -82,6 +82,7 @@ class Xopt:
         if config:
             self.config = load_config(config, verbose=self.verbose)  
             self.configure()
+
         else:
             # Make a template, so the user knows what is available
             self.vprint('Initializing with defaults')
@@ -117,6 +118,7 @@ class Xopt:
     def configure_xopt(self):   
         # Allows for .json or .yaml filenames as values. 
         self.config['xopt'] = load_config(self.config['xopt'])
+
         fill_defaults(self.config['xopt'], XOPT_DEFAULTS)
 
     def configure_algorithm(self):
@@ -159,6 +161,7 @@ class Xopt:
         self.configure_algorithm()
         self.configure_simulation()
         self.configure_vocs()
+        
         
         # expand all paths
         self.config = expand_paths(self.config, ensure_exists=True)

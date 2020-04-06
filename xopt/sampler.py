@@ -1,4 +1,4 @@
-from .tools import full_path, new_date_filename, random_settings
+from .tools import full_path, new_date_filename, random_settings, DummyExecutor
 from deap.base import Toolbox
 import json
 import time
@@ -81,6 +81,10 @@ def random_sampler(executor,
     
     # Logo
     vprint(sampler_logo)
+    
+    if not executor:
+        executor = DummyExecutor()
+        vprint('No executor given. Running in serial mode.')    
     
     # Setup saving to file
     if output_path:

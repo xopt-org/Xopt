@@ -415,6 +415,7 @@ def cnsga(executor,
         
         if 'generation' in population:
             generation = population['generation']+1
+            max_generations += generation
         else:
             generation=0
         MU = len(pop)
