@@ -355,8 +355,8 @@ def cnsga(executor,
     
     random.seed(seed)
     MU = population_size
-    CXPB = crossover_probability
-    MUTPB = mutation_probability
+    CXPB = float(crossover_probability)
+    MUTPB = float(mutation_probability)
     
     
 
