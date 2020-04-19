@@ -33,7 +33,7 @@ cnsga_logo = """
 ░                                              
 
 
-Continous Non-dominated Sorting Genetic Algorithm
+Continuous Non-dominated Sorting Genetic Algorithm
 
 """
 
