@@ -2,6 +2,7 @@ from .tools import full_path, expand_paths, load_config, save_config, fill_defau
 from .cnsga import cnsga
 from .sampler import random_sampler
 from .configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
+from ._version import __version__
 import pprint
 from copy import deepcopy
 import yaml
@@ -274,11 +275,10 @@ class Xopt:
     
     def __repr__(self):
         s = f"""
-            Xopt
+            Xopt 
 ________________________________           
-
+Version: {__version__}
 Configured: {self.configured}
-
 Config as YAML:
 """
         #return s+pprint.pformat(self.config)

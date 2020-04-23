@@ -1,6 +1,6 @@
 from xopt import creator, vocs_tools, fitness_with_constraints
 from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config
-
+from ._version import __version__
 from deap import algorithms, base, tools
 
 import numpy as np
@@ -18,7 +18,7 @@ Continuous NSGA-II, NSGA-III
 
 """
 
-cnsga_logo = """
+cnsga_logo = f"""
 
 
  ▄████▄   ███▄    █   ██████   ▄████  ▄▄▄      
@@ -34,7 +34,7 @@ cnsga_logo = """
 
 
 Continuous Non-dominated Sorting Genetic Algorithm
-
+Version {__version__}
 """
 
 
