@@ -1,11 +1,12 @@
 from .tools import full_path, new_date_filename, random_settings, DummyExecutor
+from ._version import __version__
 from deap.base import Toolbox
 import json
 import time
 import os, sys
 
 
-sampler_logo = """
+sampler_logo = f"""
 
 ███████╗ █████╗ ███╗   ███╗██████╗ ██╗     ███████╗██████╗ 
 ██╔════╝██╔══██╗████╗ ████║██╔══██╗██║     ██╔════╝██╔══██╗
@@ -16,7 +17,7 @@ sampler_logo = """
                                                            
 
 Xopt Random Sampler
-
+Version {__version__}
 """
 
 
