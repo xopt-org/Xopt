@@ -1,0 +1,37 @@
+
+name: kekgun
+description: Test case
+simulation: astra_with_generator
+templates:
+  astra_input_file: $XOPT_DIR/examples/templates/kekgun/kekgun.in
+  generator_input_file: $XOPT_DIR/examples/templates/kekgun/dist004.in
+variables:
+  sig_x: [0.05, 1]
+  lt: [0.005, 0.07]
+  maxe(1): [20, 50]
+  phi(1): [-30, 30]
+  maxb(1): [0, 0.4]
+  maxe(2): [0, 32]
+  phi(2): [-180, 180]
+  maxb(2): [0, 0.3]
+  maxe(3): [0, 32]
+  maxe(4): [0, 32]
+  phi(3): [-45, 45]
+  phi(4): [-45, 45]
+  phi(6): [-45, 45]
+constants:
+  ipart: 1000
+  lspch: true
+  zstop: 16.54
+  
+objectives:
+  end_core_emit_95percent_x: MINIMIZE
+  end_sigma_z: MINIMIZE
+constraints:
+  end_sigma_z: [LESS_THAN, 0.0015]
+  end_core_emit_95percent_x: [LESS_THAN, 9.0e-07]
+  end_sigma_energy: [LESS_THAN, 200000.0]
+  end_higher_order_energy_spread: [LESS_THAN, 5000.0]
+  end_mean_kinetic_energy: [GREATER_THAN, 90000000.0]
+  end_n_particle_loss: [LESS_THAN, 1]
+linked_variables: null
