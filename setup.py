@@ -10,7 +10,7 @@ with open(path.join(cur_dir, 'requirements.txt'), 'r') as f:
 
 setup(
     name='xopt',
-    version = 'v0.1.0',
+    version = '0.4.0',
     packages=find_packages(),  
     package_dir={'xopt':'xopt'},
     url='https://github.com/ChristopherMayes/xopt',
