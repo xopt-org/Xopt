@@ -6,6 +6,7 @@ from deap import algorithms, base, tools
 import numpy as np
 import json
 
+import logging
 
 from pprint import pprint
 import time
@@ -362,8 +363,12 @@ def cnsga(executor,
 
     # Initial population
 
+    # Logger
+    logger = logging.getLogger(__name__)
+    
     # Verbose print helper
     def vprint(*a, **k):
+        #logger.debug(' '.join(a))
         if verbose:
             print(*a, **k)
             sys.stdout.flush()
