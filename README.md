@@ -62,19 +62,6 @@ conda search xopt --channel conda-forge
 
 
 
-## Example simulations
-xopt currently supports:
-
-**ASTRA**
-
-http://www.desy.de/~mpyflo/
-
-**GPT**
-
-http://pulsar.nl/gpt/index.html
-
-
-
 
 Developers
 ===============
