@@ -56,6 +56,17 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
     """
     Creates a DEAP toolbox from VOCS dict for use with cnsga. 
     
+    Selection options:
+    
+    nsga2: Standard NSGA2 [Deb2002] selection
+    nsga3: NSGA3 [Deb2014] selection
+    spea2: SPEA-II [Zitzler2001] selection 
+    auto: will choose nsga2 for <= 2 objectives, otherwise nsga3
+    
+    
+    See DEAP code for details. 
+    
+
     """
     
     var, obj, con = vocs['variables'], vocs['objectives'], vocs['constraints']
@@ -117,8 +128,15 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
 
     if selection == 'nsga2':
         toolbox.register('select', tools.selNSGA2)
+    
+    # Doesn't work with constraints. TODO: investigate
+    #elif selection == 'nsga2_log':
+    #    toolbox.register('select', tools.selNSGA2, nd='log')        
     elif selection == 'nsga3':
-        toolbox.register('select', tools.selNSGA3)
+        toolbox.register('select', tools.selNSGA3)   
+    elif selection == 'spea2':
+        toolbox.register('select', tools.selSPEA2)
+ 
     else:
         print('Error: invalid selection algorithm', selection)
         raise
@@ -166,7 +184,8 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
         if vocs:
             
             # Evaluation
-            outputs = evaluate_f(inputs)
+            inputs0 = inputs.copy()       # Make a copy, because the evaluate function might modify the inputs.
+            outputs = evaluate_f(inputs0)
         
             obj_eval = vocs_tools.evaluate_objectives(vocs['objectives'], outputs)
             con_eval = vocs_tools.evaluate_constraints(vocs['constraints'], outputs)
