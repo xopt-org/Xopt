@@ -343,7 +343,7 @@ def flatten_dict(dd, sep=':', prefix=''):
     return { prefix + sep + k if prefix else k : v
              for kk, vv in dd.items()
              for k, v in flatten_dict(vv, sep, kk).items()
-             } if isinstance(dd, dict) else { prefix : dd }
+             } if (dd and isinstance(dd, dict)) else { prefix : dd } # handles empty dicts
 
 def unflatten_dict(d, sep=':', prefix=''):
     """
