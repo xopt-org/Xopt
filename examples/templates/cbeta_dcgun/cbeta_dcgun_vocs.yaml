@@ -1,8 +1,8 @@
 name: cu dcgun
 description: Test case
 simulation: gpt_with_distgen
-templates: {gpt_input_file: $XOPT_DIR/examples/templates/cbeta_dcgun/cbeta_dcgun_gpt.in,
-  distgen_input_file: $XOPT_DIR/examples/templates/cbeta_dcgun/cbeta_dcgun_distgen.yaml}
+templates: {gpt_input_file: ../templates/cbeta_dcgun/cbeta_dcgun_gpt.in,
+  distgen_input_file: ../templates/cbeta_dcgun/cbeta_dcgun_distgen.yaml}
 variables:
   r_dist:sigma_xy:value: [0.0, 10]
   r_dist:alpha:value: [0.1, 1.0]
