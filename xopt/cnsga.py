@@ -12,6 +12,7 @@ from pprint import pprint
 import time
 import array
 import random
+import traceback
 import os, sys
 
 """
@@ -133,7 +134,10 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
     #elif selection == 'nsga2_log':
     #    toolbox.register('select', tools.selNSGA2, nd='log')        
     elif selection == 'nsga3':
-        toolbox.register('select', tools.selNSGA3)   
+        # Create uniform reference point
+        ref_points = tools.uniform_reference_points(n_obj, 12)  
+        toolbox.register('select', tools.selNSGA3, ref_points=ref_points)   
+        
     elif selection == 'spea2':
         toolbox.register('select', tools.selSPEA2)
  
@@ -200,7 +204,7 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     except Exception as ex:
         if verbose:
             print('Exception caught in cnsga_evaluate:', ex)
-        outputs = {'Exception':  str(ex)}
+        outputs = {'Exception':  str(traceback.format_exc())}
         
         # Dummy output
         err = True
