@@ -397,7 +397,10 @@ def cnsga(executor,
             sys.stdout.flush()
                         
     # Logo
-    vprint(cnsga_logo)
+    try:
+        vprint(cnsga_logo)
+    except:
+        vprint('CNSGA')  # Windows has a problem with the logo
     
     if not executor:
         executor = DummyExecutor()
