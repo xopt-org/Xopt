@@ -117,9 +117,9 @@ VOCS_DEFAULTS = {
     'templates':None,
     'variables':None,
     'objectives':None,
-    'constraints':None,
-    'linked_variables':None,
-    'constants':None
+    'constraints':{},
+    'linked_variables':{},
+    'constants':{}
 }
 
 def configure_vocs(config):
