@@ -1,4 +1,4 @@
-from .tools import full_path, new_date_filename, random_settings, DummyExecutor
+from .tools import full_path, new_date_filename, random_settings, DummyExecutor, NpEncoder
 from ._version import __version__
 from deap.base import Toolbox
 import json
@@ -95,7 +95,7 @@ def random_sampler(executor,
         def save(data):
             file = new_date_filename(prefix='sampler-', path=path)
             with open(file, 'w') as f:
-                json.dump(data, f, ensure_ascii=True)#, indent=4)
+                json.dump(data, f, ensure_ascii=True, cls=NpEncoder) #, indent=4)
             vprint('Samples written to:\n', file) 
         
     else:
