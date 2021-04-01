@@ -53,6 +53,8 @@ def evaluate_TNK(inputs, extra_option='abc', **params):
     objectives, constraints = TNK(ind)    
     outputs = {'y1':objectives[0], 'y2':objectives[1], 'c1':constraints[0], 'c2':constraints[1]}
     
+    outputs['some_array'] = np.array([1,2,3])
+    
     return outputs
 
 

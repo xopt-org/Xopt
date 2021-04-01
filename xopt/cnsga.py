@@ -1,5 +1,5 @@
 from xopt import creator, vocs_tools, fitness_with_constraints
-from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config
+from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config, NpEncoder
 from ._version import __version__
 from deap import algorithms, base, tools
 
@@ -417,7 +417,7 @@ def cnsga(executor,
             data = pop_to_data(vocs, pop, generation=generation)
             fullfile = os.path.join(path, file)
             with open(fullfile, 'w') as f:
-                json.dump(data, f, ensure_ascii=True, indent=4)
+                json.dump(data, f, ensure_ascii=True, cls=NpEncoder, indent=4)
             vprint('Pop written to', fullfile)
         
     else:
