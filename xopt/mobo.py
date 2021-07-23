@@ -5,6 +5,8 @@ import sys
 import traceback
 import time
 
+from functools import partial
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -127,6 +129,64 @@ def collect_results(results, vocs):
     return train_x, train_y, train_c
 
 
+def plot_acq(model, bounds, ref_point, partitioning, sampler, n_obectives, n_constraints, constraint_functions):
+    # only works in 2D
+    assert bounds.shape[-1] == 2
+
+    n = 100
+    x = np.linspace(0, 3.14, n)
+    xx = np.meshgrid(x, x)
+    pts = torch.tensor(np.vstack((ele.ravel() for ele in xx)).T, **tkwargs)
+    pts = pts.reshape(n ** 2, 1, 2)
+
+    ehvi_acq_func = qExpectedHypervolumeImprovement(
+        model=model,
+        ref_point=ref_point.tolist(),  # use known reference point
+        partitioning=partitioning,
+        sampler=sampler,
+        # define an objective that specifies which outcomes are the objectives
+        objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
+    )
+
+    constr_acq_func = qExpectedHypervolumeImprovement(
+        model=model,
+        ref_point=ref_point.tolist(),  # use known reference point
+        partitioning=partitioning,
+        sampler=sampler,
+        # define an objective that specifies which outcomes are the objectives
+        objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
+        # define constraint functions - a list of functions that map input b x q x m to b x q for each constraint
+        constraints=constraint_functions
+    )
+
+    with torch.no_grad():
+        ehvi = ehvi_acq_func(pts)
+
+    fig, ax = plt.subplots()
+    c = ax.pcolor(*xx, ehvi.reshape(n, n))
+    fig.colorbar(c)
+
+    with torch.no_grad():
+        cehvi = constr_acq_func(pts)
+
+    fig, ax = plt.subplots()
+    c = ax.pcolor(*xx, cehvi.reshape(n, n))
+    fig.colorbar(c)
+
+    with torch.no_grad():
+        pos = model.posterior(pts.squeeze())
+        mean = pos.mean
+
+    for j in range(n_obectives + n_constraints):
+        fig, ax = plt.subplots()
+        c = ax.pcolor(*xx, mean[:, j].reshape(n, n))
+        ax.contour(xx[0].reshape(n, n),
+                   xx[1].reshape(n, n),
+                   mean[:, j].reshape(n, n), levels=[0.0])
+
+        fig.colorbar(c)
+
+
 def optimize_qehvi(model,
                    train_y,
                    train_c,
@@ -153,9 +213,15 @@ def optimize_qehvi(model,
         Y=train_y[better_than_ref & is_feas],
 
     )
+
+    # define constraint functions - note issues with lambda implementation
+    # https://tinyurl.com/j8wmckd3
+    def constr_func(Z, index=-1):
+        return Z[..., index]
+
     constraint_functions = []
-    constraint_functions += [lambda Z: Z[..., -1]]
-    constraint_functions += [lambda Z: Z[..., -2]]
+    for i in range(1, n_constraints+1):
+        constraint_functions += [partial(constr_func, index=-i)]
 
     acq_func = qExpectedHypervolumeImprovement(
         model=model,
@@ -173,51 +239,10 @@ def optimize_qehvi(model,
 
     # plot the acquisition function and each model for debugging purposes
     if plot:
-        model.eval()
-        # only works in 2D
-        assert bounds.shape[-1] == 2
-
-        n = 100
-        x = np.linspace(0, 3.14, n)
-        xx = np.meshgrid(x, x)
-        pts = torch.tensor(np.vstack((ele.ravel() for ele in xx)).T, **tkwargs)
-        pts = pts.reshape(n ** 2, 1, 2)
-
-        ehvi_acq_func = qExpectedHypervolumeImprovement(
-            model=model,
-            ref_point=ref_point.tolist(),  # use known reference point
-            partitioning=partitioning,
-            sampler=sampler,
-            # define an objective that specifies which outcomes are the objectives
-            objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
-        )
-
-        with torch.no_grad():
-            ehvi = ehvi_acq_func(pts)
-
-        fig, ax = plt.subplots()
-        c = ax.pcolor(*xx, ehvi.reshape(n, n))
-        fig.colorbar(c)
-
-        with torch.no_grad():
-            cehvi = acq_func(pts)
-
-        fig, ax = plt.subplots()
-        c = ax.pcolor(*xx, cehvi.reshape(n, n))
-        fig.colorbar(c)
-
-        with torch.no_grad():
-            pos = model.posterior(pts.squeeze())
-            mean = pos.mean
-
-        for j in range(n_obectives + n_constraints):
-            fig, ax = plt.subplots()
-            c = ax.pcolor(*xx, mean[:, j].reshape(n, n))
-            ax.contour(xx[0].reshape(n, n),
-                       xx[1].reshape(n, n),
-                       mean[:, j].reshape(n, n), levels=[0.0])
-
-            fig.colorbar(c)
+        plot_acq(model, bounds,
+                 ref_point, partitioning,
+                 sampler, n_obectives, n_constraints,
+                 constraint_functions)
 
     # optimize
     candidates, _ = optimize_acqf(
@@ -237,6 +262,7 @@ def optimize_qehvi(model,
 def mobo(vocs, evaluate_f, ref,
          n_steps=30,
          mc_samples=128,
+         batch_size=1,
          executor=None,
          n_initial_samples=5,
          model_options=None,
@@ -269,7 +295,7 @@ def mobo(vocs, evaluate_f, ref,
         tkwargs['device'] = 'cpu'
 
     # convert ref tensor to match model device
-    ref.to(**tkwargs)
+    ref = ref.to(**tkwargs)
 
     # Verbose print helper
     def vprint(*a, **k):
@@ -386,7 +412,8 @@ def mobo(vocs, evaluate_f, ref,
                                     corrected_train_c,
                                     bounds,
                                     corrected_ref,
-                                    mc_sampler)
+                                    mc_sampler,
+                                    batch_size=batch_size)
 
         if verbose:
             print(candidates)
@@ -445,4 +472,4 @@ def mobo(vocs, evaluate_f, ref,
         return train_x, train_y, train_c, model
 
     else:
-        return train_x, train_y, train_c
+        return train_x.cpu(), train_y.cpu(), train_c.cpu()
