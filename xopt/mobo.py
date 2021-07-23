@@ -273,14 +273,73 @@ def mobo(vocs, evaluate_f, ref,
          initial_x=None,
          plot_acq=False,
          use_gpu=True):
+
     """
-        Multi-objective Bayeisan optimization
 
-        Works with executors instantiated from:
-            concurrent.futures.ProcessPoolExecutor
-            concurrent.futures.ThreadPoolExecutor
-            mpi4py.futures.MPIPoolExecutor
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
 
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
+
+    ref : torch.Tensor
+        Reference point for multi-objective optimization
+
+    n_steps : int, default: 30
+        Number of optimization steps to take
+
+    mc_samples : int, default: 128
+        Number of monte carlo samples to take when computing the acquisition function intergral
+
+    batch_size : int, default: 1
+        Number of candidates to generate at each optimization step
+
+    executor : futures.Executor, default: None
+        Executor object to evaluate problem using multiple threads or processors
+
+    n_initial_samples : int, defualt: 5
+        Number of initial sobel_random samples to take to start optimization. Ignored if initial_x is not None.
+
+    model_options : dict, optional
+        Arguments to Gaussian Process model creation, ie. custom kernels, likelihoods
+
+    seed : int, optional
+        Seed for random number generation to freeze random number generation.
+
+    output_path : str, optional
+        Location to save optimization data and models.
+
+    verbose : bool, default: False
+        Specify if the algorithm should print optimization progress.
+
+    return_model : bool, default: False
+        Specify if the algorithm should return the final trained model
+
+    initial_x : torch.Tensor, optional
+        Initial input points to sample evaluator at, causes sampling to ignore n_initial_samples
+
+    plot_acq : bool, False
+        Specify if the algorithm should plot the GP predictions and acquisition function values in
+        the input domain at the end of optimization.
+
+    use_gpu : bool, True
+        Specify if the algorithm should use GPU resources if available. Only use on large problems!
+
+    Returns
+    -------
+    train_x : torch.Tensor
+        Observed variable values
+
+    train_y : torch.Tensor
+        Observed objective values
+
+    train_c : torch.Tensor
+        Observed constraint values
+
+    model : SingleTaskGP
+        If return_model = True this contains the final trained model for objectives and constraints.
 
     """
 
@@ -300,6 +359,7 @@ def mobo(vocs, evaluate_f, ref,
     # Verbose print helper
     def vprint(*a, **k):
         # logger.debug(' '.join(a))
+        # TODO: use logging instead of print statements
         if verbose:
             print(*a, **k)
             sys.stdout.flush()
@@ -315,7 +375,8 @@ def mobo(vocs, evaluate_f, ref,
         assert os.path.exists(path), f'output_path does not exist {path}'
 
         def save(pop, prefix, generation):
-            pass
+            # TODO: implement this
+            raise NotImplementedError
 
     else:
         # Dummy save
@@ -335,12 +396,10 @@ def mobo(vocs, evaluate_f, ref,
     # get initial bounds
     bounds = torch.transpose(
         torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in variables.items()]), 0, 1)
-    # create normalization transforms for model inputs and outputs
+
+    # create normalization transforms for model inputs
     # inputs are normalized in [0,1]
-    # outputs are standardized (mean = 0, std = 1) - NOTE: we only standardize the objectives
     input_normalize = Normalize(len(variable_names), bounds)
-    # output_normalize = Standardize(len(objective_names) + len(constraint_names),
-    #                               outputs=list(range(len(objective_names))))
 
     # generate initial samples if no initial samples are given
     if initial_x is None:
@@ -348,14 +407,11 @@ def mobo(vocs, evaluate_f, ref,
 
     # submit evaluation of initial samples
     sampler_evaluate_args = {'verbose': verbose}
-
     initial_y = [executor.submit(sampler_evaluate,
                                  dict(zip(variable_names, x.cpu().numpy())),
                                  evaluate_f,
                                  **sampler_evaluate_args) for x in initial_x]
-
     results = get_results(initial_y)
-
     train_x, train_y, train_c = collect_results(results, vocs)
 
     hv_track = []
@@ -416,7 +472,7 @@ def mobo(vocs, evaluate_f, ref,
                                     batch_size=batch_size)
 
         if verbose:
-            print(candidates)
+            vprint(candidates)
 
         # observe candidates
         fut = [executor.submit(sampler_evaluate,
