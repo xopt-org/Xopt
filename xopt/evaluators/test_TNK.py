@@ -15,7 +15,7 @@ VOCS = {
     },
     'constraints': {
         'c1': ['GREATER_THAN', 0],
-        'c2': ['GREATER_THAN', 0]
+        'c2': ['LESS_THAN', 0.5]
 
     },
     'constants': {'a': 'dummy_constant'},
@@ -36,7 +36,7 @@ def TNK(individual):
     x2 = individual[1]
     objectives = (x1, x2)
     constraints = (x1 ** 2 + x2 ** 2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
-                   0.5 - (x1 - 0.5) ** 2 - (x2 - 0.5) ** 2)
+                   (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2)
     return objectives, constraints
 
 
@@ -49,8 +49,8 @@ def evaluate_TNK(inputs, extra_option='abc', **params):
         raise ValueError(f'Input greater than {BOUND_UP[0]} ')
 
     objectives, constraints = TNK(ind)
-    outputs = {'y1': objectives[0], 'y2': objectives[1], 'c1': constraints[0], 'c2': constraints[1]}
-
-    outputs['some_array'] = np.array([1, 2, 3])
+    outputs = {'y1': objectives[0], 'y2': objectives[1],
+               'c1': constraints[0], 'c2': constraints[1],
+               'some_array': np.array([1, 2, 3])}
 
     return outputs
