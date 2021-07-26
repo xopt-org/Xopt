@@ -4,6 +4,10 @@
 devel/*
 .DS_Store
 *.pyc
+xopt.egg-info
+
+#pycharm files
+.idea
 
 
 

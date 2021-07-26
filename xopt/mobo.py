@@ -38,6 +38,9 @@ tkwargs = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 }
 
+# Logger
+logger = logging.getLogger(__name__)
+
 
 class NoValidResultsError(Exception):
     pass
@@ -133,7 +136,7 @@ def plot_acq(model, bounds, ref_point, partitioning, sampler, n_obectives, n_con
     # only works in 2D
     assert bounds.shape[-1] == 2
 
-    n = 100
+    n = 50
     x = np.linspace(0, 3.14, n)
     xx = np.meshgrid(x, x)
     pts = torch.tensor(np.vstack((ele.ravel() for ele in xx)).T, **tkwargs)
@@ -220,7 +223,7 @@ def optimize_qehvi(model,
         return Z[..., index]
 
     constraint_functions = []
-    for i in range(1, n_constraints+1):
+    for i in range(1, n_constraints + 1):
         constraint_functions += [partial(constr_func, index=-i)]
 
     acq_func = qExpectedHypervolumeImprovement(
@@ -259,6 +262,47 @@ def optimize_qehvi(model,
     return candidates.detach()
 
 
+def get_corrected_outputs(vocs, ref, train_y, train_c):
+    """
+    scale and invert outputs depending on maximization/minimization, etc.
+    """
+
+    objectives = vocs['objectives']
+    objective_names = list(objectives.keys())
+
+    constraints = vocs['constraints']
+    constraint_names = list(constraints.keys())
+
+    # need to multiply -1 for each axis that we are using 'MINIMIZE' for an objective
+    # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a constraint
+    corrected_ref = ref.clone()
+    corrected_train_y = train_y.clone()
+    corrected_train_c = train_c.clone()
+
+    # negate objective measurements that want to be minimized
+    for j, name in zip(range(len(objective_names)), objective_names):
+        if vocs['objectives'][name] == 'MINIMIZE':
+            corrected_train_y[:, j] = -train_y[:, j]
+            corrected_ref[j] = -ref[j]
+
+        elif vocs['objectives'][name] == 'MAXIMIZE':
+            pass
+        else:
+            logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
+
+    # negate constraints that use 'GREATER_THAN'
+    for k, name in zip(range(len(constraint_names)), constraint_names):
+        if vocs['constraints'][name][0] == 'GREATER_THAN':
+            corrected_train_c[:, k] = (vocs['constraints'][name][1] - train_c[:, k])
+
+        elif vocs['constraints'][name][0] == 'LESS_THAN':
+            corrected_train_c[:, k] = -(vocs['constraints'][name][1] - train_c[:, k])
+        else:
+            logger.warning(f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
+
+    return corrected_train_y, corrected_train_c, corrected_ref
+
+
 def mobo(vocs, evaluate_f, ref,
          n_steps=30,
          mc_samples=128,
@@ -272,8 +316,7 @@ def mobo(vocs, evaluate_f, ref,
          return_model=False,
          initial_x=None,
          plot_acq=False,
-         use_gpu=True):
-
+         use_gpu=False):
     """
 
     Parameters
@@ -347,9 +390,6 @@ def mobo(vocs, evaluate_f, ref,
     if model_options is None:
         model_options = {}
 
-    # Logger
-    logger = logging.getLogger(__name__)
-
     if not use_gpu:
         tkwargs['device'] = 'cpu'
 
@@ -418,37 +458,12 @@ def mobo(vocs, evaluate_f, ref,
 
     # do optimization
     for i in range(n_steps):
-        # train model
 
-        # need to multiply -1 for each axis that we are using 'MINIMIZE' for an objective
-        # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a constraint
-        corrected_ref = ref.clone()
-        corrected_train_y = train_y.clone()
-        corrected_train_c = train_c.clone()
-
-        # negate objective measurements that want to be minimized
-        for j, name in zip(range(len(objective_names)), objective_names):
-            if vocs['objectives'][name] == 'MINIMIZE':
-                corrected_train_y[:, j] = -train_y[:, j]
-                corrected_ref[j] = -ref[j]
-
-            elif vocs['objectives'][name] == 'MAXIMIZE':
-                pass
-            else:
-                logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
+        # get corrected values
+        corrected_train_y, corrected_train_c, corrected_ref = get_corrected_outputs(vocs, ref, train_y, train_c)
 
         # standardize y training data
         standardized_train_y = standardize(corrected_train_y)
-
-        # negate constraints that use 'GREATER_THAN'
-        for k, name in zip(range(len(constraint_names)), constraint_names):
-            if vocs['constraints'][name][0] == 'GREATER_THAN':
-                corrected_train_c[:, k] = (vocs['constraints'][name][1] - train_c[:, k])
-
-            elif vocs['constraints'][name][0] == 'LESS_THAN':
-                corrected_train_c[:, k] = -(vocs['constraints'][name][1] - train_c[:, k])
-            else:
-                logger.warning(f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
 
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
@@ -520,6 +535,12 @@ def mobo(vocs, evaluate_f, ref,
                                     plot=True)
 
     if return_model:
+        # get corrected values
+        corrected_train_y, corrected_train_c, corrected_ref = get_corrected_outputs(vocs, ref, train_y, train_c)
+
+        # horiz. stack objective and constraint results for training/acq specification
+        train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
+
         model = SingleTaskGP(train_x, train_outputs,
                              input_transform=input_normalize,
                              **model_options)
