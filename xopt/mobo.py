@@ -367,7 +367,7 @@ def mobo(vocs, evaluate_f, ref,
         Specify if the algorithm should plot the GP predictions and acquisition function values in
         the input domain at the end of optimization.
 
-    use_gpu : bool, True
+    use_gpu : bool, False
         Specify if the algorithm should use GPU resources if available. Only use on large problems!
 
     Returns
