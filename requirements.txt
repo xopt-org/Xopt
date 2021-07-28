@@ -1,5 +1,8 @@
 deap
 numpy
 pyyaml
-botorch~=0.4.0
-gpytorch~=1.5.0
+torch
+botorch
+gpytorch
+pandas
+xopt
