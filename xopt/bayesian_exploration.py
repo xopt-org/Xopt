@@ -7,6 +7,7 @@ import time
 
 from functools import partial
 
+import botorch.models.model
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,7 +49,7 @@ class NoValidResultsError(Exception):
     pass
 
 
-def sampler_evaluate(inputs, evaluate_f, verbose=False):
+def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
     """
     Wrapper to catch any exceptions
 
@@ -58,11 +59,11 @@ def sampler_evaluate(inputs, evaluate_f, verbose=False):
     evaluate_f: a function that takes a dict with keys, and returns some output
 
     """
-    global outputs
+    outputs = None
     result = {}
 
     try:
-        outputs = evaluate_f(inputs)
+        outputs = evaluate_f(inputs, *eval_args)
         err = False
 
     except Exception as ex:
@@ -221,13 +222,14 @@ def bayesian_exploration(vocs, evaluate_f,
                          sigma=None,
                          executor=None,
                          n_initial_samples=5,
-                         model_options=None,
+                         custom_model=None,
                          seed=None,
                          output_path=None,
                          verbose=True,
                          return_model=False,
                          initial_x=None,
-                         use_gpu=False):
+                         use_gpu=False,
+                         eval_args=None):
     """
 
     Parameters
@@ -247,14 +249,17 @@ def bayesian_exploration(vocs, evaluate_f,
     batch_size : int, default: 1
         Number of candidates to generate at each optimization step
 
+    sigma : torch.Tensor, optional
+        Covariance matrix used for proximal biasing
+
     executor : futures.Executor, default: None
         Executor object to evaluate problem using multiple threads or processors
 
     n_initial_samples : int, defualt: 5
         Number of initial sobel_random samples to take to start optimization. Ignored if initial_x is not None.
 
-    model_options : dict, optional
-        Arguments to Gaussian Process model creation, ie. custom kernels, likelihoods
+    custom_model : callable, optional
+        Function in the form f(train_x, train_y) that returns a botorch model instance
 
     seed : int, optional
         Seed for random number generation to freeze random number generation.
@@ -274,6 +279,9 @@ def bayesian_exploration(vocs, evaluate_f,
     use_gpu : bool, False
         Specify if the algorithm should use GPU resources if available. Only use on large problems!
 
+    eval_args : list, []
+        List of positional arguments for evaluation function
+
     Returns
     -------
     train_x : torch.Tensor
@@ -290,9 +298,9 @@ def bayesian_exploration(vocs, evaluate_f,
 
     """
 
+    if eval_args is None:
+        eval_args = []
     random.seed(seed)
-    if model_options is None:
-        model_options = {}
 
     if not use_gpu:
         tkwargs['device'] = 'cpu'
@@ -351,7 +359,7 @@ def bayesian_exploration(vocs, evaluate_f,
     sampler_evaluate_args = {'verbose': verbose}
     initial_y = [executor.submit(sampler_evaluate,
                                  dict(zip(variable_names, x.cpu().numpy())),
-                                 evaluate_f,
+                                 evaluate_f, *eval_args,
                                  **sampler_evaluate_args) for x in initial_x]
     results = get_results(initial_y)
     train_x, train_y, train_c = collect_results(results, vocs)
@@ -370,14 +378,17 @@ def bayesian_exploration(vocs, evaluate_f,
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
 
-        model = SingleTaskGP(train_x, train_outputs,
-                             input_transform=input_normalize,
-                             **model_options)
+        # create model
+        if custom_model is None:
+            model = SingleTaskGP(train_x, train_outputs,
+                                 input_transform=input_normalize)
+
+        else:
+            model = custom_model(train_x, train_outputs)
+            assert isinstance(model, botorch.models.model.Model)
+
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         fit_gpytorch_model(mll)
-
-        # create MC sampler
-        mc_sampler = SobolQMCNormalSampler(mc_samples)
 
         # get candidate point(s)
         candidates = optimize_acq(model,
