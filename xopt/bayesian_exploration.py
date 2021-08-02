@@ -2,34 +2,23 @@ import logging
 import os
 import random
 import sys
-import traceback
 import time
-
+import traceback
 from functools import partial
 
 import botorch.models.model
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
 from botorch.acquisition import GenericMCObjective
-from botorch.acquisition.multi_objective.monte_carlo import qExpectedHypervolumeImprovement
-from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective
 from botorch.fit import fit_gpytorch_model
 from botorch.models.gp_regression import SingleTaskGP
 from botorch.models.transforms.input import Normalize
-from botorch.models.transforms.outcome import Standardize
 from botorch.optim.optimize import optimize_acqf
-from botorch.sampling.samplers import SobolQMCNormalSampler
-from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
-from botorch.utils.multi_objective.hypervolume import Hypervolume
-from botorch.utils.multi_objective.pareto import is_non_dominated
-from botorch.utils.transforms import standardize
 from botorch.utils.sampling import draw_sobol_samples
-from botorch.utils.transforms import unnormalize
+from botorch.utils.transforms import standardize
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 
-from xopt.tools import full_path, DummyExecutor
 from xopt.bayesian.acquisition.exploration import qBayesianExploration, BayesianExploration
+from xopt.tools import full_path, DummyExecutor
 
 """
     Bayesian Exploration Botorch
@@ -215,6 +204,22 @@ def get_corrected_constraints(vocs, train_c):
     return corrected_train_c
 
 
+def create_model(train_x, train_outputs, input_normalize, custom_model=None):
+    # create model
+    if custom_model is None:
+        model = SingleTaskGP(train_x, train_outputs,
+                             input_transform=input_normalize)
+
+    else:
+        model = custom_model(train_x, train_outputs)
+        assert isinstance(model, botorch.models.model.Model)
+
+    mll = ExactMarginalLogLikelihood(model.likelihood, model)
+    fit_gpytorch_model(mll)
+
+    return model
+
+
 def bayesian_exploration(vocs, evaluate_f,
                          n_steps=30,
                          mc_samples=128,
@@ -378,17 +383,7 @@ def bayesian_exploration(vocs, evaluate_f,
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
 
-        # create model
-        if custom_model is None:
-            model = SingleTaskGP(train_x, train_outputs,
-                                 input_transform=input_normalize)
-
-        else:
-            model = custom_model(train_x, train_outputs)
-            assert isinstance(model, botorch.models.model.Model)
-
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_model(mll)
+        model = create_model(train_x, train_outputs, input_normalize, custom_model)
 
         # get candidate point(s)
         candidates = optimize_acq(model,
@@ -424,12 +419,8 @@ def bayesian_exploration(vocs, evaluate_f,
 
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
+        model = create_model(train_x, train_outputs, input_normalize, custom_model)
 
-        model = SingleTaskGP(train_x, train_outputs,
-                             input_transform=input_normalize,
-                             **model_options)
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_model(mll)
         return train_x, train_y, train_c, model
 
     else:
