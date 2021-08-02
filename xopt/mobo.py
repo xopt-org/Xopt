@@ -22,6 +22,7 @@ from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 from botorch.utils.sampling import draw_sobol_samples
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
+#from botorch.utils import standardize
 
 from xopt.bayesian.utils import standardize
 from xopt.tools import full_path, DummyExecutor
@@ -461,7 +462,7 @@ def mobo(vocs, evaluate_f, ref,
         corrected_train_y, corrected_train_c, corrected_ref = get_corrected_outputs(vocs, ref, train_y, train_c)
 
         # standardize y training data - use xopt version to allow for nans
-        standardized_train_y = standardize(train_y)
+        standardized_train_y = standardize(corrected_train_y)
 
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
