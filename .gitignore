@@ -9,6 +9,8 @@ xopt.egg-info
 #pycharm files
 .idea
 
+# python files in examples
+examples/*.py
 
 
 # Jupyter Notebook
