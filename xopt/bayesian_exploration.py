@@ -14,11 +14,12 @@ from botorch.models.gp_regression import SingleTaskGP
 from botorch.models.transforms.input import Normalize
 from botorch.optim.optimize import optimize_acqf
 from botorch.utils.sampling import draw_sobol_samples
-from botorch.utils.transforms import standardize
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 
 from xopt.bayesian.acquisition.exploration import qBayesianExploration, BayesianExploration
+from xopt.bayesian.utils import standardize
 from xopt.tools import full_path, DummyExecutor
+
 
 """
     Bayesian Exploration Botorch
@@ -209,13 +210,13 @@ def create_model(train_x, train_outputs, input_normalize, custom_model=None):
     if custom_model is None:
         model = SingleTaskGP(train_x, train_outputs,
                              input_transform=input_normalize)
+        mll = ExactMarginalLogLikelihood(model.likelihood, model)
+        fit_gpytorch_model(mll)
 
     else:
-        model = custom_model(train_x, train_outputs)
+        model = custom_model(train_x, train_outputs,
+                             input_transform = input_normalize)
         assert isinstance(model, botorch.models.model.Model)
-
-    mll = ExactMarginalLogLikelihood(model.likelihood, model)
-    fit_gpytorch_model(mll)
 
     return model
 
@@ -377,7 +378,7 @@ def bayesian_exploration(vocs, evaluate_f,
         # get corrected values
         corrected_train_c = get_corrected_constraints(vocs, train_c)
 
-        # standardize y training data
+        # standardize y training data - use xopt version to allow for nans
         standardized_train_y = standardize(train_y)
 
         # horiz. stack objective and constraint results for training/acq specification

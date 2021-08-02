@@ -3,6 +3,7 @@ from botorch.acquisition import MCAcquisitionFunction, AnalyticAcquisitionFuncti
 from botorch.acquisition.analytic import _construct_dist
 from botorch.utils.objective import apply_constraints_nonnegative_soft
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform, convert_to_target_pre_hook
+from botorch.models.gpytorch import GPyTorchModel, ModelListGPyTorchModel
 
 
 class BayesianExploration(AnalyticAcquisitionFunction):
@@ -43,7 +44,13 @@ class BayesianExploration(AnalyticAcquisitionFunction):
 
         # define sigma matrix for proximal term - if not defined set to very large
         if sigma is None:
-            self.sigma = torch.eye(self.model.train_inputs[0].shape[-1]) * 1e6
+            if isinstance(self.model, ModelListGPyTorchModel):
+                self.sigma = torch.eye(self.model.train_inputs[0][0].shape[-1]) * 1e6
+            elif isinstance(self.model, GPyTorchModel):
+                self.sigma = torch.eye(self.model.train_inputs[0].shape[-1]) * 1e6
+            else:
+                raise NotImplementedError('Get Ryan to make corrections for this type of model in proximal acq, '
+                                          'or specify your own sigma matrix')
         else:
             self.sigma = sigma
 
@@ -74,7 +81,10 @@ class BayesianExploration(AnalyticAcquisitionFunction):
 
     def _calculate_proximal(self, X):
         # get last observation point
-        last_x = self.model.train_inputs[0][0, -1]
+        try:
+            last_x = self.model.last_x
+        except AttributeError:
+            last_x = self.model.train_inputs[0][0][-1]
 
         # create probability dist
         self.sigma = self.sigma.type(last_x.type())

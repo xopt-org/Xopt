@@ -15,17 +15,15 @@ from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputO
 from botorch.fit import fit_gpytorch_model
 from botorch.models.gp_regression import SingleTaskGP
 from botorch.models.transforms.input import Normalize
-from botorch.models.transforms.outcome import Standardize
 from botorch.optim.optimize import optimize_acqf
 from botorch.sampling.samplers import SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
-from botorch.utils.transforms import standardize
 from botorch.utils.sampling import draw_sobol_samples
-from botorch.utils.transforms import unnormalize
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 
+from xopt.bayesian.utils import standardize
 from xopt.tools import full_path, DummyExecutor
 
 """
@@ -462,8 +460,8 @@ def mobo(vocs, evaluate_f, ref,
         # get corrected values
         corrected_train_y, corrected_train_c, corrected_ref = get_corrected_outputs(vocs, ref, train_y, train_c)
 
-        # standardize y training data
-        standardized_train_y = standardize(corrected_train_y)
+        # standardize y training data - use xopt version to allow for nans
+        standardized_train_y = standardize(train_y)
 
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
