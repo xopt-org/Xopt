@@ -302,7 +302,8 @@ def get_corrected_outputs(vocs, ref, train_y, train_c):
     return corrected_train_y, corrected_train_c, corrected_ref
 
 
-def mobo(vocs, evaluate_f, ref,
+def mobo(vocs, evaluate_f,
+         ref=None,
          n_steps=30,
          mc_samples=128,
          batch_size=1,
@@ -391,6 +392,11 @@ def mobo(vocs, evaluate_f, ref,
 
     if not use_gpu:
         tkwargs['device'] = 'cpu'
+
+    if ref is None:
+        raise ValueError('Need to specify reference point with numpy')
+    else:
+        ref = torch.tensor(ref)
 
     # convert ref tensor to match model device
     ref = ref.to(**tkwargs)

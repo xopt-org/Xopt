@@ -68,7 +68,7 @@ class Xopt:
         self.verbose = verbose
         self.configured = False
 
-        self.population = None
+        self.results = None
 
         if config:
             self.config = load_config(config, verbose=self.verbose)
@@ -171,19 +171,16 @@ class Xopt:
         alg = self.algorithm['name']
         self.algorithm['options']['executor'] = executor
 
+        algorithms = ['random_sampler', 'bayesian_exploration', 'mobo']
+
         if alg == 'cnsga':
             self.run_cnsga(executor=executor)
 
-        elif alg == 'random_sampler':
-            self.population = self.run_f(self.vocs,
-                                         self.evaluate,
-                                         output_path=self.config['xopt']['output_path'],
-                                         **self.algorithm['options'])
-        elif alg == 'bayesian_exploration':
-            self.run_f(self.vocs,
-                       self.evaluate,
-                       output_path=self.config['xopt']['output_path'],
-                       **self.algorithm['options'])
+        elif alg in algorithms:
+            self.results = self.run_f(self.vocs,
+                                      self.evaluate,
+                                      output_path=self.config['xopt']['output_path'],
+                                      **self.algorithm['options'])
 
         else:
             raise Exception(f'Unknown algorithm {alg}')
