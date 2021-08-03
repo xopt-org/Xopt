@@ -12,8 +12,7 @@ import os
 
 XOPT_DEFAULTS = {
     'output_path': '.',
-    'verbose': True,
-    'algorithm': 'cnsga'
+    'verbose': True
 }
 
 SIMULATION_DEFAULTS = {
@@ -170,6 +169,7 @@ class Xopt:
         self.vprint(f'Starting at time {isotime()}')
 
         alg = self.algorithm['name']
+        self.algorithm['options']['executor'] = executor
 
         if alg == 'cnsga':
             self.run_cnsga(executor=executor)
