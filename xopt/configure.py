@@ -24,7 +24,7 @@ ALGORITHM_DEFAULTS = {
 
 def configure_algorithm(config):
     """
-    Configures a simulation config dict. The dict should have:
+    Configures a algorithm config dict. The dict should have:
     
     'name': <string that VOCS refers to>
     'function': <fully qualified function name>
