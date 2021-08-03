@@ -16,10 +16,10 @@ from botorch.optim.optimize import optimize_acqf
 from botorch.utils.sampling import draw_sobol_samples
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 
-from xopt.bayesian.acquisition.exploration import qBayesianExploration, BayesianExploration
-from xopt.bayesian.utils import standardize
-from xopt.tools import full_path, DummyExecutor
-
+from .bayesian.acquisition.exploration import qBayesianExploration, BayesianExploration
+from .bayesian.utils import standardize, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
+from .bayesian.models.models import create_model
+from .tools import full_path, DummyExecutor
 
 """
     Bayesian Exploration Botorch
@@ -33,96 +33,6 @@ tkwargs = {
 
 # Logger
 logger = logging.getLogger(__name__)
-
-
-class NoValidResultsError(Exception):
-    pass
-
-
-def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
-    """
-    Wrapper to catch any exceptions
-
-
-    inputs: possible inputs to evaluate_f (a single positional argument)
-
-    evaluate_f: a function that takes a dict with keys, and returns some output
-
-    """
-    outputs = None
-    result = {}
-
-    try:
-        outputs = evaluate_f(inputs, *eval_args)
-        err = False
-
-    except Exception as ex:
-        outputs = {'Exception': str(ex),
-                   'Traceback': traceback.print_tb(ex.__traceback__)}
-        err = True
-        if verbose:
-            print(outputs)
-
-    finally:
-        result['inputs'] = inputs
-        result['outputs'] = outputs
-        result['error'] = err
-
-    return result
-
-
-def get_results(futures):
-    # check the status of all futures
-    results = []
-    done = False
-    ii = 1
-    n_samples = len(futures)
-    while not done:
-        for ix in range(n_samples):
-            fut = futures[ix]
-
-            if not fut.done():
-                continue
-
-            results.append(fut.result())
-            ii += 1
-
-        if ii > n_samples:
-            done = True
-
-        # Slow down polling. Needed for MPI to work well.
-        time.sleep(0.001)
-
-    return results
-
-
-def collect_results(results, vocs):
-    """
-        Collect successful measurement results into torch tensors to add to training data
-    """
-
-    train_x = []
-    train_y = []
-    train_c = []
-
-    at_least_one_point = False
-
-    for result in results:
-        if not result['error']:
-            train_x += [[result['inputs'][ele] for ele in vocs['variables'].keys()]]
-            train_y += [[result['outputs'][ele] for ele in vocs['objectives'].keys()]]
-            train_c += [[result['outputs'][ele] for ele in vocs['constraints'].keys()]]
-
-            at_least_one_point = True
-
-    if not at_least_one_point:
-        raise NoValidResultsError('No valid results')
-
-    train_x = torch.tensor(train_x, **tkwargs)
-    train_y = torch.tensor(train_y, **tkwargs)
-    train_c = torch.tensor(train_c, **tkwargs)
-
-    return train_x, train_y, train_c
 
 
 def optimize_acq(model,
@@ -179,46 +89,6 @@ def optimize_acq(model,
     )
 
     return candidates.detach()
-
-
-def get_corrected_constraints(vocs, train_c):
-    """
-    scale and invert outputs depending on maximization/minimization, etc.
-    """
-
-    constraints = vocs['constraints']
-    constraint_names = list(constraints.keys())
-
-    # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a constraint
-    corrected_train_c = train_c.clone()
-
-    # negate constraints that use 'GREATER_THAN'
-    for k, name in zip(range(len(constraint_names)), constraint_names):
-        if vocs['constraints'][name][0] == 'GREATER_THAN':
-            corrected_train_c[:, k] = (vocs['constraints'][name][1] - train_c[:, k])
-
-        elif vocs['constraints'][name][0] == 'LESS_THAN':
-            corrected_train_c[:, k] = -(vocs['constraints'][name][1] - train_c[:, k])
-        else:
-            logger.warning(f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
-
-    return corrected_train_c
-
-
-def create_model(train_x, train_outputs, input_normalize, custom_model=None):
-    # create model
-    if custom_model is None:
-        model = SingleTaskGP(train_x, train_outputs,
-                             input_transform=input_normalize)
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_model(mll)
-
-    else:
-        model = custom_model(train_x, train_outputs,
-                             input_transform = input_normalize)
-        assert isinstance(model, botorch.models.model.Model)
-
-    return model
 
 
 def bayesian_exploration(vocs, evaluate_f,
@@ -367,19 +237,17 @@ def bayesian_exploration(vocs, evaluate_f,
                                  dict(zip(variable_names, x.cpu().numpy())),
                                  evaluate_f, *eval_args,
                                  **sampler_evaluate_args) for x in initial_x]
-    results = get_results(initial_y)
-    train_x, train_y, train_c = collect_results(results, vocs)
 
-    hv_track = []
+    train_x, train_y, train_c = collect_results(initial_y, vocs)
 
     # do optimization
     for i in range(n_steps):
 
         # get corrected values
-        corrected_train_c = get_corrected_constraints(vocs, train_c)
+        corrected_train_y, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
 
         # standardize y training data - use xopt version to allow for nans
-        standardized_train_y = standardize(train_y)
+        standardized_train_y = standardize(corrected_train_y)
 
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
@@ -401,10 +269,8 @@ def bayesian_exploration(vocs, evaluate_f,
                                dict(zip(variable_names, x.cpu().numpy())),
                                evaluate_f,
                                **sampler_evaluate_args) for x in candidates]
-        results = get_results(fut)
-
         try:
-            new_x, new_y, new_c = collect_results(results, vocs)
+            new_x, new_y, new_c = collect_results(fut, vocs)
 
             # add new observations to training data
             train_x = torch.vstack((train_x, new_x))
@@ -414,15 +280,21 @@ def bayesian_exploration(vocs, evaluate_f,
             print('No valid results found, skipping to next iteration')
             continue
 
-    if return_model:
-        # get corrected values
-        corrected_train_c = get_corrected_constraints(vocs, train_y, train_c)
+    # get corrected values
+    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
+    feas = torch.all(corrected_train_c < 0.0, dim=-1)
+    constraint_status = corrected_train_c < 0.0
 
-        # horiz. stack objective and constraint results for training/acq specification
-        train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
-        model = create_model(train_x, train_outputs, input_normalize, custom_model)
+    # horiz. stack objective and constraint results for training/acq specification
+    standardized_train_y = standardize(train_y)
+    train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
+    model = create_model(train_x, train_outputs, input_normalize, custom_model)
 
-        return train_x, train_y, train_c, model
+    results = {'inputs': train_x.cpu(),
+               'objectives': train_y.cpu(),
+               'constraints': train_c.cpu(),
+               'constraint_status': constraint_status.cpu(),
+               'feasibility': feas.cpu(),
+               'model': model.cpu()}
 
-    else:
-        return train_x.cpu(), train_y.cpu(), train_c.cpu()
+    return results
