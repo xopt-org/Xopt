@@ -13,7 +13,7 @@ class NoValidResultsError(Exception):
 logger = logging.getLogger(__name__)
 
 
-def get_corrected_outputs(vocs, train_y, train_c, ref=None):
+def get_corrected_outputs(vocs, train_y, train_c):
     """
     scale and invert outputs depending on maximization/minimization, etc.
     """
@@ -26,8 +26,6 @@ def get_corrected_outputs(vocs, train_y, train_c, ref=None):
 
     # need to multiply -1 for each axis that we are using 'MINIMIZE' for an objective
     # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a constraint
-    if ref is not None:
-        corrected_ref = ref.clone()
     corrected_train_y = train_y.clone()
     corrected_train_c = train_c.clone()
 
@@ -35,9 +33,6 @@ def get_corrected_outputs(vocs, train_y, train_c, ref=None):
     for j, name in zip(range(len(objective_names)), objective_names):
         if vocs['objectives'][name] == 'MINIMIZE':
             corrected_train_y[:, j] = -train_y[:, j]
-
-            if ref is not None:
-                corrected_ref[j] = -ref[j]
 
         elif vocs['objectives'][name] == 'MAXIMIZE' or vocs['objectives'][name] == 'None':
             pass
@@ -54,10 +49,7 @@ def get_corrected_outputs(vocs, train_y, train_c, ref=None):
         else:
             logger.warning(f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
 
-    if ref is not None:
-        return corrected_train_y, corrected_train_c, corrected_ref
-    else:
-        return corrected_train_y, corrected_train_c
+    return corrected_train_y, corrected_train_c
 
 
 def parse_vocs(vocs):
