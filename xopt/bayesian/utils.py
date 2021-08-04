@@ -104,18 +104,16 @@ def get_results(futures):
     done = False
     ii = 1
     n_samples = len(futures)
-    while not done:
-        for ix in range(n_samples):
-            fut = futures[ix]
 
-            if not fut.done():
-                continue
-
-            results.append(fut.result())
-            ii += 1
-
-        if ii > n_samples:
-            done = True
+    while True:
+        if len(futures) == 0:
+            break
+        else:
+            # get the first element of futures - if done delete the element
+            fut = futures[0]
+            if fut.done():
+                results.append(fut.result())
+                del futures[0]
 
         # Slow down polling. Needed for MPI to work well.
         time.sleep(0.001)
