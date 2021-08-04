@@ -11,7 +11,7 @@ xopt.egg-info
 
 # python files in examples
 examples/*.py
-
+tests/*
 
 # Jupyter Notebook
 .ipynb_checkpoints

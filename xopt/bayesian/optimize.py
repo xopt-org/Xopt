@@ -83,17 +83,8 @@ def bayesian_optimize(vocs, evaluate_f,
 
     Returns
     -------
-    train_x : torch.Tensor
-        Observed variable values
-
-    train_y : torch.Tensor
-        Observed objective values
-
-    train_c : torch.Tensor
-        Observed constraint values
-
-    model : SingleTaskGP
-        If return_model = True this contains the final trained model for objectives and constraints.
+    results : dict
+        Dictionary object containing optimization points + other info
 
     """
 
@@ -182,7 +173,7 @@ def bayesian_optimize(vocs, evaluate_f,
                                evaluate_f,
                                **sampler_evaluate_args) for x in candidates]
         try:
-            new_x, new_y, new_c = collect_results(fut, vocs)
+            new_x, new_y, new_c = collect_results(fut, vocs, **tkwargs)
 
             # add new observations to training data
             train_x = torch.vstack((train_x, new_x))
