@@ -3,6 +3,7 @@ import os
 import random
 import sys
 
+import pandas as pd
 import torch
 from botorch.models.gp_regression import SingleTaskGP
 from botorch.models.transforms.input import Normalize
@@ -35,6 +36,7 @@ def bayesian_optimize(vocs, evaluate_f,
                       seed=None,
                       output_path=None,
                       verbose=True,
+                      restart_data_file=None,
                       initial_x=None,
                       use_gpu=False,
                       eval_args=None,
@@ -72,6 +74,9 @@ def bayesian_optimize(vocs, evaluate_f,
     verbose : bool, default: False
         Specify if the algorithm should print optimization progress.
 
+    restart_data_file : str, optional
+        Pickled pandas data frame object containing initial data for restarting optimization.
+
     initial_x : torch.Tensor, optional
         Initial input points to sample evaluator at, causes sampling to ignore n_initial_samples
 
@@ -94,6 +99,9 @@ def bayesian_optimize(vocs, evaluate_f,
 
     if not use_gpu:
         tkwargs['device'] = 'cpu'
+
+    if output_path is None:
+        output_path = ''
 
     # Verbose print helper
     def vprint(*a, **k):
@@ -134,18 +142,26 @@ def bayesian_optimize(vocs, evaluate_f,
     # inputs are normalized in [0,1]
     input_normalize = Normalize(len(variable_names), bounds)
 
-    # generate initial samples if no initial samples are given
-    if initial_x is None:
-        initial_x = draw_sobol_samples(bounds, 1, n_initial_samples)[0]
-
-    # submit evaluation of initial samples
     sampler_evaluate_args = {'verbose': verbose}
-    initial_y = [executor.submit(sampler_evaluate,
-                                 dict(zip(variable_names, x.cpu().numpy())),
-                                 evaluate_f, *eval_args,
-                                 **sampler_evaluate_args) for x in initial_x]
 
-    train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
+    # generate initial samples if no initial samples are given
+    if restart_data_file is None:
+        if initial_x is None:
+            initial_x = draw_sobol_samples(bounds, 1, n_initial_samples)[0]
+
+        # submit evaluation of initial samples
+        initial_y = [executor.submit(sampler_evaluate,
+                                     dict(zip(variable_names, x.cpu().numpy())),
+                                     evaluate_f, *eval_args,
+                                     **sampler_evaluate_args) for x in initial_x]
+
+        train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
+
+    else:
+        df = pd.read_pickle(restart_data_file)
+        train_x = torch.tensor(df[vocs['variables'].keys()].to_numpy())
+        train_y = torch.tensor(df[vocs['objectives'].keys()].to_numpy())
+        train_c = torch.tensor(df[vocs['constraints'].keys()].to_numpy())
 
     # do optimization
     for i in range(n_steps):
@@ -179,14 +195,26 @@ def bayesian_optimize(vocs, evaluate_f,
             train_x = torch.vstack((train_x, new_x))
             train_y = torch.vstack((train_y, new_y))
             train_c = torch.vstack((train_c, new_c))
+
+            # get feasibility values
+            _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
+            feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
+            constraint_status = corrected_train_c < 0.0
+
+            # add data to pandas array for storage
+            full_data = torch.hstack((train_x, train_y, train_c, constraint_status, feas))
+            labels = list(vocs['variables'].keys()) + \
+                     list(vocs['objectives'].keys()) + \
+                     list(vocs['constraints'].keys()) + \
+                     [ele + '_stat' for ele in vocs['constraints'].keys()] + \
+                     ['feasibility']
+
+            df = pd.DataFrame(full_data.numpy(), columns=labels)
+            df.to_pickle(output_path + 'opt_data.pkl')
+
         except NoValidResultsError:
             print('No valid results found, skipping to next iteration')
             continue
-
-    # get corrected values
-    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
-    feas = torch.all(corrected_train_c < 0.0, dim=-1)
-    constraint_status = corrected_train_c < 0.0
 
     # horiz. stack objective and constraint results for training/acq specification
     standardized_train_y = standardize(train_y)
