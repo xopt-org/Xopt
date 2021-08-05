@@ -53,6 +53,7 @@ def bayesian_optimize(vocs, evaluate_f,
 
     gen_candidate : callable
         Callable that takes the form f(model, bounds, vocs, **kwargs) and returns 1 or more candidates
+
     n_steps : int, default: 30
         Number of optimization steps to take
 
@@ -186,7 +187,7 @@ def bayesian_optimize(vocs, evaluate_f,
         # observe candidates
         fut = [executor.submit(sampler_evaluate,
                                dict(zip(variable_names, x.cpu().numpy())),
-                               evaluate_f,
+                               evaluate_f, *eval_args,
                                **sampler_evaluate_args) for x in candidates]
         try:
             new_x, new_y, new_c = collect_results(fut, vocs, **tkwargs)
