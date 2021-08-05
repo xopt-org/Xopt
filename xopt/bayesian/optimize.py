@@ -5,7 +5,6 @@ import sys
 
 import pandas as pd
 import torch
-from botorch.models.gp_regression import SingleTaskGP
 from botorch.models.transforms.input import Normalize
 from botorch.utils.sampling import draw_sobol_samples
 
@@ -159,7 +158,7 @@ def bayesian_optimize(vocs, evaluate_f,
         train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
 
     else:
-        df = pd.read_pickle(restart_data_file)
+        df = pd.read_json(restart_data_file)
         train_x = torch.tensor(df[vocs['variables'].keys()].to_numpy())
         train_y = torch.tensor(df[vocs['objectives'].keys()].to_numpy())
         train_c = torch.tensor(df[vocs['constraints'].keys()].to_numpy())
@@ -211,7 +210,7 @@ def bayesian_optimize(vocs, evaluate_f,
                      ['feasibility']
 
             df = pd.DataFrame(full_data.numpy(), columns=labels)
-            df.to_pickle(output_path + 'opt_data.pkl')
+            df.to_json(output_path + 'opt_data.json')
 
         except NoValidResultsError:
             print('No valid results found, skipping to next iteration')
