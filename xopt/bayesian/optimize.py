@@ -5,6 +5,7 @@ import sys
 
 import pandas as pd
 import torch
+from botorch.models.transforms import Standardize
 from botorch.models.transforms.input import Normalize
 from botorch.utils.sampling import draw_sobol_samples
 
@@ -218,7 +219,12 @@ def bayesian_optimize(vocs, evaluate_f,
 
     # horiz. stack objective and constraint results for training/acq specification
     train_outputs = torch.hstack((train_y, train_c))
-    model = create_model(train_x, train_outputs, input_normalize, custom_model)
+    
+    # output transformer
+    output_standardize = Standardize(train_outputs.shape[-1])
+    model = create_model(train_x, train_outputs,
+                         input_normalize, custom_model,
+                         outcome_transform=output_standardize)
 
     results = {'inputs': train_x.cpu(),
                'objectives': train_y.cpu(),
