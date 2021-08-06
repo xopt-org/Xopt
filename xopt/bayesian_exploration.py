@@ -16,14 +16,14 @@ from .bayesian.optimize import bayesian_optimize
 logger = logging.getLogger(__name__)
 
 
-def bayes_exp(model,
-              bounds,
-              vocs,
-              sigma=None,
-              sampler=None,
-              batch_size=1,
-              num_restarts=20,
-              raw_samples=1024):
+def bayes_exp_acq(model,
+                  bounds,
+                  vocs,
+                  sigma=None,
+                  sampler=None,
+                  batch_size=1,
+                  num_restarts=20,
+                  raw_samples=1024):
     """
 
     Optimize Bayesian Exploration
@@ -75,4 +75,4 @@ def bayes_exp(model,
 
 
 def bayesian_exploration(vocs, evaluate_f, **kwargs):
-    return bayesian_optimize(vocs, evaluate_f, bayes_exp, **kwargs)
+    return bayesian_optimize(vocs, evaluate_f, bayes_exp_acq, **kwargs)
