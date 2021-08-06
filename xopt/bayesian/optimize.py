@@ -217,8 +217,7 @@ def bayesian_optimize(vocs, evaluate_f,
             continue
 
     # horiz. stack objective and constraint results for training/acq specification
-    standardized_train_y = standardize(train_y)
-    train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
+    train_outputs = torch.hstack((train_y, train_c))
     model = create_model(train_x, train_outputs, input_normalize, custom_model)
 
     results = {'inputs': train_x.cpu(),
