@@ -3,6 +3,7 @@ import numpy as np
 import time
 import traceback
 import logging
+import pandas as pd
 
 
 class NoValidResultsError(Exception):
@@ -34,10 +35,11 @@ def get_corrected_outputs(vocs, train_y, train_c):
         if vocs['objectives'][name] == 'MINIMIZE':
             corrected_train_y[:, j] = -train_y[:, j]
 
-        elif vocs['objectives'][name] == 'MAXIMIZE' or vocs['objectives'][name] == 'None':
-            pass
+        #elif vocs['objectives'][name] == 'MAXIMIZE' or vocs['objectives'][name] == 'None':
+        #    pass
         else:
-            logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
+            pass
+            #logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
 
     # negate constraints that use 'GREATER_THAN'
     for k, name in zip(range(len(constraint_names)), constraint_names):

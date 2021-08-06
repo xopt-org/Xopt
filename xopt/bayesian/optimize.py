@@ -5,12 +5,14 @@ import sys
 
 import pandas as pd
 import torch
+from copy import deepcopy
 from botorch.models.transforms import Standardize
 from botorch.models.transforms.input import Normalize
 from botorch.utils.sampling import draw_sobol_samples
 
 from .models.models import create_model
 from .utils import standardize, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
+from .data import save_data_dict, save_data_pd, get_data_json
 from ..tools import full_path, DummyExecutor
 
 """
@@ -27,7 +29,7 @@ tkwargs = {
 logger = logging.getLogger(__name__)
 
 
-def bayesian_optimize(vocs, evaluate_f,
+def bayesian_optimize(config, evaluate_f,
                       gen_candidate,
                       n_steps=30,
                       executor=None,
@@ -45,7 +47,7 @@ def bayesian_optimize(vocs, evaluate_f,
 
     Parameters
     ----------
-    vocs : dict
+    config : dict
         Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
 
     evaluate_f : callable
@@ -93,6 +95,18 @@ def bayesian_optimize(vocs, evaluate_f,
         Dictionary object containing optimization points + other info
 
     """
+
+    try:
+        vocs = config['vocs']
+
+    except KeyError:
+        config['vocs'] = deepcopy(config)
+        config['xopt'] = {'verbose': verbose,
+                          'output_path': output_path}
+        for ele in config['vocs'].keys():
+            del config[ele]
+
+        vocs = config['vocs']
 
     if eval_args is None:
         eval_args = []
@@ -159,10 +173,7 @@ def bayesian_optimize(vocs, evaluate_f,
         train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
 
     else:
-        df = pd.read_json(restart_data_file)
-        train_x = torch.tensor(df[vocs['variables'].keys()].to_numpy())
-        train_y = torch.tensor(df[vocs['objectives'].keys()].to_numpy())
-        train_c = torch.tensor(df[vocs['constraints'].keys()].to_numpy())
+        train_x, train_y, train_c = get_data_json(restart_data_file, vocs, **tkwargs)
 
     # do optimization
     for i in range(n_steps):
@@ -202,16 +213,8 @@ def bayesian_optimize(vocs, evaluate_f,
             feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
             constraint_status = corrected_train_c < 0.0
 
-            # add data to pandas array for storage
             full_data = torch.hstack((train_x, train_y, train_c, constraint_status, feas))
-            labels = list(vocs['variables'].keys()) + \
-                     list(vocs['objectives'].keys()) + \
-                     list(vocs['constraints'].keys()) + \
-                     [ele + '_stat' for ele in vocs['constraints'].keys()] + \
-                     ['feasibility']
-
-            df = pd.DataFrame(full_data.numpy(), columns=labels)
-            df.to_json(output_path + 'opt_data.json')
+            save_data_dict(config, full_data)
 
         except NoValidResultsError:
             print('No valid results found, skipping to next iteration')
@@ -219,7 +222,7 @@ def bayesian_optimize(vocs, evaluate_f,
 
     # horiz. stack objective and constraint results for training/acq specification
     train_outputs = torch.hstack((train_y, train_c))
-    
+
     # output transformer
     output_standardize = Standardize(train_outputs.shape[-1])
     model = create_model(train_x, train_outputs,

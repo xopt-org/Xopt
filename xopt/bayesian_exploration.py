@@ -74,5 +74,5 @@ def bayes_exp_acq(model,
     return candidates.detach()
 
 
-def bayesian_exploration(vocs, evaluate_f, **kwargs):
-    return bayesian_optimize(vocs, evaluate_f, bayes_exp_acq, **kwargs)
+def bayesian_exploration(config, evaluate_f, **kwargs):
+    return bayesian_optimize(config, evaluate_f, bayes_exp_acq, **kwargs)

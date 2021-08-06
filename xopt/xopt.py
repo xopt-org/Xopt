@@ -169,7 +169,7 @@ class Xopt:
         self.vprint(f'Starting at time {isotime()}')
 
         alg = self.algorithm['name']
-        self.algorithm['options']['executor'] = executor
+        #self.algorithm['options']['executor'] = executor
 
         algorithms = ['random_sampler', 'bayesian_exploration', 'mobo']
 
@@ -177,7 +177,7 @@ class Xopt:
             self.run_cnsga(executor=executor)
 
         elif alg in algorithms:
-            self.results = self.run_f(self.vocs,
+            self.results = self.run_f(self.config,
                                       self.evaluate,
                                       output_path=self.config['xopt']['output_path'],
                                       **self.algorithm['options'])
