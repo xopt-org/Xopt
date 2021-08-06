@@ -95,18 +95,7 @@ def bayesian_optimize(config, evaluate_f,
         Dictionary object containing optimization points + other info
 
     """
-
-    try:
-        vocs = config['vocs']
-
-    except KeyError:
-        config['vocs'] = deepcopy(config)
-        config['xopt'] = {'verbose': verbose,
-                          'output_path': output_path}
-        for ele in config['vocs'].keys():
-            del config[ele]
-
-        vocs = config['vocs']
+    vocs = config['vocs']
 
     if eval_args is None:
         eval_args = []

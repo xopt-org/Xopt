@@ -9,6 +9,7 @@ from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputO
 from botorch.optim.optimize import optimize_acqf
 from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
 
+from .bayesian.utils import check_config
 from .bayesian.optimize import bayesian_optimize
 
 """
@@ -166,6 +167,6 @@ def get_corrected_ref(vocs, ref):
 
 
 def mobo(config, evaluate_f, **kwargs):
-
+    config = check_config(config, **kwargs)
     ref = get_corrected_ref(config['vocs'], kwargs.pop('ref'))
     return bayesian_optimize(config, evaluate_f, opt_mobo, ref_point=ref, **kwargs)
