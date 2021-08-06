@@ -2,7 +2,6 @@
 Tools to configure an xopt run
 
 """
-import xopt.bayesian_exploration
 from xopt import tools
 
 # -----------------------
