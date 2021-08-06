@@ -6,7 +6,7 @@ from botorch.optim.optimize import optimize_acqf
 
 from .bayesian.acquisition.exploration import qBayesianExploration, BayesianExploration
 from .bayesian.optimize import bayesian_optimize
-
+from .bayesian.utils import check_config
 """
     Bayesian Exploration Botorch
 
@@ -75,4 +75,5 @@ def bayes_exp_acq(model,
 
 
 def bayesian_exploration(config, evaluate_f, **kwargs):
+    config = check_config(config, **kwargs)
     return bayesian_optimize(config, evaluate_f, bayes_exp_acq, **kwargs)

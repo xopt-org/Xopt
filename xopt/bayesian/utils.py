@@ -3,7 +3,7 @@ import numpy as np
 import time
 import traceback
 import logging
-import pandas as pd
+from copy import deepcopy
 
 
 class NoValidResultsError(Exception):
@@ -12,6 +12,20 @@ class NoValidResultsError(Exception):
 
 # Logger
 logger = logging.getLogger(__name__)
+
+
+def check_config(config, **kwargs):
+    try:
+        vocs = config['vocs']
+
+    except KeyError:
+        config['vocs'] = deepcopy(config)
+        config['xopt'] = {'verbose': kwargs.get('verbose', False),
+                          'output_path': kwargs.get('output_path', '')}
+        for ele in config['vocs'].keys():
+            del config[ele]
+
+    return config
 
 
 def get_corrected_outputs(vocs, train_y, train_c):
