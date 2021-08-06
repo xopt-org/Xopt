@@ -165,7 +165,7 @@ def get_corrected_ref(vocs, ref):
     return ref
 
 
-def mobo(vocs, evaluate_f, **kwargs):
+def mobo(config, evaluate_f, **kwargs):
 
-    ref = get_corrected_ref(vocs, kwargs.pop('ref'))
-    return bayesian_optimize(vocs, evaluate_f, opt_mobo, ref_point=ref, **kwargs)
+    ref = get_corrected_ref(config['vocs'], kwargs.pop('ref'))
+    return bayesian_optimize(config, evaluate_f, opt_mobo, ref_point=ref, **kwargs)

@@ -37,6 +37,11 @@ class NanEnabledModelListGP(IndependentModelList, ModelListGPyTorchModel):
                     raise ModelCreationError('No valid measurements passed to model')
 
                 # create single task model and add to list
+
+                # modify output transform if given
+                if 'outcome_transform' in kwargs.keys():
+                    kwargs['outcome_transform']._m = 1
+
                 submodel = SingleTaskGP(temp_train_x, temp_train_y, **kwargs)
 
                 mll = ExactMarginalLogLikelihood(submodel.likelihood, submodel)

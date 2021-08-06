@@ -22,15 +22,15 @@ def feasible(constraint_dict, output):
     for k in constraint_dict:
         x = output[k]
         op, d = constraint_dict[k]
-        op = op.upper() # Allow any case
-        
+        op = op.upper()  # Allow any case
+
         # Make a not null column
-        results[k+'_notnull'] = ~x.isnull()
-        
-        if op  == 'GREATER_THAN':   # x > d -> x-d > 0
-            results[k] = x-d > 0 
-        elif op == 'LESS_THAN':      # x < d -> d-x > 0
-            results[k] =  d-x >0 
+        results[k + '_notnull'] = ~x.isnull()
+
+        if op == 'GREATER_THAN':  # x > d -> x-d > 0
+            results[k] = x - d > 0
+        elif op == 'LESS_THAN':  # x < d -> d-x > 0
+            results[k] = d - x > 0
         else:
             raise ValueError(f'Unknown constraint operator: {op}')
 
@@ -44,13 +44,14 @@ def load_xopt_data(xopt_json, verbose=False):
     if verbose:
         print(xopt_json)
     indat = json.load(open(xopt_json))
-    data = {'vocs':indat['vocs']}
+    data = {'vocs': indat['vocs']}
     for k in KLIST:
         data[k] = pd.DataFrame(indat[k])
-            
+
     return data
 
-def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible = False):
+
+def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible=False):
     """
     Loads many JSON files, concatenates and returns dict of DataFrame .
     
@@ -62,17 +63,15 @@ def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible = False):
     alldat = {}
     for k in KLIST:
         alldat[k] = pd.concat([d[k] for d in dats], ignore_index=True)
-    
-    vocs = dats[0]['vocs']
-    
 
-    
+    vocs = dats[0]['vocs']
+
     # Concatenate
-    cdat  =pd.concat([alldat['inputs'], alldat['outputs'] ], axis=1)
+    cdat = pd.concat([alldat['inputs'], alldat['outputs']], axis=1)
     nc = len(cdat)
     if add_feasible:
         cdat['feasible'] = feasible(vocs['constraints'], cdat)
         if verbose:
             print(cdat['feasible'].sum(), 'feasible out of', len(cdat))
-    
+
     return cdat
