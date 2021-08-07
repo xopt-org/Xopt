@@ -13,10 +13,30 @@ class NoValidResultsError(Exception):
 # Logger
 logger = logging.getLogger(__name__)
 
+algorithm_defaults = {'n_steps': 30,
+                      'executor': None,
+                      'n_initial_samples': 5,
+                      'custom_model': None,
+                      'output_path': None,
+                      'verbose': True,
+                      'restart_data_file': None,
+                      'initial_x': None,
+                      'use_gpu': False,
+                      'eval_args': None}
 
-def check_config(config, **kwargs):
+
+def check_config(config, function_name, **kwargs):
     try:
         vocs = config['vocs']
+
+        # add default arguments
+        default_names = list(algorithm_defaults.keys())
+        n_items = len(default_names)
+
+        for ii in range(n_items):
+            name = default_names[ii]
+            if name not in config['algorithm']['options'].keys():
+                config['algorithm']['options'].update({name: algorithm_defaults[name]})
 
     except KeyError:
         config['vocs'] = deepcopy(config)
@@ -25,7 +45,19 @@ def check_config(config, **kwargs):
         for ele in config['vocs'].keys():
             del config[ele]
 
-    return config
+        if 'algorithm' not in config.keys():
+            config['algorithm'] = {}
+            config['algorithm']['options'] = algorithm_defaults
+            config['algorithm']['function'] = function_name
+
+            names = list(kwargs.keys())
+            n_items = len(names)
+
+            for ii in range(n_items):
+                if names[ii] in config['algorithm']['options'].keys():
+                    config['algorithm']['options'][names[ii]] = kwargs.pop(names[ii])
+
+    return config, kwargs
 
 
 def get_corrected_outputs(vocs, train_y, train_c):
@@ -49,11 +81,11 @@ def get_corrected_outputs(vocs, train_y, train_c):
         if vocs['objectives'][name] == 'MINIMIZE':
             corrected_train_y[:, j] = -train_y[:, j]
 
-        #elif vocs['objectives'][name] == 'MAXIMIZE' or vocs['objectives'][name] == 'None':
+        # elif vocs['objectives'][name] == 'MAXIMIZE' or vocs['objectives'][name] == 'None':
         #    pass
         else:
             pass
-            #logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
+            # logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
 
     # negate constraints that use 'GREATER_THAN'
     for k, name in zip(range(len(constraint_names)), constraint_names):

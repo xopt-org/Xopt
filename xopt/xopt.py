@@ -177,10 +177,7 @@ class Xopt:
             self.run_cnsga(executor=executor)
 
         elif alg in algorithms:
-            self.results = self.run_f(self.config,
-                                      self.evaluate,
-                                      output_path=self.config['xopt']['output_path'],
-                                      **self.algorithm['options'])
+            self.results = self.run_f(self.config, self.evaluate)
 
         else:
             raise Exception(f'Unknown algorithm {alg}')
