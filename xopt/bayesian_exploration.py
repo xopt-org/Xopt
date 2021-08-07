@@ -7,6 +7,7 @@ from botorch.optim.optimize import optimize_acqf
 from .bayesian.acquisition.exploration import qBayesianExploration, BayesianExploration
 from .bayesian.optimize import bayesian_optimize
 from .bayesian.utils import check_config
+
 """
     Bayesian Exploration Botorch
 
@@ -75,5 +76,56 @@ def bayes_exp_acq(model,
 
 
 def bayesian_exploration(config, evaluate_f, **kwargs):
-    config = check_config(config, **kwargs)
-    return bayesian_optimize(config, evaluate_f, bayes_exp_acq, **kwargs)
+    """
+        Bayesian exploration algorithm
+
+        Parameters
+        ----------
+        config : dict
+            Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
+
+        evaluate_f : callable
+            Returns dict of outputs after problem has been evaluated
+
+
+        Optional kwargs arguments
+        --------
+        n_steps : int, default: 30
+            Number of optimization steps to take
+
+        executor : futures.Executor, default: None
+            Executor object to evaluate problem using multiple threads or processors
+
+        n_initial_samples : int, defualt: 5
+            Number of initial sobel_random samples to take to start optimization. Ignored if initial_x is not None.
+
+        custom_model : callable, optional
+            Function in the form f(train_x, train_y) that returns a botorch model instance
+
+        output_path : str, optional
+            Location to save optimization data and models.
+
+        verbose : bool, default: False
+            Specify if the algorithm should print optimization progress.
+
+        restart_data_file : str, optional
+            Pickled pandas data frame object containing initial data for restarting optimization.
+
+        initial_x : torch.Tensor, optional
+            Initial input points to sample evaluator at, causes sampling to ignore n_initial_samples
+
+        use_gpu : bool, False
+            Specify if the algorithm should use GPU resources if available. Only use on large problems!
+
+        eval_args : list, []
+            List of positional arguments for evaluation function
+
+        Returns
+        -------
+        results : dict
+            Dictionary object containing optimization points + other info
+
+        """
+
+    config, new_kwargs = check_config(config, __name__, **kwargs)
+    return bayesian_optimize(config, evaluate_f, bayes_exp_acq, **new_kwargs)

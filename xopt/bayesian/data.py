@@ -1,5 +1,7 @@
 import json
 import logging
+import math
+import numpy as np
 import pandas as pd
 from copy import deepcopy
 
@@ -20,7 +22,9 @@ def save_data_dict(config, full_data):
     for name in names:
         val = {}
         for ele in vocs[name].keys():
-            val[ele] = full_data[:, i].tolist()
+            temp_data = full_data[:, i].tolist()
+            # replace nans with None
+            val[ele] = [x if not math.isnan(x) else None for x in temp_data]
             i += 1
 
         results[name] = val
@@ -49,15 +53,18 @@ def get_data_json(json_filename, vocs, **tkwargs):
     f = open(json_filename)
     data = json.load(f)
 
-    train_x = torch.hstack([torch.tensor(data['results']['variables'][ele], **tkwargs).reshape(-1, 1) for
-                            ele in vocs['variables'].keys()])
+    data_sets = []
+    names = ['variables', 'objectives', 'constraints']
 
-    train_y = torch.hstack([torch.tensor(data['results']['objectives'][ele], **tkwargs).reshape(-1, 1) for
-                                 ele in vocs['objectives'].keys()])
+    #replace None's with Nans
+    def replace_none(l):
+        return [math.nan if x is None else x for x in l]
 
-    train_c = torch.hstack([torch.tensor(data['results']['constraints'][ele], **tkwargs).reshape(-1, 1) for
-                                 ele in vocs['constraints'].keys()])
-    return train_x, train_y, train_c
+    for name in names:
+        data_sets += [torch.hstack([torch.tensor(replace_none(data['results'][name][ele]), **tkwargs).reshape(-1, 1) for
+                                    ele in vocs[name].keys()])]
+
+    return data_sets[0], data_sets[1], data_sets[2]
 
 
 def save_data_pd(config, full_data):
