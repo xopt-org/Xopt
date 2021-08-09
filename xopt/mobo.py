@@ -178,6 +178,8 @@ def mobo(config, evaluate_f, ref = None, **kwargs):
           evaluate_f : callable
               Returns dict of outputs after problem has been evaluated
 
+          ref : list
+              Reference point
 
           Optional kwargs arguments
           --------
