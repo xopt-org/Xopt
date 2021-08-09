@@ -85,25 +85,31 @@ def plot_acq(model, bounds, ref_point, partitioning, n_obectives, n_constraints,
 def opt_mobo(model,
              bounds,
              vocs,
-             ref=None,
-             batch_size=1,
-             num_restarts=20,
-             raw_samples=1024,
-             plot=False):
-
+             options):
     """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
     n_obectives = len(vocs['objectives'])
     n_constraints = len(vocs['constraints'])
+    batch_size = options.get('batch_size', 1)
+    sigma = options.get('sigma', None)
+    sampler = options.get('sampler', None)
+    ref = options.get('ref', None)
+    num_restarts = options.get('n_restarts', 20)
+    raw_samples = options.get('raw_samples', 1024)
 
     train_outputs = model.train_targets.T
     train_y = train_outputs[:, :n_obectives]
     train_c = train_outputs[:, n_obectives:]
 
-    assert ref is not None
+    assert ref is not None, 'reference point needs to be specified with "ref" keyword'
+    # convert ref to tensor
+    ref = torch.tensor(ref.copy())
 
     # compute feasible observations
     is_feas = (train_c <= 0).all(dim=-1)
-    print(f'n_feas: {torch.count_nonzero(is_feas)}')
+
+    if options.get('verbose', False):
+        print(f'n_feas: {torch.count_nonzero(is_feas)}')
+
     # compute points that are better than the known reference point
     better_than_ref = (train_y > ref).all(dim=-1)
     # partition non-dominated space into disjoint rectangles
@@ -136,13 +142,6 @@ def opt_mobo(model,
     standard_bounds = torch.zeros(bounds.shape)
     standard_bounds[1] = 1
 
-    # plot the acquisition function and each model for debugging purposes
-    if plot:
-        plot_acq(model, bounds,
-                 ref, partitioning,
-                 n_obectives, n_constraints,
-                 constraint_functions)
-
     # optimize
     candidates, _ = optimize_acqf(
         acq_function=acq_func,
@@ -163,10 +162,10 @@ def get_corrected_ref(vocs, ref):
     for j, name in zip(range(len(vocs['objectives'])), vocs['objectives'].keys()):
         if vocs['objectives'][name] == 'MINIMIZE':
             ref[j] = -ref[j]
-    return ref
+    return ref.tolist()
 
 
-def mobo(config, evaluate_f, ref = None, **kwargs):
+def mobo(config, evaluate_f, ref=None, **kwargs):
     """
           Constrained Multi-objective Bayesian Optimization
 
@@ -220,13 +219,13 @@ def mobo(config, evaluate_f, ref = None, **kwargs):
 
           """
 
-    config, new_kwargs = check_config(config, __name__, **kwargs)
+    config = check_config(config, __name__, **kwargs)
 
     # set reference point
     if ref is not None:
-        new_kwargs['ref'] = get_corrected_ref(config['vocs'], ref)
+        config['algorithm']['options']['ref'] = get_corrected_ref(config['vocs'], ref)
     else:
-        new_kwargs['ref'] = get_corrected_ref(config['vocs'],
-                                              config['algorithm']['options']['ref'])
+        config['algorithm']['options']['ref'] = get_corrected_ref(config['vocs'],
+                                                                  config['algorithm']['options']['ref'])
 
-    return bayesian_optimize(config, evaluate_f, opt_mobo, **new_kwargs)
+    return bayesian_optimize(config, evaluate_f, opt_mobo)

@@ -1,11 +1,13 @@
 import logging
 import os
 import sys
+from concurrent.futures import Executor
 
 import torch
 from botorch.models.transforms import Standardize
 from botorch.models.transforms.input import Normalize
 from botorch.utils.sampling import draw_sobol_samples
+
 
 from .data import save_data_dict, get_data_json
 from .models.models import create_model
@@ -27,8 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def bayesian_optimize(config, evaluate_f,
-                      gen_candidate,
-                      **kwargs):
+                      gen_candidate):
     """
 
     Parameters
@@ -75,7 +76,7 @@ def bayesian_optimize(config, evaluate_f,
             sys.stdout.flush()
 
     # set up an executor
-    if config['algorithm']['options']['executor'] is None:
+    if not isinstance(config['algorithm']['options']['executor'], Executor):
         executor = DummyExecutor()
         vprint('No executor given. Running in serial mode.')
     else:
@@ -83,8 +84,9 @@ def bayesian_optimize(config, evaluate_f,
     config['algorithm']['options']['executor'] = str(type(executor))
 
     # set the custom model
+    # TODO: point json results file to model location file
     custom_model = config['algorithm']['options']['custom_model']
-    config['algorithm']['options']['custom_model'] = str(type(custom_model))
+    #config['algorithm']['options']['custom_model'] = str(type(custom_model))
 
     # Setup saving to file
     if output_path:
@@ -149,10 +151,10 @@ def bayesian_optimize(config, evaluate_f,
                              custom_model)
 
         # get candidate point(s)
-        candidates = gen_candidate(model, bounds, vocs, **kwargs)
+        candidates = gen_candidate(model, bounds, vocs, config['algorithm']['options'])
 
         if config['algorithm']['options']['verbose']:
-            vprint(candidates)
+            vprint(f'Candidate(s): {candidates}')
 
         # observe candidates
         fut = [executor.submit(sampler_evaluate,
