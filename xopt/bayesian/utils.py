@@ -25,10 +25,12 @@ algorithm_defaults = {'n_steps': 30,
                       'eval_args': None}
 
 
-def check_config(config, function_name, **kwargs):
-    try:
-        vocs = config['vocs']
+def check_config(old_config, function_name, **kwargs):
+    if 'vocs' in list(old_config.keys()):
+        # this will be the case if the input is a YAML file
+        # TODO: specify the YAML file input explicitly
 
+        config = deepcopy(old_config)
         # add default arguments
         default_names = list(algorithm_defaults.keys())
         n_items = len(default_names)
@@ -38,12 +40,14 @@ def check_config(config, function_name, **kwargs):
             if name not in config['algorithm']['options'].keys():
                 config['algorithm']['options'].update({name: algorithm_defaults[name]})
 
-    except KeyError:
-        config['vocs'] = deepcopy(config)
-        config['xopt'] = {'verbose': kwargs.get('verbose', False),
-                          'output_path': kwargs.get('output_path', '')}
-        for ele in config['vocs'].keys():
-            del config[ele]
+    else:
+        # this is the case when it is called via a script
+        config = {'vocs': deepcopy(old_config),
+                  'xopt': {'verbose': kwargs.get('verbose', False),
+                           'output_path': kwargs.get('output_path', '')}}
+
+        #for ele in config['vocs'].keys():
+        #    del config[ele]
 
         if 'algorithm' not in config.keys():
             config['algorithm'] = {}
@@ -53,11 +57,15 @@ def check_config(config, function_name, **kwargs):
             names = list(kwargs.keys())
             n_items = len(names)
 
+            # add kwargs to options and overwrite defaults
             for ii in range(n_items):
-                if names[ii] in config['algorithm']['options'].keys():
-                    config['algorithm']['options'][names[ii]] = kwargs.pop(names[ii])
+                val = kwargs.pop(names[ii])
+                if isinstance(val, torch.Tensor):
+                    config['algorithm']['options'][names[ii]] = val.tolist()
+                else:
+                    config['algorithm']['options'][names[ii]] = val
 
-    return config, kwargs
+    return config
 
 
 def get_corrected_outputs(vocs, train_y, train_c):

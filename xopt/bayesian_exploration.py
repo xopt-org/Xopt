@@ -1,6 +1,7 @@
 import logging
 from functools import partial
 
+import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.optim.optimize import optimize_acqf
 
@@ -20,11 +21,7 @@ logger = logging.getLogger(__name__)
 def bayes_exp_acq(model,
                   bounds,
                   vocs,
-                  sigma=None,
-                  sampler=None,
-                  batch_size=1,
-                  num_restarts=20,
-                  raw_samples=1024):
+                  options):
     """
 
     Optimize Bayesian Exploration
@@ -33,8 +30,15 @@ def bayes_exp_acq(model,
     where the first element is the target function for exploration and m is the number of constraints
 
     """
-
     n_constraints = len(vocs['constraints'])
+    batch_size = options.get('batch_size', 1)
+    sigma = options.get('sigma', None)
+    sampler = options.get('sampler', None)
+    num_restarts = options.get('n_restarts', 20)
+    raw_samples = options.get('raw_samples', 1024)
+
+    if sigma is not None:
+        sigma = torch.tensor(sigma.copy())
 
     # serialized Bayesian Exploration
     if batch_size == 1:
@@ -46,7 +50,7 @@ def bayes_exp_acq(model,
 
     # batched Bayesian Exploration
     else:
-        assert sigma is None  # proximal biasing not possible in batched context
+        assert sigma is None, 'proximal biasing not possible in batched context'
 
         mc_obj = GenericMCObjective(lambda Z, X: Z[..., 0])
 
@@ -127,5 +131,5 @@ def bayesian_exploration(config, evaluate_f, **kwargs):
 
         """
 
-    config, new_kwargs = check_config(config, __name__, **kwargs)
-    return bayesian_optimize(config, evaluate_f, bayes_exp_acq, **new_kwargs)
+    config = check_config(config, __name__, **kwargs)
+    return bayesian_optimize(config, evaluate_f, bayes_exp_acq)
