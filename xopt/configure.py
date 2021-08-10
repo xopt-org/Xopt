@@ -11,8 +11,8 @@ from xopt import tools
 KNOWN_ALGORITHMS = {
     'cnsga': 'xopt.cnsga.cnsga',
     'random_sampler': 'xopt.sampler.random_sampler',
-    'bayesian_exploration': 'xopt.bayesian_exploration.bayesian_exploration',
-    'mobo': 'xopt.mobo.mobo'
+    'bayesian_exploration': 'xopt.bayesian.algorithms.bayesian_exploration',
+    'mobo': 'xopt.bayesian.algorithms.mobo'
 }
 
 ALGORITHM_DEFAULTS = {

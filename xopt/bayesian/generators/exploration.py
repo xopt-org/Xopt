@@ -25,9 +25,8 @@ class BayesianExplorationGenerator:
         self.sampler = sampler
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
-        self.use_gpu = use_gpu
 
-    def generate(self, model, bounds, vocs):
+    def generate(self, model, bounds, vocs, **tkwargs):
         """
 
         Optimize Bayesian Exploration
@@ -41,14 +40,17 @@ class BayesianExplorationGenerator:
 
         # serialized Bayesian Exploration
         if self.batch_size == 1:
-
             if self.sigma is None:
-                self.sigma = torch.eye(n_variables) * 1e10
+                self.sigma = torch.eye(n_variables, **tkwargs) * 1e10
+
+            elif not isinstance(self.sigma, torch.Tensor):
+                self.sigma = torch.tensor(self.sigma.copy(), **tkwargs)
 
             constraint_dict = {}
             for i in range(1, n_constraints + 1):
                 constraint_dict[i] = [None, 0.0]
 
+            constraint_dict = constraint_dict if len(constraint_dict) else None
             acq_func = BayesianExploration(model, 0, constraint_dict, self.sigma)
 
         # batched Bayesian Exploration

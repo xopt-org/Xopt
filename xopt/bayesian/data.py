@@ -11,8 +11,7 @@ import torch
 logger = logging.getLogger(__name__)
 
 
-def save_data_dict(config, full_data):
-    vocs = config['vocs']
+def save_data_dict(vocs, full_data, output_path):
 
     # add results to config dict and save to json
     results = {}
@@ -37,16 +36,11 @@ def save_data_dict(config, full_data):
     results['constraint_status'] = constraint_status
     results['feasibility'] = full_data[:, i].tolist()
 
-    outputs = deepcopy(config)
-    outputs['results'] = results
-
-    if config['xopt']['output_path'] is None:
-        output_path = ''
-    else:
-        output_path = config['xopt']['output_path']
-
+    #outputs = deepcopy(config)
+    #outputs['results'] = results
+    output_path = '' if output_path is None else output_path
     with open(output_path + 'results.json', 'w') as outfile:
-        json.dump(outputs, outfile)
+        json.dump(results, outfile)
 
 
 def get_data_json(json_filename, vocs, **tkwargs):

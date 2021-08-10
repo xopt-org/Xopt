@@ -11,7 +11,6 @@ from .data import save_data_dict, get_data_json
 from .models.models import create_model
 from .utils import standardize, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
 from ..tools import full_path, DummyExecutor
-from .generators import exploration, mobo
 
 """
     Bayesian Exploration Botorch
@@ -38,13 +37,13 @@ def bayesian_optimize(vocs,
                       n_initial_samples=1,
                       n_steps=1,
                       verbose=True,
-                      ref=None,
+                      use_gpu=False,
                       ):
     """
 
     Parameters
     ----------
-    ref
+    use_gpu
     vocs
     verbose
     n_steps
@@ -74,11 +73,12 @@ def bayesian_optimize(vocs,
 
     """
 
-    # allow string specification of generator objects with default values
-    if candidate_generator == 'mobo':
-        candidate_generator = mobo.MOBOGenerator(ref)
-    elif candidate_generator == 'bayes_exp':
-        candidate_generator = exploration.BayesianExplorationGenerator()
+    # set up gpu if requested
+    if use_gpu:
+        if torch.cuda.is_available():
+            tkwargs['device'] = torch.device('cuda')
+        else:
+            logger.warning('gpu requested but not found, using cpu')
 
     # Verbose print helper
     def vprint(*a, **k):
@@ -107,8 +107,7 @@ def bayesian_optimize(vocs,
     variable_names = list(variables.keys())
 
     # get initial bounds
-    bounds = torch.transpose(
-        torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in variables.items()]), 0, 1)
+    bounds = torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in variables.items()]).T
 
     # create normalization transforms for model inputs
     # inputs are normalized in [0,1]
@@ -147,11 +146,10 @@ def bayesian_optimize(vocs,
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
 
-        model = create_model(train_x, train_outputs, input_normalize,
-                             custom_model)
+        model = create_model(train_x, train_outputs, input_normalize, custom_model)
 
         # get candidate point(s)
-        candidates = candidate_generator.generate(model, bounds, vocs)
+        candidates = candidate_generator.generate(model, bounds, vocs, **tkwargs)
 
         if verbose:
             vprint(f'Candidate(s): {candidates}')
@@ -175,7 +173,7 @@ def bayesian_optimize(vocs,
             constraint_status = corrected_train_c < 0.0
 
             full_data = torch.hstack((train_x, train_y, train_c, constraint_status, feas))
-            # save_data_dict(config, full_data)
+            save_data_dict(vocs, full_data, output_path)
 
         except NoValidResultsError:
             print('No valid results found, skipping to next iteration')
