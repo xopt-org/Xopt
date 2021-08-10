@@ -39,7 +39,9 @@ class BayesianExploration(AnalyticAcquisitionFunction):
         self.objective = None
         self.objective_index = objective_index
         self.constraints = constraints
-        self._preprocess_constraint_bounds(constraints=constraints)
+        if self.constraints is not None:
+            self._preprocess_constraint_bounds(constraints=constraints)
+
         self.register_forward_pre_hook(convert_to_target_pre_hook)
 
         # define sigma matrix for proximal term - if not defined set to very large
@@ -69,9 +71,12 @@ class BayesianExploration(AnalyticAcquisitionFunction):
         means = posterior.mean.squeeze(dim=-2)  # (b) x m
         sigmas = posterior.variance.squeeze(dim=-2).sqrt().clamp_min(1e-9)  # (b) x m
 
-        # weight the output by feasibility probability
-        prob_feas = self._compute_prob_feas(X=X, means=means, sigmas=sigmas)
-        out = sigmas[:, self.objective_index] * prob_feas.flatten()
+        if self.constraints is not None:
+            # weight the output by feasibility probability
+            prob_feas = self._compute_prob_feas(X=X, means=means, sigmas=sigmas)
+            out = sigmas[:, self.objective_index] * prob_feas.flatten()
+        else:
+            out = sigmas[:, self.objective_index]
 
         # weight the output by proximity
         prox_weight = self._calculate_proximal(X)
@@ -200,7 +205,10 @@ class qBayesianExploration(MCAcquisitionFunction):
         obj = self.objective(samples, X=X)
 
         # get feasibility weights
-        feas_weights = apply_constraints_nonnegative_soft(torch.ones(obj.shape), self.constraints, samples, eta=1e-3)
+        # NOTE this might slow down optimization by sending the ones matrix to the gpu every step - should investigate
+        feas_weights = apply_constraints_nonnegative_soft(torch.ones(obj.shape, device=obj.device,
+                                                                     dtype=obj.dtype), self.constraints,
+                                                          samples, eta=1e-3)
 
         ucb_mean = obj.mean(dim=0)
         ucb_samples = (obj - ucb_mean).abs() * feas_weights

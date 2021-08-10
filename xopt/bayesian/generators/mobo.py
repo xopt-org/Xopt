@@ -17,8 +17,7 @@ class MOBOGenerator:
                  sigma=None,
                  sampler=None,
                  num_restarts=20,
-                 raw_samples=1024,
-                 use_gpu=False):
+                 raw_samples=1024):
 
         self.ref = ref
         self._corrected_ref = None
@@ -28,14 +27,15 @@ class MOBOGenerator:
         self.sampler = sampler
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
-        self.use_gpu = use_gpu
 
-    def generate(self, model, bounds, vocs, verbose=False):
+    def generate(self, model, bounds, vocs, **tkwargs):
         """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
         n_obectives = len(vocs['objectives'])
         n_constraints = len(vocs['constraints'])
 
-        self._corrected_ref = self.get_corrected_ref(vocs)
+        self.ref = self.ref.to(tkwargs['device']) if isinstance(self.ref, torch.Tensor) else torch.tensor(self.ref,
+                                                                                                          **tkwargs)
+        self._corrected_ref = self.get_corrected_ref(self.ref, vocs)
 
         train_outputs = model.train_targets.T
         train_y = train_outputs[:, :n_obectives]
@@ -43,9 +43,6 @@ class MOBOGenerator:
 
         # compute feasible observations
         is_feas = (train_c <= 0).all(dim=-1)
-
-        if verbose:
-            print(f'n_feas: {torch.count_nonzero(is_feas)}')
 
         # compute points that are better than the known reference point
         better_than_ref = (train_y > self._corrected_ref).all(dim=-1)
@@ -89,8 +86,9 @@ class MOBOGenerator:
 
         return candidates.detach()
 
-    def get_corrected_ref(self, vocs):
-        new_ref = self.ref.copy()
+    @staticmethod
+    def get_corrected_ref(ref, vocs):
+        new_ref = ref.clone()
         for j, name in zip(range(len(vocs['objectives'])), vocs['objectives'].keys()):
             if vocs['objectives'][name] == 'MINIMIZE':
                 new_ref[j] = -new_ref[j]
