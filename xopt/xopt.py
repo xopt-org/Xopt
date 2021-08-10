@@ -182,7 +182,7 @@ class Xopt:
         elif alg in algorithms:
             self.results = self.run_f(self.vocs,
                                       self.evaluate_f,
-                                      self.config['xopt']['output_path'],
+                                      output_path=self.config['xopt']['output_path'],
                                       **self.algorithm['options'])
 
 

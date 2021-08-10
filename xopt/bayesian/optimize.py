@@ -29,48 +29,61 @@ logger = logging.getLogger(__name__)
 def bayesian_optimize(vocs,
                       evaluate_f,
                       candidate_generator,
-                      output_path=None,
-                      custom_model=None,
-                      executor=DummyExecutor(),
-                      restart_file=None,
-                      initial_x=None,
-                      n_initial_samples=1,
-                      n_steps=1,
-                      verbose=True,
-                      use_gpu=False,
+                      n_steps,
+                      n_initial_samples,
+                      output_path,
+                      custom_model,
+                      executor,
+                      restart_file,
+                      initial_x,
+                      verbose,
+                      use_gpu,
                       ):
     """
+    Backend function for model based optimization
 
     Parameters
     ----------
-    use_gpu
-    vocs
-    verbose
-    n_steps
-    n_initial_samples
-    initial_x
-    executor
-    restart_file
-    custom_model
-    output_path
-    candidate_generator
-    config : dict
+    vocs : dict
         Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
 
     evaluate_f : callable
         Returns dict of outputs after problem has been evaluated
 
-    gen_candidate : callable
-        Callable that takes the form f(model, bounds, vocs, **kwargs) and returns 1 or more candidates
+    candidate_generator : object
+        Generator object that has a generate(model, bounds, vocs, **tkwargs) method
 
-    **kwargs
-        Optional arguments for acquisition function optimization
+    n_steps : int
+        Number of optimization steps to execute
+
+    n_initial_samples : int
+        Number of initial samples to take before using the model, overwritten by initial_x
+
+    output_path : str
+        Path location to place outputs
+
+    custom_model : callable
+        Function of the form f(train_inputs, train_outputs) that returns a trained custom model
+
+    executor : Executor
+        Executor object to run evaluate_f
+
+    restart_file : str
+        File location of JSON file that has previous data
+
+    initial_x : list
+        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
+
+    verbose : bool
+        Print out messages during optimization
+
+    use_gpu : bool
+        Specify if GPU should be used if available
 
     Returns
     -------
     results : dict
-        Dictionary object containing optimization points + other info
-
+        Dictionary with output data at the end of optimization
     """
 
     # set up gpu if requested
@@ -102,6 +115,9 @@ def bayesian_optimize(vocs,
         def save(pop, prefix, generation):
             pass
 
+    # set executor
+    exe = DummyExecutor() if executor is None else executor
+
     # parse VOCS
     variables = vocs['variables']
     variable_names = list(variables.keys())
@@ -123,7 +139,7 @@ def bayesian_optimize(vocs,
             initial_x = initial_x
 
         # submit evaluation of initial samples
-        initial_y = [executor.submit(sampler_evaluate,
+        initial_y = [exe.submit(sampler_evaluate,
                                      dict(zip(variable_names, x.cpu().numpy())),
                                      evaluate_f,
                                      **sampler_evaluate_args) for x in initial_x]
@@ -155,7 +171,7 @@ def bayesian_optimize(vocs,
             vprint(f'Candidate(s): {candidates}')
 
         # observe candidates
-        fut = [executor.submit(sampler_evaluate,
+        fut = [exe.submit(sampler_evaluate,
                                dict(zip(variable_names, x.cpu().numpy())),
                                evaluate_f,
                                **sampler_evaluate_args) for x in candidates]
