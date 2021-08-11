@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 
 import torch
 from botorch.models.transforms import Standardize
@@ -90,6 +91,7 @@ def bayesian_optimize(vocs,
     if use_gpu:
         if torch.cuda.is_available():
             tkwargs['device'] = torch.device('cuda')
+            print(f'using gpu device {torch.cuda.get_device_name(tkwargs["device"])}')
         else:
             logger.warning('gpu requested but not found, using cpu')
 
@@ -162,12 +164,17 @@ def bayesian_optimize(vocs,
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
 
+        # create and train model
+        model_start = time.time()
         model = create_model(train_x, train_outputs, input_normalize, custom_model)
+        if verbose:
+            vprint(f'Model creation time: {time.time() - model_start:.4} s')
 
         # get candidate point(s)
+        candidate_start = time.time()
         candidates = candidate_generator.generate(model, bounds, vocs, **tkwargs)
-
         if verbose:
+            vprint(f'Candidate generation time: {time.time() - candidate_start:.4} s')
             vprint(f'Candidate(s): {candidates}')
 
         # observe candidates
