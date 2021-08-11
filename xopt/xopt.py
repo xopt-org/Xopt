@@ -12,7 +12,8 @@ import os
 
 XOPT_DEFAULTS = {
     'output_path': '.',
-    'verbose': True
+    'verbose': True,
+    'algorithm':'cnsga'
 }
 
 SIMULATION_DEFAULTS = {
@@ -171,9 +172,6 @@ class Xopt:
         alg = self.algorithm['name']
         # self.algorithm['options']['executor'] = executor
 
-        # get generator options
-        generator_options = self.algorithm.get('generator_options', {})
-
         algorithms = ['random_sampler', 'bayesian_exploration', 'mobo']
 
         if alg == 'cnsga':
@@ -210,7 +208,7 @@ class Xopt:
         #            print(f'removing {k}')
         #            options['population'].pop(k)
 
-        self.population = self.run_f(executor=executor, vocs=self.vocs, evaluate_f=self.evaluate,
+        self.results = self.run_f(executor=executor, vocs=self.vocs, evaluate_f=self.evaluate,
                                      output_path=output_path, **options)
 
         # --------------------------
