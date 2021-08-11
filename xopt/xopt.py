@@ -118,7 +118,7 @@ class Xopt:
         options = alg['options']
 
         # Reserved keys
-        for k in ['vocs', 'evaluate_f', 'output_path', 'toolbox']:
+        for k in ['vocs', 'executor', 'evaluate_f', 'output_path', 'toolbox']:
             if k in options:
                 options.pop(k)
 
@@ -170,48 +170,27 @@ class Xopt:
         self.vprint(f'Starting at time {isotime()}')
 
         alg = self.algorithm['name']
-        # self.algorithm['options']['executor'] = executor
-
-        algorithms = ['random_sampler', 'bayesian_exploration', 'mobo']
-
-        if alg == 'cnsga':
-            self.run_cnsga(executor=executor)
-
-        elif alg in algorithms:
-            self.results = self.run_f(self.vocs,
-                                      self.evaluate_f,
+        opts = self.algorithm['options']
+             
+        # Special for genetic algorithms
+        if self.results and 'population' in opts:
+            opts['population'] = self.results
+                
+        if alg in ['cnsga', 'random_sampler', 'bayesian_exploration', 'mobo']:
+            self.results = self.run_f(executor=executor, vocs = self.vocs,
+                                      evaluate_f = self.evaluate, # Already prepared with 
                                       output_path=self.config['xopt']['output_path'],
-                                      **self.algorithm['options'])
+                                      **opts)
 
+        # Run a generic algorithm 
+        #else alg in algorithms:
+        #    self.results = self.run_f(self.vocs,
+        #                              self.evaluate_f,
+        #                              **self.algorithm['options'])            
 
         else:
             raise Exception(f'Unknown algorithm {alg}')
 
-    def run_cnsga(self, executor=None):
-        """Run the CNSGA algorithm with an executor"""
-        options = self.algorithm['options']
-        output_path = self.config['xopt']['output_path']
-
-        # This takes priority
-        # if self.population:
-        #    options['population'] = self.population
-        # elif 'population' not in options:
-        #    print('Warning. Population not found in options.')
-        #    options['population'] = None
-        # else:
-        #    options['population'] = load_config(options['population'], verbose=self.verbose)
-        #
-        ## Clean up
-        # if options['population']:
-        #    for k in list(options['population']):
-        #        if k not in ['variables', 'generation']:
-        #            print(f'removing {k}')
-        #            options['population'].pop(k)
-
-        self.results = self.run_f(executor=executor, vocs=self.vocs, evaluate_f=self.evaluate,
-                                     output_path=output_path, **options)
-
-        # --------------------------
 
     # Evaluate
 
