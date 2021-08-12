@@ -340,7 +340,7 @@ def get_vecs(inds):
 #--------------------------------------------    
 #--------------------------------------------
 
-def cnsga(executor,
+def cnsga(executor=None,
           vocs=None,
           population=None,
           toolbox=None,
