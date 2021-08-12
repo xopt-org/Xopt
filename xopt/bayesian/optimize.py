@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 
 import torch
 from botorch.models.transforms import Standardize
@@ -86,13 +87,6 @@ def bayesian_optimize(vocs,
         Dictionary with output data at the end of optimization
     """
 
-    # set up gpu if requested
-    if use_gpu:
-        if torch.cuda.is_available():
-            tkwargs['device'] = torch.device('cuda')
-        else:
-            logger.warning('gpu requested but not found, using cpu')
-
     # Verbose print helper
     def vprint(*a, **k):
         # logger.debug(' '.join(a))
@@ -100,6 +94,16 @@ def bayesian_optimize(vocs,
         if verbose:
             print(*a, **k)
             sys.stdout.flush()
+
+    vprint(f'started running optimization with generator: {candidate_generator}')
+
+    # set up gpu if requested
+    if use_gpu:
+        if torch.cuda.is_available():
+            tkwargs['device'] = torch.device('cuda')
+            vprint(f'using gpu device {torch.cuda.get_device_name(tkwargs["device"])}')
+        else:
+            logger.warning('gpu requested but not found, using cpu')
 
     # Setup saving to file
     if output_path:
@@ -139,6 +143,7 @@ def bayesian_optimize(vocs,
             initial_x = initial_x
 
         # submit evaluation of initial samples
+        vprint('submitting initial candidates')
         initial_y = [exe.submit(sampler_evaluate,
                                      dict(zip(variable_names, x.cpu().numpy())),
                                      evaluate_f,
@@ -151,6 +156,7 @@ def bayesian_optimize(vocs,
                                                   vocs, **tkwargs)
 
     # do optimization
+    vprint('starting optimization loop')
     for i in range(n_steps):
 
         # get corrected values
@@ -162,15 +168,19 @@ def bayesian_optimize(vocs,
         # horiz. stack objective and constraint results for training/acq specification
         train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
 
+        # create and train model
+        model_start = time.time()
         model = create_model(train_x, train_outputs, input_normalize, custom_model)
+        vprint(f'Model creation time: {time.time() - model_start:.4} s')
 
         # get candidate point(s)
+        candidate_start = time.time()
         candidates = candidate_generator.generate(model, bounds, vocs, **tkwargs)
-
-        if verbose:
-            vprint(f'Candidate(s): {candidates}')
+        vprint(f'Candidate generation time: {time.time() - candidate_start:.4} s')
+        vprint(f'Candidate(s): {candidates}')
 
         # observe candidates
+        vprint('submitting candidates')
         fut = [exe.submit(sampler_evaluate,
                                dict(zip(variable_names, x.cpu().numpy())),
                                evaluate_f,
