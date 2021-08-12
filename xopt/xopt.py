@@ -1,9 +1,9 @@
-from .tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function, \
+from xopt.tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function, \
     isotime
-from .cnsga import cnsga
-from .sampler import random_sampler
-from .configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
-from ._version import __version__
+from xopt.cnsga import cnsga
+from xopt.sampler import random_sampler
+from xopt.configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
+from xopt import __version__
 import pprint
 from copy import deepcopy
 import yaml

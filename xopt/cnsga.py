@@ -1,6 +1,6 @@
 from xopt import creator, vocs_tools, fitness_with_constraints
 from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config, NpEncoder
-from ._version import __version__
+from xopt import __version__
 from deap import algorithms, base, tools
 
 import numpy as np
