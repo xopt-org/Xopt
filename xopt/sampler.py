@@ -1,5 +1,5 @@
-from .tools import full_path, new_date_filename, random_settings, DummyExecutor, NpEncoder
-from ._version import __version__
+from xopt.tools import full_path, new_date_filename, random_settings, DummyExecutor, NpEncoder
+from xopt import __version__
 from deap.base import Toolbox
 import json
 import time
