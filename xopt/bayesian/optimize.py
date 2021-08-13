@@ -127,7 +127,7 @@ def bayesian_optimize(vocs,
 
     # parse VOCS
     variables = vocs['variables']
-    variable_names = list(variables.keys())
+    variable_names = list(variables)
 
     # get initial bounds
     bounds = torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in variables.items()]).T
@@ -233,7 +233,7 @@ def get_feasability_constraint_status(train_y, train_c, vocs):
 
 
 def submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args):
-    variable_names = list(vocs['variables'].keys())
+    variable_names = list(vocs['variables'])
     settings = get_settings(candidates, variable_names, vocs)
     fut = [exe.submit(sampler_evaluate,
                       setting,
