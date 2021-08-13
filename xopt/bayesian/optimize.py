@@ -87,6 +87,9 @@ def bayesian_optimize(vocs,
         Dictionary with output data at the end of optimization
     """
 
+    # raise error if someone tries to use linked variables TODO: implement linked variables
+    assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+
     # Verbose print helper
     def vprint(*a, **k):
         # logger.debug(' '.join(a))
@@ -144,10 +147,7 @@ def bayesian_optimize(vocs,
 
         # submit evaluation of initial samples
         vprint('submitting initial candidates')
-        initial_y = [exe.submit(sampler_evaluate,
-                                     dict(zip(variable_names, x.cpu().numpy())),
-                                     evaluate_f,
-                                     **sampler_evaluate_args) for x in initial_x]
+        initial_y = submit_jobs(initial_x, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
 
@@ -184,10 +184,8 @@ def bayesian_optimize(vocs,
 
         # observe candidates
         vprint('submitting candidates')
-        fut = [exe.submit(sampler_evaluate,
-                               dict(zip(variable_names, x.cpu().numpy())),
-                               evaluate_f,
-                               **sampler_evaluate_args) for x in candidates]
+        fut = submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args)
+
         try:
             new_x, new_y, new_c = collect_results(fut, vocs, **tkwargs)
 
@@ -234,6 +232,24 @@ def get_feasability_constraint_status(train_y, train_c, vocs):
     return feas, constraint_status
 
 
+def submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args):
+    variable_names = list(vocs['variables'].keys())
+    settings = get_settings(candidates, variable_names, vocs)
+    fut = [exe.submit(sampler_evaluate,
+                      setting,
+                      evaluate_f,
+                      **sampler_evaluate_args) for setting in settings]
+    return fut
+
+
+def get_settings(X, variable_names, vocs):
+    settings = [dict(zip(variable_names, x.cpu().numpy())) for x in X]
+    for setting in settings:
+        setting.update(vocs['constants'])
+
+    return settings
+
+
 def check_training_data_shape(train_x, train_y, train_c, vocs):
     # check to make sure that the training tensor have the correct shapes
     for ele, vocs_type in zip([train_x, train_y, train_c], ['variables', 'objectives', 'constraints']):
@@ -241,4 +257,3 @@ def check_training_data_shape(train_x, train_y, train_c, vocs):
         assert ele.shape[-1] == len(vocs[vocs_type]), f'current shape of training data ({ele.shape}) ' \
                                                       f'does not match number of vocs {vocs_type} == ' \
                                                       f'{len(vocs[vocs_type])} '
-
