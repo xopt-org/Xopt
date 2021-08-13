@@ -87,6 +87,9 @@ def bayesian_optimize(vocs,
         Dictionary with output data at the end of optimization
     """
 
+    # raise error if someone tries to use linked variables TODO: implement linked variables
+    assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+
     # Verbose print helper
     def vprint(*a, **k):
         # logger.debug(' '.join(a))
@@ -124,7 +127,7 @@ def bayesian_optimize(vocs,
 
     # parse VOCS
     variables = vocs['variables']
-    variable_names = list(variables.keys())
+    variable_names = list(variables)
 
     # get initial bounds
     bounds = torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in variables.items()]).T
@@ -144,10 +147,7 @@ def bayesian_optimize(vocs,
 
         # submit evaluation of initial samples
         vprint('submitting initial candidates')
-        initial_y = [exe.submit(sampler_evaluate,
-                                     dict(zip(variable_names, x.cpu().numpy())),
-                                     evaluate_f,
-                                     **sampler_evaluate_args) for x in initial_x]
+        initial_y = submit_jobs(initial_x, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
 
@@ -155,9 +155,12 @@ def bayesian_optimize(vocs,
         train_x, train_y, train_c = get_data_json(restart_file,
                                                   vocs, **tkwargs)
 
+    check_training_data_shape(train_x, train_y, train_c, vocs)
+
     # do optimization
     vprint('starting optimization loop')
     for i in range(n_steps):
+        check_training_data_shape(train_x, train_y, train_c, vocs)
 
         # get corrected values
         corrected_train_y, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
@@ -181,10 +184,8 @@ def bayesian_optimize(vocs,
 
         # observe candidates
         vprint('submitting candidates')
-        fut = [exe.submit(sampler_evaluate,
-                               dict(zip(variable_names, x.cpu().numpy())),
-                               evaluate_f,
-                               **sampler_evaluate_args) for x in candidates]
+        fut = submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args)
+
         try:
             new_x, new_y, new_c = collect_results(fut, vocs, **tkwargs)
 
@@ -194,9 +195,7 @@ def bayesian_optimize(vocs,
             train_c = torch.vstack((train_c, new_c))
 
             # get feasibility values
-            _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
-            feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
-            constraint_status = corrected_train_c < 0.0
+            feas, constraint_status = get_feasability_constraint_status(train_y, train_c, vocs)
 
             full_data = torch.hstack((train_x, train_y, train_c, constraint_status, feas))
             save_data_dict(vocs, full_data, output_path)
@@ -207,6 +206,8 @@ def bayesian_optimize(vocs,
 
     # horiz. stack objective and constraint results for training/acq specification
     train_outputs = torch.hstack((train_y, train_c))
+
+    feas, constraint_status = get_feasability_constraint_status(train_y, train_c, vocs)
 
     # output transformer
     output_standardize = Standardize(train_outputs.shape[-1])
@@ -222,3 +223,37 @@ def bayesian_optimize(vocs,
                'model': model.cpu()}
 
     return results
+
+
+def get_feasability_constraint_status(train_y, train_c, vocs):
+    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
+    feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
+    constraint_status = corrected_train_c < 0.0
+    return feas, constraint_status
+
+
+def submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args):
+    variable_names = list(vocs['variables'])
+    settings = get_settings(candidates, variable_names, vocs)
+    fut = [exe.submit(sampler_evaluate,
+                      setting,
+                      evaluate_f,
+                      **sampler_evaluate_args) for setting in settings]
+    return fut
+
+
+def get_settings(X, variable_names, vocs):
+    settings = [dict(zip(variable_names, x.cpu().numpy())) for x in X]
+    for setting in settings:
+        setting.update(vocs['constants'])
+
+    return settings
+
+
+def check_training_data_shape(train_x, train_y, train_c, vocs):
+    # check to make sure that the training tensor have the correct shapes
+    for ele, vocs_type in zip([train_x, train_y, train_c], ['variables', 'objectives', 'constraints']):
+        assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, shape currently is {ele.shape}'
+        assert ele.shape[-1] == len(vocs[vocs_type]), f'current shape of training data ({ele.shape}) ' \
+                                                      f'does not match number of vocs {vocs_type} == ' \
+                                                      f'{len(vocs[vocs_type])} '
