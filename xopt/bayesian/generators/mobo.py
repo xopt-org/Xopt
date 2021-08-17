@@ -8,6 +8,8 @@ from botorch.optim.optimize import optimize_acqf
 from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
 
 # Logger
+from xopt.bayesian.utils import get_bounds
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,10 +30,11 @@ class MOBOGenerator:
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
 
-    def generate(self, model, bounds, vocs, **tkwargs):
+    def generate(self, model, vocs, **tkwargs):
         """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
         n_obectives = len(vocs['objectives'])
         n_constraints = len(vocs['constraints'])
+        bounds = get_bounds(vocs, **tkwargs)
 
         self.ref = self.ref.to(tkwargs['device']) if isinstance(self.ref, torch.Tensor) else torch.tensor(self.ref,
                                                                                                           **tkwargs)

@@ -6,7 +6,7 @@ from botorch.acquisition import GenericMCObjective
 from botorch.optim.optimize import optimize_acqf
 
 from ..acquisition.exploration import qBayesianExploration, BayesianExploration
-
+from ..utils import get_bounds
 #Logger
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class BayesianExplorationGenerator:
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
 
-    def generate(self, model, bounds, vocs, **tkwargs):
+    def generate(self, model, vocs, **tkwargs):
         """
 
         Optimize Bayesian Exploration
@@ -37,6 +37,7 @@ class BayesianExplorationGenerator:
         """
         n_constraints = len(vocs['constraints'])
         n_variables = len(vocs['variables'])
+        bounds = get_bounds(vocs, **tkwargs)
 
         # serialized Bayesian Exploration
         if self.batch_size == 1:

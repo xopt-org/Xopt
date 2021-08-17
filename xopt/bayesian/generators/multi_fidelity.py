@@ -10,6 +10,8 @@ from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
 
 # Logger
+from xopt.bayesian.utils import get_bounds
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,12 +63,13 @@ class MultiFidelityGenerator:
             project=self.project,
         )
 
-    def generate(self, model, bounds, vocs, **tkwargs):
+    def generate(self, model, vocs, **tkwargs):
         """
 
         Optimize Multifidelity acquisition function
 
         """
+        bounds = get_bounds(vocs, **tkwargs)
 
         X_init = gen_one_shot_kg_initial_conditions(
             acq_function=self.get_mfkg(model, bounds),
