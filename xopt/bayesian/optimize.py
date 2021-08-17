@@ -88,7 +88,8 @@ def bayesian_optimize(vocs,
     """
 
     # raise error if someone tries to use linked variables TODO: implement linked variables
-    assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+    if 'linked_variables' in vocs.keys():
+        assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
 
     # Verbose print helper
     def vprint(*a, **k):
@@ -165,15 +166,9 @@ def bayesian_optimize(vocs,
         # get corrected values
         corrected_train_y, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
 
-        # standardize y training data - use xopt version to allow for nans
-        standardized_train_y = standardize(corrected_train_y)
-
-        # horiz. stack objective and constraint results for training/acq specification
-        train_outputs = torch.hstack((standardized_train_y, corrected_train_c))
-
         # create and train model
         model_start = time.time()
-        model = create_model(train_x, train_outputs, input_normalize, custom_model)
+        model = create_model(train_x, corrected_train_y, corrected_train_c, input_normalize, custom_model)
         vprint(f'Model creation time: {time.time() - model_start:.4} s')
 
         # get candidate point(s)
@@ -205,15 +200,11 @@ def bayesian_optimize(vocs,
             continue
 
     # horiz. stack objective and constraint results for training/acq specification
-    train_outputs = torch.hstack((train_y, train_c))
-
     feas, constraint_status = get_feasability_constraint_status(train_y, train_c, vocs)
 
     # output transformer
-    output_standardize = Standardize(train_outputs.shape[-1])
-    model = create_model(train_x, train_outputs,
-                         input_normalize, custom_model,
-                         outcome_transform=output_standardize)
+    model = create_model(train_x, train_y, train_c,
+                         input_normalize, custom_model)
 
     results = {'variables': train_x.cpu(),
                'objectives': train_y.cpu(),
