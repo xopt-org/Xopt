@@ -88,8 +88,9 @@ def bayesian_optimize(vocs,
     """
 
     # raise error if someone tries to use linked variables TODO: implement linked variables
-    assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
-
+    if 'linked_variables' in vocs.keys():
+        assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+        
     # Verbose print helper
     def vprint(*a, **k):
         # logger.debug(' '.join(a))
