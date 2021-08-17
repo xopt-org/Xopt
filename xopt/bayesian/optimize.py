@@ -4,13 +4,11 @@ import sys
 import time
 
 import torch
-from botorch.models.transforms import Standardize
-from botorch.models.transforms.input import Normalize
 from botorch.utils.sampling import draw_sobol_samples
 
 from .data import save_data_dict, get_data_json
 from .models.models import create_model
-from .utils import standardize, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
+from .utils import get_bounds, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
 from ..tools import full_path, DummyExecutor
 
 """
@@ -130,19 +128,16 @@ def bayesian_optimize(vocs,
     variables = vocs['variables']
     variable_names = list(variables)
 
-    # get initial bounds
-    bounds = torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in variables.items()]).T
-
     # create normalization transforms for model inputs
     # inputs are normalized in [0,1]
-    input_normalize = Normalize(len(variable_names), bounds)
 
     sampler_evaluate_args = {'verbose': verbose}
 
     # generate initial samples if no initial samples are given
     if restart_file is None:
         if initial_x is None:
-            initial_x = draw_sobol_samples(bounds, 1, n_initial_samples)[0]
+            initial_x = draw_sobol_samples(get_bounds(vocs, **tkwargs),
+                                           1, n_initial_samples)[0]
         else:
             initial_x = initial_x
 
@@ -168,12 +163,12 @@ def bayesian_optimize(vocs,
 
         # create and train model
         model_start = time.time()
-        model = create_model(train_x, corrected_train_y, corrected_train_c, input_normalize, custom_model)
+        model = create_model(train_x, corrected_train_y, corrected_train_c, vocs, custom_model)
         vprint(f'Model creation time: {time.time() - model_start:.4} s')
 
         # get candidate point(s)
         candidate_start = time.time()
-        candidates = candidate_generator.generate(model, bounds, vocs, **tkwargs)
+        candidates = candidate_generator.generate(model, vocs, **tkwargs)
         vprint(f'Candidate generation time: {time.time() - candidate_start:.4} s')
         vprint(f'Candidate(s): {candidates}')
 
@@ -204,7 +199,7 @@ def bayesian_optimize(vocs,
 
     # output transformer
     model = create_model(train_x, train_y, train_c,
-                         input_normalize, custom_model)
+                         vocs, custom_model)
 
     results = {'variables': train_x.cpu(),
                'objectives': train_y.cpu(),

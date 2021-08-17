@@ -13,14 +13,15 @@ VOCS = {
         'x3': [0, 1.0],
         'x4': [0, 1.0],
         'x5': [0, 1.0],
-        'x6': [0, 1.0]
+        'x6': [0, 1.0],
+        'cost': [0, 1.0]
     },
     'objectives': {
         'y1': 'MINIMIZE',
 
     },
     'constraints': {},
-    'constants': {'cost': 0.0},
+    'constants': {}
 }
 
 
