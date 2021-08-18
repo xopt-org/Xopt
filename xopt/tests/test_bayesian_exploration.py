@@ -7,9 +7,8 @@ YAML = """
 xopt: {output_path: null, verbose: true}
 
 algorithm:
-  name: mobo
-  options: {ref: [1.4, 1.4],
-            n_initial_samples: 5,
+  name: bayesian_exploration
+  options: {n_initial_samples: 5,
             use_gpu: False,
             n_steps: 2, 
             generator_options: {batch_size: 2},
@@ -39,9 +38,8 @@ YAML2 = """
 xopt: {output_path: null, verbose: true}
 
 algorithm:
-  name: mobo
-  options: {ref: [1.4, 1.4],
-            n_initial_samples: 5,
+  name: bayesian_exploration
+  options: {n_initial_samples: 5,
             use_gpu: False,
             n_steps: 2, 
             generator_options: {batch_size: 1, sigma: [[1.0,0.0],[0.0,1.0]]},
@@ -64,12 +62,11 @@ vocs:
     c1: [GREATER_THAN, 0]
     c2: [LESS_THAN, 0.5]
   constants: {a: dummy_constant}
-  linked_variables: {}
 
 """
 
 
-def test_mobo_tnk():
+def test_bayes_exp_tnk():
     for ele in [YAML, YAML2]:
         X = Xopt(yaml.safe_load(ele))
         X.run()
