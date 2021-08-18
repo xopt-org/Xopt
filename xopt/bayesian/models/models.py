@@ -1,12 +1,11 @@
 import botorch
 from botorch import fit_gpytorch_model
 from botorch.models import SingleTaskGP
+from botorch.models.transforms.input import Normalize
+
 from gpytorch import ExactMarginalLogLikelihood
 import torch
 from ..utils import standardize, get_bounds
-
-from botorch.models.transforms import Standardize
-from botorch.models.transforms.input import Normalize
 
 
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
@@ -30,4 +29,3 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
         assert isinstance(model, botorch.models.model.Model)
 
     return model
-
