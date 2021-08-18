@@ -196,9 +196,10 @@ def bayesian_optimize(vocs,
 
     # horiz. stack objective and constraint results for training/acq specification
     feas, constraint_status = get_feasability_constraint_status(train_y, train_c, vocs)
+    corrected_train_y, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
 
-    # output transformer
-    model = create_model(train_x, train_y, train_c,
+    # output model
+    model = create_model(train_x, corrected_train_y, corrected_train_c,
                          vocs, custom_model)
 
     results = {'variables': train_x.cpu(),

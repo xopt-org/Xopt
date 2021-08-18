@@ -30,7 +30,18 @@ def evaluate(inputs, extra_option='abc', **params):
     x = [inputs[f'x{ele}'] for ele in range(1, 7)]
     x += [inputs['cost']]
     problem = AugmentedHartmann(negate=False)
-    objective = problem.evaluate_true(torch.tensor(x).reshape(1, -1)).numpy()
+    objective = problem(torch.tensor(x).reshape(1, -1)).numpy()
     outputs = {'y1': objective[0]}
 
     return outputs
+
+
+if __name__ == '__main__':
+    input = {'x1': 0.208,
+             'x2': 0.164,
+             'x3': 0.514,
+             'x4': 0.280,
+             'x5': 0.301,
+             'x6': 0.664,
+             'cost': 1.000}
+    print(evaluate(input))
