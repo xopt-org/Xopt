@@ -11,6 +11,7 @@ from .models.models import create_model
 from .utils import get_bounds, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
 from ..tools import full_path, DummyExecutor
 
+
 """
     Bayesian Exploration Botorch
 
@@ -142,7 +143,7 @@ def bayesian_optimize(vocs,
             initial_x = initial_x
 
         # submit evaluation of initial samples
-        vprint('submitting initial candidates')
+        vprint(f'submitting initial candidates at time {isotime()}')
         initial_y = submit_jobs(initial_x, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
@@ -173,7 +174,7 @@ def bayesian_optimize(vocs,
         vprint(f'Candidate(s): {candidates}')
 
         # observe candidates
-        vprint('submitting candidates')
+        vprint(f'submitting candidates at time {isotime()}')
         fut = submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         try:
