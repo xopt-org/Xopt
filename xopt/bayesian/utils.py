@@ -68,6 +68,11 @@ def check_config(old_config, function_name, **kwargs):
     return config
 
 
+def get_bounds(vocs, **tkwargs):
+    # get initial bounds
+    return torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in vocs['variables'].items()]).T
+
+
 def get_corrected_outputs(vocs, train_y, train_c):
     """
     scale and invert outputs depending on maximization/minimization, etc.
