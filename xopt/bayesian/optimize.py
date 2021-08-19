@@ -11,7 +11,7 @@ from botorch.utils.sampling import draw_sobol_samples
 from .data import save_data_dict, get_data_json
 from .models.models import create_model
 from .utils import standardize, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
-from ..tools import full_path, DummyExecutor
+from ..tools import full_path, DummyExecutor, isotime
 
 """
     Bayesian Exploration Botorch
@@ -88,8 +88,9 @@ def bayesian_optimize(vocs,
     """
 
     # raise error if someone tries to use linked variables TODO: implement linked variables
-    assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
-
+    if 'linked_variables' in vocs.keys():
+        assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+        
     # Verbose print helper
     def vprint(*a, **k):
         # logger.debug(' '.join(a))
@@ -146,7 +147,7 @@ def bayesian_optimize(vocs,
             initial_x = initial_x
 
         # submit evaluation of initial samples
-        vprint('submitting initial candidates')
+        vprint(f'submitting initial candidates at time {isotime()}')
         initial_y = submit_jobs(initial_x, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
@@ -183,7 +184,7 @@ def bayesian_optimize(vocs,
         vprint(f'Candidate(s): {candidates}')
 
         # observe candidates
-        vprint('submitting candidates')
+        vprint(f'submitting candidates at time {isotime()}')
         fut = submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         try:
