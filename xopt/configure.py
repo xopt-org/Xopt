@@ -12,7 +12,8 @@ KNOWN_ALGORITHMS = {
     'cnsga': 'xopt.cnsga.cnsga',
     'random_sampler': 'xopt.sampler.random_sampler',
     'bayesian_exploration': 'xopt.bayesian.algorithms.bayesian_exploration',
-    'mobo': 'xopt.bayesian.algorithms.mobo'
+    'mobo': 'xopt.bayesian.algorithms.mobo',
+    'multi_fidelity': 'xopt.bayesian.algorithms.multi_fidelity_optimize'
 }
 
 ALGORITHM_DEFAULTS = {
