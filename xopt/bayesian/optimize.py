@@ -9,7 +9,7 @@ from botorch.utils.sampling import draw_sobol_samples
 from .data import save_data_dict, get_data_json
 from .models.models import create_model
 from .utils import get_bounds, collect_results, sampler_evaluate, get_corrected_outputs, NoValidResultsError
-from ..tools import full_path, DummyExecutor
+from ..tools import full_path, DummyExecutor, isotime
 
 
 """
