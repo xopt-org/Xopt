@@ -1,6 +1,6 @@
 from . import generators
 from .optimize import bayesian_optimize
-from .models import multi_fidelity
+from .models.models import create_multi_fidelity_model
 
 
 def mobo(vocs, evaluate_f,
@@ -168,7 +168,7 @@ def multi_fidelity_optimize(vocs, evaluate_f,
                             n_steps=1,
                             n_initial_samples=1,
                             output_path=None,
-                            custom_model=multi_fidelity.generate_multi_fidelity_model,
+                            custom_model=create_multi_fidelity_model,
                             executor=None,
                             restart_file=None,
                             initial_x=None,

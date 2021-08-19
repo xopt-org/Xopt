@@ -1,8 +1,7 @@
 from xopt.tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function, \
     isotime
-from xopt.cnsga import cnsga
-from xopt.sampler import random_sampler
 from xopt.configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
+import xopt.configure as config
 from xopt import __version__
 import pprint
 from copy import deepcopy
@@ -176,7 +175,7 @@ class Xopt:
         if self.results and 'population' in opts:
             opts['population'] = self.results
                 
-        if alg in ['cnsga', 'random_sampler', 'bayesian_exploration', 'mobo']:
+        if alg in config.KNOWN_ALGORITHMS:
             self.results = self.run_f(executor=executor, vocs = self.vocs,
                                       evaluate_f = self.evaluate, # Already prepared with 
                                       output_path=self.config['xopt']['output_path'],
