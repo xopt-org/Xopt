@@ -24,12 +24,15 @@ class MultiFidelityGenerator(BayesianGenerator):
                  target_fidelities=None,
                  acq=None,
                  num_restarts=20,
-                 raw_samples=1024):
+                 raw_samples=1024,
+                 num_fantasies=128):
 
         super(MultiFidelityGenerator, self).__init__(vocs, batch_size, 1, num_restarts,raw_samples)
 
+        self.num_fantasies = num_fantasies
         self.target_fidelities = target_fidelities
         self.cost_model = AffineFidelityCostModel(self.target_fidelities, fixed_cost)
+
 
         if acq is None:
             self.acq = PosteriorMean
