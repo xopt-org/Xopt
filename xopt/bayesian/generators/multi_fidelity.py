@@ -11,36 +11,29 @@ from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
 
 # Logger
-from xopt.bayesian.utils import get_bounds
+from ..utils import get_bounds
+from .generator import BayesianGenerator
 
 logger = logging.getLogger(__name__)
 
 
-class MultiFidelityGenerator:
+class MultiFidelityGenerator(BayesianGenerator):
     def __init__(self, vocs,
                  batch_size=1,
-                 sampler=None,
                  fixed_cost=0.01,
                  target_fidelities=None,
                  acq=None,
                  num_restarts=20,
-                 raw_samples=1024,
-                 num_fantasies=128):
+                 raw_samples=1024):
 
-        self.vocs = vocs
-        self.batch_size = batch_size
-        self.sampler = sampler
-        self.num_restarts = num_restarts
-        self.raw_samples = raw_samples
-        self.num_fantasies = num_fantasies
+        super(MultiFidelityGenerator, self).__init__(vocs, batch_size, 1, num_restarts,raw_samples)
+
         self.target_fidelities = target_fidelities
-
         self.cost_model = AffineFidelityCostModel(self.target_fidelities, fixed_cost)
 
         if acq is None:
             self.acq = PosteriorMean
         else:
-            print(type(acq))
             assert isinstance(acq, botorch.acquisition.AcquisitionFunction) or callable(acq)
             self.acq = acq
 
@@ -49,12 +42,12 @@ class MultiFidelityGenerator:
     def project(self, X):
         return project_to_target_fidelity(X=X, target_fidelities=self.target_fidelities)
 
-    def get_mfkg(self, model, bounds, cost_aware_utility, vocs):
+    def get_mfkg(self, model, bounds, cost_aware_utility):
 
         curr_val_acqf = FixedFeatureAcquisitionFunction(
             acq_function=self.acq(model),
-            d=len(vocs['variables']),
-            columns=[len(vocs['variables']) - 1],
+            d=len(self.vocs['variables']),
+            columns=[len(self.vocs['variables']) - 1],
             values=[1],
         )
 
@@ -88,7 +81,7 @@ class MultiFidelityGenerator:
         cost_aware_utility = InverseCostWeightedUtility(cost_model=self.cost_model)
 
         X_init = gen_one_shot_kg_initial_conditions(
-            acq_function=self.get_mfkg(model, bounds, cost_aware_utility, self.vocs),
+            acq_function=self.get_mfkg(model, bounds, cost_aware_utility),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=self.num_restarts,
@@ -96,7 +89,7 @@ class MultiFidelityGenerator:
         )
 
         candidates, _ = optimize_acqf(
-            acq_function=self.get_mfkg(model, bounds, cost_aware_utility, self.vocs),
+            acq_function=self.get_mfkg(model, bounds, cost_aware_utility),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=self.num_restarts,

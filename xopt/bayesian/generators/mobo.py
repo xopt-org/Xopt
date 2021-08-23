@@ -6,30 +6,29 @@ from botorch.acquisition.multi_objective.monte_carlo import qExpectedHypervolume
 from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective
 from botorch.optim.optimize import optimize_acqf
 from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
-
+from .generator import BayesianGenerator
 # Logger
 from xopt.bayesian.utils import get_bounds
 
 logger = logging.getLogger(__name__)
 
 
-class MOBOGenerator:
+class MOBOGenerator(BayesianGenerator):
     def __init__(self, vocs, ref,
                  batch_size=1,
                  sigma=None,
-                 sampler=None,
+                 mc_samples=512,
                  num_restarts=20,
                  raw_samples=1024):
 
-        self.vocs = vocs
+        super(MOBOGenerator, self).__init__(vocs,
+                                            batch_size,
+                                            mc_samples,
+                                            num_restarts,
+                                            raw_samples)
         self.ref = ref
         self._corrected_ref = None
-
-        self.batch_size = batch_size
         self.sigma = sigma
-        self.sampler = sampler
-        self.num_restarts = num_restarts
-        self.raw_samples = raw_samples
 
     def generate(self, model, **tkwargs):
         """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
@@ -74,7 +73,8 @@ class MOBOGenerator:
             # define an objective that specifies which outcomes are the objectives
             objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
             # define constraint function - see botorch docs for info - I'm not sure how it works
-            constraints=constraint_functions
+            constraints=constraint_functions,
+            sampler=self.sampler
         )
 
         # optimize
