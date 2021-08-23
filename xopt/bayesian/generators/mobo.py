@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class MOBOGenerator:
-    def __init__(self, ref,
+    def __init__(self, vocs, ref,
                  batch_size=1,
                  sigma=None,
                  sampler=None,
                  num_restarts=20,
                  raw_samples=1024):
 
+        self.vocs = vocs
         self.ref = ref
         self._corrected_ref = None
 
@@ -30,15 +31,15 @@ class MOBOGenerator:
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
 
-    def generate(self, model, vocs, **tkwargs):
+    def generate(self, model, **tkwargs):
         """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
-        n_obectives = len(vocs['objectives'])
-        n_constraints = len(vocs['constraints'])
-        bounds = get_bounds(vocs, **tkwargs)
+        n_obectives = len(self.vocs['objectives'])
+        n_constraints = len(self.vocs['constraints'])
+        bounds = get_bounds(self.vocs, **tkwargs)
 
         self.ref = self.ref.to(tkwargs['device']) if isinstance(self.ref, torch.Tensor) else torch.tensor(self.ref,
                                                                                                           **tkwargs)
-        self._corrected_ref = self.get_corrected_ref(self.ref, vocs)
+        self._corrected_ref = self.get_corrected_ref(self.ref)
 
         train_outputs = model.train_targets.T
         train_y = train_outputs[:, :n_obectives]
@@ -89,10 +90,9 @@ class MOBOGenerator:
 
         return candidates.detach()
 
-    @staticmethod
-    def get_corrected_ref(ref, vocs):
+    def get_corrected_ref(self, ref):
         new_ref = ref.clone()
-        for j, name in zip(range(len(vocs['objectives'])), vocs['objectives'].keys()):
-            if vocs['objectives'][name] == 'MINIMIZE':
+        for j, name in zip(range(len(self.vocs['objectives'])), self.vocs['objectives'].keys()):
+            if self.vocs['objectives'][name] == 'MINIMIZE':
                 new_ref[j] = -new_ref[j]
         return new_ref

@@ -16,18 +16,27 @@ logger = logging.getLogger(__name__)
 
 
 class MultiFidelityGenerator:
-    def __init__(self,
+    def __init__(self, vocs,
                  batch_size=1,
                  sampler=None,
+                 cost_model=None,
                  num_restarts=20,
                  raw_samples=1024,
                  num_fantasies=128):
+
+        self.vocs = vocs
         self.batch_size = batch_size
         self.sampler = sampler
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
         self.num_fantasies = num_fantasies
         self.target_fidelities = None
+
+        if cost_model is None:
+            self.target_fidelities = {len(vocs['variables']) - 1: 1.0}
+            self.cost_model = AffineFidelityCostModel(fidelity_weights=self.target_fidelities)
+        else:
+            self.cost_model = cost_model
 
         self.cost = []
 
@@ -61,22 +70,20 @@ class MultiFidelityGenerator:
             project=self.project,
         )
 
-    def generate(self, model, vocs, **tkwargs):
+    def generate(self, model, **tkwargs):
         """
 
         Optimize Multifidelity acquisition function
 
         """
-        assert list(vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
+        assert list(self.vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
 
-        bounds = get_bounds(vocs, **tkwargs)
+        bounds = get_bounds(self.vocs, **tkwargs)
 
-        self.target_fidelities = {len(vocs['variables']) - 1: 1.0}
-        cost_model = AffineFidelityCostModel(fidelity_weights=self.target_fidelities, fixed_cost=5.0)
-        cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
+        cost_aware_utility = InverseCostWeightedUtility(cost_model=self.cost_model)
 
         X_init = gen_one_shot_kg_initial_conditions(
-            acq_function=self.get_mfkg(model, bounds, cost_aware_utility, vocs),
+            acq_function=self.get_mfkg(model, bounds, cost_aware_utility, self.vocs),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=self.num_restarts,
@@ -84,7 +91,7 @@ class MultiFidelityGenerator:
         )
 
         candidates, _ = optimize_acqf(
-            acq_function=self.get_mfkg(model, bounds, cost_aware_utility, vocs),
+            acq_function=self.get_mfkg(model, bounds, cost_aware_utility, self.vocs),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=self.num_restarts,
@@ -92,15 +99,15 @@ class MultiFidelityGenerator:
             batch_initial_conditions=X_init,
             options={"batch_limit": 5, "maxiter": 200},
         )
-        self.cost += [cost_model(candidates).sum()]
+        self.cost += [self.cost_model(candidates).sum()]
         return candidates.detach()
 
-    def get_recommendation(self, model, vocs, **tkwargs):
-        bounds = get_bounds(vocs, **tkwargs)
+    def get_recommendation(self, model, **tkwargs):
+        bounds = get_bounds(self.vocs, **tkwargs)
         rec_acqf = FixedFeatureAcquisitionFunction(
             acq_function=PosteriorMean(model),
-            d=len(vocs['variables']),
-            columns=[len(vocs['variables'])-1],
+            d=len(self.vocs['variables']),
+            columns=[len(self.vocs['variables'])-1],
             values=[1],
         )
 
