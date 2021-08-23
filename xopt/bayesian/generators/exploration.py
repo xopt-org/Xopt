@@ -12,21 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 class BayesianExplorationGenerator:
-    def __init__(self,
+    def __init__(self, vocs,
                  batch_size=1,
                  sigma=None,
                  sampler=None,
                  num_restarts=20,
-                 raw_samples=1024,
-                 use_gpu=False):
+                 raw_samples=1024):
 
+        self.vocs = vocs
         self.batch_size = batch_size
         self.sigma = sigma
         self.sampler = sampler
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
+        self.acq_func = BayesianExploration
 
-    def generate(self, model, vocs, **tkwargs):
+    def generate(self, model, **tkwargs):
         """
 
         Optimize Bayesian Exploration
@@ -35,9 +36,9 @@ class BayesianExplorationGenerator:
         where the first element is the target function for exploration and m is the number of constraints
 
         """
-        n_constraints = len(vocs['constraints'])
-        n_variables = len(vocs['variables'])
-        bounds = get_bounds(vocs, **tkwargs)
+        n_constraints = len(self.vocs['constraints'])
+        n_variables = len(self.vocs['variables'])
+        bounds = get_bounds(self.vocs, **tkwargs)
 
         # serialized Bayesian Exploration
         if self.batch_size == 1:
@@ -52,7 +53,7 @@ class BayesianExplorationGenerator:
                 constraint_dict[i] = [None, 0.0]
 
             constraint_dict = constraint_dict if len(constraint_dict) else None
-            acq_func = BayesianExploration(model, 0, constraint_dict, self.sigma)
+            acq_func = self.acq_func(model, 0, constraint_dict, self.sigma)
 
         # batched Bayesian Exploration
         else:

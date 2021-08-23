@@ -169,7 +169,7 @@ def bayesian_optimize(vocs,
 
         # get candidate point(s)
         candidate_start = time.time()
-        candidates = candidate_generator.generate(model, vocs, **tkwargs)
+        candidates = candidate_generator.generate(model, **tkwargs)
         vprint(f'Candidate generation time: {time.time() - candidate_start:.4} s')
         vprint(f'Candidate(s): {candidates}')
 

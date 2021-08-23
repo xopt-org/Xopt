@@ -71,7 +71,7 @@ def mobo(vocs, evaluate_f,
 
     assert ref is not None, 'reference point required for MOBO, use keyword argument "ref"'
 
-    generator = generators.mobo.MOBOGenerator(ref, **generator_options)
+    generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
     return bayesian_optimize(vocs,
                              evaluate_f,
                              generator,
@@ -148,7 +148,7 @@ def bayesian_exploration(vocs, evaluate_f,
     if generator_options is None:
         generator_options = {}
 
-    generator = generators.exploration.BayesianExplorationGenerator(**generator_options)
+    generator = generators.exploration.BayesianExplorationGenerator(vocs, **generator_options)
     return bayesian_optimize(vocs,
                              evaluate_f,
                              generator,
@@ -225,7 +225,7 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     if generator_options is None:
         generator_options = {}
 
-    generator = generators.multi_fidelity.MultiFidelityGenerator(**generator_options)
+    generator = generators.multi_fidelity.MultiFidelityGenerator(vocs, **generator_options)
     return bayesian_optimize(vocs,
                              evaluate_f,
                              generator,
