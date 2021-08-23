@@ -57,6 +57,15 @@ def configure_algorithm(config):
     defaults = tools.get_function_defaults(f)
     tools.fill_defaults(options, defaults, strict=False)
 
+    # see if generator_options are in options - functions can be specified in generator options
+    if 'generator_options' in options:
+        for name, val in options['generator_options'].items():
+            if isinstance(val, str):
+                try:
+                    options['generator_options'][name] = tools.get_function(val)
+                except ValueError:
+                    pass
+
     return {'name': config['name'], 'function': f_name, 'options': options}
 
 

@@ -1,5 +1,6 @@
 import logging
 
+import botorch.acquisition
 from botorch.models.cost import AffineFidelityCostModel
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition import PosteriorMean
@@ -19,7 +20,9 @@ class MultiFidelityGenerator:
     def __init__(self, vocs,
                  batch_size=1,
                  sampler=None,
-                 cost_model=None,
+                 fixed_cost=0.01,
+                 target_fidelities=None,
+                 acq=None,
                  num_restarts=20,
                  raw_samples=1024,
                  num_fantasies=128):
@@ -30,26 +33,28 @@ class MultiFidelityGenerator:
         self.num_restarts = num_restarts
         self.raw_samples = raw_samples
         self.num_fantasies = num_fantasies
-        self.target_fidelities = None
+        self.target_fidelities = target_fidelities
 
-        if cost_model is None:
-            self.target_fidelities = {len(vocs['variables']) - 1: 1.0}
-            self.cost_model = AffineFidelityCostModel(fidelity_weights=self.target_fidelities)
+        self.cost_model = AffineFidelityCostModel(self.target_fidelities, fixed_cost)
+
+        if acq is None:
+            self.acq = PosteriorMean
         else:
-            self.cost_model = cost_model
+            print(type(acq))
+            assert isinstance(acq, botorch.acquisition.AcquisitionFunction) or callable(acq)
+            self.acq = acq
 
         self.cost = []
 
     def project(self, X):
-        assert self.target_fidelities is not None
         return project_to_target_fidelity(X=X, target_fidelities=self.target_fidelities)
 
     def get_mfkg(self, model, bounds, cost_aware_utility, vocs):
 
         curr_val_acqf = FixedFeatureAcquisitionFunction(
-            acq_function=PosteriorMean(model),
+            acq_function=self.acq(model),
             d=len(vocs['variables']),
-            columns=[len(vocs['variables'])-1],
+            columns=[len(vocs['variables']) - 1],
             values=[1],
         )
 
@@ -105,9 +110,9 @@ class MultiFidelityGenerator:
     def get_recommendation(self, model, **tkwargs):
         bounds = get_bounds(self.vocs, **tkwargs)
         rec_acqf = FixedFeatureAcquisitionFunction(
-            acq_function=PosteriorMean(model),
+            acq_function=self.acq(model),
             d=len(self.vocs['variables']),
-            columns=[len(self.vocs['variables'])-1],
+            columns=[len(self.vocs['variables']) - 1],
             values=[1],
         )
 
