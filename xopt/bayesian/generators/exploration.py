@@ -5,27 +5,28 @@ import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.optim.optimize import optimize_acqf
 
+from .generator import BayesianGenerator
 from ..acquisition.exploration import qBayesianExploration, BayesianExploration
 from ..utils import get_bounds
 #Logger
 logger = logging.getLogger(__name__)
 
 
-class BayesianExplorationGenerator:
+class BayesianExplorationGenerator(BayesianGenerator):
     def __init__(self, vocs,
                  batch_size=1,
                  sigma=None,
-                 sampler=None,
+                 mc_samples=512,
                  num_restarts=20,
                  raw_samples=1024):
 
-        self.vocs = vocs
-        self.batch_size = batch_size
-        self.sigma = sigma
-        self.sampler = sampler
-        self.num_restarts = num_restarts
-        self.raw_samples = raw_samples
+        super(BayesianExplorationGenerator, self).__init__(vocs,
+                                                           batch_size,
+                                                           mc_samples,
+                                                           num_restarts,
+                                                           raw_samples)
         self.acq_func = BayesianExploration
+        self.sigma = sigma
 
     def generate(self, model, **tkwargs):
         """

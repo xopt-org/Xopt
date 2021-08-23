@@ -61,10 +61,7 @@ def configure_algorithm(config):
     if 'generator_options' in options:
         for name, val in options['generator_options'].items():
             if isinstance(val, str):
-                try:
-                    options['generator_options'][name] = tools.get_function(val)
-                except ValueError:
-                    pass
+                options['generator_options'][name] = tools.get_function(val)
 
     return {'name': config['name'], 'function': f_name, 'options': options}
 
