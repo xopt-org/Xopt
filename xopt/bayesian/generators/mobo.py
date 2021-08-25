@@ -6,36 +6,39 @@ from botorch.acquisition.multi_objective.monte_carlo import qExpectedHypervolume
 from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective
 from botorch.optim.optimize import optimize_acqf
 from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
-
+from .generator import BayesianGenerator
 # Logger
+from xopt.bayesian.utils import get_bounds
+
 logger = logging.getLogger(__name__)
 
 
-class MOBOGenerator:
-    def __init__(self, ref,
+class MOBOGenerator(BayesianGenerator):
+    def __init__(self, vocs, ref,
                  batch_size=1,
                  sigma=None,
-                 sampler=None,
+                 mc_samples=512,
                  num_restarts=20,
                  raw_samples=1024):
 
+        super(MOBOGenerator, self).__init__(vocs,
+                                            batch_size,
+                                            mc_samples,
+                                            num_restarts,
+                                            raw_samples)
         self.ref = ref
         self._corrected_ref = None
-
-        self.batch_size = batch_size
         self.sigma = sigma
-        self.sampler = sampler
-        self.num_restarts = num_restarts
-        self.raw_samples = raw_samples
 
-    def generate(self, model, bounds, vocs, **tkwargs):
+    def generate(self, model, **tkwargs):
         """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
-        n_obectives = len(vocs['objectives'])
-        n_constraints = len(vocs['constraints'])
+        n_obectives = len(self.vocs['objectives'])
+        n_constraints = len(self.vocs['constraints'])
+        bounds = get_bounds(self.vocs, **tkwargs)
 
         self.ref = self.ref.to(tkwargs['device']) if isinstance(self.ref, torch.Tensor) else torch.tensor(self.ref,
                                                                                                           **tkwargs)
-        self._corrected_ref = self.get_corrected_ref(self.ref, vocs)
+        self._corrected_ref = self.get_corrected_ref(self.ref)
 
         train_outputs = model.train_targets.T
         train_y = train_outputs[:, :n_obectives]
@@ -70,7 +73,8 @@ class MOBOGenerator:
             # define an objective that specifies which outcomes are the objectives
             objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
             # define constraint function - see botorch docs for info - I'm not sure how it works
-            constraints=constraint_functions
+            constraints=constraint_functions,
+            sampler=self.sampler
         )
 
         # optimize
@@ -86,10 +90,9 @@ class MOBOGenerator:
 
         return candidates.detach()
 
-    @staticmethod
-    def get_corrected_ref(ref, vocs):
+    def get_corrected_ref(self, ref):
         new_ref = ref.clone()
-        for j, name in zip(range(len(vocs['objectives'])), vocs['objectives'].keys()):
-            if vocs['objectives'][name] == 'MINIMIZE':
+        for j, name in zip(range(len(self.vocs['objectives'])), self.vocs['objectives'].keys()):
+            if self.vocs['objectives'][name] == 'MINIMIZE':
                 new_ref[j] = -new_ref[j]
         return new_ref

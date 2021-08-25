@@ -5,28 +5,30 @@ import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.optim.optimize import optimize_acqf
 
+from .generator import BayesianGenerator
 from ..acquisition.exploration import qBayesianExploration, BayesianExploration
-
+from ..utils import get_bounds
 #Logger
 logger = logging.getLogger(__name__)
 
 
-class BayesianExplorationGenerator:
-    def __init__(self,
+class BayesianExplorationGenerator(BayesianGenerator):
+    def __init__(self, vocs,
                  batch_size=1,
                  sigma=None,
-                 sampler=None,
+                 mc_samples=512,
                  num_restarts=20,
-                 raw_samples=1024,
-                 use_gpu=False):
+                 raw_samples=1024):
 
-        self.batch_size = batch_size
+        super(BayesianExplorationGenerator, self).__init__(vocs,
+                                                           batch_size,
+                                                           mc_samples,
+                                                           num_restarts,
+                                                           raw_samples)
+        self.acq_func = BayesianExploration
         self.sigma = sigma
-        self.sampler = sampler
-        self.num_restarts = num_restarts
-        self.raw_samples = raw_samples
 
-    def generate(self, model, bounds, vocs, **tkwargs):
+    def generate(self, model, **tkwargs):
         """
 
         Optimize Bayesian Exploration
@@ -35,8 +37,9 @@ class BayesianExplorationGenerator:
         where the first element is the target function for exploration and m is the number of constraints
 
         """
-        n_constraints = len(vocs['constraints'])
-        n_variables = len(vocs['variables'])
+        n_constraints = len(self.vocs['constraints'])
+        n_variables = len(self.vocs['variables'])
+        bounds = get_bounds(self.vocs, **tkwargs)
 
         # serialized Bayesian Exploration
         if self.batch_size == 1:
@@ -51,7 +54,7 @@ class BayesianExplorationGenerator:
                 constraint_dict[i] = [None, 0.0]
 
             constraint_dict = constraint_dict if len(constraint_dict) else None
-            acq_func = BayesianExploration(model, 0, constraint_dict, self.sigma)
+            acq_func = self.acq_func(model, 0, constraint_dict, self.sigma)
 
         # batched Bayesian Exploration
         else:

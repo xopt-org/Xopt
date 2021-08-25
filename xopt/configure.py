@@ -12,7 +12,8 @@ KNOWN_ALGORITHMS = {
     'cnsga': 'xopt.cnsga.cnsga',
     'random_sampler': 'xopt.sampler.random_sampler',
     'bayesian_exploration': 'xopt.bayesian.algorithms.bayesian_exploration',
-    'mobo': 'xopt.bayesian.algorithms.mobo'
+    'mobo': 'xopt.bayesian.algorithms.mobo',
+    'multi_fidelity': 'xopt.bayesian.algorithms.multi_fidelity_optimize'
 }
 
 ALGORITHM_DEFAULTS = {
@@ -55,6 +56,12 @@ def configure_algorithm(config):
         options.update(config['options'])
     defaults = tools.get_function_defaults(f)
     tools.fill_defaults(options, defaults, strict=False)
+
+    # see if generator_options are in options - functions can be specified in generator options
+    if 'generator_options' in options:
+        for name, val in options['generator_options'].items():
+            if isinstance(val, str):
+                options['generator_options'][name] = tools.get_function(val)
 
     return {'name': config['name'], 'function': f_name, 'options': options}
 

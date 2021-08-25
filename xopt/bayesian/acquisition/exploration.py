@@ -210,7 +210,7 @@ class qBayesianExploration(MCAcquisitionFunction):
                                                                      dtype=obj.dtype), self.constraints,
                                                           samples, eta=1e-3)
 
-        ucb_mean = obj.mean(dim=0)
-        ucb_samples = (obj - ucb_mean).abs() * feas_weights
-        ucb_result = ucb_samples.max(dim=-1)[0].mean(dim=0)
-        return ucb_result
+        be_mean = obj.mean(dim=0)
+        be_samples = (obj - be_mean).abs() * feas_weights
+        be_result = be_samples.max(dim=-1)[0].mean(dim=0)
+        return be_result
