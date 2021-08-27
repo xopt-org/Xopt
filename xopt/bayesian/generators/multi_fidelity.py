@@ -1,4 +1,5 @@
 import logging
+import copy
 
 import botorch.acquisition
 from botorch.models.cost import AffineFidelityCostModel
@@ -10,10 +11,10 @@ from botorch.optim.optimize import optimize_acqf
 from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
 
-# Logger
 from ..utils import get_bounds
 from .generator import BayesianGenerator
 
+# Logger
 logger = logging.getLogger(__name__)
 
 
@@ -22,25 +23,31 @@ class MultiFidelityGenerator(BayesianGenerator):
                  batch_size=1,
                  fixed_cost=0.01,
                  target_fidelities=None,
-                 acq=None,
+                 base_acq=None,
                  num_restarts=20,
                  raw_samples=1024,
-                 num_fantasies=128):
+                 mc_samples=512,
+                 num_fantasies=128,
+                 use_gpu=False):
 
-        super(MultiFidelityGenerator, self).__init__(vocs, batch_size, 1, num_restarts,raw_samples)
+        super(MultiFidelityGenerator, self).__init__(vocs,
+                                                     self.create_acq,
+                                                     batch_size,
+                                                     num_restarts,
+                                                     raw_samples,
+                                                     mc_samples,
+                                                     use_gpu=use_gpu)
 
         self.num_fantasies = num_fantasies
         self.target_fidelities = target_fidelities
         self.cost_model = AffineFidelityCostModel(self.target_fidelities, fixed_cost)
 
-
-        if acq is None:
-            self.acq = PosteriorMean
+        if base_acq is None:
+            self.base_acq = PosteriorMean
         else:
-            assert isinstance(acq, botorch.acquisition.AcquisitionFunction) or callable(acq)
-            self.acq = acq
-
-        self.cost = []
+            assert (isinstance(base_acq, botorch.acquisition.AcquisitionFunction) or
+                    callable(base_acq))
+            self.base_acq = base_acq
 
     def project(self, X):
         return project_to_target_fidelity(X=X, target_fidelities=self.target_fidelities)
@@ -48,7 +55,7 @@ class MultiFidelityGenerator(BayesianGenerator):
     def get_mfkg(self, model, bounds, cost_aware_utility):
 
         curr_val_acqf = FixedFeatureAcquisitionFunction(
-            acq_function=self.acq(model),
+            acq_function=self.base_acq(model),
             d=len(self.vocs['variables']),
             columns=[len(self.vocs['variables']) - 1],
             values=[1],
@@ -58,9 +65,9 @@ class MultiFidelityGenerator(BayesianGenerator):
             acq_function=curr_val_acqf,
             bounds=bounds[:, :-1],
             q=1,
-            num_restarts=self.num_restarts,
-            raw_samples=self.raw_samples,
-            options={"batch_limit": 10, "maxiter": 200},
+            num_restarts=self.optimize_options['num_restarts'],
+            raw_samples=self.optimize_options['raw_samples'],
+            options=self.optimize_options['options'],
         )
 
         return qMultiFidelityKnowledgeGradient(
@@ -71,54 +78,56 @@ class MultiFidelityGenerator(BayesianGenerator):
             project=self.project,
         )
 
-    def generate(self, model, **tkwargs):
+    def create_acq(self, model):
         """
 
-        Optimize Multifidelity acquisition function
+        Create Multifidelity acquisition function
 
         """
-        assert list(self.vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
+        assert list(self.vocs['variables'])[
+                   -1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
 
-        bounds = get_bounds(self.vocs, **tkwargs)
+        bounds = get_bounds(self.vocs, **self.tkwargs)
 
         cost_aware_utility = InverseCostWeightedUtility(cost_model=self.cost_model)
+
+        # get optimization options
+        one_shot_options = copy.deepcopy(self.optimize_options)
+        if 'batch_initial_conditions' in one_shot_options:
+            one_shot_options.pop('batch_initial_conditions')
 
         X_init = gen_one_shot_kg_initial_conditions(
             acq_function=self.get_mfkg(model, bounds, cost_aware_utility),
             bounds=bounds,
-            q=self.batch_size,
-            num_restarts=self.num_restarts,
-            raw_samples=self.raw_samples,
+            **one_shot_options
         )
 
-        candidates, _ = optimize_acqf(
-            acq_function=self.get_mfkg(model, bounds, cost_aware_utility),
-            bounds=bounds,
-            q=self.batch_size,
-            num_restarts=self.num_restarts,
-            raw_samples=self.raw_samples,
-            batch_initial_conditions=X_init,
-            options={"batch_limit": 5, "maxiter": 200},
-        )
-        self.cost += [self.cost_model(candidates).sum()]
-        return candidates.detach()
+        self.optimize_options['batch_initial_conditions'] = X_init
 
-    def get_recommendation(self, model, **tkwargs):
-        bounds = get_bounds(self.vocs, **tkwargs)
+        return self.get_mfkg(model, bounds, cost_aware_utility)
+
+    def get_recommendation(self, model):
+        bounds = get_bounds(self.vocs, **self.tkwargs)
         rec_acqf = FixedFeatureAcquisitionFunction(
-            acq_function=self.acq(model),
+            acq_function=self.base_acq(model),
             d=len(self.vocs['variables']),
             columns=[len(self.vocs['variables']) - 1],
             values=[1],
         )
 
+        # get optimization options for recommendation optimization
+        final_options = copy.deepcopy(self.optimize_options)
+        for ele in ['q', 'batch_initial_conditions']:
+            try:
+                final_options.pop(ele)
+            except KeyError:
+                pass
+
         final_rec, _ = optimize_acqf(
             acq_function=rec_acqf,
             bounds=bounds[:, :-1],
             q=1,
-            num_restarts=self.num_restarts,
-            raw_samples=self.raw_samples,
-            options={"batch_limit": 5, "maxiter": 200},
+            **final_options
         )
 
         return rec_acqf._construct_X_full(final_rec)

@@ -9,7 +9,6 @@ xopt: {output_path: null, verbose: true}
 algorithm:
   name: bayesian_exploration
   options: {n_initial_samples: 5,
-            use_gpu: False,
             n_steps: 2, 
             generator_options: {batch_size: 2},
             verbose: True}
@@ -40,7 +39,6 @@ xopt: {output_path: null, verbose: true}
 algorithm:
   name: bayesian_exploration
   options: {n_initial_samples: 5,
-            use_gpu: False,
             n_steps: 2, 
             generator_options: {batch_size: 1, sigma: [[1.0,0.0],[0.0,1.0]]},
             verbose: True}

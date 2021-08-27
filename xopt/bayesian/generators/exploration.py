@@ -3,12 +3,12 @@ from functools import partial
 
 import torch
 from botorch.acquisition import GenericMCObjective
-from botorch.optim.optimize import optimize_acqf
 
 from .generator import BayesianGenerator
 from ..acquisition.exploration import qBayesianExploration, BayesianExploration
-from ..utils import get_bounds
-#Logger
+from ..utils import UnsupportedError
+
+# Logger
 logger = logging.getLogger(__name__)
 
 
@@ -18,48 +18,55 @@ class BayesianExplorationGenerator(BayesianGenerator):
                  sigma=None,
                  mc_samples=512,
                  num_restarts=20,
-                 raw_samples=1024):
+                 raw_samples=1024,
+                 use_gpu=False):
 
-        super(BayesianExplorationGenerator, self).__init__(vocs,
-                                                           batch_size,
-                                                           mc_samples,
-                                                           num_restarts,
-                                                           raw_samples)
-        self.acq_func = BayesianExploration
+        optimize_options = {'sequential': True}
+        super(BayesianExplorationGenerator,
+              self).__init__(vocs,
+                             self.create_acq,
+                             batch_size,
+                             num_restarts,
+                             raw_samples,
+                             mc_samples=mc_samples,
+                             optimize_options=optimize_options,
+                             use_gpu=use_gpu)
+
+        if batch_size != 1 and sigma is not None:
+            raise UnsupportedError("`not possible to use proximal term in "
+                                   "multi-batch setting")
         self.sigma = sigma
 
-    def generate(self, model, **tkwargs):
+    def create_acq(self, model):
         """
 
         Optimize Bayesian Exploration
 
-        model should be a SingleTaskGP model trained such that the output has a shape n x m + 1
-        where the first element is the target function for exploration and m is the number of constraints
+        model should be a SingleTaskGP model trained such that the output has a shape
+        n x m + 1 where the first element is the target function for exploration and
+        m is the number of constraints
 
         """
         n_constraints = len(self.vocs['constraints'])
         n_variables = len(self.vocs['variables'])
-        bounds = get_bounds(self.vocs, **tkwargs)
 
         # serialized Bayesian Exploration
-        if self.batch_size == 1:
+        if self.optimize_options['q'] == 1:
             if self.sigma is None:
-                self.sigma = torch.eye(n_variables, **tkwargs) * 1e10
+                self.sigma = torch.eye(n_variables, **self.tkwargs) * 1e10
 
             elif not isinstance(self.sigma, torch.Tensor):
-                self.sigma = torch.tensor(self.sigma.copy(), **tkwargs)
+                self.sigma = torch.tensor(self.sigma.copy(), **self.tkwargs)
 
             constraint_dict = {}
             for i in range(1, n_constraints + 1):
                 constraint_dict[i] = [None, 0.0]
 
             constraint_dict = constraint_dict if len(constraint_dict) else None
-            acq_func = self.acq_func(model, 0, constraint_dict, self.sigma)
+            acq_func = BayesianExploration(model, 0, constraint_dict, self.sigma)
 
         # batched Bayesian Exploration
         else:
-            assert self.sigma is None, 'proximal biasing not possible in batched context'
-
             mc_obj = GenericMCObjective(lambda Z, X: Z[..., 0])
 
             # define constraint functions - note issues with lambda implementation
@@ -71,18 +78,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
             for i in range(1, n_constraints + 1):
                 constraint_functions += [partial(constr_func, index=-i)]
 
-            acq_func = qBayesianExploration(model, self.sampler, mc_obj, constraints=constraint_functions)
+            acq_func = qBayesianExploration(model, self.sampler, mc_obj,
+                                            constraints=constraint_functions)
 
-        # optimize
-        candidates, _ = optimize_acqf(
-            acq_function=acq_func,
-            bounds=bounds,
-            q=self.batch_size,
-            num_restarts=self.num_restarts,
-            raw_samples=self.raw_samples,  # used for initialization heuristic
-            options={"batch_limit": 5, "maxiter": 200, "nonnegative": True},
-            sequential=True,
-        )
-
-        return candidates.detach()
-
+        return acq_func

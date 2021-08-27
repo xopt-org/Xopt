@@ -10,6 +10,10 @@ class NoValidResultsError(Exception):
     pass
 
 
+class UnsupportedError(Exception):
+    pass
+
+
 # Logger
 logger = logging.getLogger(__name__)
 
@@ -46,7 +50,7 @@ def check_config(old_config, function_name, **kwargs):
                   'xopt': {'verbose': kwargs.get('verbose', False),
                            'output_path': kwargs.get('output_path', '')}}
 
-        #for ele in config['vocs'].keys():
+        # for ele in config['vocs'].keys():
         #    del config[ele]
 
         if 'algorithm' not in config.keys():
@@ -70,7 +74,8 @@ def check_config(old_config, function_name, **kwargs):
 
 def get_bounds(vocs, **tkwargs):
     # get initial bounds
-    return torch.vstack([torch.tensor(ele, **tkwargs) for _, ele in vocs['variables'].items()]).T
+    return torch.vstack(
+        [torch.tensor(ele, **tkwargs) for _, ele in vocs['variables'].items()]).T
 
 
 def get_corrected_outputs(vocs, train_y, train_c):
@@ -108,7 +113,8 @@ def get_corrected_outputs(vocs, train_y, train_c):
         elif vocs['constraints'][name][0] == 'LESS_THAN':
             corrected_train_c[:, k] = -(vocs['constraints'][name][1] - train_c[:, k])
         else:
-            logger.warning(f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
+            logger.warning(
+                f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
 
     return corrected_train_y, corrected_train_c
 
