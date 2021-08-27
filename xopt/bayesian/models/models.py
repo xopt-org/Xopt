@@ -46,3 +46,17 @@ def create_multi_fidelity_model(train_x, train_obj, train_c, vocs):
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
     return model
+
+
+def create_simple_multi_fidelity_model(train_x, train_obj, train_c, vocs):
+    assert list(vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
+    input_normalize = Normalize(len(vocs['variables']), get_bounds(vocs, device=train_x.device))
+    model = SingleTaskMultiFidelityGP(
+        train_x,
+        train_obj,
+        #input_transform=input_normalize,
+        outcome_transform=Standardize(m=1),
+    )
+    mll = ExactMarginalLogLikelihood(model.likelihood, model)
+    fit_gpytorch_model(mll)
+    return model

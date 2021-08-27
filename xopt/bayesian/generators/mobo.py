@@ -2,13 +2,15 @@ import logging
 from functools import partial
 
 import torch
-from botorch.acquisition.multi_objective.monte_carlo import qExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective.monte_carlo import \
+    qExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective
-from botorch.optim.optimize import optimize_acqf
-from botorch.utils.multi_objective.box_decompositions.non_dominated import NondominatedPartitioning
+from botorch.utils.multi_objective.box_decompositions.non_dominated import \
+    NondominatedPartitioning
+
 from .generator import BayesianGenerator
+
 # Logger
-from xopt.bayesian.utils import get_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -19,25 +21,31 @@ class MOBOGenerator(BayesianGenerator):
                  sigma=None,
                  mc_samples=512,
                  num_restarts=20,
-                 raw_samples=1024):
+                 raw_samples=1024,
+                 use_gpu=False):
 
-        super(MOBOGenerator, self).__init__(vocs,
-                                            batch_size,
-                                            mc_samples,
-                                            num_restarts,
-                                            raw_samples)
         self.ref = ref
         self._corrected_ref = None
         self.sigma = sigma
+        optimize_options = {'sequential': True}
 
-    def generate(self, model, **tkwargs):
-        """Optimizes the qEHVI acquisition function and returns new candidate(s)."""
+        super(MOBOGenerator, self).__init__(vocs,
+                                            self.create_acqf,
+                                            batch_size,
+                                            num_restarts,
+                                            raw_samples,
+                                            mc_samples=mc_samples,
+                                            optimize_options=optimize_options,
+                                            use_gpu=use_gpu)
+
+    def create_acqf(self, model):
         n_obectives = len(self.vocs['objectives'])
         n_constraints = len(self.vocs['constraints'])
-        bounds = get_bounds(self.vocs, **tkwargs)
 
-        self.ref = self.ref.to(tkwargs['device']) if isinstance(self.ref, torch.Tensor) else torch.tensor(self.ref,
-                                                                                                          **tkwargs)
+        self.ref = (self.ref.to(self.tkwargs['device'])
+                    if isinstance(self.ref, torch.Tensor) else
+                    torch.tensor(self.ref, **self.tkwargs))
+
         self._corrected_ref = self.get_corrected_ref(self.ref)
 
         train_outputs = model.train_targets.T
@@ -52,7 +60,8 @@ class MOBOGenerator(BayesianGenerator):
         # partition non-dominated space into disjoint rectangles
         partitioning = NondominatedPartitioning(
             ref_point=self._corrected_ref,
-            # use observations that are better than the specified reference point and feasible
+            # use observations that are better than the specified reference point and
+            # feasible
             Y=train_y[better_than_ref & is_feas],
 
         )
@@ -72,27 +81,18 @@ class MOBOGenerator(BayesianGenerator):
             partitioning=partitioning,
             # define an objective that specifies which outcomes are the objectives
             objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
-            # define constraint function - see botorch docs for info - I'm not sure how it works
+            # define constraint function - see botorch docs for info - I'm not sure
+            # how it works
             constraints=constraint_functions,
             sampler=self.sampler
         )
 
-        # optimize
-        candidates, _ = optimize_acqf(
-            acq_function=acq_func,
-            bounds=bounds,
-            q=self.batch_size,
-            num_restarts=self.num_restarts,
-            raw_samples=self.raw_samples,  # used for initialization heuristic
-            options={"batch_limit": 5, "maxiter": 200, "nonnegative": True},
-            sequential=True,
-        )
-
-        return candidates.detach()
+        return acq_func
 
     def get_corrected_ref(self, ref):
         new_ref = ref.clone()
-        for j, name in zip(range(len(self.vocs['objectives'])), self.vocs['objectives'].keys()):
+        for j, name in zip(range(len(self.vocs['objectives'])),
+                           self.vocs['objectives'].keys()):
             if self.vocs['objectives'][name] == 'MINIMIZE':
                 new_ref[j] = -new_ref[j]
         return new_ref
