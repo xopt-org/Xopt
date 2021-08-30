@@ -3,6 +3,7 @@ import copy
 from xopt import Xopt
 import pytest
 from ..evaluators import test_TNK
+from ..bayesian.utils import UnsupportedError
 
 
 class TestClassMOBO:
@@ -15,8 +16,9 @@ class TestClassMOBO:
                            'options': {
                                'n_initial_samples': 1,
                                'n_steps': 1,
-                               'ref': None,
+                               'ref': [],
                                'generator_options': {
+                                   'batch_size': 1,
                                    'mc_samples': 4,
                                    'num_restarts': 1,
                                    'raw_samples': 4
@@ -56,12 +58,11 @@ class TestClassMOBO:
     def test_mobo_proximal(self):
         test_config = copy.deepcopy(self.config)
         test_config['algorithm']['options']['generator_options'] = {
-            'sigma': [1.0, 1.0]
+            'sigma': [1.0, 1.0],
+            'batch_size': 2
         }
         test_config['algorithm']['options']['ref'] = [1.4, 1.4]
 
         # try with sigma matrix
         X = Xopt(test_config)
         X.run()
-
-
