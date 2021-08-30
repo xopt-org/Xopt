@@ -1,12 +1,16 @@
 import logging
 from functools import partial
+from typing import Dict, Optional, Union, List
 
 import torch
+from botorch.acquisition import AcquisitionFunction
 from botorch.acquisition.multi_objective.monte_carlo import \
     qExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective
+from botorch.models.model import Model
 from botorch.utils.multi_objective.box_decompositions.non_dominated import \
     NondominatedPartitioning
+from torch import Tensor
 
 from .generator import BayesianGenerator
 
@@ -16,13 +20,15 @@ logger = logging.getLogger(__name__)
 
 
 class MOBOGenerator(BayesianGenerator):
-    def __init__(self, vocs, ref,
-                 batch_size=1,
-                 sigma=None,
-                 mc_samples=512,
-                 num_restarts=20,
-                 raw_samples=1024,
-                 use_gpu=False):
+    def __init__(self,
+                 vocs: [Dict],
+                 ref: Union[Tensor, List],
+                 batch_size: Optional[int] = 1,
+                 sigma: Optional[Union[Tensor, List]] = None,
+                 mc_samples: Optional[int] = 512,
+                 num_restarts: Optional[int] = 20,
+                 raw_samples: Optional[int] = 1024,
+                 use_gpu: Optional[bool] = False) -> None:
 
         self.ref = ref
         self._corrected_ref = None
@@ -38,7 +44,7 @@ class MOBOGenerator(BayesianGenerator):
                                             optimize_options=optimize_options,
                                             use_gpu=use_gpu)
 
-    def create_acqf(self, model):
+    def create_acqf(self, model: [Model]) -> AcquisitionFunction:
         n_obectives = len(self.vocs['objectives'])
         n_constraints = len(self.vocs['constraints'])
 

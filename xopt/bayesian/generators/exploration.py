@@ -2,25 +2,52 @@ import logging
 from functools import partial
 
 import torch
+from torch import Tensor
 from botorch.acquisition import GenericMCObjective
 
 from .generator import BayesianGenerator
 from ..acquisition.exploration import qBayesianExploration, BayesianExploration
 from ..utils import UnsupportedError
+from typing import Dict, Optional, Union, List
 
 # Logger
 logger = logging.getLogger(__name__)
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
-    def __init__(self, vocs,
-                 batch_size=1,
-                 sigma=None,
-                 mc_samples=512,
-                 num_restarts=20,
-                 raw_samples=1024,
-                 use_gpu=False):
+    def __init__(self,
+                 vocs: [Dict],
+                 batch_size: Optional[int] = 1,
+                 sigma: Optional[Union[Tensor, List]] = None,
+                 mc_samples: Optional[int] = 512,
+                 num_restarts: Optional[int] = 20,
+                 raw_samples: Optional[int] = 1024,
+                 use_gpu: Optional[bool] = False) -> None:
+        """
 
+        Parameters
+        ----------
+        vocs : dict
+            Varabiles, objectives, constraints and statics dictionary,
+            see xopt documentation for detials
+
+        batch_size : int, default: 1
+            Batch size for parallel candidate generation.
+
+        num_restarts : int, default: 20
+            Number of optimization restarts used when performing optimization(s)
+
+        raw_samples : int, default: 1024
+            Number of raw samples to use when performing optimization(s)
+
+        mc_samples : int, default: 512
+            Number of Monte Carlo samples to use during MC calculation, (ignored for
+            analytical calculations)
+
+        use_gpu : bool, default: False
+            Flag to use GPU when available
+
+        """
         optimize_options = {'sequential': True}
         super(BayesianExplorationGenerator,
               self).__init__(vocs,

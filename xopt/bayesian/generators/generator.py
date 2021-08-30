@@ -3,32 +3,71 @@ from botorch.sampling.samplers import SobolQMCNormalSampler
 from xopt.bayesian.utils import get_bounds
 from botorch.optim.optimize import optimize_acqf
 from botorch.acquisition import AcquisitionFunction
+from botorch.models.model import Model
 import torch
 import logging
+
+from typing import Dict, Optional, Tuple, Union, Callable
 
 logger = logging.getLogger(__name__)
 
 
 class Generator(ABC):
-    def __init__(self, vocs):
+    def __init__(self, vocs: [Dict]) -> None:
         self.vocs = vocs
 
     @abstractmethod
-    def generate(self):
+    def generate(self, model: [Model]) -> torch.Tensor:
         pass
 
 
 class BayesianGenerator(Generator):
-    def __init__(self, vocs,
-                 acq_func,
-                 batch_size=1,
-                 num_restarts=20,
-                 raw_samples=1024,
-                 mc_samples=512,
-                 use_gpu=False,
-                 acq_options=None,
-                 optimize_options=None,
-                 ):
+    def __init__(self,
+                 vocs: [Dict],
+                 acq_func: Union[Callable, AcquisitionFunction],
+                 batch_size: Optional[int] = 1,
+                 num_restarts: Optional[int] = 20,
+                 raw_samples: Optional[int] = 1024,
+                 mc_samples: Optional[int] = 512,
+                 use_gpu: Optional[bool] = False,
+                 acq_options: Optional[Dict] = None,
+                 optimize_options: Optional[Dict] = None,
+                 ) -> None:
+        """
+
+        Parameters
+        ----------
+        vocs : dict
+            Varabiles, objectives, constraints and statics dictionary,
+            see xopt documentation for detials
+
+        acq_func : callable, AcquisitionFunction
+            Botorch Acquisition function object or function that returns
+            AcqusititionFunction object
+
+        batch_size : int, default: 1
+            Batch size for parallel candidate generation.
+
+        num_restarts : int, default: 20
+            Number of optimization restarts used when performing optimization(s)
+
+        raw_samples : int, default: 1024
+            Number of raw samples to use when performing optimization(s)
+
+        mc_samples : int, default: 512
+            Number of Monte Carlo samples to use during MC calculation, (ignored for
+            analytical calculations)
+
+        use_gpu : bool, default: False
+            Flag to use GPU when available
+
+        acq_options : dict, optional
+            Dictionary of arguments to pass to the acquisition function
+
+        optimize_options : dict, optional
+            Extra arguments passed to optimizer(s)
+        """
+
         super(BayesianGenerator, self).__init__(vocs)
 
         # check to make sure acq_function is correct type
@@ -65,7 +104,19 @@ class BayesianGenerator(Generator):
 
         self.optimize_options.update(optimize_options)
 
-    def generate(self, model):
+    def generate(self,
+                 model: [Model]) -> torch.Tensor:
+        """
+
+        Parameters
+        ----------
+        model : botorch.
+
+        Returns
+        -------
+        candidates : torch.Tensor
+            Candidates for observation
+        """
         bounds = get_bounds(self.vocs, **self.tkwargs)
 
         # set up acquisition function object
