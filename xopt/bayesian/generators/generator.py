@@ -4,6 +4,7 @@ from xopt.bayesian.utils import get_bounds
 from botorch.optim.optimize import optimize_acqf
 from botorch.acquisition import AcquisitionFunction
 from botorch.models.model import Model
+from botorch.exceptions.errors import BotorchError
 import torch
 import logging
 
@@ -71,8 +72,9 @@ class BayesianGenerator(Generator):
         super(BayesianGenerator, self).__init__(vocs)
 
         # check to make sure acq_function is correct type
-        assert isinstance(acq_func, AcquisitionFunction) or callable(acq_func), \
-            "`acq_function` must be of type AcquisitionFunction or callable"
+        if not (isinstance(acq_func, AcquisitionFunction) or callable(acq_func)):
+            raise ValueError('`acq_func` is not type AcquisitionFunction or callable')
+
         self.acq_func = acq_func
         self.sampler = SobolQMCNormalSampler(mc_samples)
 
@@ -117,13 +119,27 @@ class BayesianGenerator(Generator):
         candidates : torch.Tensor
             Candidates for observation
         """
+
+        # check model input dims and outputs
+        if model.train_inputs[0].shape[-1] != len(self.vocs['variables']):
+            raise BotorchError('model input training data does not match `vocs`')
+
+        n_objectives = len(self.vocs['objectives'])
+        n_constraints = len(self.vocs['constraints'])
+
+        if (model.train_targets.shape[0] !=
+                n_objectives + n_constraints):
+            raise BotorchError('model target training data does not match `vocs`,'
+                               'must be n_constraints + n_objectives')
+
         bounds = get_bounds(self.vocs, **self.tkwargs)
 
         # set up acquisition function object
         acq_func = self.acq_func(model, **self.acq_options)
-        assert isinstance(acq_func, AcquisitionFunction), "`acq_func` method must " \
-                                                          "return a botorch " \
-                                                          "acquisition function type"
+
+        if not isinstance(acq_func, AcquisitionFunction):
+            raise RuntimeError('callable `acq_func` does not return type '
+                               'AcquisitionFunction')
 
         # optimize
         candidates, _ = optimize_acqf(
