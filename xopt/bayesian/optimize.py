@@ -15,6 +15,7 @@ from typing import Dict, Optional, Tuple, Callable, List
 from .generators.generator import BayesianGenerator
 from concurrent.futures import Executor, Future
 from torch import Tensor
+
 """
     Main optimization function for Bayesian optimization
 
@@ -265,12 +266,11 @@ def check_training_data_shape(train_x: [Tensor],
     # check to make sure that the training tensor have the correct shapes
     for ele, vocs_type in zip([train_x, train_y, train_c],
                               ['variables', 'objectives', 'constraints']):
-
         assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
                               f'shape currently is {ele.shape} '
 
-        assert (ele.shape[-1] == len(vocs[vocs_type]),
-                f'current shape of training '
-                f'data ({ele.shape}) '
-                f'does not match number of vocs {vocs_type} == '
-                f'{len(vocs[vocs_type])} ')
+        assert ele.shape[-1] == len(vocs[vocs_type]),\
+                                    f'current shape of training '\
+                                    f'data ({ele.shape}) '\
+                                    f'does not match number of vocs {vocs_type} == '\
+                                    f'{len(vocs[vocs_type])} '
