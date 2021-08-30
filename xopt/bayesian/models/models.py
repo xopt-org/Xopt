@@ -2,6 +2,7 @@ import botorch
 import torch
 from botorch import fit_gpytorch_model
 from botorch.models import SingleTaskGP
+from botorch.models.model import Model
 from botorch.models.gp_regression_fidelity import SingleTaskMultiFidelityGP
 from botorch.models.transforms.input import Normalize
 from botorch.models.transforms.outcome import Standardize
@@ -28,7 +29,7 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
 
     else:
         model = custom_model(train_x, train_y, train_c, vocs, **kwargs)
-        assert isinstance(model, botorch.models.model.Model)
+        assert isinstance(model, Model)
 
     return model
 

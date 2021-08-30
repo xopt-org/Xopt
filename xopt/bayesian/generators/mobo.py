@@ -1,7 +1,8 @@
 import logging
 from functools import partial
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union, List, Tuple
 
+import numpy as np
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.acquisition.multi_objective.monte_carlo import \
@@ -11,7 +12,9 @@ from botorch.models.model import Model
 from botorch.utils.multi_objective.box_decompositions.non_dominated import \
     NondominatedPartitioning
 from torch import Tensor
+from botorch.exceptions.errors import BotorchError
 
+from ..acquisition.proximal import ProximalAcquisitionFunction
 from .generator import BayesianGenerator
 
 # Logger
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 class MOBOGenerator(BayesianGenerator):
     def __init__(self,
                  vocs: [Dict],
-                 ref: Union[Tensor, List],
+                 ref: Union[Tensor, List, np.ndarray, Tuple],
                  batch_size: Optional[int] = 1,
                  sigma: Optional[Union[Tensor, List]] = None,
                  mc_samples: Optional[int] = 512,
@@ -30,7 +33,15 @@ class MOBOGenerator(BayesianGenerator):
                  raw_samples: Optional[int] = 1024,
                  use_gpu: Optional[bool] = False) -> None:
 
-        self.ref = ref
+        if isinstance(ref, (np.ndarray, list, tuple, torch.Tensor)):
+            self.ref = ref
+        else:
+            raise ValueError('reference point must be '
+                             'Union[Tensor, List, np.ndarray, Tuple]')
+
+        if len(ref) != len(vocs['objectives']):
+            raise ValueError('reference point must match dim of objectives')
+
         self._corrected_ref = None
         self.sigma = sigma
         optimize_options = {'sequential': True}
@@ -45,8 +56,17 @@ class MOBOGenerator(BayesianGenerator):
                                             use_gpu=use_gpu)
 
     def create_acqf(self, model: [Model]) -> AcquisitionFunction:
-        n_obectives = len(self.vocs['objectives'])
+        # check model input dims and outputs
+        if model.train_inputs[0].shape[-1] != len(self.vocs['variables']):
+            raise BotorchError('model input training data does not match `vocs`')
+
+        n_objectives = len(self.vocs['objectives'])
         n_constraints = len(self.vocs['constraints'])
+
+        if (model.train_targets.shape[0] !=
+                n_objectives + n_constraints):
+            raise BotorchError('model target training data does not match `vocs`,'
+                               'must be n_constraints + n_objectives')
 
         self.ref = (self.ref.to(self.tkwargs['device'])
                     if isinstance(self.ref, torch.Tensor) else
@@ -55,8 +75,8 @@ class MOBOGenerator(BayesianGenerator):
         self._corrected_ref = self.get_corrected_ref(self.ref)
 
         train_outputs = model.train_targets.T
-        train_y = train_outputs[:, :n_obectives]
-        train_c = train_outputs[:, n_obectives:]
+        train_y = train_outputs[:, :n_objectives]
+        train_c = train_outputs[:, n_objectives:]
 
         # compute feasible observations
         is_feas = (train_c <= 0).all(dim=-1)
@@ -86,12 +106,16 @@ class MOBOGenerator(BayesianGenerator):
             ref_point=self._corrected_ref.tolist(),  # use known reference point
             partitioning=partitioning,
             # define an objective that specifies which outcomes are the objectives
-            objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_obectives))),
+            objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_objectives))),
             # define constraint function - see botorch docs for info - I'm not sure
             # how it works
             constraints=constraint_functions,
             sampler=self.sampler
         )
+
+        # add in proximal biasing
+        if self.sigma is not None:
+            acq_func = ProximalAcquisitionFunction(acq_func, torch.tensor(self.sigma))
 
         return acq_func
 

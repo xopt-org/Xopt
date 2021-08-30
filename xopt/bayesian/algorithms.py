@@ -148,9 +148,6 @@ def mobo(vocs, evaluate_f,
     if generator_options is None:
         generator_options = {}
 
-    assert ref is not None, 'reference point required for MOBO, use keyword argument ' \
-                            '"ref" '
-
     generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
     return optimize(vocs,
                     evaluate_f,
