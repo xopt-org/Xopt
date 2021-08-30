@@ -8,12 +8,15 @@ from botorch.utils.sampling import draw_sobol_samples
 
 from .data import save_data_dict, get_data_json
 from .models.models import create_model
-from .utils import get_bounds, collect_results, sampler_evaluate, get_corrected_outputs, \
-    NoValidResultsError
+from .utils import get_bounds, collect_results, sampler_evaluate, \
+    get_corrected_outputs, NoValidResultsError
 from ..tools import full_path, DummyExecutor, isotime
-
+from typing import Dict, Optional, Tuple, Callable, List
+from .generators.generator import BayesianGenerator
+from concurrent.futures import Executor, Future
+from torch import Tensor
 """
-    Bayesian Exploration Botorch
+    Main optimization function for Bayesian optimization
 
 """
 
@@ -21,23 +24,24 @@ from ..tools import full_path, DummyExecutor, isotime
 logger = logging.getLogger(__name__)
 
 
-def optimize(vocs,
-             evaluate_f,
-             candidate_generator,
-             n_steps,
-             n_initial_samples,
-             output_path,
-             custom_model,
-             executor,
-             restart_file,
-             initial_x,
-             verbose,
-             tkwargs,
-             ):
+def optimize(vocs: [Dict],
+             evaluate_f: [Callable],
+             candidate_generator: [BayesianGenerator],
+             n_steps: [int],
+             n_initial_samples: [int],
+             output_path: Optional[str] = '',
+             custom_model: Optional[Callable] = None,
+             executor: Optional[Executor] = None,
+             restart_file: Optional[str] = None,
+             initial_x: Optional[torch.Tensor] = None,
+             verbose: Optional[bool] = False,
+             tkwargs: Optional[Dict] = None,
+             ) -> Dict:
     """
     Backend function for model based optimization
 
-    Parameters ----------
+    Parameters
+    ----------
     vocs : dict
         Varabiles, objectives, constraints and statics dictionary,
         see xopt documentation for detials
@@ -88,6 +92,9 @@ def optimize(vocs,
     # TODO: implement linked variables
     if 'linked_variables' in vocs.keys():
         assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+
+    if tkwargs is None:
+        tkwargs = {}
 
     # Verbose print helper
     def vprint(*a, **k):
@@ -218,14 +225,20 @@ def optimize(vocs,
     return results
 
 
-def get_feasability_constraint_status(train_y, train_c, vocs):
+def get_feasability_constraint_status(train_y: [Tensor],
+                                      train_c: [Tensor],
+                                      vocs: [Dict]) -> Tuple[Tensor, Tensor]:
     _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
     feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
     constraint_status = corrected_train_c < 0.0
     return feas, constraint_status
 
 
-def submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args):
+def submit_jobs(candidates: [Tensor],
+                exe: [Executor],
+                vocs: [Dict],
+                evaluate_f: [Callable],
+                sampler_evaluate_args: [Dict]) -> List[Future]:
     variable_names = list(vocs['variables'])
     settings = get_settings(candidates, variable_names, vocs)
     fut = [exe.submit(sampler_evaluate,
@@ -235,7 +248,9 @@ def submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args):
     return fut
 
 
-def get_settings(X, variable_names, vocs):
+def get_settings(X: [Tensor],
+                 variable_names: List[str],
+                 vocs: [Dict]) -> List[Dict]:
     settings = [dict(zip(variable_names, x.cpu().numpy())) for x in X]
     for setting in settings:
         setting.update(vocs['constants'])
@@ -243,7 +258,10 @@ def get_settings(X, variable_names, vocs):
     return settings
 
 
-def check_training_data_shape(train_x, train_y, train_c, vocs):
+def check_training_data_shape(train_x: [Tensor],
+                              train_y: [Tensor],
+                              train_c: [Tensor],
+                              vocs: [Dict]) -> None:
     # check to make sure that the training tensor have the correct shapes
     for ele, vocs_type in zip([train_x, train_y, train_c],
                               ['variables', 'objectives', 'constraints']):
