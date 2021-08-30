@@ -1,10 +1,9 @@
 import logging
 import copy
 
-import botorch.acquisition
 from botorch.models.cost import AffineFidelityCostModel
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
-from botorch.acquisition import PosteriorMean
+from botorch.acquisition import PosteriorMean, AcquisitionFunction
 from botorch.acquisition.knowledge_gradient import qMultiFidelityKnowledgeGradient
 from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.optim.optimize import optimize_acqf
@@ -38,6 +37,9 @@ class MultiFidelityGenerator(BayesianGenerator):
                                                      mc_samples,
                                                      use_gpu=use_gpu)
 
+        if list(self.vocs['variables'])[-1] != 'cost':
+            raise ValueError('`cost` must be the last keyword in vocs[variables]')
+
         self.num_fantasies = num_fantasies
         self.target_fidelities = target_fidelities
         self.cost_model = AffineFidelityCostModel(self.target_fidelities, fixed_cost)
@@ -45,12 +47,16 @@ class MultiFidelityGenerator(BayesianGenerator):
         if base_acq is None:
             self.base_acq = PosteriorMean
         else:
-            assert (isinstance(base_acq, botorch.acquisition.AcquisitionFunction) or
-                    callable(base_acq))
+            # check to make sure acq_function is correct type
+            if not (isinstance(base_acq, AcquisitionFunction) or callable(base_acq)):
+                raise ValueError(
+                    '`acq_func` is not type AcquisitionFunction or callable')
+
             self.base_acq = base_acq
 
     def project(self, X):
-        return project_to_target_fidelity(X=X, target_fidelities=self.target_fidelities)
+        return project_to_target_fidelity(X=X,
+                                          target_fidelities=self.target_fidelities)
 
     def get_mfkg(self, model, bounds, cost_aware_utility):
 
@@ -84,8 +90,6 @@ class MultiFidelityGenerator(BayesianGenerator):
         Create Multifidelity acquisition function
 
         """
-        assert list(self.vocs['variables'])[
-                   -1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
 
         bounds = get_bounds(self.vocs, **self.tkwargs)
 
