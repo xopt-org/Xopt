@@ -25,11 +25,11 @@ from torch import Tensor
 logger = logging.getLogger(__name__)
 
 
-def optimize(vocs: [Dict],
-             evaluate_f: [Callable],
-             candidate_generator: [BayesianGenerator],
-             n_steps: [int],
-             n_initial_samples: [int],
+def optimize(vocs: Dict,
+             evaluate_f: Callable,
+             candidate_generator: BayesianGenerator,
+             n_steps: int,
+             n_initial_samples: int,
              output_path: Optional[str] = '',
              custom_model: Optional[Callable] = None,
              executor: Optional[Executor] = None,

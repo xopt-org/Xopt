@@ -6,7 +6,6 @@ VOCS = {
     'name': 'AugmentedHartmann',
     'description': 'Augmented hartmann multi-fideldity optimization problem, provided by botorch, '
                    'see https://botorch.org/tutorials/multi_fidelity_bo',
-    'simulation': 'AugmentedHartmann',
     'variables': {
         'x1': [0, 1.0],
         'x2': [0, 1.0],

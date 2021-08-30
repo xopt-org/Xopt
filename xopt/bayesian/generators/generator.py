@@ -14,17 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 class Generator(ABC):
-    def __init__(self, vocs: [Dict]) -> None:
+    def __init__(self, vocs: Dict) -> None:
         self.vocs = vocs
 
     @abstractmethod
-    def generate(self, model: [Model]) -> torch.Tensor:
+    def generate(self, model: Model) -> torch.Tensor:
         pass
 
 
 class BayesianGenerator(Generator):
     def __init__(self,
-                 vocs: [Dict],
+                 vocs: Dict,
                  acq_func: Union[Callable, AcquisitionFunction],
                  batch_size: Optional[int] = 1,
                  num_restarts: Optional[int] = 20,
@@ -107,7 +107,7 @@ class BayesianGenerator(Generator):
         self.optimize_options.update(optimize_options)
 
     def generate(self,
-                 model: [Model]) -> torch.Tensor:
+                 model: Model) -> torch.Tensor:
         """
 
         Parameters
