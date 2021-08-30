@@ -56,17 +56,9 @@ class MOBOGenerator(BayesianGenerator):
                                             use_gpu=use_gpu)
 
     def create_acqf(self, model: [Model]) -> AcquisitionFunction:
-        # check model input dims and outputs
-        if model.train_inputs[0].shape[-1] != len(self.vocs['variables']):
-            raise BotorchError('model input training data does not match `vocs`')
 
         n_objectives = len(self.vocs['objectives'])
         n_constraints = len(self.vocs['constraints'])
-
-        if (model.train_targets.shape[0] !=
-                n_objectives + n_constraints):
-            raise BotorchError('model target training data does not match `vocs`,'
-                               'must be n_constraints + n_objectives')
 
         self.ref = (self.ref.to(self.tkwargs['device'])
                     if isinstance(self.ref, torch.Tensor) else
