@@ -1,18 +1,16 @@
-from abc import ABC
-
 import torch
-from botorch.models.gpytorch import ModelListGPyTorchModel
+from botorch import fit_gpytorch_model
 from botorch.models import SingleTaskGP
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from botorch import fit_gpytorch_model
-from gpytorch.models import IndependentModelList
+from botorch.models.model_list_gp_regression import ModelListGP
 
 
 class ModelCreationError(Exception):
     pass
 
 
-class NanEnabledModelListGP(IndependentModelList, ModelListGPyTorchModel):
+def get_nan_model(train_x, train_outputs,
+                  input_transform, outcome_transform):
     """
     Model that allows for Nans by splitting up each objective/constraint that has nans
     into seperate GP models using IndependentModelList.
@@ -21,49 +19,32 @@ class NanEnabledModelListGP(IndependentModelList, ModelListGPyTorchModel):
     point is removed from the corresponding model.
 
     """
-    def __init__(self, train_x, train_y, train_c, vocs, **kwargs):
-        combined_outputs = torch.hstack((train_y, train_c))
-        n_outputs = combined_outputs.shape[-1]
 
-        # check if there are any nans
-        has_nans = torch.any(torch.isnan(combined_outputs))
+    combined_outputs = train_outputs
+    n_outputs = combined_outputs.shape[-1]
 
-        gp_models = []
-        if has_nans:
-            for ii in range(n_outputs):
-                output = combined_outputs[:, ii].flatten()
+    gp_models = []
+    for ii in range(n_outputs):
+        output = combined_outputs[:, ii].flatten()
 
-                nan_state = torch.isnan(output)
-                not_nan_idx = torch.nonzero(~nan_state).flatten()
+        nan_state = torch.isnan(output)
+        not_nan_idx = torch.nonzero(~nan_state).flatten()
 
-                # remove elements that have nan values
-                temp_train_x = train_x[not_nan_idx]
-                temp_train_y = output[not_nan_idx].reshape(-1, 1)
+        # remove elements that have nan values
+        temp_train_x = train_x[not_nan_idx]
+        temp_train_y = output[not_nan_idx].reshape(-1, 1)
 
-                if len(temp_train_y) == 0:
-                    print(train_y)
-                    raise ModelCreationError('No valid measurements passed to model')
+        if len(temp_train_y) == 0:
+            raise ModelCreationError('No valid measurements passed to model')
 
-                # create single task model and add to list
+        # create single task model and add to list
+        submodel = SingleTaskGP(temp_train_x, temp_train_y,
+                                input_transform=input_transform,
+                                outcome_transform=outcome_transform)
 
-                # modify output transform if given
-                if 'outcome_transform' in kwargs.keys():
-                    kwargs['outcome_transform']._m = 1
+        mll = ExactMarginalLogLikelihood(submodel.likelihood, submodel)
+        fit_gpytorch_model(mll)
 
-                submodel = SingleTaskGP(temp_train_x, temp_train_y, **kwargs)
+        gp_models.append(submodel)
 
-                mll = ExactMarginalLogLikelihood(submodel.likelihood, submodel)
-                fit_gpytorch_model(mll)
-
-                gp_models.append(submodel)
-
-        else:
-            model = SingleTaskGP(train_x, train_y, **kwargs)
-
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            fit_gpytorch_model(mll)
-
-            gp_models.append(model)
-
-        self.last_x = train_x[-1]
-        super(NanEnabledModelListGP, self).__init__(*gp_models)
+    return ModelListGP(*gp_models)
