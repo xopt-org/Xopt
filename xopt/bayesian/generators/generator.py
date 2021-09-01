@@ -4,6 +4,7 @@ from xopt.bayesian.utils import get_bounds
 from botorch.optim.optimize import optimize_acqf
 from botorch.acquisition import AcquisitionFunction
 from botorch.models.model import Model
+from botorch.models.model_list_gp_regression import ModelListGPyTorchModel
 from botorch.exceptions.errors import BotorchError
 import torch
 import logging
@@ -112,7 +113,8 @@ class BayesianGenerator(Generator):
 
         Parameters
         ----------
-        model : botorch.
+        model : botorch.model.Model
+            Model passed to acquisition function to generate new candidates.
 
         Returns
         -------
@@ -121,16 +123,27 @@ class BayesianGenerator(Generator):
         """
 
         # check model input dims and outputs
-        if model.train_inputs[0].shape[-1] != len(self.vocs['variables']):
-            raise BotorchError('model input training data does not match `vocs`')
+        if isinstance(model, ModelListGPyTorchModel):
+            if model.train_inputs[0][0].shape[-1] != len(self.vocs['variables']):
+                raise BotorchError('model input training data does not match `vocs`')
+
+        else:
+            if model.train_inputs[0].shape[-1] != len(self.vocs['variables']):
+                raise BotorchError('model input training data does not match `vocs`')
 
         n_objectives = len(self.vocs['objectives'])
         n_constraints = len(self.vocs['constraints'])
 
-        if (model.train_targets.shape[0] !=
-                n_objectives + n_constraints):
-            raise BotorchError('model target training data does not match `vocs`,'
-                               'must be n_constraints + n_objectives')
+        if isinstance(model, ModelListGPyTorchModel):
+            if (len(model.train_targets) !=
+                    n_objectives + n_constraints):
+                raise BotorchError('model target training data does not match `vocs`, '
+                                   'must be n_constraints + n_objectives')
+        else:
+            if (model.train_targets.shape[0] !=
+                    n_objectives + n_constraints):
+                raise BotorchError('model target training data does not match `vocs`, '
+                                   'must be n_constraints + n_objectives')
 
         bounds = get_bounds(self.vocs, **self.tkwargs)
 
