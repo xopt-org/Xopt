@@ -30,6 +30,7 @@ def parse_ipynb(file: Path) -> str:
     nb = nbformat.reads(nb_str, nbformat.NO_CONVERT)
     exporter = PythonExporter()
     script, _ = exporter.from_notebook_node(nb)
+
     return script
 
 
@@ -41,7 +42,6 @@ def run_script(script: str, env: Dict[str, str] = None) -> None:
             tmp_script.write(script)
     if env is not None:
         env = {**os.environ, **env}
-    print(subprocess.list2cmdline(["ipython", tf_name]))
     run_out = subprocess.run(
         ["ipython", tf_name], capture_output=True, text=True, env=env
     )
@@ -82,7 +82,7 @@ def run_tutorials(
     num_runs = 0
     num_errors = 0
 
-    sub_dirs = ['bayes_exp']
+    sub_dirs = ['mobo', 'bayes_exp']
 
     for sub_dir in sub_dirs:
         tutorial_dir = Path(tutorial_base).joinpath(sub_dir)
@@ -106,6 +106,11 @@ def run_tutorials(
 
 
 if __name__ == "__main__":
+    ########################
+    #WARNING!!!!!!!! - calling pinfo magic command crashes
+    # evaluation for some reason
+    ########################
+
     parser = argparse.ArgumentParser(description="Run the tutorials.")
     parser.add_argument(
         "-p", "--path", metavar="path", required=True, help="botorch repo directory."

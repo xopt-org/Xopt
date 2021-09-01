@@ -8,24 +8,31 @@ from botorch.models.transforms.input import Normalize
 from botorch.models.transforms.outcome import Standardize
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 
-from ..utils import get_bounds, standardize
+from ..utils import get_bounds
+from ..models.nan_enabled import get_nan_model
+from ..transforms import NanEnabledStandardize
 
 
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
+    input_normalize = Normalize(len(vocs['variables']), get_bounds(vocs))
+    train_outputs = torch.hstack((train_y, train_c))
+
     # create model
     if custom_model is None:
-        # standardize y training data - use xopt version to allow for nans
-        standardized_train_y = standardize(train_y)
-
         # horiz. stack objective and constraint results for training/acq specification
-        train_outputs = torch.hstack((standardized_train_y, train_c))
 
-        input_normalize = Normalize(len(vocs['variables']), get_bounds(vocs))
+        if torch.any(torch.isnan(train_outputs)):
+            output_standardize = NanEnabledStandardize(m=1)
+            model = get_nan_model(train_x, train_outputs,
+                                  input_normalize, output_standardize)
+        else:
+            output_standardize = Standardize(m=train_outputs.shape[-1])
+            model = SingleTaskGP(train_x, train_outputs,
+                                 input_transform=input_normalize,
+                                 outcome_transform=output_standardize)
 
-        model = SingleTaskGP(train_x, train_outputs,
-                             input_transform=input_normalize, **kwargs)
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_model(mll)
+            mll = ExactMarginalLogLikelihood(model.likelihood, model)
+            fit_gpytorch_model(mll)
 
     else:
         model = custom_model(train_x, train_y, train_c, vocs, **kwargs)
