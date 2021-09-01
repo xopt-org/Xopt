@@ -13,17 +13,25 @@ class ModelCreationError(Exception):
 
 
 class NanEnabledModelListGP(IndependentModelList, ModelListGPyTorchModel):
-    def __init__(self, train_x, train_y, **kwargs):
-        n_outputs = train_y.shape[-1]
+    """
+    Model that allows for Nans by splitting up each objective/constraint that has nans
+    into seperate GP models using IndependentModelList.
+
+    For each training data point that has a Nan in the output, that training data
+    point is removed from the corresponding model.
+
+    """
+    def __init__(self, train_x, train_y, train_c, vocs, **kwargs):
+        combined_outputs = torch.hstack((train_y, train_c))
+        n_outputs = combined_outputs.shape[-1]
 
         # check if there are any nans
-        # has_nans = torch.any(torch.isnan(train_outputs))
-        has_nans = True
+        has_nans = torch.any(torch.isnan(combined_outputs))
 
         gp_models = []
         if has_nans:
             for ii in range(n_outputs):
-                output = train_y[:, ii].flatten()
+                output = combined_outputs[:, ii].flatten()
 
                 nan_state = torch.isnan(output)
                 not_nan_idx = torch.nonzero(~nan_state).flatten()
