@@ -151,6 +151,19 @@ def optimize(vocs: Dict,
         train_x, train_y, train_c = get_data_json(restart_file,
                                                   vocs, **tkwargs)
 
+    # save initial data to file
+    # get feasibility values
+    feas, constraint_status = get_feasability_constraint_status(train_y,
+                                                                train_c,
+                                                                vocs)
+
+    full_data = torch.hstack((train_x,
+                              train_y,
+                              train_c,
+                              constraint_status,
+                              feas))
+    save_data_dict(vocs, full_data, output_path)
+
     check_training_data_shape(train_x, train_y, train_c, vocs)
 
     # do optimization
