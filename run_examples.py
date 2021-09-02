@@ -23,6 +23,8 @@ IGNORE = {
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
+SUB_DIRS = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity']
+
 
 def parse_ipynb(file: Path) -> str:
     with open(file, "r", encoding="utf-8") as nb_file:
@@ -82,9 +84,7 @@ def run_tutorials(
     num_runs = 0
     num_errors = 0
 
-    sub_dirs = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity']
-
-    for sub_dir in sub_dirs:
+    for sub_dir in SUB_DIRS:
         tutorial_dir = Path(tutorial_base).joinpath(sub_dir)
         print(f'In directory {sub_dir}')
         for tutorial in tutorial_dir.iterdir():
