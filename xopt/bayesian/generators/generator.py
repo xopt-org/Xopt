@@ -143,9 +143,13 @@ class BayesianGenerator(Generator):
                                    'must be n_constraints + n_objectives')
         else:
             if (model.train_targets.shape[0] !=
-                    n_objectives + n_constraints):
+                    n_objectives + n_constraints and
+                    not (len(model.train_targets.shape) == 1 and n_constraints +
+                         n_objectives == 1)):
                 raise BotorchError('model target training data does not match `vocs`, '
-                                   'must be n_constraints + n_objectives')
+                                   'must be n_constraints + n_objectives, training '
+                                   f'data has shape {model.train_targets.shape} with '
+                                   f'vocs n_outputs {n_objectives + n_constraints}')
 
         bounds = get_bounds(self.vocs, **self.tkwargs)
 
