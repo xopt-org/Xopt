@@ -20,12 +20,12 @@ from nbconvert import PythonExporter
 
 
 IGNORE = {
-    "vae_mnist.ipynb",  # requires setting paths to local data
+    "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
 
 def parse_ipynb(file: Path) -> str:
-    with open(file, "r") as nb_file:
+    with open(file, "r", encoding="utf-8") as nb_file:
         nb_str = nb_file.read()
     nb = nbformat.reads(nb_str, nbformat.NO_CONVERT)
     exporter = PythonExporter()
@@ -38,7 +38,7 @@ def run_script(script: str, env: Dict[str, str] = None) -> None:
     # need to keep the file around & close it so subprocess does not run into I/O issues
     with tempfile.NamedTemporaryFile(delete=False) as tf:
         tf_name = tf.name
-        with open(tf_name, "w") as tmp_script:
+        with open(tf_name, "w", encoding="utf-8") as tmp_script:
             tmp_script.write(script)
     if env is not None:
         env = {**os.environ, **env}
@@ -82,7 +82,7 @@ def run_tutorials(
     num_runs = 0
     num_errors = 0
 
-    sub_dirs = ['mobo', 'bayes_exp']
+    sub_dirs = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity']
 
     for sub_dir in sub_dirs:
         tutorial_dir = Path(tutorial_base).joinpath(sub_dir)

@@ -19,8 +19,7 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
 
     # create model
     if custom_model is None:
-        # horiz. stack objective and constraint results for training/acq specification
-
+        # test if there are nans in the training data
         if torch.any(torch.isnan(train_outputs)):
             output_standardize = NanEnabledStandardize(m=1)
             model = get_nan_model(train_x, train_outputs,

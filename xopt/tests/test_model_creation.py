@@ -2,6 +2,7 @@ import torch
 from ..bayesian.models.models import create_model
 import numpy as np
 
+
 class TestModelCreation:
     vocs = {'variables': {'x1': [0, 1],
                           'x2': [0, 1],
@@ -18,6 +19,3 @@ class TestModelCreation:
         train_y_nan[0][1] = np.nan
 
         model = create_model(train_x, train_y_nan, train_c, vocs=self.vocs)
-
-
-
