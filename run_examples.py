@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
-# Copyright (c) Facebook, Inc. and its affiliates.
+# !/usr/bin/env python3
 #
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
-
-from __future__ import annotations
+# Adapted from botorch: M. Balandat, B. Karrer, D. R. Jiang,
+# S. Daulton, B. Letham, A. G. Wilson, and E. Bakshy. BoTorch: A Framework for
+# Efficient Monte-Carlo Bayesian Optimization. Advances in Neural Information
+# Processing Systems 33, 2020. https://github.com/pytorch/botorch
 
 import argparse
 import os
