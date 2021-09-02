@@ -33,6 +33,10 @@ def parse_ipynb(file: Path) -> str:
     exporter = PythonExporter()
     script, _ = exporter.from_notebook_node(nb)
 
+    if 'pinfo' in script:
+        raise ValueError('`pinfo` command (`?`) in notebook freezes execution, '
+                         'cannot proceed, please remove')
+
     return script
 
 
