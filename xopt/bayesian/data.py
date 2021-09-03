@@ -2,10 +2,11 @@ import copy
 import json
 import logging
 import math
+import os.path
+
 import numpy as np
 import pandas as pd
-from copy import deepcopy
-
+from ..tools import NpEncoder
 # Logger
 import torch
 
@@ -37,26 +38,14 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     results['constraint_status'] = constraint_status
     results['feasibility'] = full_data[:, i].tolist()
 
-    results['inputs'] = [prepare_for_json(ele) for ele in inputs]
-    results['outputs'] = [prepare_for_json(ele) for ele in outputs]
+    results['inputs'] = inputs
+    results['outputs'] = outputs
     #outputs = deepcopy(config)
     #outputs['results'] = results
     output_path = '' if output_path is None else output_path
-    with open(output_path + 'results.json', 'w') as outfile:
-        json.dump(results, outfile)
-
-
-def prepare_for_json(d):
-    temp_d = copy.deepcopy(d)
-    for name, item in temp_d.items():
-        try:
-            json.dump(item)
-        except TypeError:
-            if isinstance(item, np.ndarray):
-                temp_d[name] = str(list(item))
-            else:
-                temp_d[name] = str(item)
-    return temp_d
+    # TODO: Combine into one function for xopt
+    with open(os.path.join(output_path, 'results.json'), 'w') as outfile:
+        json.dump(results, outfile, cls=NpEncoder)
 
 
 def get_data_json(json_filename, vocs, **tkwargs):
