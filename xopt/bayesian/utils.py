@@ -166,8 +166,6 @@ def collect_results(futures, vocs, **tkwargs):
             train_y += [[result['outputs'][ele] for ele in vocs['objectives'].keys()]]
             train_c += [[result['outputs'][ele] for ele in vocs['constraints'].keys()]]
 
-            print(inputs)
-            print(outputs)
             inputs += [result['inputs']]
             outputs += [result['outputs']]
 
