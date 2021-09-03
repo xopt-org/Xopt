@@ -29,49 +29,6 @@ algorithm_defaults = {'n_steps': 30,
                       'eval_args': None}
 
 
-def check_config(old_config, function_name, **kwargs):
-    if 'vocs' in list(old_config.keys()):
-        # this will be the case if the input is a YAML file
-        # TODO: specify the YAML file input explicitly
-
-        config = deepcopy(old_config)
-        # add default arguments
-        default_names = list(algorithm_defaults.keys())
-        n_items = len(default_names)
-
-        for ii in range(n_items):
-            name = default_names[ii]
-            if name not in config['algorithm']['options'].keys():
-                config['algorithm']['options'].update({name: algorithm_defaults[name]})
-
-    else:
-        # this is the case when it is called via a script
-        config = {'vocs': deepcopy(old_config),
-                  'xopt': {'verbose': kwargs.get('verbose', False),
-                           'output_path': kwargs.get('output_path', '')}}
-
-        # for ele in config['vocs'].keys():
-        #    del config[ele]
-
-        if 'algorithm' not in config.keys():
-            config['algorithm'] = {}
-            config['algorithm']['options'] = algorithm_defaults
-            config['algorithm']['function'] = function_name
-
-            names = list(kwargs.keys())
-            n_items = len(names)
-
-            # add kwargs to options and overwrite defaults
-            for ii in range(n_items):
-                val = kwargs.pop(names[ii])
-                if isinstance(val, torch.Tensor):
-                    config['algorithm']['options'][names[ii]] = val.tolist()
-                else:
-                    config['algorithm']['options'][names[ii]] = val
-
-    return config
-
-
 def get_bounds(vocs, **tkwargs):
     # get initial bounds
     return torch.vstack(
@@ -197,6 +154,9 @@ def collect_results(futures, vocs, **tkwargs):
     train_y = []
     train_c = []
 
+    inputs = []
+    outputs = []
+
     at_least_one_point = False
     results = get_results(futures)
 
@@ -205,6 +165,11 @@ def collect_results(futures, vocs, **tkwargs):
             train_x += [[result['inputs'][ele] for ele in vocs['variables'].keys()]]
             train_y += [[result['outputs'][ele] for ele in vocs['objectives'].keys()]]
             train_c += [[result['outputs'][ele] for ele in vocs['constraints'].keys()]]
+
+            print(inputs)
+            print(outputs)
+            inputs += [result['inputs']]
+            outputs += [result['outputs']]
 
             at_least_one_point = True
 
@@ -215,34 +180,4 @@ def collect_results(futures, vocs, **tkwargs):
     train_y = torch.tensor(train_y, **tkwargs)
     train_c = torch.tensor(train_c, **tkwargs)
 
-    return train_x, train_y, train_c
-
-
-def standardize(Y):
-    # check if there are nans -> if there are we cannot use gradients
-    if torch.any(torch.isnan(Y)):
-        stddim = -1 if Y.dim() < 2 else -2
-        stddim = -2
-        Y_np = Y.detach().numpy()
-
-        # NOTE differences between std calc for torch and numpy to get unbiased estimator
-        # see aboutdatablog.com/post/why-computing-standard-deviation-in-
-        # pandas-and-numpy-yields-different-results
-        std = np.nanstd(Y_np, axis=stddim, keepdims=True, ddof=1)
-        std = np.where(std >= 1e-9, std, np.full_like(std, 1.0))
-
-        Y_std_np = (Y_np - np.nanmean(Y_np, axis=stddim, keepdims=True)) / std
-        return torch.tensor(Y_std_np, dtype=Y.dtype)
-
-    else:
-        stddim = -1 if Y.dim() < 2 else -2
-        Y_std = Y.std(dim=stddim, keepdim=True)
-        Y_std = Y_std.where(Y_std >= 1e-9, torch.full_like(Y_std, 1.0))
-        return (Y - Y.mean(dim=stddim, keepdim=True)) / Y_std
-
-
-if __name__ == '__main__':
-    t = torch.tensor(((1., 2., 3.), (4., 5., 6.), (7., 8., 9.)))
-    print(t)
-    t[0, 0] = np.nan
-    print(standardize(t))
+    return train_x, train_y, train_c, inputs, outputs

@@ -145,11 +145,12 @@ def optimize(vocs: Dict,
         vprint(f'submitting initial candidates at time {isotime()}')
         initial_y = submit_jobs(initial_x, exe, vocs, evaluate_f, sampler_evaluate_args)
 
-        train_x, train_y, train_c = collect_results(initial_y, vocs, **tkwargs)
+        train_x, train_y, train_c, inputs, outputs = collect_results(initial_y, vocs,
+                                                                     **tkwargs)
 
     else:
-        train_x, train_y, train_c = get_data_json(restart_file,
-                                                  vocs, **tkwargs)
+        train_x, train_y, train_c, inputs, outputs = get_data_json(restart_file,
+                                                                   vocs, **tkwargs)
 
     # save initial data to file
     # get feasibility values
@@ -162,7 +163,7 @@ def optimize(vocs: Dict,
                               train_c,
                               constraint_status,
                               feas))
-    save_data_dict(vocs, full_data, output_path)
+    save_data_dict(vocs, full_data, inputs, outputs, output_path)
 
     check_training_data_shape(train_x, train_y, train_c, vocs)
 
@@ -196,12 +197,16 @@ def optimize(vocs: Dict,
         fut = submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args)
 
         try:
-            new_x, new_y, new_c = collect_results(fut, vocs, **tkwargs)
+            new_x, new_y, new_c, new_inputs, new_outputs = collect_results(fut, vocs,
+                                                                           **tkwargs)
 
             # add new observations to training data
             train_x = torch.vstack((train_x, new_x))
             train_y = torch.vstack((train_y, new_y))
             train_c = torch.vstack((train_c, new_c))
+
+            inputs += new_inputs
+            outputs += new_outputs
 
             # get feasibility values
             feas, constraint_status = get_feasability_constraint_status(train_y,
@@ -213,7 +218,7 @@ def optimize(vocs: Dict,
                                       train_c,
                                       constraint_status,
                                       feas))
-            save_data_dict(vocs, full_data, output_path)
+            save_data_dict(vocs, full_data, inputs, outputs, output_path)
 
         except NoValidResultsError:
             print('No valid results found, skipping to next iteration')
@@ -282,8 +287,8 @@ def check_training_data_shape(train_x: [Tensor],
         assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
                               f'shape currently is {ele.shape} '
 
-        assert ele.shape[-1] == len(vocs[vocs_type]),\
-                                    f'current shape of training '\
-                                    f'data ({ele.shape}) '\
-                                    f'does not match number of vocs {vocs_type} == '\
-                                    f'{len(vocs[vocs_type])} '
+        assert ele.shape[-1] == len(vocs[vocs_type]), \
+            f'current shape of training ' \
+            f'data ({ele.shape}) ' \
+            f'does not match number of vocs {vocs_type} == ' \
+            f'{len(vocs[vocs_type])} '
