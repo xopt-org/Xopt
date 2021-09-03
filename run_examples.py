@@ -19,6 +19,7 @@ from nbconvert import PythonExporter
 
 
 IGNORE = {
+    "cnsga_tnk.ipynb",
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
