@@ -20,7 +20,7 @@ Continuous NSGA-II, NSGA-III
 
 """
 
-cnsga_logo_old = f"""
+cnsga_logo = f"""
 
 
  ▄████▄   ███▄    █   ██████   ▄████  ▄▄▄      
@@ -35,10 +35,6 @@ cnsga_logo_old = f"""
 ░                                              
 
 
-Continuous Non-dominated Sorting Genetic Algorithm
-Version {__version__}
-"""
-cnsga_logo = f"""
 Continuous Non-dominated Sorting Genetic Algorithm
 Version {__version__}
 """
