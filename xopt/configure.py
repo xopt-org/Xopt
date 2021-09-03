@@ -2,6 +2,7 @@
 Tools to configure an xopt run
 
 """
+import xopt.bayesian.algorithms
 from xopt import tools
 
 # -----------------------
@@ -11,6 +12,7 @@ from xopt import tools
 KNOWN_ALGORITHMS = {
     'cnsga': 'xopt.cnsga.cnsga',
     'random_sampler': 'xopt.sampler.random_sampler',
+    'bayesian_optimization': 'xopt.bayesian.algorithms.bayesian_optimize',
     'bayesian_exploration': 'xopt.bayesian.algorithms.bayesian_exploration',
     'mobo': 'xopt.bayesian.algorithms.mobo',
     'multi_fidelity': 'xopt.bayesian.algorithms.multi_fidelity_optimize'
@@ -57,11 +59,13 @@ def configure_algorithm(config):
     defaults = tools.get_function_defaults(f)
     tools.fill_defaults(options, defaults, strict=False)
 
-    # see if generator_options are in options - functions can be specified in generator options
+    # see if generator_options are in options - functions can be specified in
+    # generator options
     if 'generator_options' in options:
-        for name, val in options['generator_options'].items():
-            if isinstance(val, str):
-                options['generator_options'][name] = tools.get_function(val)
+        if options['generator_options'] is not None:
+            for name, val in options['generator_options'].items():
+                if isinstance(val, str):
+                    options['generator_options'][name] = tools.get_function(val)
 
     return {'name': config['name'], 'function': f_name, 'options': options}
 

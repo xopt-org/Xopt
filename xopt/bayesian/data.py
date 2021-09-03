@@ -1,17 +1,19 @@
+import copy
 import json
 import logging
 import math
+import os.path
+
 import numpy as np
 import pandas as pd
-from copy import deepcopy
-
+from ..tools import NpEncoder
 # Logger
 import torch
 
 logger = logging.getLogger(__name__)
 
 
-def save_data_dict(vocs, full_data, output_path):
+def save_data_dict(vocs, full_data, inputs, outputs, output_path):
 
     # add results to config dict and save to json
     results = {}
@@ -36,11 +38,14 @@ def save_data_dict(vocs, full_data, output_path):
     results['constraint_status'] = constraint_status
     results['feasibility'] = full_data[:, i].tolist()
 
+    results['inputs'] = inputs
+    results['outputs'] = outputs
     #outputs = deepcopy(config)
     #outputs['results'] = results
     output_path = '' if output_path is None else output_path
-    with open(output_path + 'results.json', 'w') as outfile:
-        json.dump(results, outfile)
+    # TODO: Combine into one function for xopt
+    with open(os.path.join(output_path, 'results.json'), 'w') as outfile:
+        json.dump(results, outfile, cls=NpEncoder)
 
 
 def get_data_json(json_filename, vocs, **tkwargs):
@@ -55,10 +60,11 @@ def get_data_json(json_filename, vocs, **tkwargs):
         return [math.nan if x is None else x for x in l]
 
     for name in names:
-        data_sets += [torch.hstack([torch.tensor(replace_none(data[name][ele]), **tkwargs).reshape(-1, 1) for
+        data_sets += [torch.hstack([torch.tensor(replace_none(data[name][ele]),
+                                                 **tkwargs).reshape(-1, 1) for
                                     ele in vocs[name].keys()])]
 
-    return data_sets[0], data_sets[1], data_sets[2]
+    return data_sets[0], data_sets[1], data_sets[2], data['inputs'], data['outputs']
 
 
 def save_data_pd(config, full_data):
