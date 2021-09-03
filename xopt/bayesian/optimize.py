@@ -122,7 +122,7 @@ def optimize(vocs: Dict,
             pass
 
     # set executor
-    exe = DummyExecutor() if executor is None else executor
+    executor = DummyExecutor() if executor is None else executor
 
     # parse VOCS
     variables = vocs['variables']
@@ -143,7 +143,7 @@ def optimize(vocs: Dict,
 
         # submit evaluation of initial samples
         vprint(f'submitting initial candidates at time {isotime()}')
-        initial_y = submit_jobs(initial_x, exe, vocs, evaluate_f, sampler_evaluate_args)
+        initial_y = submit_jobs(initial_x, executor, vocs, evaluate_f, sampler_evaluate_args)
 
         train_x, train_y, train_c, inputs, outputs = collect_results(initial_y, vocs,
                                                                      **tkwargs)
@@ -194,7 +194,7 @@ def optimize(vocs: Dict,
 
         # observe candidates
         vprint(f'submitting candidates at time {isotime()}')
-        fut = submit_jobs(candidates, exe, vocs, evaluate_f, sampler_evaluate_args)
+        fut = submit_jobs(candidates, executor, vocs, evaluate_f, sampler_evaluate_args)
 
         try:
             new_x, new_y, new_c, new_inputs, new_outputs = collect_results(fut, vocs,
@@ -254,16 +254,16 @@ def get_feasability_constraint_status(train_y: [Tensor],
 
 
 def submit_jobs(candidates: [Tensor],
-                exe: [Executor],
+                executor: [Executor],
                 vocs: [Dict],
                 evaluate_f: [Callable],
                 sampler_evaluate_args: [Dict]) -> List[Future]:
     variable_names = list(vocs['variables'])
     settings = get_settings(candidates, variable_names, vocs)
-    fut = [exe.submit(sampler_evaluate,
-                      setting,
-                      evaluate_f,
-                      **sampler_evaluate_args) for setting in settings]
+    fut = [executor.submit(sampler_evaluate,
+                           setting,
+                           evaluate_f,
+                           **sampler_evaluate_args) for setting in settings]
     return fut
 
 
