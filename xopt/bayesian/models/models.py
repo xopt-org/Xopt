@@ -11,6 +11,7 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from ..utils import get_bounds
 from ..models.nan_enabled import get_nan_model
 from ..outcome_transforms import NanEnabledStandardize
+from ..input_transforms import CostAwareNormalize
 
 
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
@@ -41,12 +42,13 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
 
 
 def create_multi_fidelity_model(train_x, train_obj, train_c, vocs):
-    assert list(vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
-    input_normalize = Normalize(len(vocs['variables']), get_bounds(vocs, device=train_x.device))
+    assert list(vocs['variables'])[
+               -1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
+    input_normalize = CostAwareNormalize(len(vocs['variables']))
     model = SingleTaskMultiFidelityGP(
         train_x,
         train_obj,
-        #input_transform=input_normalize,
+        input_transform=input_normalize,
         outcome_transform=Standardize(m=1),
         data_fidelity=len(vocs['variables']) - 1
     )
@@ -56,12 +58,14 @@ def create_multi_fidelity_model(train_x, train_obj, train_c, vocs):
 
 
 def create_simple_multi_fidelity_model(train_x, train_obj, train_c, vocs):
-    assert list(vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
-    input_normalize = Normalize(len(vocs['variables']), get_bounds(vocs, device=train_x.device))
+    assert list(vocs['variables'])[
+               -1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
+    input_normalize = Normalize(len(vocs['variables']),
+                                get_bounds(vocs, device=train_x.device))
     model = SingleTaskMultiFidelityGP(
         train_x,
         train_obj,
-        #input_transform=input_normalize,
+        # input_transform=input_normalize,
         outcome_transform=Standardize(m=1),
     )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
