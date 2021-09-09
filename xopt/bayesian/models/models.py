@@ -3,7 +3,6 @@ import torch
 from botorch import fit_gpytorch_model
 from botorch.models import SingleTaskGP
 from botorch.models.model import Model
-from botorch.models.gp_regression_fidelity import SingleTaskMultiFidelityGP
 from botorch.models.transforms.input import Normalize
 from botorch.models.transforms.outcome import Standardize
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
@@ -12,6 +11,7 @@ from ..utils import get_bounds
 from ..models.nan_enabled import get_nan_model
 from ..outcome_transforms import NanEnabledStandardize
 from ..input_transforms import CostAwareNormalize
+from ..models.multi_fidelity import SingleTaskMultiFidelityGP
 
 
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
