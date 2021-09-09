@@ -42,7 +42,8 @@ class MultiFidelityGenerator(BayesianGenerator):
 
         self.num_fantasies = num_fantasies
         self.target_fidelities = target_fidelities
-        self.cost_model = AffineFidelityCostModel(self.target_fidelities, fixed_cost)
+        self.cost_model = AffineFidelityCostModel(self.target_fidelities,
+                                                  fixed_cost)
 
         if base_acq is None:
             self.base_acq = PosteriorMean

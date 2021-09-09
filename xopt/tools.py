@@ -434,6 +434,7 @@ def get_function(name):
             raise ValueError(f'global {name} is not callable')
     else:
         # try to import
+        print(name)
         m_name, f_name = name.rsplit('.', 1)
         module = importlib.import_module(m_name)
         f = getattr(module, f_name)
