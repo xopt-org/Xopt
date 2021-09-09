@@ -44,7 +44,8 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
 def create_multi_fidelity_model(train_x, train_obj, train_c, vocs):
     assert list(vocs['variables'])[
                -1] == 'cost', 'last variable in vocs["variables"] must be "cost"'
-    input_normalize = CostAwareNormalize(len(vocs['variables']))
+    assert train_x.shape[-1] > 1
+    input_normalize = CostAwareNormalize(len(vocs['variables']), get_bounds(vocs))
     model = SingleTaskMultiFidelityGP(
         train_x,
         train_obj,
