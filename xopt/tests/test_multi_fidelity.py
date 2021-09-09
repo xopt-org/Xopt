@@ -9,10 +9,10 @@ class TestClassMultiFidelity:
     config = {'vocs': test_multi_fidelity.VOCS.copy()}
     config['simulation'] = {'name': 'AugmentedHartmann',
                             'evaluate': 'xopt.evaluators.test_multi_fidelity.evaluate'}
-    config['xopt'] = {'output_path': '', 'verbose': False, 'algorithm': 'mobo'}
+    config['xopt'] = {'output_path': '', 'verbose': True, 'algorithm': 'mobo'}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {
-                               'n_initial_samples': 1,
+                               'n_initial_samples': 2,
                                'n_steps': 1,
                                'generator_options': {
                                    'batch_size': 1,

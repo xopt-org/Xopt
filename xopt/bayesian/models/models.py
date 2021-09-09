@@ -46,7 +46,7 @@ def create_multi_fidelity_model(train_x, train_y, train_c, vocs):
     
     input_transform = CostAwareNormalize(len(vocs['variables']), get_bounds(vocs, device=train_x.device))
     outcome_transform = Standardize(m=1)
-    
+
     model = SingleTaskMultiFidelityGP(
         train_x,
         train_y,
