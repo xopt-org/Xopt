@@ -1,12 +1,12 @@
-# xopt
-Felxible optimization of arbitrary problems in python.
+# Xopt
+Flexible optimization of arbitrary problems in Python.
 
 The goal of this package is to provide advanced algorithmic support for arbitrary 
 simulations/control systems with minimal required coding. Users can easily connect 
 arbitrary evaluation functions to advanced algorithms with minimal coding with 
 support for multi-threaded or MPI-enabled execution.
 
-Currenty xopt provides the following optimization algorithms:
+Currenty Xopt provides the following optimization algorithms:
 - random sampling
 - cnsga
 - Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel)
@@ -54,7 +54,7 @@ vocs:
 
 Defining evaluation function
 ===============
-Xopt can interface with arbitrary evaluate functions (defined in python) with the 
+Xopt can interface with arbitrary evaluate functions (defined in Python) with the 
 following form:
 ```
 evaluate(params[Dict]) -> Dict
@@ -78,7 +78,7 @@ The complete configuration of a simulation optimization is given by a proper YAM
 
 
 
-Installing xopt
+Installing Xopt
 ===============
 
 Installing `xopt` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
