@@ -21,7 +21,7 @@ VOCS = {
 # labeled version
 def evaluate(inputs, extra_option='abc', **params):
     x = inputs['x1']
-    outputs = {'y1': (x - 15.0)**2 + np.random.rand()*0.1}
+    outputs = {'y1': (x - 15.0)**2}
 
     return outputs
 
