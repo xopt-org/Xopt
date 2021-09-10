@@ -23,7 +23,7 @@ VOCS = {
 # labeled version
 def evaluate(inputs, extra_option='abc', **params):
     x = np.array((inputs['x1'], inputs['x2'], inputs['x3']))
-    outputs = {'y1': np.linalg.norm(x - 5.0)}
+    outputs = {'y1': np.linalg.norm(x - 15.0)**2}
 
     return outputs
 
