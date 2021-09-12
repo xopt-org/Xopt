@@ -1,5 +1,10 @@
 import numpy as np
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
 import matlab.engine
+
+
 
 VOCS = {
     'name': 'TNK_test',
@@ -32,19 +37,21 @@ Y_RANGE = [0, 1.4]
 
 
 # Pure number version
-def TNK(individual,eng):
+def TNK(individual):
     x1 = individual[0]
     x2 = individual[1]
 
     objectives = (x1, x2)
-    constraints = eng[WorkerNumber].testeval(x1,x2,nargout=2)
+    rank = comm.Get_rank()
+    eng = matlab.engine.connect_matlab('Engine_'+str(rank))
+    constraints = eng.testeval(x1,x2,nargout=2)
     #constraints = (x1 ** 2 + x2 ** 2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
-    #               (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2)
+    #              (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2)
     return objectives, constraints
 
 
 # labeled version
-def evaluate_TNK(inputs, eng, extra_option='abc', **params):
+def evaluate_TNK(inputs, extra_option='abc', **params):
     info = {'some': 'info', 'about': ['the', 'run']}
     ind = [inputs['x1'], inputs['x2']]
 

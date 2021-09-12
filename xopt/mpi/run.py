@@ -25,6 +25,7 @@ import os
 import sys
 from pprint import pprint
 
+import matlab.engine
 
 ARGS = [sys.argv[-1]]
 #ARGS = 'xopt.in'.split()
@@ -38,6 +39,7 @@ assert os.path.exists(infile), f'Input file does not exist: {infile}'
 
 
 if __name__ == "__main__":
+
     print(xopt_logo)
     print('_________________________________')
     print('Parallel execution with', mpi_size, 'workers')   
