@@ -3,7 +3,7 @@
 :: Install python matlab_engine libs: https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html
 
 :: Start 1 matlab_engine instance per core
-matlab -nodesktop -nosplash -r matinit
+matlab -nodesktop -nosplash -r "parpool('IdelTimeout',120);matinit"
 timeout /t 30
 
 :: Run example xopt instance with test_TNK_matlab.py evaluator which calls testeval.m function in running matlab_engines instances
