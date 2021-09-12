@@ -1,20 +1,35 @@
-# xopt
-Simulation optimization, based on **DEAP** https://deap.readthedocs.io
+# Xopt
+Flexible optimization of arbitrary problems in Python.
 
-Example MPI run, with `xopt.yaml` as the only user-defined file:
-```
-mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
-```
+The goal of this package is to provide advanced algorithmic support for arbitrary 
+simulations/control systems with minimal required coding. Users can easily connect 
+arbitrary evaluation functions to advanced algorithms with minimal coding with 
+support for multi-threaded or MPI-enabled execution.
 
-The complete configuration of a simulation optimization is given by a proper YAML file:
+Currenty Xopt provides the following optimization algorithms:
+- random sampling
+- cnsga
+- Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel)
+- Multi-objective Bayesian optimization (w/ or w/o constraints, serial or parallel)
+- Bayesian exploration
+- Multi-fidelity Single objective Bayesian optimization 
+
+Configuring an Xopt run
+===============
+Xopt runs are specified via a dictionary that can be directly imported from a YAML file.
 
 ```yaml
 xopt: {output_path: null, verbose: true, algorithm: cnsga}
 
 algorithm:
   name: cnsga
-  options: {max_generations: 50, population_size: 128, crossover_probability: 0.9, mutation_probability: 1.0,
-  selection: auto, verbose: true, population: null}
+  options: {max_generations: 50, 
+            population_size: 128, 
+            crossover_probability: 0.9, 
+            mutation_probability: 1.0,
+            selection: auto, 
+            verbose: true, 
+            population: null}
   
 simulation: 
   name: test_TNK
@@ -25,10 +40,10 @@ vocs:
   description: null
   simulation: test_TNK
   templates: null
-  variables:
-    x1: [0, 3.14159]
-    x2: [0, 3.14159]
-  objectives: {y1: MINIMIZE, y2: MINIMIZE}
+  variables: {x1: [0, 3.14159]
+              x2: [0, 3.14159]}
+  objectives: {y1: MINIMIZE, 
+               y2: MINIMIZE}
   constraints:
     c1: [GREATER_THAN, 0]
     c2: [LESS_THAN, 0.5]
@@ -37,9 +52,33 @@ vocs:
 ```
 
 
+Defining evaluation function
+===============
+Xopt can interface with arbitrary evaluate functions (defined in Python) with the 
+following form:
+```
+evaluate(params[Dict]) -> Dict
+```
+Evaluate functions must accept a dictionary object that **at least** has the keys 
+specified in `variables, constants, linked_variables` and returns a dictionary 
+containing **at least** the 
+keys contained in `objectives, constraints`. Extra dictionary keys are tracked and 
+used in the evaluate function but are not modified by xopt.
+
+Using MPI
+===============
+Example MPI run, with `xopt.yaml` as the only user-defined file:
+```
+mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+```
+
+The complete configuration of a simulation optimization is given by a proper YAML file:
 
 
-Installing xopt
+
+
+
+Installing Xopt
 ===============
 
 Installing `xopt` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:

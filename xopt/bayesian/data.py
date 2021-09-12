@@ -60,11 +60,12 @@ def get_data_json(json_filename, vocs, **tkwargs):
         return [math.nan if x is None else x for x in l]
 
     for name in names:
-        data_sets += [torch.hstack([torch.tensor(replace_none(data[name][ele]),
-                                                 **tkwargs).reshape(-1, 1) for
-                                    ele in vocs[name].keys()])]
+        if vocs[name] != {}:
+            data_sets += [torch.hstack([torch.tensor(replace_none(data[name][ele]),
+                                                     **tkwargs).reshape(-1, 1) for
+                                        ele in vocs[name].keys()])]
 
-    return data_sets[0], data_sets[1], data_sets[2], data['inputs'], data['outputs']
+    return *data_sets, data['inputs'], data['outputs']
 
 
 def save_data_pd(config, full_data):
