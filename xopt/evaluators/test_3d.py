@@ -1,7 +1,10 @@
 import numpy as np
 import torch
+import time
 from botorch.test_functions.multi_fidelity import AugmentedHartmann
+import logging
 
+logger = logging.getLogger(__name__)
 VOCS = {
     'name': '1D test',
     'description': '1D test function (with optional multi-fidelity) for debugging',
@@ -24,6 +27,8 @@ VOCS = {
 def evaluate(inputs, extra_option='abc', **params):
     x = np.array((inputs['x1'], inputs['x2'], inputs['x3']))
     outputs = {'y1': np.linalg.norm(x - 0.15)**2}
+
+    time.sleep(inputs['cost'] * 60.0 + 20.0)
 
     return outputs
 

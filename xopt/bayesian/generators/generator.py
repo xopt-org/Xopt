@@ -109,7 +109,8 @@ class BayesianGenerator(Generator):
         self.optimize_options.update(optimize_options)
 
     def generate(self,
-                 model: Model) -> torch.Tensor:
+                 model: Model,
+                 q: Optional[int] = None) -> torch.Tensor:
         """
 
         Parameters
@@ -117,11 +118,17 @@ class BayesianGenerator(Generator):
         model : botorch.model.Model
             Model passed to acquisition function to generate new candidates.
 
+        q : int, optional
+            Specify number of candidates to generate, overwrites constructor argument
+            `batch_size`
+
         Returns
         -------
         candidates : torch.Tensor
             Candidates for observation
         """
+        if q is not None:
+            self.optimize_options['q'] = q
 
         # check model input dims and outputs
         if isinstance(model, ModelListGP):
