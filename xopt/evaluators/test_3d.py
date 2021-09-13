@@ -6,9 +6,9 @@ VOCS = {
     'name': '1D test',
     'description': '1D test function (with optional multi-fidelity) for debugging',
     'variables': {
-        'x1': [0, 20.0],
-        'x2': [0, 20.0],
-        'x3': [0, 20.0],
+        'x1': [0, 0.2],
+        'x2': [0, 0.2],
+        'x3': [0, 0.2],
         'cost': [0, 1.0]
     },
     'objectives': {
@@ -23,7 +23,7 @@ VOCS = {
 # labeled version
 def evaluate(inputs, extra_option='abc', **params):
     x = np.array((inputs['x1'], inputs['x2'], inputs['x3']))
-    outputs = {'y1': np.linalg.norm(x - 15.0)**2}
+    outputs = {'y1': np.linalg.norm(x - 0.15)**2}
 
     return outputs
 
