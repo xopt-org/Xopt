@@ -1,22 +1,20 @@
-import logging
-import os
-import sys
-import time
-import queue
 import concurrent.futures
+import logging
+import queue
+import time
+from concurrent.futures import Executor
+from typing import Dict, Optional, Tuple, Callable, List
 
 import torch
 from botorch.utils.sampling import draw_sobol_samples
+from torch import Tensor
 
 from .data import save_data_dict, get_data_json
+from .generators.generator import BayesianGenerator
 from .models.models import create_model
 from .utils import get_bounds, collect_results, sampler_evaluate, \
     get_corrected_outputs, NoValidResultsError
-from ..tools import full_path, DummyExecutor, isotime
-from typing import Dict, Optional, Tuple, Callable, List
-from .generators.generator import BayesianGenerator
-from concurrent.futures import Executor, Future
-from torch import Tensor
+from ..tools import DummyExecutor
 
 """
     Asynchronized optimization function for Bayesian optimization
