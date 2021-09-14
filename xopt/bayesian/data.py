@@ -1,20 +1,77 @@
-import copy
 import json
 import logging
 import math
 import os.path
+from typing import Dict, Tuple, List
 
-import numpy as np
 import pandas as pd
-from ..tools import NpEncoder
 # Logger
 import torch
+from torch import Tensor
+
+from .utils import collect_results, get_feasability_constraint_status, \
+    NoValidResultsError
+from ..tools import NpEncoder
 
 logger = logging.getLogger(__name__)
 
 
-def save_data_dict(vocs, full_data, inputs, outputs, output_path):
+def gather_and_save_training_data(futures: List,
+                                  vocs: Dict,
+                                  tkwargs: Dict,
+                                  train_x: Tensor = None,
+                                  train_y: Tensor = None,
+                                  train_c: Tensor = None,
+                                  inputs: Dict = None,
+                                  outputs: Dict = None,
+                                  output_path: str = None) -> Tuple[Tensor,
+                                                                    Tensor,
+                                                                    Tensor,
+                                                                    Dict,
+                                                                    Dict]:
+    if tkwargs is None:
+        tkwargs = {}
 
+    try:
+        new_x, new_y, new_c, new_inputs, new_outputs = collect_results(futures,
+                                                                       vocs,
+                                                                       **tkwargs)
+
+        if train_x is None:
+            train_x = new_x
+            train_y = new_y
+            train_c = new_c
+            inputs = new_inputs
+            outputs = new_outputs
+
+        else:
+            # add new observations to training data
+            train_x = torch.vstack((train_x, new_x))
+            train_y = torch.vstack((train_y, new_y))
+            train_c = torch.vstack((train_c, new_c))
+
+            inputs += new_inputs
+            outputs += new_outputs
+
+        # get feasibility values
+        feas, constraint_status = get_feasability_constraint_status(train_y,
+                                                                    train_c,
+                                                                    vocs)
+
+        full_data = torch.hstack((train_x,
+                                  train_y,
+                                  train_c,
+                                  constraint_status,
+                                  feas))
+        save_data_dict(vocs, full_data, inputs, outputs, output_path)
+
+    except NoValidResultsError:
+        logger.warning('No valid results found, skipping to next iteration')
+
+    return train_x, train_y, train_c, inputs, outputs
+
+
+def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     # add results to config dict and save to json
     results = {}
 
@@ -40,8 +97,8 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
 
     results['inputs'] = inputs
     results['outputs'] = outputs
-    #outputs = deepcopy(config)
-    #outputs['results'] = results
+    # outputs = deepcopy(config)
+    # outputs['results'] = results
     output_path = '' if output_path is None else output_path
     # TODO: Combine into one function for xopt
     with open(os.path.join(output_path, 'results.json'), 'w') as outfile:
@@ -55,7 +112,7 @@ def get_data_json(json_filename, vocs, **tkwargs):
     data_sets = []
     names = ['variables', 'objectives', 'constraints']
 
-    #replace None's with Nans
+    # replace None's with Nans
     def replace_none(l):
         return [math.nan if x is None else x for x in l]
 
