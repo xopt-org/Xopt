@@ -70,13 +70,13 @@ def get_candidates(train_x: Tensor,
                          corrected_train_c,
                          vocs,
                          custom_model)
-    logger.info(f'Model creation time: {time.time() - model_start:.4} s')
+    logger.debug(f'Model creation time: {time.time() - model_start:.4} s')
 
     # get candidate point(s)
     candidate_start = time.time()
     candidates = candidate_generator.generate(model, q)
-    logger.info(f'Candidate generation time: {time.time() - candidate_start:.4} s')
-    logger.info(f'Candidate(s): {candidates}')
+    logger.debug(f'Candidate generation time: {time.time() - candidate_start:.4} s')
+    logger.debug(f'Candidate(s): {candidates}')
     return candidates
 
 
@@ -100,7 +100,7 @@ def submit_candidates(candidates: Tensor,
             {executor.submit(sampler_evaluate,
                              setting,
                              evaluate_f,
-                             **sampler_evaluate_args): candidate_index_start + 1})
+                             **sampler_evaluate_args): candidate})
 
     return fut
 

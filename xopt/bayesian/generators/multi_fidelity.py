@@ -45,6 +45,7 @@ class MultiFidelityGenerator(BayesianGenerator):
         self.target_fidelities = target_fidelities
         self.cost_model = AffineFidelityCostModel(self.target_fidelities,
                                                   fixed_cost)
+        self.X_pending = None
 
         if base_acq is None:
             self.base_acq = PosteriorMean
@@ -84,6 +85,7 @@ class MultiFidelityGenerator(BayesianGenerator):
             current_value=current_value,
             cost_aware_utility=cost_aware_utility,
             project=self.project,
+            X_pending=self.X_pending,
         )
 
     def create_acq(self, model):
