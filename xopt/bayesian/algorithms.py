@@ -338,7 +338,6 @@ def multi_fidelity_optimize(vocs, evaluate_f,
                            executor,
                            restart_file,
                            initial_x,
-                           verbose,
                            generator.tkwargs
                            )
 
