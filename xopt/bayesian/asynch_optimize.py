@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 def asynch_optimize(vocs: Dict,
                     evaluate_f: Callable,
                     candidate_generator: BayesianGenerator,
-                    budget: int,
+                    budget: float,
                     processes: int,
                     base_cost: Optional[float] = 1.0,
                     output_path: Optional[str] = '',
@@ -39,7 +39,30 @@ def asynch_optimize(vocs: Dict,
                     tkwargs: Optional[Dict] = None,
                     ) -> Dict:
     """
-    Backend function for model based optimization
+    Backend function for parallelized asynchronous optimization.
+
+    As opposed to normal optimizers that follow the pattern "generate candidates" ->
+    "evaluate candidates" -> "repeat", this optimizer generates candidates after each
+    evaluation function returns a result. We assume that each call to the evaluate
+    function will take a variable amount of time thus making normal optimization
+    loops inefficient as the slowest evaulations dominate the algorithm runtime.
+
+    To solve this problem we add candiates to a queue that is consumed by a
+    parallelized executor (can also be done with serial evaluators). Candidates are
+    generated and added to the queue every time we detect an evaluation has finished,
+    meaning that roughly the same number of processes is used at all times.
+
+    A stopping condition is specified by a maximum evaluation cost or `budget`. Each
+    time an evaluation is submitted to the queue, we add the evaulation `cost` to the
+    `total_cost`. If total_cost exceeds the budget, evaluations are no longer added
+    to the queue and the optimizer waits for the remaining evaluations to finish.
+
+    Notes
+    ----------
+    If `cost` is not specifed in `vocs['variables']` we assume a fixed cost of 1 for
+    each evaluation, meaning `budget` reduces to the number of candidates that can be
+    evaluated during optimization. In this case, `cost` is not supplied to the
+    evaluate function.
 
     Parameters
     ----------
@@ -53,7 +76,7 @@ def asynch_optimize(vocs: Dict,
     candidate_generator : object
         Generator object that has a generate(model, bounds, vocs, **tkwargs) method
 
-    budget : int
+    budget : float
         Optimization budget
 
     processes : int
@@ -103,11 +126,10 @@ def asynch_optimize(vocs: Dict,
     # set executor
     executor = DummyExecutor() if executor is None else executor
 
-    # parse VOCS
-    variables = vocs['variables']
-    variable_names = list(variables)
-
-    assert variable_names[-1] == 'cost'
+    # check if variable cost is specified in VOCS
+    fixed_cost = False
+    if 'cost' not in vocs['variables']:
+        fixed_cost = True
 
     sampler_evaluate_args = {'verbose': verbose}
 
@@ -166,16 +188,24 @@ def asynch_optimize(vocs: Dict,
         while not q.empty() and not exceeded_budget:
             candidate = q.get()
 
-            logger.info(f'Submitting candidate {candidate_index}: {candidate}')
             futures.update(submit_candidates(candidate,
                                              executor,
                                              vocs,
                                              evaluate_f,
                                              sampler_evaluate_args,
                                              candidate_index))
-            candidate_index += 1
-            total_cost += candidate[-1] + base_cost
+
+            if fixed_cost:
+                c = 1.0
+            else:
+                c = candidate[-1] + base_cost
+            total_cost += c
+
+            logger.info(f'Submitted candidate {candidate_index}, cost: {c}')
+            logger.debug(f'{candidate}')
             logger.info(f'total cost: {total_cost}')
+
+            candidate_index += 1
 
             if total_cost > budget:
                 logger.info(f'budget exceeded, waiting for simulations to end')

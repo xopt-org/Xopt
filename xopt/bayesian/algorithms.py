@@ -254,7 +254,24 @@ def multi_fidelity_optimize(vocs, evaluate_f,
                             verbose=True,
                             generator_options=None):
     """
-        Multi-fidelity optimization
+        Multi-fidelity optimization using Bayesian optimization
+
+        This optimization algorithm attempts to reduce the computational cost of
+        optimizing a scalar function through the use of many low-cost approximate
+        evaluations. We create a GP model that models the function f(x,c) where x
+        represents free parameters and c in the range [0,1] reperestents the `cost`.
+        This algorithm uses the knoweldge gradient approach
+        (https://botorch.org/tutorials/multi_fidelity_bo) to choose points that are
+        likely to provide the most information about the optimimum point at maximum
+        fidelity (c=1).
+
+        Since evaluations have variable cost, we specify a maximum `budget` that
+        stops the algorithm when the total cost exceeds the budget. Cost for a single
+        evaluation is given by `cost` + 'base_cost`.
+
+        This algoritm is most efficient when used with a parallel executor,
+        as evaluations will be done asynchronously, allowing multiple cheap
+        simulations to run in parallel with expensive ones.
 
         Parameters
         ----------
@@ -306,6 +323,7 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     if generator_options is None:
         generator_options = {}
 
+    generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
                                                                  **generator_options)
 
