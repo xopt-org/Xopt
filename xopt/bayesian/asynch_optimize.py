@@ -35,7 +35,6 @@ def asynch_optimize(vocs: Dict,
                     executor: Optional[Executor] = None,
                     restart_file: Optional[str] = None,
                     initial_x: Optional[torch.Tensor] = None,
-                    verbose: Optional[bool] = False,
                     tkwargs: Optional[Dict] = None,
                     ) -> Dict:
     """
@@ -82,28 +81,25 @@ def asynch_optimize(vocs: Dict,
     processes : int
         Number of processes to evaluate simultaneously
 
-    base_cost : float, default=0.1
+    base_cost : float, default: 1.0
         Base cost for simulations
 
-    output_path : str
+    output_path : str, optional
         Path location to place outputs
 
-    custom_model : callable
+    custom_model : callable, optional
         Function of the form f(train_inputs, train_outputs) that
         returns a trained custom model
 
-    executor : Executor
+    executor : Executor, optional
         Executor object to run evaluate_f
 
-    restart_file : str
+    restart_file : str, optional
         File location of JSON file that has previous data
 
-    initial_x : list
+    initial_x : list, optional
         Nested list to provide initial candiates to evaluate,
         overwrites n_initial_samples
-
-    verbose : bool
-        Print out messages during optimization
 
     tkwargs : dict
         Specify data type and device for pytorch
@@ -131,8 +127,6 @@ def asynch_optimize(vocs: Dict,
     if 'cost' not in vocs['variables']:
         fixed_cost = True
 
-    sampler_evaluate_args = {'verbose': verbose}
-
     # define queue for evaluation
     q = queue.Queue()
 
@@ -152,16 +146,17 @@ def asynch_optimize(vocs: Dict,
         for ele in initial_x:
             q.put(ele)
 
-        data = [None] * 5
+        train_x, train_y, train_c, inputs, outputs = [None]*5
 
     else:
         data = get_data_json(restart_file,
                              vocs, **tkwargs)
+        train_x, train_y, train_c, inputs, outputs = data
 
         # get a new set of candidates and put them in the queue
-        new_candidates = get_candidates(data[0],
-                                        data[1],
-                                        data[2],
+        new_candidates = get_candidates(train_x,
+                                        train_y,
+                                        train_c,
                                         vocs,
                                         custom_model,
                                         candidate_generator,
@@ -192,7 +187,7 @@ def asynch_optimize(vocs: Dict,
                                              executor,
                                              vocs,
                                              evaluate_f,
-                                             sampler_evaluate_args,
+                                             {},
                                              candidate_index))
 
             if fixed_cost:
@@ -201,9 +196,9 @@ def asynch_optimize(vocs: Dict,
                 c = candidate[-1] + base_cost
             total_cost += c
 
-            logger.info(f'Submitted candidate {candidate_index}, cost: {c}')
+            logger.info(f'Submitted candidate {candidate_index:3}, cost: {c:4.3}, '
+                        f'total cost: {total_cost:4.4}')
             logger.debug(f'{candidate}')
-            logger.info(f'total cost: {total_cost}')
 
             candidate_index += 1
 
@@ -218,25 +213,35 @@ def asynch_optimize(vocs: Dict,
             data = gather_and_save_training_data(list(done),
                                                  vocs,
                                                  tkwargs,
-                                                 data[0],
-                                                 data[1],
-                                                 data[2],
-                                                 data[3],
-                                                 data[4],
+                                                 train_x,
+                                                 train_y,
+                                                 train_c,
+                                                 inputs,
+                                                 outputs,
                                                  output_path)
+            train_x, train_y, train_c, inputs, outputs = data
 
             # get a new set of candidates if budget has not been met and put them in
             # the queue
             if not exceeded_budget:
-                logger.info(f'generating {len(done)} new candidates')
-                new_candidates = get_candidates(data[0],
-                                                data[1],
-                                                data[2],
+                logger.info(f'generating {len(done)} new candidate(s)')
+
+                # get X_pending is available
+                if len(not_done):
+                    X_pending = []
+                    for ele in list(not_done):
+                        X_pending += [futures[ele].reshape(1, -1)]
+                    candidate_generator.X_pending = torch.vstack(X_pending)
+
+                new_candidates = get_candidates(train_x,
+                                                train_y,
+                                                train_c,
                                                 vocs,
                                                 custom_model,
                                                 candidate_generator,
-                                                len(done), )
+                                                len(done),)
 
+                # add new candidates to queue
                 for ele in new_candidates:
                     q.put(ele)
 
@@ -250,21 +255,21 @@ def asynch_optimize(vocs: Dict,
             break
 
     # horiz. stack objective and constraint results for training/acq specification
-    feas, constraint_status = get_feasability_constraint_status(data[1],
-                                                                data[2],
+    feas, constraint_status = get_feasability_constraint_status(train_y,
+                                                                train_c,
                                                                 vocs)
     corrected_train_y, corrected_train_c = get_corrected_outputs(vocs,
-                                                                 data[1],
-                                                                 data[2], )
+                                                                 train_y,
+                                                                 train_c)
 
     # output model
-    model = create_model(data[0], corrected_train_y, corrected_train_c,
+    model = create_model(train_x, corrected_train_y, corrected_train_c,
                          vocs, custom_model)
 
-    results = {'variables': data[0].cpu(),
-               'objectives': data[1].cpu(),
+    results = {'variables': train_x.cpu(),
+               'objectives': train_y.cpu(),
                'corrected_objectives': corrected_train_y.cpu(),
-               'constraints': data[2].cpu(),
+               'constraints': train_c.cpu(),
                'corrected_constraints': corrected_train_c.cpu(),
                'constraint_status': constraint_status.cpu(),
                'feasibility': feas.cpu(),
