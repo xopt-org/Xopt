@@ -294,9 +294,6 @@ def multi_fidelity_optimize(vocs, evaluate_f,
         verbose : bool, defualt = True
             Print out messages during optimization
 
-        use_gpu : bool, default = False
-            Specify if GPU should be used if available
-
         generator_options : dict
             Dictionary of options for MOBO
 

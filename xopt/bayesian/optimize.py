@@ -1,21 +1,20 @@
 import logging
 import os
 import sys
-import time
+from concurrent.futures import Executor
+from typing import Dict, Optional, Callable
 
 import torch
 from botorch.utils.sampling import draw_sobol_samples
 
-from .data import save_data_dict, get_data_json
-from .models.models import create_model
-from .utils import get_bounds, collect_results, sampler_evaluate, \
-    get_corrected_outputs, NoValidResultsError
-from ..tools import full_path, DummyExecutor, isotime
-from typing import Dict, Optional, Tuple, Callable, List
+from .data import get_data_json, gather_and_save_training_data
 from .generators.generator import BayesianGenerator
-from concurrent.futures import Executor, Future
-from torch import Tensor
-
+from .models.models import create_model
+from .utils import submit_candidates, \
+    get_corrected_outputs, get_candidates, \
+    get_feasability_constraint_status
+from ..tools import full_path, DummyExecutor, isotime
+from ..vocs_tools import get_bounds
 """
     Main optimization function for Bayesian optimization
 
@@ -124,105 +123,62 @@ def optimize(vocs: Dict,
     # set executor
     executor = DummyExecutor() if executor is None else executor
 
-    # parse VOCS
-    variables = vocs['variables']
-    variable_names = list(variables)
-
-    # create normalization transforms for model inputs
-    # inputs are normalized in [0,1]
-
     sampler_evaluate_args = {'verbose': verbose}
 
     # generate initial samples if no initial samples are given
     if restart_file is None:
         if initial_x is None:
-            initial_x = draw_sobol_samples(get_bounds(vocs, **tkwargs),
-                                           1, n_initial_samples)[0]
+            initial_x = draw_sobol_samples(torch.tensor(get_bounds(vocs),
+                                                        **tkwargs),
+                                            1, n_initial_samples)[0]
         else:
             initial_x = initial_x
 
         # submit evaluation of initial samples
         vprint(f'submitting initial candidates at time {isotime()}')
-        initial_y = submit_jobs(initial_x, executor, vocs, evaluate_f, sampler_evaluate_args)
+        initial_y = submit_candidates(initial_x, executor, vocs, evaluate_f,
+                                      sampler_evaluate_args)
 
-        train_x, train_y, train_c, inputs, outputs = collect_results(initial_y, vocs,
-                                                                     **tkwargs)
+        data = gather_and_save_training_data(list(initial_y),
+                                             vocs,
+                                             tkwargs,
+                                             output_path=output_path
+                                             )
+        train_x, train_y, train_c, inputs, outputs = data
 
     else:
         train_x, train_y, train_c, inputs, outputs = get_data_json(restart_file,
                                                                    vocs, **tkwargs)
 
-    # save initial data to file
-    # get feasibility values
-    feas, constraint_status = get_feasability_constraint_status(train_y,
-                                                                train_c,
-                                                                vocs)
-
-    full_data = torch.hstack((train_x,
-                              train_y,
-                              train_c,
-                              constraint_status,
-                              feas))
-    save_data_dict(vocs, full_data, inputs, outputs, output_path)
-
-    check_training_data_shape(train_x, train_y, train_c, vocs)
-
     # do optimization
     vprint('starting optimization loop')
     for i in range(n_steps):
-        check_training_data_shape(train_x, train_y, train_c, vocs)
-
-        # get corrected values
-        corrected_train_y, corrected_train_c = get_corrected_outputs(vocs,
-                                                                     train_y,
-                                                                     train_c)
-
-        # create and train model
-        model_start = time.time()
-        model = create_model(train_x,
-                             corrected_train_y,
-                             corrected_train_c,
-                             vocs,
-                             custom_model)
-        vprint(f'Model creation time: {time.time() - model_start:.4} s')
-
-        # get candidate point(s)
-        candidate_start = time.time()
-        candidates = candidate_generator.generate(model)
-        vprint(f'Candidate generation time: {time.time() - candidate_start:.4} s')
-        vprint(f'Candidate(s): {candidates}')
+        candidates = get_candidates(train_x,
+                                    train_y,
+                                    train_c,
+                                    vocs,
+                                    custom_model,
+                                    candidate_generator)
 
         # observe candidates
         vprint(f'submitting candidates at time {isotime()}')
-        fut = submit_jobs(candidates, executor, vocs, evaluate_f, sampler_evaluate_args)
+        fut = submit_candidates(candidates,
+                                executor,
+                                vocs,
+                                evaluate_f,
+                                sampler_evaluate_args)
 
-        try:
-            new_x, new_y, new_c, new_inputs, new_outputs = collect_results(fut, vocs,
-                                                                           **tkwargs)
-
-            # add new observations to training data
-            train_x = torch.vstack((train_x, new_x))
-            train_y = torch.vstack((train_y, new_y))
-            train_c = torch.vstack((train_c, new_c))
-
-            inputs += new_inputs
-            outputs += new_outputs
-
-            # get feasibility values
-            feas, constraint_status = get_feasability_constraint_status(train_y,
-                                                                        train_c,
-                                                                        vocs)
-
-            full_data = torch.hstack((train_x,
-                                      train_y,
-                                      train_c,
-                                      constraint_status,
-                                      feas))
-            save_data_dict(vocs, full_data, inputs, outputs, output_path)
-
-        except NoValidResultsError:
-            print('No valid results found, skipping to next iteration')
-            continue
+        data = gather_and_save_training_data(list(fut),
+                                             vocs,
+                                             tkwargs,
+                                             train_x,
+                                             train_y,
+                                             train_c,
+                                             inputs,
+                                             outputs,
+                                             output_path=output_path
+                                             )
+        train_x, train_y, train_c, inputs, outputs = data
 
     # horiz. stack objective and constraint results for training/acq specification
     feas, constraint_status = get_feasability_constraint_status(train_y, train_c, vocs)
@@ -242,53 +198,3 @@ def optimize(vocs: Dict,
                'model': model.cpu()}
 
     return results
-
-
-def get_feasability_constraint_status(train_y: [Tensor],
-                                      train_c: [Tensor],
-                                      vocs: [Dict]) -> Tuple[Tensor, Tensor]:
-    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
-    feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
-    constraint_status = corrected_train_c < 0.0
-    return feas, constraint_status
-
-
-def submit_jobs(candidates: [Tensor],
-                executor: [Executor],
-                vocs: [Dict],
-                evaluate_f: [Callable],
-                sampler_evaluate_args: [Dict]) -> List[Future]:
-    variable_names = list(vocs['variables'])
-    settings = get_settings(candidates, variable_names, vocs)
-    fut = [executor.submit(sampler_evaluate,
-                           setting,
-                           evaluate_f,
-                           **sampler_evaluate_args) for setting in settings]
-    return fut
-
-
-def get_settings(X: [Tensor],
-                 variable_names: List[str],
-                 vocs: [Dict]) -> List[Dict]:
-    settings = [dict(zip(variable_names, x.cpu().numpy())) for x in X]
-    for setting in settings:
-        setting.update(vocs['constants'])
-
-    return settings
-
-
-def check_training_data_shape(train_x: [Tensor],
-                              train_y: [Tensor],
-                              train_c: [Tensor],
-                              vocs: [Dict]) -> None:
-    # check to make sure that the training tensor have the correct shapes
-    for ele, vocs_type in zip([train_x, train_y, train_c],
-                              ['variables', 'objectives', 'constraints']):
-        assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
-                              f'shape currently is {ele.shape} '
-
-        assert ele.shape[-1] == len(vocs[vocs_type]), \
-            f'current shape of training ' \
-            f'data ({ele.shape}) ' \
-            f'does not match number of vocs {vocs_type} == ' \
-            f'{len(vocs[vocs_type])} '

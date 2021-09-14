@@ -1,20 +1,19 @@
 import concurrent.futures
 import logging
 import queue
-import time
 from concurrent.futures import Executor
-from typing import Dict, Optional, Tuple, Callable, List
+from typing import Dict, Optional, Callable
 
 import torch
 from botorch.utils.sampling import draw_sobol_samples
-from torch import Tensor
 
-from .data import save_data_dict, get_data_json
+from .data import gather_and_save_training_data, get_data_json
 from .generators.generator import BayesianGenerator
 from .models.models import create_model
-from .utils import get_bounds, collect_results, sampler_evaluate, \
-    get_corrected_outputs, NoValidResultsError
+from .utils import get_corrected_outputs, get_candidates, \
+    get_feasability_constraint_status, submit_candidates
 from ..tools import DummyExecutor
+from ..vocs_tools import get_bounds
 
 """
     Asynchronized optimization function for Bayesian optimization
@@ -122,7 +121,7 @@ def asynch_optimize(vocs: Dict,
     if restart_file is None:
         # generate initial samples if no initial samples are given
         if initial_x is None:
-            initial_x = draw_sobol_samples(get_bounds(vocs, **tkwargs),
+            initial_x = draw_sobol_samples(torch.tensor(get_bounds(vocs), **tkwargs),
                                            1, processes)[0]
         else:
             initial_x = initial_x
@@ -138,11 +137,13 @@ def asynch_optimize(vocs: Dict,
                              vocs, **tkwargs)
 
         # get a new set of candidates and put them in the queue
-        new_candidates = get_candidates(processes,
-                                        *data[:3],
+        new_candidates = get_candidates(data[0],
+                                        data[1],
+                                        data[2],
                                         vocs,
                                         custom_model,
-                                        candidate_generator)
+                                        candidate_generator,
+                                        processes, )
 
         for ele in new_candidates:
             q.put(ele)
@@ -166,12 +167,12 @@ def asynch_optimize(vocs: Dict,
             candidate = q.get()
 
             logger.info(f'Submitting candidate {candidate_index}: {candidate}')
-            futures.update(submit_candidate(candidate,
-                                            executor,
-                                            vocs,
-                                            evaluate_f,
-                                            sampler_evaluate_args,
-                                            candidate_index))
+            futures.update(submit_candidates(candidate,
+                                             executor,
+                                             vocs,
+                                             evaluate_f,
+                                             sampler_evaluate_args,
+                                             candidate_index))
             candidate_index += 1
             total_cost += candidate[-1] + base_cost
             logger.info(f'total cost: {total_cost}')
@@ -184,21 +185,27 @@ def asynch_optimize(vocs: Dict,
         # process done futures and add new candidates to queue
         if len(done):
             # add results to dataset
-            data = gather(list(done),
-                          vocs,
-                          *data,
-                          tkwargs,
-                          output_path)
+            data = gather_and_save_training_data(list(done),
+                                                 vocs,
+                                                 tkwargs,
+                                                 data[0],
+                                                 data[1],
+                                                 data[2],
+                                                 data[3],
+                                                 data[4],
+                                                 output_path)
 
             # get a new set of candidates if budget has not been met and put them in
             # the queue
             if not exceeded_budget:
                 logger.info(f'generating {len(done)} new candidates')
-                new_candidates = get_candidates(len(done),
-                                                *data[:3],
+                new_candidates = get_candidates(data[0],
+                                                data[1],
+                                                data[2],
                                                 vocs,
                                                 custom_model,
-                                                candidate_generator)
+                                                candidate_generator,
+                                                len(done), )
 
                 for ele in new_candidates:
                     q.put(ele)
@@ -218,7 +225,7 @@ def asynch_optimize(vocs: Dict,
                                                                 vocs)
     corrected_train_y, corrected_train_c = get_corrected_outputs(vocs,
                                                                  data[1],
-                                                                 data[2],)
+                                                                 data[2], )
 
     # output model
     model = create_model(data[0], corrected_train_y, corrected_train_c,
@@ -235,148 +242,3 @@ def asynch_optimize(vocs: Dict,
 
     return results
 
-
-def get_candidates(q,
-                   train_x,
-                   train_y,
-                   train_c,
-                   vocs,
-                   custom_model,
-                   candidate_generator):
-    """
-
-
-    Parameters
-    ----------
-    custom_model
-    candidate_generator
-    q
-    train_x
-    train_y
-    train_c
-    vocs
-
-    Returns
-    -------
-
-    """
-    check_training_data_shape(train_x, train_y, train_c, vocs)
-
-    # get corrected values
-    corrected_train_y, corrected_train_c = get_corrected_outputs(vocs,
-                                                                 train_y,
-                                                                 train_c)
-    # create and train model
-    model_start = time.time()
-    model = create_model(train_x,
-                         corrected_train_y,
-                         corrected_train_c,
-                         vocs,
-                         custom_model)
-    logger.info(f'Model creation time: {time.time() - model_start:.4} s')
-
-    # get candidate point(s)
-    candidate_start = time.time()
-    candidates = candidate_generator.generate(model, q)
-    logger.info(f'Candidate generation time: {time.time() - candidate_start:.4} s')
-    logger.info(f'Candidate(s): {candidates}')
-    return candidates
-
-
-def gather(done,
-           vocs,
-           train_x,
-           train_y,
-           train_c,
-           inputs,
-           outputs,
-           tkwargs,
-           output_path):
-    try:
-        new_x, new_y, new_c, new_inputs, new_outputs = collect_results(done,
-                                                                       vocs,
-                                                                       **tkwargs)
-
-        if train_x is None:
-            train_x = new_x
-            train_y = new_y
-            train_c = new_c
-            inputs = new_inputs
-            outputs = new_outputs
-
-        else:
-            # add new observations to training data
-            train_x = torch.vstack((train_x, new_x))
-            train_y = torch.vstack((train_y, new_y))
-            train_c = torch.vstack((train_c, new_c))
-
-            inputs += new_inputs
-            outputs += new_outputs
-
-        # get feasibility values
-        feas, constraint_status = get_feasability_constraint_status(train_y,
-                                                                    train_c,
-                                                                    vocs)
-
-        full_data = torch.hstack((train_x,
-                                  train_y,
-                                  train_c,
-                                  constraint_status,
-                                  feas))
-        save_data_dict(vocs, full_data, inputs, outputs, output_path)
-
-    except NoValidResultsError:
-        logger.warning('No valid results found, skipping to next iteration')
-
-    return train_x, train_y, train_c, inputs, outputs
-
-
-def get_feasability_constraint_status(train_y: [Tensor],
-                                      train_c: [Tensor],
-                                      vocs: [Dict]) -> Tuple[Tensor, Tensor]:
-    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
-    feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
-    constraint_status = corrected_train_c < 0.0
-    return feas, constraint_status
-
-
-def submit_candidate(candidate: [Tensor],
-                     executor: [Executor],
-                     vocs: [Dict],
-                     evaluate_f: [Callable],
-                     sampler_evaluate_args: [Dict],
-                     candidate_index_start: [int]) -> Dict:
-    variable_names = list(vocs['variables'])
-    settings = get_settings(candidate, variable_names, vocs)
-    fut = {executor.submit(sampler_evaluate,
-                           settings,
-                           evaluate_f,
-                           **sampler_evaluate_args): candidate_index_start + 1}
-
-    return fut
-
-
-def get_settings(X: [Tensor],
-                 variable_names: List[str],
-                 vocs: [Dict]) -> Dict:
-    settings = dict(zip(variable_names, X.cpu().numpy()))
-    settings.update(vocs['constants'])
-
-    return settings
-
-
-def check_training_data_shape(train_x: [Tensor],
-                              train_y: [Tensor],
-                              train_c: [Tensor],
-                              vocs: [Dict]) -> None:
-    # check to make sure that the training tensor have the correct shapes
-    for ele, vocs_type in zip([train_x, train_y, train_c],
-                              ['variables', 'objectives', 'constraints']):
-        assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
-                              f'shape currently is {ele.shape} '
-
-        assert ele.shape[-1] == len(vocs[vocs_type]), \
-            f'current shape of training ' \
-            f'data ({ele.shape}) ' \
-            f'does not match number of vocs {vocs_type} == ' \
-            f'{len(vocs[vocs_type])}'
