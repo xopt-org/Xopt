@@ -1,4 +1,5 @@
 from . import generators
+from .asynch_optimize import asynch_optimize
 from .optimize import optimize
 from .models.models import create_multi_fidelity_model
 
@@ -242,8 +243,9 @@ def bayesian_exploration(vocs, evaluate_f,
 
 
 def multi_fidelity_optimize(vocs, evaluate_f,
-                            n_steps=1,
-                            n_initial_samples=1,
+                            budget=1,
+                            processes=1,
+                            base_cost=1.0,
                             output_path=None,
                             custom_model=create_multi_fidelity_model,
                             executor=None,
@@ -252,27 +254,50 @@ def multi_fidelity_optimize(vocs, evaluate_f,
                             verbose=True,
                             generator_options=None):
     """
-        Multi-fidelity optimization
+        Multi-fidelity optimization using Bayesian optimization
+
+        This optimization algorithm attempts to reduce the computational cost of
+        optimizing a scalar function through the use of many low-cost approximate
+        evaluations. We create a GP model that models the function f(x,c) where x
+        represents free parameters and c in the range [0,1] reperestents the `cost`.
+        This algorithm uses the knoweldge gradient approach
+        (https://botorch.org/tutorials/multi_fidelity_bo) to choose points that are
+        likely to provide the most information about the optimimum point at maximum
+        fidelity (c=1).
+
+        Since evaluations have variable cost, we specify a maximum `budget` that
+        stops the algorithm when the total cost exceeds the budget. Cost for a single
+        evaluation is given by `cost` + 'base_cost`.
+
+        This algoritm is most efficient when used with a parallel executor,
+        as evaluations will be done asynchronously, allowing multiple cheap
+        simulations to run in parallel with expensive ones.
 
         Parameters
         ----------
         vocs : dict
-            Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
+            Varabiles, objectives, constraints and statics dictionary, see xopt
+            documentation for detials
 
         evaluate_f : callable
             Returns dict of outputs after problem has been evaluated
 
-        n_steps : int, default = 1
-            Number of optimization steps to execute
+        budget : int, default = 1
+            Optimization budget
 
-        n_initial_samples : int, defualt = 1
-            Number of initial samples to take before using the model, overwritten by initial_x
+        processes : int, defualt = 1
+            Number of parallel processes to use or number of candidates to generate
+            at each step.
+
+        base_cost : float, defualt = 1.0
+            Base cost of running simulations. Total cost is base + `cost` variable
 
         output_path : str, default = ''
             Path location to place outputs
 
         custom_model : callable, optional
-            Function of the form f(train_inputs, train_outputs) that returns a trained custom model
+            Function of the form f(train_inputs, train_outputs) that returns a trained
+            custom model
 
         executor : Executor, optional
             Executor object to run evaluate_f
@@ -286,9 +311,6 @@ def multi_fidelity_optimize(vocs, evaluate_f,
         verbose : bool, defualt = True
             Print out messages during optimization
 
-        use_gpu : bool, default = False
-            Specify if GPU should be used if available
-
         generator_options : dict
             Dictionary of options for MOBO
 
@@ -301,18 +323,21 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     if generator_options is None:
         generator_options = {}
 
+    generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
                                                                  **generator_options)
-    return optimize(vocs,
-                    evaluate_f,
-                    generator,
-                    n_steps,
-                    n_initial_samples,
-                    output_path,
-                    custom_model,
-                    executor,
-                    restart_file,
-                    initial_x,
-                    verbose,
-                    generator.tkwargs
-                    )
+
+    return asynch_optimize(vocs,
+                           evaluate_f,
+                           generator,
+                           budget,
+                           processes,
+                           base_cost,
+                           output_path,
+                           custom_model,
+                           executor,
+                           restart_file,
+                           initial_x,
+                           generator.tkwargs
+                           )
+

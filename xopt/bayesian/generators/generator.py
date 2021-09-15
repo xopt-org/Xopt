@@ -10,7 +10,7 @@ from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.optim.optimize import optimize_acqf
 from botorch.sampling.samplers import SobolQMCNormalSampler
 
-from xopt.bayesian.utils import get_bounds
+from ...vocs_tools import get_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,8 @@ class BayesianGenerator(Generator):
         self.optimize_options.update(optimize_options)
 
     def generate(self,
-                 model: Model) -> torch.Tensor:
+                 model: Model,
+                 q: Optional[int] = None) -> torch.Tensor:
         """
 
         Parameters
@@ -117,11 +118,17 @@ class BayesianGenerator(Generator):
         model : botorch.model.Model
             Model passed to acquisition function to generate new candidates.
 
+        q : int, optional
+            Specify number of candidates to generate, overwrites constructor argument
+            `batch_size`
+
         Returns
         -------
         candidates : torch.Tensor
             Candidates for observation
         """
+        if q is not None:
+            self.optimize_options['q'] = q
 
         # check model input dims and outputs
         if isinstance(model, ModelListGP):
@@ -151,7 +158,7 @@ class BayesianGenerator(Generator):
                                    f'data has shape {model.train_targets.shape} with '
                                    f'vocs n_outputs {n_objectives + n_constraints}')
 
-        bounds = get_bounds(self.vocs, **self.tkwargs)
+        bounds = torch.tensor(get_bounds(self.vocs), **self.tkwargs)
 
         # set up acquisition function object
         acq_func = self.acq_func(model, **self.acq_options)

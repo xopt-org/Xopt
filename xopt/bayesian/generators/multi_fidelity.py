@@ -1,6 +1,7 @@
 import logging
 import copy
 
+import torch
 from botorch.models.cost import AffineFidelityCostModel
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition import PosteriorMean, AcquisitionFunction
@@ -10,7 +11,7 @@ from botorch.optim.optimize import optimize_acqf
 from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
 
-from ..utils import get_bounds
+from ...vocs_tools import get_bounds
 from .generator import BayesianGenerator
 
 # Logger
@@ -44,6 +45,7 @@ class MultiFidelityGenerator(BayesianGenerator):
         self.target_fidelities = target_fidelities
         self.cost_model = AffineFidelityCostModel(self.target_fidelities,
                                                   fixed_cost)
+        self.X_pending = None
 
         if base_acq is None:
             self.base_acq = PosteriorMean
@@ -83,6 +85,7 @@ class MultiFidelityGenerator(BayesianGenerator):
             current_value=current_value,
             cost_aware_utility=cost_aware_utility,
             project=self.project,
+            X_pending=self.X_pending,
         )
 
     def create_acq(self, model):
@@ -92,7 +95,7 @@ class MultiFidelityGenerator(BayesianGenerator):
 
         """
 
-        bounds = get_bounds(self.vocs, **self.tkwargs)
+        bounds = torch.tensor(get_bounds(self.vocs), **self.tkwargs)
 
         cost_aware_utility = InverseCostWeightedUtility(cost_model=self.cost_model)
 
@@ -112,7 +115,7 @@ class MultiFidelityGenerator(BayesianGenerator):
         return self.get_mfkg(model, bounds, cost_aware_utility)
 
     def get_recommendation(self, model):
-        bounds = get_bounds(self.vocs, **self.tkwargs)
+        bounds = torch.tensor(get_bounds(self.vocs), **self.tkwargs)
         rec_acqf = FixedFeatureAcquisitionFunction(
             acq_function=self.base_acq(model),
             d=len(self.vocs['variables']),

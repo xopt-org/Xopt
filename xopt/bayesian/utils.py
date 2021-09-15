@@ -1,9 +1,13 @@
-import torch
-import numpy as np
+import logging
 import time
 import traceback
-import logging
-from copy import deepcopy
+from concurrent.futures import Executor
+from typing import Dict, Optional, Tuple, Callable
+
+import torch
+from torch import Tensor
+
+from .models.models import create_model
 
 
 class NoValidResultsError(Exception):
@@ -29,11 +33,102 @@ algorithm_defaults = {'n_steps': 30,
                       'eval_args': None}
 
 
-def get_bounds(vocs, **tkwargs):
-    # get initial bounds
-    return torch.vstack(
-        [torch.tensor(ele, **tkwargs) for _, ele in vocs['variables'].items()]).T
+def get_candidates(train_x: Tensor,
+                   train_y: Tensor,
+                   train_c: Tensor,
+                   vocs: Dict,
+                   custom_model: Callable,
+                   candidate_generator,
+                   q: Optional[int] = None):
+    """
+    Gets candidates based on training data
 
+    Parameters
+    ----------
+    custom_model
+    candidate_generator
+    q
+    train_x
+    train_y
+    train_c
+    vocs
+
+    Returns
+    -------
+
+    """
+    check_training_data_shape(train_x, train_y, train_c, vocs)
+
+    # get corrected values
+    corrected_train_y, corrected_train_c = get_corrected_outputs(vocs,
+                                                                 train_y,
+                                                                 train_c)
+    # create and train model
+    model_start = time.time()
+    model = create_model(train_x,
+                         corrected_train_y,
+                         corrected_train_c,
+                         vocs,
+                         custom_model)
+    logger.debug(f'Model creation time: {time.time() - model_start:.4} s')
+
+    # get candidate point(s)
+    candidate_start = time.time()
+    candidates = candidate_generator.generate(model, q)
+    logger.debug(f'Candidate generation time: {time.time() - candidate_start:.4} s')
+    logger.debug(f'Candidate(s): {candidates}')
+    return candidates
+
+
+def submit_candidates(candidates: Tensor,
+                      executor: Executor,
+                      vocs: Dict,
+                      evaluate_f: Callable,
+                      sampler_evaluate_args: Dict,
+                      candidate_index_start: Optional[int] = 1) -> Dict:
+    variable_names = list(vocs['variables'])
+
+    # add an extra axis if there is only one candidate
+    candidates = torch.atleast_2d(candidates)
+
+    fut = {}
+    for candidate in candidates:
+        setting = dict(zip(variable_names, candidate.cpu().numpy()))
+        setting.update(vocs['constants'])
+
+        fut.update(
+            {executor.submit(sampler_evaluate,
+                             setting,
+                             evaluate_f,
+                             **sampler_evaluate_args): candidate})
+
+    return fut
+
+
+def check_training_data_shape(train_x: [Tensor],
+                              train_y: [Tensor],
+                              train_c: [Tensor],
+                              vocs: [Dict]) -> None:
+    # check to make sure that the training tensor have the correct shapes
+    for ele, vocs_type in zip([train_x, train_y, train_c],
+                              ['variables', 'objectives', 'constraints']):
+        assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
+                              f'shape currently is {ele.shape} '
+
+        assert ele.shape[-1] == len(vocs[vocs_type]), \
+            f'current shape of training ' \
+            f'data ({ele.shape}) ' \
+            f'does not match number of vocs {vocs_type} == ' \
+            f'{len(vocs[vocs_type])}'
+
+
+def get_feasability_constraint_status(train_y: [Tensor],
+                                      train_c: [Tensor],
+                                      vocs: [Dict]) -> Tuple[Tensor, Tensor]:
+    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
+    feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
+    constraint_status = corrected_train_c < 0.0
+    return feas, constraint_status
 
 def get_corrected_outputs(vocs, train_y, train_c):
     """
@@ -47,7 +142,8 @@ def get_corrected_outputs(vocs, train_y, train_c):
     constraint_names = list(constraints.keys())
 
     # need to multiply -1 for each axis that we are using 'MINIMIZE' for an objective
-    # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a constraint
+    # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a
+    # constraint
     corrected_train_y = train_y.clone()
     corrected_train_c = train_c.clone()
 
@@ -76,20 +172,6 @@ def get_corrected_outputs(vocs, train_y, train_c):
     return corrected_train_y, corrected_train_c
 
 
-def parse_vocs(vocs):
-    # parse VOCS
-    variables = vocs['variables']
-    vocs['variable_names'] = list(variables.keys())
-
-    objectives = vocs['objectives']
-    vocs['objective_names'] = list(objectives.keys())
-    assert len(vocs['objective_names']) == 1
-
-    constraints = vocs['constraints']
-    vocs['constraint_names'] = list(constraints.keys())
-    return vocs
-
-
 def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
     """
     Wrapper to catch any exceptions
@@ -103,9 +185,9 @@ def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
     outputs = None
     result = {}
 
+    err = False
     try:
         outputs = evaluate_f(inputs, *eval_args)
-        err = False
 
     except Exception as ex:
         outputs = {'Exception': str(ex),
