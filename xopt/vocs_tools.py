@@ -1,6 +1,7 @@
 import numpy as np
 import json
 from math import isnan
+from typing import Dict, Optional, Callable
 
 
 # --------------------------------
@@ -56,6 +57,12 @@ def weight_list(objective_dict):
         operator = objective_dict[k].upper()
         weights.append(OBJECTIVE_WEIGHT[operator])
     return weights
+
+
+def get_bounds(vocs: Dict) -> np.ndarray:
+    # get initial bounds
+    return np.vstack(
+        [np.array(ele) for _, ele in vocs['variables'].items()]).T
 
 
 # -------------------------------------------------------
@@ -202,7 +209,8 @@ def random_inputs(vocs, n=None, include_constants=True, include_linked_variables
         inputs.update(vocs['constants'])
 
     # Handle linked variables
-    if include_linked_variables and 'linked_variables' in vocs and vocs['linked_variables']:
+    if include_linked_variables and 'linked_variables' in vocs and vocs[
+        'linked_variables']:
         for k, v in vocs['linked_variables'].items():
             inputs[k] = inputs[v]
 
