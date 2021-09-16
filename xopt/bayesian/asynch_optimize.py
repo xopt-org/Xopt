@@ -146,7 +146,7 @@ def asynch_optimize(vocs: Dict,
         for ele in initial_x:
             q.put(ele)
 
-        train_x, train_y, train_c, inputs, outputs = [None]*5
+        train_x, train_y, train_c, inputs, outputs = [None] * 5
 
     else:
         data = get_data_json(restart_file,
@@ -161,11 +161,11 @@ def asynch_optimize(vocs: Dict,
         logger.info(f'generating {processes} new candidate(s) from restart file')
         new_candidates = get_candidates(train_x,
                                         train_y,
-                                        train_c,
                                         vocs,
-                                        custom_model,
                                         candidate_generator,
-                                        processes,)
+                                        train_c=train_c,
+                                        custom_model=custom_model,
+                                        q=processes, )
 
         for ele in new_candidates:
             q.put(ele)
@@ -240,11 +240,11 @@ def asynch_optimize(vocs: Dict,
 
                 new_candidates = get_candidates(train_x,
                                                 train_y,
-                                                train_c,
                                                 vocs,
-                                                custom_model,
                                                 candidate_generator,
-                                                len(done),)
+                                                train_c=train_c,
+                                                custom_model=custom_model,
+                                                q=len(done),)
 
                 # add new candidates to queue
                 for ele in new_candidates:
@@ -281,4 +281,3 @@ def asynch_optimize(vocs: Dict,
                'model': model.cpu()}
 
     return results
-

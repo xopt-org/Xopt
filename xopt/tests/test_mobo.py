@@ -66,3 +66,12 @@ class TestClassMOBO:
         # try with sigma matrix
         X = Xopt(test_config)
         X.run()
+
+    def test_mobo_unconstrained(self):
+        test_config = copy.deepcopy(self.config)
+        test_config['vocs']['constraints'] = {}
+        test_config['algorithm']['options']['ref'] = [1.4, 1.4]
+
+        # try with sigma matrix
+        X = Xopt(test_config)
+        X.run()
