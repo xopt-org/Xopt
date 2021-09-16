@@ -58,7 +58,8 @@ def create_multi_fidelity_model(train_x, train_y, train_c, vocs):
         train_y,
         input_transform=input_transform,
         outcome_transform=outcome_transform,
-        data_fidelity=len(vocs['variables']) - 1
+        linear_truncated=False,
+        iteration_fidelity=len(vocs['variables']) - 1
     )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
