@@ -181,7 +181,7 @@ def asynch_optimize(vocs: Dict,
         # check for status of the futures which are currently working
         done, not_done = concurrent.futures.wait(
             futures, timeout=5.0,
-            return_when=concurrent.futures.ALL_COMPLETED)
+            return_when=concurrent.futures.FIRST_COMPLETED)
 
         # if there is incoming work, start a new future - unless our computation
         # budget has been exceeded
