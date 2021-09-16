@@ -154,13 +154,14 @@ def asynch_optimize(vocs: Dict,
         train_x, train_y, train_c, inputs, outputs = data
 
         # get a new set of candidates and put them in the queue
+        logger.info(f'generating {processes} new candidate(s) from restart file')
         new_candidates = get_candidates(train_x,
                                         train_y,
                                         train_c,
                                         vocs,
                                         custom_model,
                                         candidate_generator,
-                                        processes, )
+                                        processes,)
 
         for ele in new_candidates:
             q.put(ele)
