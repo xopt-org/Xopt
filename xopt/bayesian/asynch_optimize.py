@@ -151,7 +151,11 @@ def asynch_optimize(vocs: Dict,
     else:
         data = get_data_json(restart_file,
                              vocs, **tkwargs)
-        train_x, train_y, train_c, inputs, outputs = data
+        train_x = data['variables']
+        train_y = data['objectives']
+        train_c = data['constraints']
+        inputs = data['inputs']
+        outputs = data['outputs']
 
         # get a new set of candidates and put them in the queue
         logger.info(f'generating {processes} new candidate(s) from restart file')

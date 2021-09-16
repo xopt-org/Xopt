@@ -147,8 +147,13 @@ def optimize(vocs: Dict,
         train_x, train_y, train_c, inputs, outputs = data
 
     else:
-        train_x, train_y, train_c, inputs, outputs = get_data_json(restart_file,
-                                                                   vocs, **tkwargs)
+        data = get_data_json(restart_file, vocs, **tkwargs)
+
+        train_x = data['variables']
+        train_y = data['objectives']
+        train_c = data['constraints']
+        inputs = data['inputs']
+        outputs = data['outputs']
 
     # do optimization
     vprint('starting optimization loop')
