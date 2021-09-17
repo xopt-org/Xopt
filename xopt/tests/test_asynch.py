@@ -1,28 +1,20 @@
-import matplotlib.pyplot as plt
-import numpy as np
-import torch
-import logging
-
 from xopt import Xopt
-from xopt.bayesian.generators.multi_fidelity import MultiFidelityGenerator
-from xopt.bayesian.models.models import create_multi_fidelity_model
-from xopt.evaluators import test_3d, test_1d
+from .evaluators import quad_3d
 from concurrent.futures import ThreadPoolExecutor
 import copy
 
 
 class TestMultiFidelity:
-    VOCS = test_3d.VOCS
-    config = {'vocs': test_3d.VOCS.copy()}
+    VOCS = quad_3d.VOCS
+    config = {'vocs': quad_3d.VOCS.copy()}
     config['simulation'] = {'name': 'AugmentedHartmann',
-                            'evaluate': 'xopt.evaluators.test_3d.evaluate'}
+                            'evaluate': 'xopt.tests.evaluators.quad_3d.evaluate'}
     config['xopt'] = {'output_path': '', 'verbose': True,
                       'algorithm': 'multi_fidelity'}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {
-                               'processes': 4,
-                               'budget': 5,
-                               'base_cost': 1.0,
+                               'processes': 2,
+                               'budget': 3,
                                'generator_options': {}
                            }}
 

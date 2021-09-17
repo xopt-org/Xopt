@@ -1,14 +1,15 @@
 import copy
 
 from xopt import Xopt
-from ..evaluators import test_multi_fidelity
+from .evaluators import multi_fidelity
 
 
 class TestClassMultiFidelity:
-    VOCS = test_multi_fidelity.VOCS
-    config = {'vocs': test_multi_fidelity.VOCS.copy()}
+    VOCS = multi_fidelity.VOCS
+    config = {'vocs': multi_fidelity.VOCS.copy()}
     config['simulation'] = {'name': 'AugmentedHartmann',
-                            'evaluate': 'xopt.evaluators.test_multi_fidelity.evaluate'}
+                            'evaluate':
+                                'xopt.tests.evaluators.multi_fidelity.evaluate'}
     config['xopt'] = {'output_path': '', 'verbose': True, 'algorithm': 'mobo'}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {

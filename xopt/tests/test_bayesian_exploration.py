@@ -1,14 +1,14 @@
 import copy
 
 from xopt import Xopt
-from ..evaluators import test_TNK
+from .evaluators import TNK
 
 
 class TestClassBayesExp:
-    VOCS = test_TNK.VOCS
-    config = {'vocs': test_TNK.VOCS.copy()}
+    VOCS = TNK.VOCS
+    config = {'vocs': TNK.VOCS.copy()}
     config['simulation'] = {'name': 'test_TNK',
-                            'evaluate': 'xopt.evaluators.test_TNK.evaluate_TNK'}
+                            'evaluate': 'xopt.tests.evaluators.TNK.evaluate_TNK'}
     config['xopt'] = {'output_path': '', 'verbose': False, 'algorithm': 'mobo'}
     config['algorithm'] = {'name': 'bayesian_exploration',
                            'options': {
