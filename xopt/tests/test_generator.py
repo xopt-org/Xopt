@@ -4,7 +4,7 @@ from botorch.acquisition.analytic import UpperConfidenceBound
 from botorch.exceptions.errors import BotorchError
 import torch
 from botorch.models import SingleTaskGP
-from xopt.evaluators import test_TNK
+from .evaluators import TNK
 
 
 def _good_test(model, beta):
@@ -17,7 +17,7 @@ def _bad_test(model):
 
 class TestGenerator:
     def test_generator(self):
-        vocs = test_TNK.VOCS
+        vocs = TNK.VOCS
 
         train_x = torch.rand(2, len(vocs['variables']))
         train_y = torch.ones(2, len(vocs['objectives']) +

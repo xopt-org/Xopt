@@ -35,10 +35,10 @@ algorithm_defaults = {'n_steps': 30,
 
 def get_candidates(train_x: Tensor,
                    train_y: Tensor,
-                   train_c: Tensor,
                    vocs: Dict,
-                   custom_model: Callable,
                    candidate_generator,
+                   custom_model: Optional[Callable] = None,
+                   train_c: Optional[Tensor] = None,
                    q: Optional[int] = None):
     """
     Gets candidates based on training data
@@ -112,23 +112,31 @@ def check_training_data_shape(train_x: [Tensor],
     # check to make sure that the training tensor have the correct shapes
     for ele, vocs_type in zip([train_x, train_y, train_c],
                               ['variables', 'objectives', 'constraints']):
-        assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
-                              f'shape currently is {ele.shape} '
+        if ele is not None:
+            assert ele.ndim == 2, f'training data for vocs "{vocs_type}" must be 2 dim, ' \
+                                  f'shape currently is {ele.shape} '
 
-        assert ele.shape[-1] == len(vocs[vocs_type]), \
-            f'current shape of training ' \
-            f'data ({ele.shape}) ' \
-            f'does not match number of vocs {vocs_type} == ' \
-            f'{len(vocs[vocs_type])}'
+            assert ele.shape[-1] == len(vocs[vocs_type]), \
+                f'current shape of training ' \
+                f'data ({ele.shape}) ' \
+                f'does not match number of vocs {vocs_type} == ' \
+                f'{len(vocs[vocs_type])}'
+        else:
+            assert vocs[vocs_type] == {}, f'Training data for {vocs_type} is None'
 
 
 def get_feasability_constraint_status(train_y: [Tensor],
                                       train_c: [Tensor],
                                       vocs: [Dict]) -> Tuple[Tensor, Tensor]:
-    _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
-    feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
-    constraint_status = corrected_train_c < 0.0
+    if train_c is not None:
+        _, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
+        feas = torch.all(corrected_train_c < 0.0, dim=-1).reshape(-1, 1)
+        constraint_status = corrected_train_c < 0.0
+    else:
+        feas = torch.ones((len(train_y), 1))
+        constraint_status = feas.clone()
     return feas, constraint_status
+
 
 def get_corrected_outputs(vocs, train_y, train_c):
     """
@@ -138,14 +146,10 @@ def get_corrected_outputs(vocs, train_y, train_c):
     objectives = vocs['objectives']
     objective_names = list(objectives.keys())
 
-    constraints = vocs['constraints']
-    constraint_names = list(constraints.keys())
-
     # need to multiply -1 for each axis that we are using 'MINIMIZE' for an objective
     # need to multiply -1 for each axis that we are using 'GREATER_THAN' for a
     # constraint
     corrected_train_y = train_y.clone()
-    corrected_train_c = train_c.clone()
 
     # negate objective measurements that want to be minimized
     for j, name in zip(range(len(objective_names)), objective_names):
@@ -158,16 +162,23 @@ def get_corrected_outputs(vocs, train_y, train_c):
             pass
             # logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
 
-    # negate constraints that use 'GREATER_THAN'
-    for k, name in zip(range(len(constraint_names)), constraint_names):
-        if vocs['constraints'][name][0] == 'GREATER_THAN':
-            corrected_train_c[:, k] = (vocs['constraints'][name][1] - train_c[:, k])
+    if train_c is not None:
+        constraints = vocs['constraints']
+        constraint_names = list(constraints.keys())
+        corrected_train_c = train_c.clone()
 
-        elif vocs['constraints'][name][0] == 'LESS_THAN':
-            corrected_train_c[:, k] = -(vocs['constraints'][name][1] - train_c[:, k])
-        else:
-            logger.warning(
-                f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
+        # negate constraints that use 'GREATER_THAN'
+        for k, name in zip(range(len(constraint_names)), constraint_names):
+            if vocs['constraints'][name][0] == 'GREATER_THAN':
+                corrected_train_c[:, k] = (vocs['constraints'][name][1] - train_c[:, k])
+
+            elif vocs['constraints'][name][0] == 'LESS_THAN':
+                corrected_train_c[:, k] = -(vocs['constraints'][name][1] - train_c[:, k])
+            else:
+                logger.warning(
+                    f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN')
+    else:
+        corrected_train_c = None
 
     return corrected_train_y, corrected_train_c
 
