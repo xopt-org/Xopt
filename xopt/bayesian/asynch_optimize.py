@@ -146,21 +146,26 @@ def asynch_optimize(vocs: Dict,
         for ele in initial_x:
             q.put(ele)
 
-        train_x, train_y, train_c, inputs, outputs = [None]*5
+        train_x, train_y, train_c, inputs, outputs = [None] * 5
 
     else:
         data = get_data_json(restart_file,
                              vocs, **tkwargs)
-        train_x, train_y, train_c, inputs, outputs = data
+        train_x = data['variables']
+        train_y = data['objectives']
+        train_c = data['constraints']
+        inputs = data['inputs']
+        outputs = data['outputs']
 
         # get a new set of candidates and put them in the queue
+        logger.info(f'generating {processes} new candidate(s) from restart file')
         new_candidates = get_candidates(train_x,
                                         train_y,
-                                        train_c,
                                         vocs,
-                                        custom_model,
                                         candidate_generator,
-                                        processes, )
+                                        train_c=train_c,
+                                        custom_model=custom_model,
+                                        q=processes, )
 
         for ele in new_candidates:
             q.put(ele)
@@ -176,7 +181,7 @@ def asynch_optimize(vocs: Dict,
         # check for status of the futures which are currently working
         done, not_done = concurrent.futures.wait(
             futures, timeout=5.0,
-            return_when=concurrent.futures.ALL_COMPLETED)
+            return_when=concurrent.futures.FIRST_COMPLETED)
 
         # if there is incoming work, start a new future - unless our computation
         # budget has been exceeded
@@ -235,13 +240,14 @@ def asynch_optimize(vocs: Dict,
 
                 new_candidates = get_candidates(train_x,
                                                 train_y,
-                                                train_c,
                                                 vocs,
-                                                custom_model,
                                                 candidate_generator,
-                                                len(done),)
+                                                train_c=train_c,
+                                                custom_model=custom_model,
+                                                q=len(done), )
 
                 # add new candidates to queue
+                logger.debug('Adding candidates to queue')
                 for ele in new_candidates:
                     q.put(ele)
 
@@ -269,11 +275,12 @@ def asynch_optimize(vocs: Dict,
     results = {'variables': train_x.cpu(),
                'objectives': train_y.cpu(),
                'corrected_objectives': corrected_train_y.cpu(),
-               'constraints': train_c.cpu(),
-               'corrected_constraints': corrected_train_c.cpu(),
                'constraint_status': constraint_status.cpu(),
                'feasibility': feas.cpu(),
                'model': model.cpu()}
 
-    return results
+    if train_c is not None:
+        results.update({'constraints': train_c.cpu(),
+                        'corrected_constraints': corrected_train_c.cpu(),})
 
+    return results

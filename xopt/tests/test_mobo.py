@@ -2,15 +2,14 @@ import copy
 
 from xopt import Xopt
 import pytest
-from ..evaluators import test_TNK
-from ..bayesian.utils import UnsupportedError
+from .evaluators import TNK
 
 
 class TestClassMOBO:
-    VOCS = test_TNK.VOCS
-    config = {'vocs': test_TNK.VOCS.copy()}
+    VOCS = TNK.VOCS
+    config = {'vocs': TNK.VOCS.copy()}
     config['simulation'] = {'name': 'test_TNK',
-                            'evaluate': 'xopt.evaluators.test_TNK.evaluate_TNK'}
+                            'evaluate': 'xopt.tests.evaluators.TNK.evaluate_TNK'}
     config['xopt'] = {'output_path': '', 'verbose': False, 'algorithm': 'mobo'}
     config['algorithm'] = {'name': 'mobo',
                            'options': {
@@ -61,6 +60,15 @@ class TestClassMOBO:
             'sigma': [1.0, 1.0],
             'batch_size': 2
         }
+        test_config['algorithm']['options']['ref'] = [1.4, 1.4]
+
+        # try with sigma matrix
+        X = Xopt(test_config)
+        X.run()
+
+    def test_mobo_unconstrained(self):
+        test_config = copy.deepcopy(self.config)
+        test_config['vocs']['constraints'] = {}
         test_config['algorithm']['options']['ref'] = [1.4, 1.4]
 
         # try with sigma matrix

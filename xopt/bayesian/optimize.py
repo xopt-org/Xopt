@@ -15,6 +15,7 @@ from .utils import submit_candidates, \
     get_feasability_constraint_status
 from ..tools import full_path, DummyExecutor, isotime
 from ..vocs_tools import get_bounds
+
 """
     Main optimization function for Bayesian optimization
 
@@ -130,7 +131,7 @@ def optimize(vocs: Dict,
         if initial_x is None:
             initial_x = draw_sobol_samples(torch.tensor(get_bounds(vocs),
                                                         **tkwargs),
-                                            1, n_initial_samples)[0]
+                                           1, n_initial_samples)[0]
         else:
             initial_x = initial_x
 
@@ -147,18 +148,24 @@ def optimize(vocs: Dict,
         train_x, train_y, train_c, inputs, outputs = data
 
     else:
-        train_x, train_y, train_c, inputs, outputs = get_data_json(restart_file,
-                                                                   vocs, **tkwargs)
+        data = get_data_json(restart_file, vocs, **tkwargs)
+
+        train_x = data['variables']
+        train_y = data['objectives']
+        train_c = data['constraints']
+        inputs = data['inputs']
+        outputs = data['outputs']
 
     # do optimization
     vprint('starting optimization loop')
     for i in range(n_steps):
         candidates = get_candidates(train_x,
                                     train_y,
-                                    train_c,
                                     vocs,
-                                    custom_model,
-                                    candidate_generator)
+                                    candidate_generator,
+                                    train_c=train_c,
+                                    custom_model=custom_model,
+                                    )
 
         # observe candidates
         vprint(f'submitting candidates at time {isotime()}')
@@ -191,10 +198,12 @@ def optimize(vocs: Dict,
     results = {'variables': train_x.cpu(),
                'objectives': train_y.cpu(),
                'corrected_objectives': corrected_train_y.cpu(),
-               'constraints': train_c.cpu(),
-               'corrected_constraints': corrected_train_c.cpu(),
                'constraint_status': constraint_status.cpu(),
                'feasibility': feas.cpu(),
                'model': model.cpu()}
+
+    if train_c is not None:
+        results.update({'constraints': train_c.cpu(),
+                        'corrected_constraints': corrected_train_c.cpu(), })
 
     return results

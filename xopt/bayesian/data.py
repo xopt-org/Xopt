@@ -48,7 +48,11 @@ def gather_and_save_training_data(futures: List,
             # add new observations to training data
             train_x = torch.vstack((train_x, new_x))
             train_y = torch.vstack((train_y, new_y))
-            train_c = torch.vstack((train_c, new_c))
+
+            if train_c is not None:
+                train_c = torch.vstack((train_c, new_c))
+            else:
+                train_c = None
 
             inputs += new_inputs
             outputs += new_outputs
@@ -58,11 +62,19 @@ def gather_and_save_training_data(futures: List,
                                                                     train_c,
                                                                     vocs)
 
-        full_data = torch.hstack((train_x,
-                                  train_y,
-                                  train_c,
-                                  constraint_status,
-                                  feas))
+        if train_c is not None:
+            elements = (train_x,
+                        train_y,
+                        train_c,
+                        constraint_status,
+                        feas)
+        else:
+            elements = (train_x,
+                        train_y,
+                        constraint_status,
+                        feas)
+
+        full_data = torch.hstack(elements)
         save_data_dict(vocs, full_data, inputs, outputs, output_path)
 
     except NoValidResultsError:
@@ -101,7 +113,7 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     # outputs['results'] = results
     output_path = '' if output_path is None else output_path
     # TODO: Combine into one function for xopt
-    with open(os.path.join(output_path, 'results.json'), 'w') as outfile:
+    with open(os.path.join(output_path, 'asynch_test_results.json'), 'w') as outfile:
         json.dump(results, outfile, cls=NpEncoder)
 
 
@@ -109,7 +121,7 @@ def get_data_json(json_filename, vocs, **tkwargs):
     f = open(json_filename)
     data = json.load(f)
 
-    data_sets = []
+    data_sets = {}
     names = ['variables', 'objectives', 'constraints']
 
     # replace None's with Nans
@@ -118,11 +130,15 @@ def get_data_json(json_filename, vocs, **tkwargs):
 
     for name in names:
         if vocs[name] != {}:
-            data_sets += [torch.hstack([torch.tensor(replace_none(data[name][ele]),
-                                                     **tkwargs).reshape(-1, 1) for
-                                        ele in vocs[name].keys()])]
+            data_sets[name] = torch.hstack([torch.tensor(replace_none(data[name][ele]),
+                                                         **tkwargs).reshape(-1, 1) for
+                                            ele in vocs[name].keys()])
+        else:
+            data_sets[name] = None
+    data_sets['inputs'] = data['inputs']
+    data_sets['outputs'] = data['outputs']
 
-    return *data_sets, data['inputs'], data['outputs']
+    return data_sets
 
 
 def save_data_pd(config, full_data):
@@ -156,5 +172,5 @@ def save_data_pd(config, full_data):
     else:
         output_path = config['xopt']['output_path']
 
-    with open(output_path + 'results.json', 'w') as outfile:
+    with open(output_path + 'asynch_test_results.json', 'w') as outfile:
         json.dump(outputs, outfile)
