@@ -198,10 +198,12 @@ def optimize(vocs: Dict,
     results = {'variables': train_x.cpu(),
                'objectives': train_y.cpu(),
                'corrected_objectives': corrected_train_y.cpu(),
-               'constraints': train_c.cpu(),
-               'corrected_constraints': corrected_train_c.cpu(),
                'constraint_status': constraint_status.cpu(),
                'feasibility': feas.cpu(),
                'model': model.cpu()}
+
+    if train_c is not None:
+        results.update({'constraints': train_c.cpu(),
+                        'corrected_constraints': corrected_train_c.cpu(), })
 
     return results
