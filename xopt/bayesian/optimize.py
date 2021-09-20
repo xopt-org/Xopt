@@ -98,15 +98,7 @@ def optimize(vocs: Dict,
     if tkwargs is None:
         tkwargs = {}
 
-    # Verbose print helper
-    def vprint(*a, **k):
-        # logger.debug(' '.join(a))
-        # TODO: use logging instead of print statements
-        if verbose:
-            print(*a, **k)
-            sys.stdout.flush()
-
-    vprint(f'started running optimization with generator: {candidate_generator}')
+    logger.info(f'started running optimization with generator: {candidate_generator}')
 
     # Setup saving to file
     if output_path:
@@ -137,7 +129,7 @@ def optimize(vocs: Dict,
             initial_x = initial_x
 
         # submit evaluation of initial samples
-        vprint(f'submitting initial candidates at time {isotime()}')
+        logger.info(f'submitting initial candidates at time {isotime()}')
         initial_y = submit_candidates(initial_x, executor, vocs, evaluate_f,
                                       sampler_evaluate_args)
 
@@ -158,7 +150,7 @@ def optimize(vocs: Dict,
         outputs = data['outputs']
 
     # do optimization
-    vprint('starting optimization loop')
+    logger.info('starting optimization loop')
     for i in range(n_steps):
         candidates = get_candidates(train_x,
                                     train_y,
@@ -169,7 +161,7 @@ def optimize(vocs: Dict,
                                     )
 
         # observe candidates
-        vprint(f'submitting candidates at time {isotime()}')
+        logger.info(f'submitting candidates at time {isotime()}')
         fut = submit_candidates(candidates,
                                 executor,
                                 vocs,

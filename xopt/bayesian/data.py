@@ -117,7 +117,7 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     # outputs['results'] = results
     output_path = '' if output_path is None else output_path
     # TODO: Combine into one function for xopt
-    with open(os.path.join(output_path, 'asynch_test_results.json'), 'w') as outfile:
+    with open(os.path.join(output_path, 'results.json'), 'w') as outfile:
         json.dump(results, outfile, cls=NpEncoder)
 
 
@@ -177,5 +177,5 @@ def save_data_pd(config, full_data):
     else:
         output_path = config['xopt']['output_path']
 
-    with open(output_path + 'asynch_test_results.json', 'w') as outfile:
+    with open(output_path + 'results.json', 'w') as outfile:
         json.dump(outputs, outfile)
