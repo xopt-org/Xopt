@@ -9,8 +9,7 @@ class TestMultiFidelity:
     config = {'vocs': quad_3d.VOCS.copy()}
     config['simulation'] = {'name': 'AugmentedHartmann',
                             'evaluate': 'xopt.tests.evaluators.quad_3d.evaluate'}
-    config['xopt'] = {'output_path': '', 'verbose': True,
-                      'algorithm': 'multi_fidelity'}
+    config['xopt'] = {'output_path': '', 'verbose': True}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {
                                'processes': 2,
