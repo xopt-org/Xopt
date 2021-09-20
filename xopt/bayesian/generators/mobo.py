@@ -57,9 +57,6 @@ class MOBOGenerator(BayesianGenerator):
 
     def create_acqf(self, model: [Model]) -> AcquisitionFunction:
 
-        n_objectives = len(self.vocs['objectives'])
-        n_constraints = len(self.vocs['constraints'])
-
         self.ref = (self.ref.to(self.tkwargs['device'])
                     if isinstance(self.ref, torch.Tensor) else
                     torch.tensor(self.ref, **self.tkwargs))
@@ -67,8 +64,8 @@ class MOBOGenerator(BayesianGenerator):
         self._corrected_ref = self.get_corrected_ref(self.ref)
 
         train_outputs = model.train_targets.T
-        train_y = train_outputs[:, :n_objectives]
-        train_c = train_outputs[:, n_objectives:]
+        train_y = train_outputs[:, :self.n_objectives]
+        train_c = train_outputs[:, self.n_objectives:]
 
         # compute feasible observations
         is_feas = (train_c <= 0).all(dim=-1)
@@ -90,7 +87,7 @@ class MOBOGenerator(BayesianGenerator):
             return Z[..., index]
 
         constraint_functions = []
-        for i in range(1, n_constraints + 1):
+        for i in range(1, self.n_constraints + 1):
             constraint_functions += [partial(constr_func, index=-i)]
 
         acq_func = qExpectedHypervolumeImprovement(
@@ -98,7 +95,8 @@ class MOBOGenerator(BayesianGenerator):
             ref_point=self._corrected_ref.tolist(),  # use known reference point
             partitioning=partitioning,
             # define an objective that specifies which outcomes are the objectives
-            objective=IdentityMCMultiOutputObjective(outcomes=list(range(n_objectives))),
+            objective=IdentityMCMultiOutputObjective(
+                outcomes=list(range(self.n_objectives))),
             # define constraint function - see botorch docs for info - I'm not sure
             # how it works
             constraints=constraint_functions,

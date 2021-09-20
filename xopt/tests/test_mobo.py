@@ -10,7 +10,7 @@ class TestClassMOBO:
     config = {'vocs': TNK.VOCS.copy()}
     config['simulation'] = {'name': 'test_TNK',
                             'evaluate': 'xopt.tests.evaluators.TNK.evaluate_TNK'}
-    config['xopt'] = {'output_path': '', 'verbose': False, 'algorithm': 'mobo'}
+    config['xopt'] = {'output_path': '', 'verbose': False}
     config['algorithm'] = {'name': 'mobo',
                            'options': {
                                'n_initial_samples': 1,

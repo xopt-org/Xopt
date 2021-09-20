@@ -92,7 +92,8 @@ def optimize(vocs: Dict,
     # raise error if someone tries to use linked variables
     # TODO: implement linked variables
     if 'linked_variables' in vocs.keys():
-        assert vocs['linked_variables'] == {}, 'linked variables not implemented yet'
+        if not (vocs['linked_variables'] == {} or vocs['linked_variables'] is None):
+            raise NotImplementedError('linked variables not implemented yet')
 
     if tkwargs is None:
         tkwargs = {}

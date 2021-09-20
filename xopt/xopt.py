@@ -1,47 +1,14 @@
-from xopt.tools import full_path, expand_paths, load_config, save_config, fill_defaults, random_settings, get_function, \
-    isotime
-from xopt.configure import configure_algorithm, configure_simulation, configure_vocs, VOCS_DEFAULTS
-import xopt.configure as config
-from xopt import __version__
-import pprint
+import logging
 from copy import deepcopy
+
 import yaml
-import json
-import os
 
-XOPT_DEFAULTS = {
-    'output_path': '.',
-    'verbose': True,
-    'algorithm':'cnsga'
-}
+import xopt.configure as configure
+from xopt import __version__
+from xopt.tools import expand_paths, load_config, save_config,\
+    random_settings, get_function, isotime
 
-SIMULATION_DEFAULTS = {
-    'name': None,
-    'evaluate': None,
-    'options': None
-}
-
-# Algorithms
-ALGORITHM_DEFAULTS = {
-    'name': 'cnsga',
-    'function': 'xopt.cnsga.cnsga',
-    'options': {
-        'population': None,
-        'max_generations': 2,
-        'population_size': 4,
-        'crossover_probability': 0.9,
-        'mutation_probability': 1.0,
-        'selection': 'auto',
-        'verbose': True
-    }
-}
-
-ALL_DEFAULTS = {
-    'xopt': XOPT_DEFAULTS,
-    'algorithm': ALGORITHM_DEFAULTS,
-    'simulation': SIMULATION_DEFAULTS,
-    'vocs': VOCS_DEFAULTS
-}
+logging.basicConfig(level=logging.INFO)
 
 
 class Xopt:
@@ -59,32 +26,85 @@ class Xopt:
           
     """
 
-    def __init__(self, config=None, verbose=True):
+    def __init__(self, config=None):
 
         # Internal state
 
         # Main configuration is in this nested dict
-        self.config = None
-        self.verbose = verbose
+        self.config = deepcopy(config)
         self.configured = False
 
         self.results = None
+        self.logger = logging.getLogger(__name__)
+
+        self.run_f = None
+        self.evaluate_f = None
 
         if config:
-            self.config = load_config(config, verbose=self.verbose)
+            self.config = load_config(self.config)
             self.configure()
 
         else:
             # Make a template, so the user knows what is available
-            self.vprint('Initializing with defaults')
-            self.config = deepcopy(ALL_DEFAULTS)
+            self.logger.info('Initializing with defaults')
+            self.config = deepcopy(configure.ALL_DEFAULTS)
+
+    def configure(self):
+        """
+        Configure everything
+
+        Configuration order:
+        xopt
+        algorithm
+        simulation
+        vocs, which contains the simulation name, and templates
+
+        """
+        # make sure configure has the required keys
+        for name in configure.ALL_DEFAULTS:
+            if name not in self.config:
+                raise Exception(f'Key {name} is required in config for Xopt')
+
+        self.configure_xopt()
+        self.configure_algorithm()
+        self.configure_simulation()
+        self.configure_vocs()
+
+        # expand all paths
+        self.config = expand_paths(self.config, ensure_exists=True)
+
+        # Get the actual functions
+        self.run_f = get_function(self.algorithm['function'])
+        self.evaluate_f = get_function(self.simulation['evaluate'])
+
+        self.configured = True
+
+    # --------------------------
+    # Configure
+    def configure_xopt(self):
+        """ configure xopt """
+        # check and fill defaults
+        configure.configure_xopt(self.config['xopt'])
+
+        # set logger level according to config
+        self.logger.setLevel(self.config['xopt']['logging'])
+
+    def configure_algorithm(self):
+        """ configure algorithm """
+        configure.configure_algorithm(self.config['algorithm'])
+
+    def configure_simulation(self):
+        configure.configure_simulation(self.config['simulation'])
+
+    def configure_vocs(self):
+        configure.configure_vocs(self.config['vocs'])
 
     # --------------------------
     # Saving and Loading from file
-
     def load(self, config):
         """Load config from file (JSON or YAML) or data"""
         self.config = load_config(config)
+        self.configure()
 
     def save(self, file):
         """Save config to file (JSON or YAML)"""
@@ -104,94 +124,24 @@ class Xopt:
         return self.config['vocs']
 
     # --------------------------
-    # Configure 
-
-    def configure_xopt(self):
-        # Allows for .json or .yaml filenames as values. 
-        self.config['xopt'] = load_config(self.config['xopt'])
-
-        fill_defaults(self.config['xopt'], XOPT_DEFAULTS)
-
-    def configure_algorithm(self):
-        alg = self.config['algorithm'] = configure_algorithm(self.config['algorithm'])
-        options = alg['options']
-
-        # Reserved keys
-        for k in ['vocs', 'executor', 'evaluate_f', 'output_path', 'toolbox']:
-            if k in options:
-                options.pop(k)
-
-    def configure_simulation(self):
-        self.config['simulation'] = configure_simulation(self.config['simulation'])
-
-    def configure_vocs(self):
-        self.config['vocs'] = configure_vocs(self.config['vocs'])
-
-        sim_name = self.vocs['simulation']
-        if sim_name:
-            assert sim_name == self.simulation['name'], f'VOCS simulation: {sim_name} has not been configured in xopt.'
-
-        # Fill in these as options. TODO: Better logic?
-        if self.vocs['templates']:
-            self.simulation['options'].update(self.vocs['templates'])
-
-    def configure(self):
-        """
-        Configure everything
-        
-        Configuration order:
-        xopt
-        algorithm
-        simulation
-        vocs, which contains the simulation name, and templates
-   
-        """
-        self.configure_xopt()
-        self.configure_algorithm()
-        self.configure_simulation()
-        self.configure_vocs()
-
-        # expand all paths
-        self.config = expand_paths(self.config, ensure_exists=True)
-
-        # Get the actual functions
-        self.run_f = get_function(self.algorithm['function'])
-        self.evaluate_f = get_function(self.simulation['evaluate'])
-
-        self.configured = True
-
-    # --------------------------
     # Run
 
     def run(self, executor=None):
         assert self.configured, 'Not configured to run.'
 
-        self.vprint(f'Starting at time {isotime()}')
+        self.logger.info(f'Starting at time {isotime()}')
 
-        alg = self.algorithm['name']
         opts = self.algorithm['options']
-             
+
         # Special for genetic algorithms
         if self.results and 'population' in opts:
             opts['population'] = self.results
-                
-        if alg in config.KNOWN_ALGORITHMS:
-            self.results = self.run_f(executor=executor, vocs = self.vocs,
-                                      evaluate_f = self.evaluate, # Already prepared with 
-                                      output_path=self.config['xopt']['output_path'],
-                                      **opts)
 
-        # Run a generic algorithm 
-        #else alg in algorithms:
-        #    self.results = self.run_f(self.vocs,
-        #                              self.evaluate_f,
-        #                              **self.algorithm['options'])            
-
-        else:
-            raise Exception(f'Unknown algorithm {alg}')
-
-
-    # Evaluate
+        self.results = self.run_f(vocs=self.vocs,
+                                  evaluate_f=self.evaluate,
+                                  executor=executor,
+                                  output_path=self.config['xopt']['output_path'],
+                                  **opts)
 
     def random_inputs(self):
         return random_settings(self.vocs)
@@ -219,20 +169,11 @@ class Xopt:
     def evaluate(self, inputs):
         """Evaluate should take one argument: A dict of inputs. """
         options = self.simulation['options']
-        # evaluate_f = get_function(self.simulation['evaluate'])
         evaluate_f = self.evaluate_f
         if options:
             return evaluate_f(inputs, **options)
         else:
             return evaluate_f(inputs)
-
-    # --------------------------
-    # Helpers and utils
-
-    def vprint(self, *args, **kwargs):
-        """Verbose print"""
-        if self.verbose:
-            print(*args, **kwargs)
 
     def __getitem__(self, config_item):
         """

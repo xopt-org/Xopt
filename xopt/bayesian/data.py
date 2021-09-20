@@ -87,7 +87,10 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     # add results to config dict and save to json
     results = {}
 
-    names = ['variables', 'objectives', 'constraints']
+    names = ['variables', 'objectives']
+
+    if vocs['constraints'] is not None:
+        names += ['constraints']
     i = 0
     for name in names:
         val = {}
@@ -99,13 +102,14 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
 
         results[name] = val
 
-    constraint_status = {}
-    for ele in vocs['constraints'].keys():
-        constraint_status[ele] = full_data[:, i].tolist()
-        i += 1
+    if vocs['constraints'] is not None:
+        constraint_status = {}
+        for ele in vocs['constraints'].keys():
+            constraint_status[ele] = full_data[:, i].tolist()
+            i += 1
 
-    results['constraint_status'] = constraint_status
-    results['feasibility'] = full_data[:, i].tolist()
+        results['constraint_status'] = constraint_status
+        results['feasibility'] = full_data[:, i].tolist()
 
     results['inputs'] = inputs
     results['outputs'] = outputs
@@ -122,6 +126,7 @@ def get_data_json(json_filename, vocs, **tkwargs):
     data = json.load(f)
 
     data_sets = {}
+
     names = ['variables', 'objectives', 'constraints']
 
     # replace None's with Nans
@@ -129,7 +134,7 @@ def get_data_json(json_filename, vocs, **tkwargs):
         return [math.nan if x is None else x for x in l]
 
     for name in names:
-        if vocs[name] != {}:
+        if vocs[name] is not None:
             data_sets[name] = torch.hstack([torch.tensor(replace_none(data[name][ele]),
                                                          **tkwargs).reshape(-1, 1) for
                                             ele in vocs[name].keys()])
