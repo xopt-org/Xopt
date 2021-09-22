@@ -8,7 +8,7 @@ algorithm:
     n_steps: 10
     verbose: True      
     generator_options:
-        batch_size: 4
+        batch_size: 1
   
 simulation: 
   name: example_MOBO_matlab
@@ -28,3 +28,4 @@ vocs:
     c2: [LESS_THAN, 0.5]
   linked_variables: {}
   constants: {a: dummy_constant}
+

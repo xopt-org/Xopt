@@ -8,4 +8,4 @@ timeout /t 30
 
 :: Run example xopt instance with test_TNK_matlab.py evaluator which calls testeval.m function in running matlab_engines instances
 :: Here, we assume 4 cores, change to match the number of cores on your machine
-mpiexec -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt_mat.yaml
+mpiexec -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt_MOBO_matlab.yaml
