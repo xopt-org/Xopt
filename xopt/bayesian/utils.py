@@ -225,6 +225,7 @@ def get_results(futures):
     n_samples = len(futures)
 
     while True:
+        logger.debug(f'futures length {len(futures)}')
         if len(futures) == 0:
             break
         else:
@@ -280,4 +281,5 @@ def collect_results(futures, vocs, **tkwargs):
     if vocs['constraints'] is not None:
         train_c = torch.tensor(train_c, **tkwargs)
 
+    logger.debug('done collecting results')
     return train_x, train_y, train_c, inputs, outputs

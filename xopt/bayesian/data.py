@@ -75,8 +75,10 @@ def gather_and_save_training_data(futures: List,
                         feas)
 
         full_data = torch.hstack(elements)
+        logger.debug('saving data')
         save_data_dict(vocs, full_data, inputs, outputs, output_path)
-
+        logger.debug('done')
+        
     except NoValidResultsError:
         logger.warning('No valid results found, skipping to next iteration')
 
