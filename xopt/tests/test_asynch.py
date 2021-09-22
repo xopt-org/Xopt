@@ -30,7 +30,7 @@ class TestMultiFidelity:
     def test_multi_fidelity_restart_file(self):
         test_config = copy.deepcopy(self.config)
         test_config['algorithm']['options']['restart_file'] = \
-            'tests/asynch_test_results.json'
+            'xopt/tests/asynch_test_results.json'
         X = Xopt(test_config)
         executor = ThreadPoolExecutor()
         X.run(executor=executor)
