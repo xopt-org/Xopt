@@ -152,6 +152,7 @@ def optimize(vocs: Dict,
     # do optimization
     logger.info('starting optimization loop')
     for i in range(n_steps):
+        logger.debug('generating candidates')
         candidates = get_candidates(train_x,
                                     train_y,
                                     vocs,
@@ -167,7 +168,7 @@ def optimize(vocs: Dict,
                                 vocs,
                                 evaluate_f,
                                 sampler_evaluate_args)
-
+        logger.debug('gathering and saving data')
         data = gather_and_save_training_data(list(fut),
                                              vocs,
                                              tkwargs,
