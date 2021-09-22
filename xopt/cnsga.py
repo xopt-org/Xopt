@@ -438,7 +438,7 @@ def cnsga(executor=None,
     if population:
         
         # Load JSON
-        population = load_config(population, verbose=verbose)
+        population = load_config(population)
         
         assert 'variables' in population, 'Population must have key: variables'
         

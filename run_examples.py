@@ -19,6 +19,9 @@ from nbconvert import PythonExporter
 
 
 IGNORE = {
+    "xopt_astra_sampler.ipynb",
+    "xopt_cnsga_astra.ipynb",
+    "xopt_gpt_example.ipynb",
     "cnsga_tnk.ipynb",
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
