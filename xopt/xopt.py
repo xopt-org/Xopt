@@ -4,6 +4,7 @@ from copy import deepcopy
 import yaml
 
 import xopt.configure as configure
+from xopt.legacy import reformat_config
 from xopt import __version__
 from xopt.tools import expand_paths, load_config, save_config,\
     random_settings, get_function, isotime
@@ -42,14 +43,23 @@ class Xopt:
 
         if config:
             self.config = load_config(self.config)
-            self.configure()
+
+            # load any high level config files
+            for ele in ['xopt', 'simulation', 'algorithm', 'vocs']:
+                self.config[ele] = load_config(self.config[ele])
+
+            # reformat old config files if needed
+            self.config = reformat_config(self.config)
+
+            # do configuration
+            self.configure_all()
 
         else:
             # Make a template, so the user knows what is available
             self.logger.info('Initializing with defaults')
             self.config = deepcopy(configure.ALL_DEFAULTS)
 
-    def configure(self):
+    def configure_all(self):
         """
         Configure everything
 
@@ -69,6 +79,8 @@ class Xopt:
         self.configure_algorithm()
         self.configure_simulation()
         self.configure_vocs()
+
+        print(self.config)
 
         # expand all paths
         self.config = expand_paths(self.config, ensure_exists=True)
@@ -91,20 +103,23 @@ class Xopt:
 
     def configure_algorithm(self):
         """ configure algorithm """
-        configure.configure_algorithm(self.config['algorithm'])
+        self.config['algorithm'] = configure.configure_algorithm(self.config[
+                                                                    'algorithm'])
 
     def configure_simulation(self):
-        configure.configure_simulation(self.config['simulation'])
+        self.config['simulation'] = configure.configure_simulation(self.config[
+                                                                    'simulation'])
 
     def configure_vocs(self):
-        configure.configure_vocs(self.config['vocs'])
+        self.config['vocs'] = configure.configure_vocs(self.config['vocs'])
+        print(self.config['vocs'])
 
     # --------------------------
     # Saving and Loading from file
     def load(self, config):
         """Load config from file (JSON or YAML) or data"""
         self.config = load_config(config)
-        self.configure()
+        self.configure_all()
 
     def save(self, file):
         """Save config to file (JSON or YAML)"""
@@ -150,7 +165,8 @@ class Xopt:
         """
         Makes random inputs and runs evaluate.
         
-        If check_vocs, will check that all keys in vocs constraints and objectives are in output.
+        If check_vocs, will check that all keys in vocs constraints and objectives
+        are in output.
         """
         inputs = self.random_inputs()
         outputs = self.evaluate(inputs)

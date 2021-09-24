@@ -29,10 +29,8 @@ XOPT_DEFAULTS = {
 
 SIMULATION_DEFAULTS = {
     'name': None,
-    'evaluate': None,
+    'function': None,
     'options': None,
-    'templates': None,
-    'logging': logging.WARNING,
 }
 
 # Algorithms
@@ -40,7 +38,6 @@ ALGORITHM_DEFAULTS = {
     'name': None,
     'function': None,
     'options': None,
-    'logging': logging.WARNING,
 }
 
 VOCS_DEFAULTS = {
@@ -63,10 +60,11 @@ logger = logging.getLogger(__name__)
 
 def configure_xopt(xopt_config: Dict) -> None:
     check_config_against_defaults(xopt_config, XOPT_DEFAULTS)
-    fill_defaults(xopt_config, XOPT_DEFAULTS)
+    xopt_config = fill_defaults(xopt_config, XOPT_DEFAULTS)
+    return xopt_config
 
 
-def configure_algorithm(alg_config: Dict) -> None:
+def configure_algorithm(alg_config: Dict) -> Dict:
     """
     Configures a algorithm config dict. The dict should have:
     
@@ -119,13 +117,14 @@ def configure_algorithm(alg_config: Dict) -> None:
 
     # update alg_config with full_options
     alg_config.update(options)
+    return alg_config
 
 
 # -----------------------
 # -----------------------
 # Simulation
 
-def configure_simulation(sim_config):
+def configure_simulation(sim_config: Dict) -> Dict:
     """
     Configures a simulation config dict. The dict should have:
     
@@ -140,10 +139,11 @@ def configure_simulation(sim_config):
      'options': {'archive_path': '.', 'merit_f': None}}
         
     """
+    check_config_against_defaults(sim_config, SIMULATION_DEFAULTS)
 
     name = sim_config['name']  # required
 
-    f_name = sim_config['evaluate']
+    f_name = sim_config['function']
 
     if f_name:
         f = tools.get_function(f_name)
@@ -156,13 +156,16 @@ def configure_simulation(sim_config):
         options = {}
 
     n_required_args = tools.get_n_required_fuction_arguments(f)
-    assert n_required_args == 1, f'{name} has {n_required_args}, but should have exactly one.'
+    assert n_required_args == 1, f'{name} has {n_required_args}, but should have ' \
+                                 f'exactly one. '
 
     defaults = tools.get_function_defaults(f)
 
     fill_defaults(options, defaults)
 
     sim_config.update({'name': name, 'evaluate': f_name, 'options': options})
+
+    return sim_config
 
 
 # -----------------------
@@ -172,12 +175,14 @@ def configure_simulation(sim_config):
 
 def configure_vocs(vocs_config):
     # Allows for .json or .yaml filenames as values.
-    vocs_config = tools.load_config(vocs_config)
+    check_config_against_defaults(vocs_config, VOCS_DEFAULTS)
     fill_defaults(vocs_config, VOCS_DEFAULTS)
 
     for key in vocs_config:
         if vocs_config[key] == {}:
             vocs_config[key] = None
+
+    return vocs_config
 
 
 # --------------------------------
@@ -194,6 +199,8 @@ def fill_defaults(dict1, defaults):
     for k, v in defaults.items():
         if k not in dict1:
             dict1[k] = deepcopy(v)
+
+    return dict1
 
 
 def check_config_against_defaults(test_dict, defaults):
