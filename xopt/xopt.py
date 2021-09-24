@@ -80,8 +80,6 @@ class Xopt:
         self.configure_simulation()
         self.configure_vocs()
 
-        print(self.config)
-
         # expand all paths
         self.config = expand_paths(self.config, ensure_exists=True)
 
