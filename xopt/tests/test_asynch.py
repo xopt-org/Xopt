@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import copy
 
 
-class TestMultiFidelity:
+class TestAsynchMultiFidelity:
     VOCS = quad_3d.VOCS
     config = {'vocs': quad_3d.VOCS.copy()}
     config['simulation'] = {'name': 'Quad 3D',
