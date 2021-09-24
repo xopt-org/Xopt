@@ -19,11 +19,11 @@ from nbconvert import PythonExporter
 
 
 IGNORE = {
-    "cnsga_tnk.ipynb",
+    "xopt_gpt_example.ipynb",
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
-SUB_DIRS = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity']
+SUB_DIRS = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity', ]
 
 
 def parse_ipynb(file: Path) -> str:
@@ -87,10 +87,12 @@ def run_tutorials(
     tutorial_base = Path(repo_dir).joinpath("examples")
     num_runs = 0
     num_errors = 0
+    os.chdir(tutorial_base)
 
     for sub_dir in SUB_DIRS:
         tutorial_dir = Path(tutorial_base).joinpath(sub_dir)
         print(f'In directory {sub_dir}')
+        os.chdir(tutorial_dir)
         for tutorial in tutorial_dir.iterdir():
             if not tutorial.is_file or tutorial.suffix != ".ipynb":
                 continue

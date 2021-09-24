@@ -2,8 +2,11 @@
 Tools to configure an xopt run
 
 """
-import xopt.bayesian.algorithms
+from copy import deepcopy
+
 from xopt import tools
+import logging
+from typing import Dict
 
 # -----------------------
 # -----------------------
@@ -18,46 +21,91 @@ KNOWN_ALGORITHMS = {
     'multi_fidelity': 'xopt.bayesian.algorithms.multi_fidelity_optimize'
 }
 
-ALGORITHM_DEFAULTS = {
-    'name': 'cnsga',
-    'function': 'xopt.cnsga.cnsga',
-    'options': {}
+# defaults for required dict keys
+XOPT_DEFAULTS = {
+    'output_path': '.',
+    'logging': logging.WARNING,
 }
 
+SIMULATION_DEFAULTS = {
+    'name': None,
+    'function': None,
+    'options': None,
+}
 
-def configure_algorithm(config):
+# Algorithms
+ALGORITHM_DEFAULTS = {
+    'name': None,
+    'function': None,
+    'options': None,
+}
+
+VOCS_DEFAULTS = {
+    'variables': None,
+    'objectives': None,
+    'constraints': None,
+    'linked_variables': None,
+    'constants': None
+}
+
+ALL_DEFAULTS = {
+    'xopt': XOPT_DEFAULTS,
+    'algorithm': ALGORITHM_DEFAULTS,
+    'simulation': SIMULATION_DEFAULTS,
+    'vocs': VOCS_DEFAULTS
+}
+
+logger = logging.getLogger(__name__)
+
+
+def configure_xopt(xopt_config: Dict) -> None:
+    check_config_against_defaults(xopt_config, XOPT_DEFAULTS)
+    xopt_config = fill_defaults(xopt_config, XOPT_DEFAULTS)
+    return xopt_config
+
+
+def configure_algorithm(alg_config: Dict) -> Dict:
     """
     Configures a algorithm config dict. The dict should have:
     
-    'name': <string that VOCS refers to>
+    'name': <name of algorithm>
     'function': <fully qualified function name>
-    'options': <any options. Default is empty {}> 
+    'options': <any options. Default is empty {}>
     
     Example:
         
     """
+    check_config_against_defaults(alg_config, ALGORITHM_DEFAULTS)
+    fill_defaults(alg_config, ALGORITHM_DEFAULTS)
 
-    for k in config:
-        if k not in ALGORITHM_DEFAULTS:
-            raise ValueError(f'unknown algoritm key: {k}, allowed: {list(ALGORITHM_DEFAULTS)}')
+    # check if EITHER name is valid known algorithm OR function is not None
+    if alg_config['name'] in KNOWN_ALGORITHMS or alg_config['function'] is not None:
+        # if BOTH known algorithm name and function is specified raise warning - use
+        # known algorithm
+        if (alg_config['name'] in KNOWN_ALGORITHMS and
+                alg_config['function'] is not None):
+            logger.warning(f'Specified both known algorithm `{alg_config["name"]}` and '
+                           f'`function`. Using known algorithm function.')
 
-    name = config['name']  # required
+            # populate function with known algorithm
+            alg_config['function'] = KNOWN_ALGORITHMS[alg_config['name']]
+        # if only named algorithm is specified populate function with corresponding
+        # function
+        elif alg_config['function'] is None:
+            alg_config['function'] = KNOWN_ALGORITHMS[alg_config['name']]
 
-    if 'function' not in config or not config['function']:
-        if name in KNOWN_ALGORITHMS:
-            f_name = KNOWN_ALGORITHMS[name]
-        else:
-            raise ValueError(f'Algorthm {name} must provide its fully qualified function name.')
     else:
-        f_name = config['function']
+        raise ValueError(f'unknown algoritm key and no algorithm function specified')
 
-    # Make sure this works, and get the options. This
-    f = tools.get_function(f_name)
+    # get function for inspection and make sure the function is callable
+    f = tools.get_function(alg_config['function'])
+
+    # add default arguments from function to options dict
     options = {}
-    if 'options' in config:
-        options.update(config['options'])
+    if 'options' in alg_config:
+        options.update(alg_config['options'])
     defaults = tools.get_function_defaults(f)
-    tools.fill_defaults(options, defaults, strict=False)
+    fill_defaults(options, defaults)
 
     # see if generator_options are in options - functions can be specified in
     # generator options
@@ -67,14 +115,16 @@ def configure_algorithm(config):
                 if isinstance(val, str):
                     options['generator_options'][name] = tools.get_function(val)
 
-    return {'name': config['name'], 'function': f_name, 'options': options}
+    # update alg_config with full_options
+    alg_config.update(options)
+    return alg_config
 
 
 # -----------------------
 # -----------------------
 # Simulation
 
-def configure_simulation(config):
+def configure_simulation(sim_config: Dict) -> Dict:
     """
     Configures a simulation config dict. The dict should have:
     
@@ -89,50 +139,80 @@ def configure_simulation(config):
      'options': {'archive_path': '.', 'merit_f': None}}
         
     """
+    check_config_against_defaults(sim_config, SIMULATION_DEFAULTS)
 
-    name = config['name']  # required
+    name = sim_config['name']  # required
 
-    f_name = config['evaluate']
+    f_name = sim_config['function']
 
     if f_name:
         f = tools.get_function(f_name)
     else:
         f = None
 
-    if 'options' in config:
-        options = config['options']
+    if 'options' in sim_config:
+        options = sim_config['options']
     else:
         options = {}
 
     n_required_args = tools.get_n_required_fuction_arguments(f)
-    assert n_required_args == 1, f'{name} has {n_required_args}, but should have exactly one.'
+    assert n_required_args == 1, f'{name} has {n_required_args}, but should have ' \
+                                 f'exactly one. '
 
     defaults = tools.get_function_defaults(f)
 
-    tools.fill_defaults(options, defaults, strict=False)
+    fill_defaults(options, defaults)
 
-    return {'name': name, 'evaluate': f_name, 'options': options}
+    sim_config.update({'name': name, 'evaluate': f_name, 'options': options})
+
+    return sim_config
 
 
 # -----------------------
 # -----------------------
 # VOCS
 
-VOCS_DEFAULTS = {
-    'name': None,
-    'description': None,
-    'simulation': None,
-    'templates': None,
-    'variables': None,
-    'objectives': None,
-    'constraints': {},
-    'linked_variables': {},
-    'constants': {}
-}
 
-
-def configure_vocs(config):
+def configure_vocs(vocs_config):
     # Allows for .json or .yaml filenames as values.
-    vocs = tools.load_config(config)
-    tools.fill_defaults(vocs, VOCS_DEFAULTS)
-    return vocs
+    check_config_against_defaults(vocs_config, VOCS_DEFAULTS)
+    fill_defaults(vocs_config, VOCS_DEFAULTS)
+
+    for key in vocs_config:
+        if vocs_config[key] == {}:
+            vocs_config[key] = None
+
+    return vocs_config
+
+
+# --------------------------------
+# adding defaults to dicts
+def fill_defaults(dict1, defaults):
+    """
+    Fills a dict with defaults in a defaults dict.
+
+    dict1 must only contain keys in defaults.
+
+    deepcopy is necessary!
+
+    """
+    for k, v in defaults.items():
+        if k not in dict1:
+            dict1[k] = deepcopy(v)
+
+    return dict1
+
+
+def check_config_against_defaults(test_dict, defaults):
+    if 'verbose' in test_dict:
+        print('WARNING: verbose keyword is depreciated, use `logging` instead.')
+        verbose = test_dict.pop('verbose')
+
+        test_dict['logging'] = logging.WARNING
+        if verbose:
+            test_dict['logging'] = logging.INFO
+
+    for k in test_dict:
+        if k not in defaults:
+            raise Exception(
+                f'Extraneous key: {k}. Allowable keys: ' + ', '.join(list(defaults)))

@@ -13,6 +13,7 @@ import importlib
 import inspect
 import datetime
 import os
+import logging
 
 xopt_logo = """  _   
                 | |  
@@ -28,44 +29,40 @@ __  _____  _ __ | |_
 
 
 def isotime():
-    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).astimezone().replace(
+    return datetime.datetime.utcnow().replace(
+        tzinfo=datetime.timezone.utc).astimezone().replace(
         microsecond=0).isoformat()
+
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------
 # Config utilities
 
-def load_config(source, verbose=False):
+def load_config(source):
     """
     Returns a dict loaded from a JSON or YAML file, or string. 
     
     If source is already a dict, just returns the same dict.
     
     """
-
-    if not source:
-        return source
-
     if isinstance(source, dict):
-        if verbose:
-            print('Loading config as dict.')
+        logger.info('Loading config from dict.')
         return source
 
     if isinstance(source, str):
         if os.path.exists(source):
-
             if source.endswith('.json'):
-                if verbose:
-                    print(f'Loading as JSON file: {source}')
+                logger.info(f'Loading from JSON file: {source}')
                 return json.load(open(source))
-            else:
-                if verbose:
-                    print(f'Loading as YAML file: {source}')
-
+            elif source.endswith('.yaml'):
+                logger.info(f'Loading from YAML file: {source}')
                 return yaml.safe_load(open(source))
+            else:
+                logger.error(f'Cannot load file {source}')
         else:
-            if verbose:
-                print('Loading config as text')
+            logger.info('Loading config from text')
             return yaml.safe_load(source)
     else:
         raise Exception(f'Do not know how to load {source}')
@@ -135,14 +132,16 @@ def random_settings(vocs, include_constants=True, include_linked_variables=True)
         settings.update(vocs['constants'])
 
     # Handle linked variables
-    if include_linked_variables and 'linked_variables' in vocs and vocs['linked_variables']:
+    if include_linked_variables and 'linked_variables' in vocs and vocs[
+        'linked_variables']:
         for k, v in vocs['linked_variables'].items():
             settings[k] = settings[v]
 
     return settings
 
 
-def random_settings_arrays(vocs, n, include_constants=True, include_linked_variables=True):
+def random_settings_arrays(vocs, n, include_constants=True,
+                           include_linked_variables=True):
     """
     Similar to random_settings, but with arrays of size n. 
     
@@ -164,7 +163,8 @@ def random_settings_arrays(vocs, n, include_constants=True, include_linked_varia
             settings[k] = np.full(n, v)
 
     # Handle linked variables
-    if include_linked_variables and 'linked_variables' in vocs and vocs['linked_variables']:
+    if include_linked_variables and 'linked_variables' in vocs and vocs[
+        'linked_variables']:
         for k, v in vocs['linked_variables'].items():
             settings[k] = np.full(n, settings[v])
 
@@ -212,7 +212,8 @@ def add_to_path(path, prepend=True):
     return p
 
 
-def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True, sep=' : ', ensure_exists=False):
+def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True,
+                 sep=' : ', ensure_exists=False):
     """
     Crawls through a nested dict and expands the path of any key that ends 
     with characters in the suffixes list. 
@@ -389,26 +390,6 @@ def update_nested_dict(d, settings, verbose=False):
     new_dict = unflatten_dict(flat_params)
 
     return new_dict
-
-
-# --------------------------------
-# adding defaults to dicts
-def fill_defaults(dict1, defaults, strict=True):
-    """
-    Fills a dict with defaults in a defaults dict. 
-    
-    dict1 must only contain keys in defaults.
-    
-    deepcopy is necessary!
-    
-    """
-    # start with defaults
-    for k in dict1:
-        if k not in defaults and strict:
-            raise Exception(f'Extraneous key: {k}. Allowable keys: ' + ', '.join(list(defaults)))
-    for k, v in defaults.items():
-        if k not in dict1:
-            dict1[k] = deepcopy(v)
 
 
 # --------------------------------

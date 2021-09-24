@@ -108,6 +108,12 @@ class BayesianGenerator(Generator):
 
         self.optimize_options.update(optimize_options)
 
+        self.n_objectives = len(self.vocs['objectives'])
+
+        self.n_constraints = 0
+        if self.vocs['constraints'] is not None:
+            self.n_constraints = len(self.vocs['constraints'])
+
     def generate(self,
                  model: Model,
                  q: Optional[int] = None) -> torch.Tensor:
@@ -139,24 +145,21 @@ class BayesianGenerator(Generator):
             if model.train_inputs[0].shape[-1] != len(self.vocs['variables']):
                 raise BotorchError('model input training data does not match `vocs`')
 
-        n_objectives = len(self.vocs['objectives'])
-        n_constraints = len(self.vocs['constraints'])
-
         if isinstance(model, ModelListGP):
             print(model.train_targets)
             if (len(model.train_targets) !=
-                    n_objectives + n_constraints):
+                    self.n_objectives + self.n_constraints):
                 raise BotorchError('model target training data does not match `vocs`, '
                                    'must be n_constraints + n_objectives')
         else:
             if (model.train_targets.shape[0] !=
-                    n_objectives + n_constraints and
-                    not (len(model.train_targets.shape) == 1 and n_constraints +
-                         n_objectives == 1)):
+                    self.n_objectives + self.n_constraints and
+                    not (len(model.train_targets.shape) == 1 and self.n_constraints +
+                         self.n_objectives == 1)):
                 raise BotorchError('model target training data does not match `vocs`, '
                                    'must be n_constraints + n_objectives, training '
                                    f'data has shape {model.train_targets.shape} with '
-                                   f'vocs n_outputs {n_objectives + n_constraints}')
+                                   f'vocs n_outputs {self.n_objectives + self.n_constraints}')
 
         bounds = torch.tensor(get_bounds(self.vocs), **self.tkwargs)
 

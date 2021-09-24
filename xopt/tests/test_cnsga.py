@@ -3,7 +3,7 @@ from xopt import Xopt
 import yaml
 # Make a proper input file. 
 YAML="""
-xopt: {output_path: null, verbose: true, algorithm: cnsga}
+xopt: {output_path: null, verbose: true}
 
 algorithm:
   name: cnsga

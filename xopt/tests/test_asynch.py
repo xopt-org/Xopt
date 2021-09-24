@@ -4,13 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 import copy
 
 
-class TestMultiFidelity:
+class TestAsynchMultiFidelity:
     VOCS = quad_3d.VOCS
     config = {'vocs': quad_3d.VOCS.copy()}
-    config['simulation'] = {'name': 'AugmentedHartmann',
+    config['simulation'] = {'name': 'Quad 3D',
                             'evaluate': 'xopt.tests.evaluators.quad_3d.evaluate'}
-    config['xopt'] = {'output_path': '', 'verbose': True,
-                      'algorithm': 'multi_fidelity'}
+    config['xopt'] = {'output_path': '', 'verbose': True}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {
                                'processes': 2,
@@ -30,7 +29,8 @@ class TestMultiFidelity:
 
     def test_multi_fidelity_restart_file(self):
         test_config = copy.deepcopy(self.config)
-        test_config['algorithm']['options']['restart_file'] = 'asynch_test_results.json'
+        test_config['algorithm']['options']['restart_file'] = \
+            'xopt/tests/asynch_test_results.json'
         X = Xopt(test_config)
         executor = ThreadPoolExecutor()
         X.run(executor=executor)
