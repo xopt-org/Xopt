@@ -20,24 +20,33 @@ Continuous NSGA-II, NSGA-III
 
 """
 
-cnsga_logo = f"""
+# check if we are running a SMOKE_TEST
+SMOKE_TEST = os.environ['SMOKE_TEST']
 
-
- ▄████▄   ███▄    █   ██████   ▄████  ▄▄▄      
-▒██▀ ▀█   ██ ▀█   █ ▒██    ▒  ██▒ ▀█▒▒████▄    
-▒▓█    ▄ ▓██  ▀█ ██▒░ ▓██▄   ▒██░▄▄▄░▒██  ▀█▄  
-▒▓▓▄ ▄██▒▓██▒  ▐▌██▒  ▒   ██▒░▓█  ██▓░██▄▄▄▄██ 
-▒ ▓███▀ ░▒██░   ▓██░▒██████▒▒░▒▓███▀▒ ▓█   ▓██▒
-░ ░▒ ▒  ░░ ▒░   ▒ ▒ ▒ ▒▓▒ ▒ ░ ░▒   ▒  ▒▒   ▓▒█░
-  ░  ▒   ░ ░░   ░ ▒░░ ░▒  ░ ░  ░   ░   ▒   ▒▒ ░
-░           ░   ░ ░ ░  ░  ░  ░ ░   ░   ░   ▒   
-░ ░               ░       ░        ░       ░  ░
-░                                              
-
-
-Continuous Non-dominated Sorting Genetic Algorithm
-Version {__version__}
-"""
+if SMOKE_TEST:
+    cnsga_logo = """
+    Continuous Non-dominated Sorting Genetic Algorithm
+    Version {__version__}
+    """
+else:
+    cnsga_logo = f"""
+    
+    
+     ▄████▄   ███▄    █   ██████   ▄████  ▄▄▄      
+    ▒██▀ ▀█   ██ ▀█   █ ▒██    ▒  ██▒ ▀█▒▒████▄    
+    ▒▓█    ▄ ▓██  ▀█ ██▒░ ▓██▄   ▒██░▄▄▄░▒██  ▀█▄  
+    ▒▓▓▄ ▄██▒▓██▒  ▐▌██▒  ▒   ██▒░▓█  ██▓░██▄▄▄▄██ 
+    ▒ ▓███▀ ░▒██░   ▓██░▒██████▒▒░▒▓███▀▒ ▓█   ▓██▒
+    ░ ░▒ ▒  ░░ ▒░   ▒ ▒ ▒ ▒▓▒ ▒ ░ ░▒   ▒  ▒▒   ▓▒█░
+      ░  ▒   ░ ░░   ░ ▒░░ ░▒  ░ ░  ░   ░   ▒   ▒▒ ░
+    ░           ░   ░ ░ ░  ░  ░  ░ ░   ░   ░   ▒   
+    ░ ░               ░       ░        ░       ░  ░
+    ░                                              
+    
+    
+    Continuous Non-dominated Sorting Genetic Algorithm
+    Version {__version__}
+    """
 
 
 

@@ -1,10 +1,3 @@
-
-name: kekgun
-description: Test case
-simulation: astra_with_generator
-templates:
-  astra_input_file: $XOPT_DIR/examples/templates/kekgun/kekgun.in
-  generator_input_file: $XOPT_DIR/examples/templates/kekgun/dist004.in
 variables:
   sig_x: [0.05, 1]
   lt: [0.005, 0.07]
