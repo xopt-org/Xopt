@@ -10,7 +10,7 @@ class TestClassMultiFidelity:
     config['simulation'] = {'name': 'AugmentedHartmann',
                             'evaluate':
                                 'xopt.tests.evaluators.multi_fidelity.evaluate'}
-    config['xopt'] = {'output_path': '', 'verbose': True, 'algorithm': 'mobo'}
+    config['xopt'] = {'output_path': '', 'verbose': True}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {
                                'budget': 2,

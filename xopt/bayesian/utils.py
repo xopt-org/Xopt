@@ -94,7 +94,8 @@ def submit_candidates(candidates: Tensor,
     fut = {}
     for candidate in candidates:
         setting = dict(zip(variable_names, candidate.cpu().numpy()))
-        setting.update(vocs['constants'])
+        if vocs['constants'] is not None:
+            setting.update(vocs['constants'])
 
         fut.update(
             {executor.submit(sampler_evaluate,
@@ -122,7 +123,8 @@ def check_training_data_shape(train_x: [Tensor],
                 f'does not match number of vocs {vocs_type} == ' \
                 f'{len(vocs[vocs_type])}'
         else:
-            assert vocs[vocs_type] == {}, f'Training data for {vocs_type} is None'
+            if vocs[vocs_type] is not None:
+                raise RuntimeError('Training data for `{vocs_type}` is None')
 
 
 def get_feasability_constraint_status(train_y: [Tensor],
@@ -223,6 +225,7 @@ def get_results(futures):
     n_samples = len(futures)
 
     while True:
+        logger.debug(f'futures length {len(futures)}')
         if len(futures) == 0:
             break
         else:
@@ -245,7 +248,11 @@ def collect_results(futures, vocs, **tkwargs):
 
     train_x = []
     train_y = []
-    train_c = []
+
+    if vocs['constraints'] is not None:
+        train_c = []
+    else:
+        train_c = None
 
     inputs = []
     outputs = []
@@ -257,7 +264,9 @@ def collect_results(futures, vocs, **tkwargs):
         if not result['error']:
             train_x += [[result['inputs'][ele] for ele in vocs['variables'].keys()]]
             train_y += [[result['outputs'][ele] for ele in vocs['objectives'].keys()]]
-            train_c += [[result['outputs'][ele] for ele in vocs['constraints'].keys()]]
+
+            if vocs['constraints'] is not None:
+                train_c += [[result['outputs'][ele] for ele in vocs['constraints'].keys()]]
 
             inputs += [result['inputs']]
             outputs += [result['outputs']]
@@ -269,6 +278,8 @@ def collect_results(futures, vocs, **tkwargs):
 
     train_x = torch.tensor(train_x, **tkwargs)
     train_y = torch.tensor(train_y, **tkwargs)
-    train_c = torch.tensor(train_c, **tkwargs)
+    if vocs['constraints'] is not None:
+        train_c = torch.tensor(train_c, **tkwargs)
 
+    logger.debug('done collecting results')
     return train_x, train_y, train_c, inputs, outputs
