@@ -11,7 +11,7 @@ Y_RANGE = [0, 1.4]
 def evaluate_TNK(inputs, matlab_f='testeval', nargout=2, verbose=False):
     info = {'some': 'info', 'about': ['the', 'run']}
 
-    x1, x2 = inputs['x1'], inputs['x2']
+    x1, x2 = float(inputs['x1']), float(inputs['x2'])
     
     objectives = (x1, x2)
       
