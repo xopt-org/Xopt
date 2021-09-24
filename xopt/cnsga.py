@@ -21,7 +21,9 @@ Continuous NSGA-II, NSGA-III
 """
 
 # check if we are running a SMOKE_TEST
-SMOKE_TEST = os.environ['SMOKE_TEST']
+SMOKE_TEST = False
+if 'SMOKE_TEST' in os.environ:
+    SMOKE_TEST = os.environ['SMOKE_TEST']
 
 if SMOKE_TEST:
     cnsga_logo = """
