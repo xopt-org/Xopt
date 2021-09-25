@@ -10,7 +10,10 @@ Contents:
 * RUNME.bat - Windows version of above
 * RUNME.mlx - Matlab live script. Example of running Xopt optimizer from within Matlab environment, and comparison with builtin Matlab optimizer.
   - RUNME.html is output of live script
-  
+
+From command line:
+$ source RUNME.sh (unix)
+
 From within the Matlab environment:
 >> help Xopt % instructions for using Xopt class
 - requires Xopt.m and xopt_fun.m files in search path
