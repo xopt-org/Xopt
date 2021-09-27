@@ -23,6 +23,7 @@ jobs:
           pip install nbformat
           pip install nbconvert
           pip install ipython
+          pip install matplotlib
 
       - name: Install Xopt
         run: |
