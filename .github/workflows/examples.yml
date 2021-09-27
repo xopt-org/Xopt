@@ -1,4 +1,4 @@
-name: Tests
+name: Examples
 
 on:
   push:
@@ -20,7 +20,8 @@ jobs:
       - name: Install Python Dependencies
         run: |
           pip install -r requirements.txt
-          pip install -r test-requirements.txt
+          pip install nbformat
+          pip install nbconvert
 
       - name: Install Xopt
         run: |
@@ -28,4 +29,4 @@ jobs:
 
       - name: Run Tests
         run: |
-          python run_examples.py -p '.'
+          python run_examples.py -p "$(pwd)" -s
