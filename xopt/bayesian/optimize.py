@@ -126,7 +126,7 @@ def optimize(vocs: Dict,
                                                         **tkwargs),
                                            1, n_initial_samples)[0]
         else:
-            initial_x = initial_x
+            initial_x = torch.tensor(initial_x)
 
         # submit evaluation of initial samples
         logger.info(f'submitting initial candidates at time {isotime()}')
