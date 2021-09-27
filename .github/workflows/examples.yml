@@ -29,6 +29,6 @@ jobs:
         run: |
           pip install .
 
-      - name: Run Tests
+      - name: Run Examples
         run: |
           python run_examples.py -p "$(pwd)" -s
