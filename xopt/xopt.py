@@ -1,4 +1,5 @@
-import logging
+
+
 from copy import deepcopy
 
 import yaml
@@ -9,7 +10,10 @@ from xopt import __version__
 from xopt.tools import expand_paths, load_config, save_config,\
     random_settings, get_function, isotime
 
-logging.basicConfig(level=logging.INFO)
+import logging
+logger = logging.getLogger(__name__)
+
+import sys
 
 
 class Xopt:
@@ -36,7 +40,6 @@ class Xopt:
         self.configured = False
 
         self.results = None
-        self.logger = logging.getLogger(__name__)
 
         self.run_f = None
         self.evaluate_f = None
@@ -56,7 +59,7 @@ class Xopt:
 
         else:
             # Make a template, so the user knows what is available
-            self.logger.info('Initializing with defaults')
+            logger.info('Initializing with defaults')
             self.config = deepcopy(configure.ALL_DEFAULTS)
 
     def configure_all(self):
@@ -96,9 +99,6 @@ class Xopt:
         # check and fill defaults
         configure.configure_xopt(self.config['xopt'])
 
-        # set logger level according to config
-        self.logger.setLevel(self.config['xopt']['logging'])
-
     def configure_algorithm(self):
         """ configure algorithm """
         self.config['algorithm'] = configure.configure_algorithm(self.config[
@@ -110,7 +110,7 @@ class Xopt:
 
     def configure_vocs(self):
         self.config['vocs'] = configure.configure_vocs(self.config['vocs'])
-        print(self.config['vocs'])
+
 
     # --------------------------
     # Saving and Loading from file
@@ -142,7 +142,7 @@ class Xopt:
     def run(self, executor=None):
         assert self.configured, 'Not configured to run.'
 
-        self.logger.info(f'Starting at time {isotime()}')
+        logger.info(f'Starting at time {isotime()}')
 
         opts = self.algorithm['options']
 
@@ -204,7 +204,8 @@ Configured: {self.configured}
 Config as YAML:
 """
         # return s+pprint.pformat(self.config)
-        return s + yaml.dump(self.config, default_flow_style=None, sort_keys=False)
+        return s + yaml.dump(self.config, default_flow_style=None,
+                             sort_keys=False)
 
     def __str__(self):
         return self.__repr__()

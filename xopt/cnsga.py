@@ -1,12 +1,25 @@
+
+"""
+Continuous NSGA-II, NSGA-III
+
+"""
+
+from xopt import creator, vocs_tools, fitness_with_constraints
+
 from xopt import creator, vocs_tools, fitness_with_constraints
 from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config, NpEncoder
 from xopt import __version__
 from deap import algorithms, base, tools
 
+from tqdm.notebook import tqdm
+
 import numpy as np
 import json
 
 import logging
+logger = logging.getLogger(__name__)
+
+import warnings
 
 from pprint import pprint
 import time
@@ -15,18 +28,13 @@ import random
 import traceback
 import os, sys
 
-"""
-Continuous NSGA-II, NSGA-III
 
-"""
 
-# check if we are running a SMOKE_TEST
-SMOKE_TEST = False
-if 'SMOKE_TEST' in os.environ:
-    SMOKE_TEST = os.environ['SMOKE_TEST']
 
-if SMOKE_TEST:
-    cnsga_logo = """
+
+# Check for continuous integration
+if 'CI' in os.environ:
+    cnsga_logo = f"""
     Continuous Non-dominated Sorting Genetic Algorithm
     Version {__version__}
     """
@@ -64,7 +72,7 @@ def uniform(low, up, size=None):
 
     
     
-def cnsga_toolbox(vocs, selection='auto', verbose=False):
+def cnsga_toolbox(vocs, selection='auto'):
     """
     Creates a DEAP toolbox from VOCS dict for use with cnsga. 
     
@@ -97,8 +105,6 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
     # Create MyFitness 
     if 'MyFitness' in dir(creator):
         del creator.MyFitness
-        if verbose:
-            print('Warning: Redefining creator.MyFitness')
     
     if n_con == 0:
         # Normal Fitness class
@@ -110,9 +116,7 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
     
     # Create Individual. Check if exists first. 
     if 'Individual' in dir(creator):
-        del creator.Individual
-        if verbose:
-            print('Warning in cnsga_toolbox: Redefining creator.Individual')    
+        del creator.Individual   
     creator.create('Individual', array.array, typecode='d', fitness=creator.MyFitness, 
                    labels=var_labels)    
     
@@ -153,13 +157,12 @@ def cnsga_toolbox(vocs, selection='auto', verbose=False):
         toolbox.register('select', tools.selSPEA2)
  
     else:
-        print('Error: invalid selection algorithm', selection)
-        raise
-    
-    
-    if verbose:
-        print(f'Created toolbox with {n_var} variables, {n_con} constraints, and {n_obj} objectives.')
-        print(f'    Using selection algorithm: {selection}')
+        raise ValueError(f'Invalid selection algorithm: {selection}')
+
+        
+    logger.info(f'Created toolbox with {n_var} variables, {n_con} constraints, and {n_obj} objectives.')
+    logger.info(f'    Using selection algorithm: {selection}')
+                         
     return toolbox
     
     
@@ -213,8 +216,8 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     
     
     except Exception as ex:
-        if verbose:
-            print('Exception caught in cnsga_evaluate:', str(traceback.format_exc()))
+        # No need to print a nasty logger exception
+        logger.warning('Exception caught in cnsga_evaluate')
         outputs = {'Exception':  str(traceback.format_exc())}
         
         # Dummy output
@@ -363,7 +366,8 @@ def cnsga(executor=None,
           crossover_probability = 0.9,
           mutation_probability = 1.0,
           selection='auto',
-          verbose=True):
+          verbose=None,
+          show_progress=False):
     """  
     Continuous NSGA-II, NSGA-III
     
@@ -394,28 +398,22 @@ def cnsga(executor=None,
     MUTPB = float(mutation_probability)
     
     
+    if verbose is not None:
+        warnings.warn('xopt.cnsga verbose option has been deprecated')                          
+                         
 
     # Initial population
 
-    # Logger
-    logger = logging.getLogger(__name__)
-    
-    # Verbose print helper
-    def vprint(*a, **k):
-        #logger.debug(' '.join(a))
-        if verbose:
-            print(*a, **k)
-            sys.stdout.flush()
-                        
+                    
     # Logo
     try:
-        vprint(cnsga_logo)
+        logger.info(cnsga_logo)
     except:
-        vprint('CNSGA')  # Windows has a problem with the logo
+        logger.info('CNSGA')  # Windows has a problem with the logo
     
     if not executor:
         executor = DummyExecutor()
-        vprint('No executor given. Running in serial mode.')
+        logger.info('No executor given. Running in serial mode.')
     
     
     # Setup saving to file
@@ -429,7 +427,7 @@ def cnsga(executor=None,
             fullfile = os.path.join(path, file)
             with open(fullfile, 'w') as f:
                 json.dump(data, f, ensure_ascii=True, cls=NpEncoder, indent=4)
-            vprint('Pop written to', fullfile)
+            logger.info(f'Pop written to  {fullfile}')
         
     else:
         # Dummy save
@@ -438,12 +436,9 @@ def cnsga(executor=None,
         
     # Toolbox
     if not toolbox:
-        vprint('Creating toolbox from vocs.')
-        toolbox = cnsga_toolbox(vocs, selection=selection, verbose=verbose)
-        toolbox.register('evaluate', cnsga_evaluate, evaluate_f=evaluate_f, vocs=vocs, verbose=verbose)
-        if verbose:
-            print('vocs:')
-            pprint(vocs) # Pretty print dict
+        logger.info('Creating toolbox from vocs.')
+        toolbox = cnsga_toolbox(vocs, selection=selection)
+        toolbox.register('evaluate', cnsga_evaluate, evaluate_f=evaluate_f, vocs=vocs)
         
     # Initial pop
     if population:
@@ -461,15 +456,15 @@ def cnsga(executor=None,
         else:
             generation=0
         MU = len(pop)
-        vprint(f'Initializing with existing population, size {MU}')
+        logger.info(f'Initializing with existing population, size {MU}')
     else:
         generation = 0
         #pop = toolbox.population(n=MU)   
         pop = pop_init_random(vocs, n=MU)
-        vprint(f'Initializing with a new population, size {MU}')
+        logger.info(f'Initializing with a new population, size {MU}')
     assert MU % 4 == 0, f'Population size (here {MU}) must be a multiple of 4'        
         
-    vprint(f'Maximum generations: {max_generations}')    
+    logger.info(f'Maximum generations: {max_generations}')    
         
     
     # Individuals that need evaluating
@@ -477,18 +472,17 @@ def cnsga(executor=None,
 
     # Initial population
     futures = [executor.submit(toolbox.evaluate, vec) for vec in vecs] 
-    vprint('____________________________________________________')
-    vprint(f'{MU} fitness calculations for initial generation')
+    logger.info('____________________________________________________')
+    logger.info(f'{MU} fitness calculations for initial generation')
     
     # Clear pop 
     pop = []
     for future in futures:
         res = future.result()
-        vprint('.', end='')
         ind = form_ind(res)
         pop.append(ind)
-    vprint('done.')
-    vprint('Submitting first batch of children')
+    logger.info('done.')
+    logger.info('Submitting first batch of children')
     save(pop, 'initial_pop_', generation)
     
     # This is just to assign the crowding distance to the individuals
@@ -508,8 +502,15 @@ def cnsga(executor=None,
     # Continuous loop
     t0 = time.time()
     done = False
+    
+    # Nice progress bar
+    pbar = tqdm(total=len(futures), disable=not show_progress)
+    
     while not done:
         # Check the status of all futures
+        
+       
+        
         for ix in range(len(futures)):
          
             # Examine a future
@@ -518,16 +519,22 @@ def cnsga(executor=None,
             if fut.done():
                 res = fut.result()
                 ind = form_ind(res)
-                new_offspring.append(ind)   
-                vprint('.', end='')
+                new_offspring.append(ind)  
+                    
+                # Increment the progress bar    
+                pbar.update(1)
+
                 # Refill inputs and save
                 if len(new_vecs) == 0:
+                    pbar.close()
+                    
+                    pbar = tqdm(total=(len(futures)))                        
+                    
                     t1 = time.time()
                     dt = t1-t0
                     t0 = t1
-                    vprint('done.')
-                    vprint('__________________________________________________________')
-                    vprint(f'Generation {generation} completed in {dt/60:0.5f} minutes')
+                    #logger.info('__________________________________________________________')
+                    logger.info(f'Generation {generation} completed in {dt/60:0.5f} minutes')
                     generation += 1
                     
                     save(new_offspring, 'gen_', generation)
@@ -547,9 +554,16 @@ def cnsga(executor=None,
                 vec = new_vecs.pop()
                 future = executor.submit(toolbox.evaluate, vec)
                 futures[ix] = future        
+                    
+
         
         # Slow down polling. Needed for MPI to work well. 
         time.sleep(0.001)
+    
+    # Close any progress bars
+    pbar.update(len(futures))
+#    pbar.clear()    
+    pbar.close()
     
     # Cancel remaining jobs
     for future in futures:

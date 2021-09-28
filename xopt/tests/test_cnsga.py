@@ -3,12 +3,12 @@ from xopt import Xopt
 import yaml
 # Make a proper input file. 
 YAML="""
-xopt: {output_path: null, verbose: true}
+xopt: {output_path: null}
 
 algorithm:
   name: cnsga
   options: {max_generations: 50, population_size: 128, crossover_probability: 0.9, mutation_probability: 1.0,
-  selection: auto, verbose: true, population: null}
+  selection: auto, population: null}
   
 simulation: 
   name: test_TNK

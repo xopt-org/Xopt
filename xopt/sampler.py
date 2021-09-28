@@ -5,6 +5,11 @@ import json
 import time
 import os, sys
 
+import traceback
+import warnings
+import logging
+logger = logging.getLogger(__name__)
+
 sampler_logo = f"""
 
 ███████╗ █████╗ ███╗   ███╗██████╗ ██╗     ███████╗██████╗ 
@@ -20,7 +25,7 @@ Version {__version__}
 """
 
 
-def sampler_evaluate(inputs, evaluate_f=None, verbose=False):
+def sampler_evaluate(inputs, evaluate_f=None):
     """
     Wrapper to catch any exceptions
     
@@ -37,10 +42,10 @@ def sampler_evaluate(inputs, evaluate_f=None, verbose=False):
         err = False
 
     except Exception as ex:
-        outputs = {'Exception': str(ex)}
+        # No need to print a nasty exception
+        logger.warning('Exception caught in cnsga_evaluate')        
+        outputs =  {'Exception':  str(traceback.format_exc())}
         err = True
-        if verbose:
-            print(outputs)
 
     finally:
         result['inputs'] = inputs
@@ -55,28 +60,26 @@ def random_sampler(vocs, evaluate_f,
                    output_path=None,
                    chunk_size=10,
                    max_samples=100,
-                   verbose=False):
+                   verbose=None):
     """
     
     Makes random samples based on vocs
     
     """
 
+    if verbose is not None:
+        warnings.warn('xopt.cnsga verbose option has been deprecated')       
+    
+    
     toolbox = Toolbox()
-    toolbox.register('evaluate', sampler_evaluate, evaluate_f=evaluate_f, verbose=verbose)
-
-    # Verbose print helper
-    def vprint(*a, **k):
-        if verbose:
-            print(*a, **k)
-            sys.stdout.flush()
+    toolbox.register('evaluate', sampler_evaluate, evaluate_f=evaluate_f)
 
     # Logo
-    vprint(sampler_logo)
+    logger.info(sampler_logo)
 
     if not executor:
         executor = DummyExecutor()
-        vprint('No executor given. Running in serial mode.')
+        logger.info('No executor given. Running in serial mode.')
 
         # Setup saving to file
     if output_path:
@@ -87,7 +90,7 @@ def random_sampler(vocs, evaluate_f,
             file = new_date_filename(prefix='sampler-', path=path)
             with open(file, 'w') as f:
                 json.dump(data, f, ensure_ascii=True, cls=NpEncoder)  # , indent=4)
-            vprint('Samples written to:\n', file)
+            logger.info(f'Samples written to: {file}')
 
     else:
         # Dummy save
@@ -120,7 +123,6 @@ def random_sampler(vocs, evaluate_f,
             # Future is done.
             results.append(fut.result())
             all_results.append(fut.result())
-            vprint('.', end='')
             ii += 1
 
             # Submit new job, keep in futures list
@@ -132,7 +134,7 @@ def random_sampler(vocs, evaluate_f,
                 t1 = time.time()
                 dt = t1 - t0
                 t0 = t1
-                vprint(f'{chunk_size} samples completed in {dt / 60:0.5f} minutes')
+                logger.info(f'{chunk_size} samples completed in {dt / 60:0.5f} minutes')
 
                 data = {'vocs': vocs}
                 # Reshape data

@@ -8,6 +8,9 @@ from xopt import tools
 import logging
 from typing import Dict
 
+logger = logging.getLogger(__name__)
+
+
 # -----------------------
 # -----------------------
 # Algorithm
@@ -23,13 +26,12 @@ KNOWN_ALGORITHMS = {
 
 # defaults for required dict keys
 XOPT_DEFAULTS = {
-    'output_path': '.',
-    'logging': logging.WARNING,
+    'output_path': '.'
 }
 
 SIMULATION_DEFAULTS = {
     'name': None,
-    'function': None,
+    'evaluate': None,
     'options': None,
 }
 
@@ -55,7 +57,7 @@ ALL_DEFAULTS = {
     'vocs': VOCS_DEFAULTS
 }
 
-logger = logging.getLogger(__name__)
+
 
 
 def configure_xopt(xopt_config: Dict) -> None:
@@ -115,8 +117,14 @@ def configure_algorithm(alg_config: Dict) -> Dict:
                 if isinstance(val, str):
                     options['generator_options'][name] = tools.get_function(val)
 
+                    
+    # Reserved keys
+    for k in ['vocs', 'executor', 'evaluate_f', 'output_path', 'toolbox']:
+        if k in options:
+            options.pop(k)                    
+                    
     # update alg_config with full_options
-    alg_config.update(options)
+    alg_config['options'] = options
     return alg_config
 
 
@@ -135,7 +143,7 @@ def configure_simulation(sim_config: Dict) -> Dict:
     Example:
     
      {'name': 'astra_with_generator',
-     'evaluate': 'astra.evaluate.evaluate_astra_with_generator',
+     'function': 'astra.evaluate.evaluate_astra_with_generator',
      'options': {'archive_path': '.', 'merit_f': None}}
         
     """
@@ -143,7 +151,16 @@ def configure_simulation(sim_config: Dict) -> Dict:
 
     name = sim_config['name']  # required
 
-    f_name = sim_config['function']
+    
+    if 'evaluate' in sim_config:
+        f_name = sim_config['evaluate']
+    
+    # Legacy syntax
+    elif 'function' in sim_config:
+        f_name = sim_config['function']
+    else:
+        raise ValueError('simulation must provide a function')
+
 
     if f_name:
         f = tools.get_function(f_name)
@@ -204,13 +221,8 @@ def fill_defaults(dict1, defaults):
 
 
 def check_config_against_defaults(test_dict, defaults):
-    if 'verbose' in test_dict:
-        print('WARNING: verbose keyword is depreciated, use `logging` instead.')
-        verbose = test_dict.pop('verbose')
-
-        test_dict['logging'] = logging.WARNING
-        if verbose:
-            test_dict['logging'] = logging.INFO
+    #if 'verbose' in test_dict:
+    #    warnings.warn('WARNING: verbose keyword is depreciated, use `logging` instead.')
 
     for k in test_dict:
         if k not in defaults:
