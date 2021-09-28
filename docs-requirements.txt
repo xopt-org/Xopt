@@ -1,0 +1,7 @@
+pygments
+mkdocs
+mkdocstrings
+mkdocs-material
+mkdocs-jupyter
+livereload
+pytkdocs[numpy-style]
