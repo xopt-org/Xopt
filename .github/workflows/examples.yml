@@ -1,0 +1,34 @@
+name: Examples
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    defaults:
+        run:
+          shell: bash
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [3.7]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Python Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install nbformat
+          pip install nbconvert
+          pip install ipython
+          pip install matplotlib
+
+      - name: Install Xopt
+        run: |
+          pip install .
+
+      - name: Run Examples
+        run: |
+          python run_examples.py -p "$(pwd)" -s
