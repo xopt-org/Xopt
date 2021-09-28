@@ -1,0 +1,71 @@
+site_name: Xopt
+repo_url: https://github.com/ChristopherMayes/lume-astra
+repo_name: "ChristopherMayes/lume-astra"
+
+nav:
+    - Home: index.md
+    #- Examples:
+    #  - examples/xopt_basic.ipynb
+    #  - examples/bayesian_exploration.ipynb
+    - API:
+      - Xopt: api/xopt.md
+      - Bayesian: api/bayesian.md
+
+theme:
+  icon:
+    repo: fontawesome/brands/github
+  name: material
+  
+  custom_dir: overrides   
+  features:
+    - navigation.top
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ChristopherMayes/Xopt
+      name: lume-astra
+
+plugins:
+    - search
+      
+    - mkdocs-jupyter:
+        include_source: True
+          
+    - mkdocstrings:
+        default_handler: python
+        handlers:
+          python:
+            selection:
+              docstring_style: "numpy"
+              inherited_members: false
+              filters:
+                - "!^_"  # exclude all members starting with _
+                - "^__init__$"  # but always include __init__ modules and methods
+            rendering:
+              show_source: true
+              show_root_heading: true
+
+
+
+
+
+
