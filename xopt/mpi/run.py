@@ -23,27 +23,63 @@ mpi_size = comm.Get_size()
 import argparse
 import os
 import sys
+import logging
 from pprint import pprint
 
 
-ARGS = [sys.argv[-1]]
-#ARGS = 'xopt.in'.split()
+from xopt.log import set_handler_with_logger
 
-parser = argparse.ArgumentParser(description='Configure xopt')
-parser.add_argument('input_file', help='input_file')
-args = parser.parse_args(ARGS)
-infile = args.input_file
 
-assert os.path.exists(infile), f'Input file does not exist: {infile}'
+
+
 
 
 if __name__ == "__main__":
-    print(xopt_logo)
-    print('_________________________________')
-    print('Parallel execution with', mpi_size, 'workers')   
+        
+    logger = logging.getLogger('xopt')
+    
+
+    #ARGS = 'xopt.in'.split()
+    
+    parser = argparse.ArgumentParser(description='Configure xopt')
+    parser.add_argument('input_file', help='input_file')
+    
+    parser.add_argument('--logfile', '-l', 
+                        help='Log file to write to')    
+
+    parser.add_argument('--verbose', '-v', action='count',
+                        help='Show more log output')
+    
+    
+    args = parser.parse_args()
+    print(args)
+    
+    infile = args.input_file    
+    assert os.path.exists(infile), f'Input file does not exist: {infile}'    
+
+    level='WARN'
+    if args.verbose:
+        iv = args.verbose
+        if iv == 1:
+            level='WARN'
+        elif iv == 2:
+            level='INFO'
+        elif iv >= 3:
+            level = 'DEBUG'
+     
+        set_handler_with_logger(level=level)    
+            
+    if args.logfile:
+        set_handler_with_logger(file=args.logfile, level=level)    
+        
+    
+    
+    #logger.info(xopt_logo)
+    #logger.info('_________________________________')
+    logger.info(f'Parallel execution with {mpi_size} workers')   
 
     X = Xopt(infile)
-    print(X)
+    #print(X)
     sys.stdout.flush() 
     with MPIPoolExecutor() as executor:
         X.run(executor=executor)

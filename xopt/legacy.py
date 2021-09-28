@@ -1,6 +1,7 @@
 from typing import Dict
 from copy import deepcopy
 import logging
+import warnings
 
 logger = logging.getLogger(__name__)
 
@@ -26,25 +27,21 @@ def reformat_config(config: Dict) -> Dict:
 
     # check xopt
     if 'algorithm' in new_config['xopt']:
-        logger.warning('`algorithm` keyword no longer allowed in xopt config, removing')
+        warnings.warn('`algorithm` keyword no longer allowed in xopt config, removing')
         del new_config['xopt']['algorithm']
 
     if 'verbose' in new_config['xopt']:
-        logger.warning('`verbose` keyword no longer allowed in xopt config, renaming '
-                       'to `logging`')
-        new_config['xopt']['logging'] = logging.INFO if new_config['xopt']['verbose']\
-            else logging.WARNING
+        warnings.warn('`verbose` keyword no longer allowed in xopt config')
         del new_config['xopt']['verbose']
 
     # check simulation
-    if 'evaluate' in new_config['simulation']:
-        logger.warning('`evaluate` keyword no longer allowed in simulation config, '
-                       'moving to `function`')
-        new_config['simulation']['function'] = new_config['simulation']['evaluate']
-        del new_config['simulation']['evaluate']
+    if 'function' in new_config['simulation']:
+        warnings.warn('`function` keyword no longer allowed in simulation config, moving to `evaluate`')
+        new_config['simulation']['evaluate'] = new_config['simulation'].pop('function')
+
 
     if 'templates' in new_config['simulation']:
-        logger.warning('`templates` keyword no longer allowed in simulation config, '
+        warnings.warn('`templates` keyword no longer allowed in simulation config, '
                        'moving to `options`')
         try:
             new_config['simulation']['options'].update({'templates': new_config[
@@ -59,7 +56,7 @@ def reformat_config(config: Dict) -> Dict:
     for ele in ['name', 'description', 'simulation']:
         if ele in new_config['vocs']:
             logger.warning(
-                f'`{ele}` keyword no longer allowed in xopt config, removing')
+                f'`{ele}` keyword no longer allowed in vocs config, removing')
             del new_config['vocs'][ele]
 
     # move templates to simulation

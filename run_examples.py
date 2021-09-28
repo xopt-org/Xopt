@@ -23,7 +23,7 @@ IGNORE = {
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
-SUB_DIRS = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity', ]
+SUB_DIRS = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity']
 
 
 def parse_ipynb(file: Path) -> str:

@@ -9,7 +9,7 @@ class TestAsynchMultiFidelity:
     config = {'vocs': quad_3d.VOCS.copy()}
     config['simulation'] = {'name': 'Quad 3D',
                             'evaluate': 'xopt.tests.evaluators.quad_3d.evaluate'}
-    config['xopt'] = {'output_path': '', 'verbose': True}
+    config['xopt'] = {'output_path': ''}
     config['algorithm'] = {'name': 'multi_fidelity',
                            'options': {
                                'processes': 2,

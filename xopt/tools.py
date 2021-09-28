@@ -75,7 +75,8 @@ def save_config(data, filename, verbose=True):
     """
     if filename.endswith('json'):
         with open(filename, 'w') as f:
-            json.dump(data, f, ensure_ascii=True, indent='  ')
+            json.dump(data, f, ensure_ascii=True, indent='  ',
+                     cls=NpEncoder)
         if verbose:
             print(f'Config written as JSON to {filename}')
     elif filename.endswith('yaml'):
