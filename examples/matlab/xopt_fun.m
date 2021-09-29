@@ -38,3 +38,4 @@ for iarg=1:nlhs
     varargout{iarg}=0;
   end
 end
+disp('>>>xopt_fun_call<<<')

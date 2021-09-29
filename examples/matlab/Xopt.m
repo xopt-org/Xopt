@@ -9,15 +9,15 @@ classdef Xopt < handle
   % * OpenMPI
   %
   % Useage:
-  %  X = Xopt(funcname,x0,nobj) ;
-  %    Associate objective function (funcname) to optimizer, this function must be in the function search path and have a number of input arguments equal t=o the length of x0 vector and nobj output arguments
+  %  X = Xopt(funcname,nvar,nobj) ;
+  %    Associate objective function (funcname) to optimizer, this function must be in the function search path and have nvar input arguments and nobj output arguments
   %    x0: initial point to evaluate objective function (dimensionality = number of decision variables)
   %    nobj: number of objectives
   %  X.runopt ;
   %  Results are in X.results
   %
   % e.g.
-  %  X = Xopt("myobjfun",[0 0],2)
+  %  X = Xopt("myobjfun",2,2)
   %  With the following objective function:
   %  [y1,y2,c1] = function myobjfun(x1,x2)
   %  y1=  x1.^2 + x2.^2 - 1.0 - 0.1 * cos(16 .* atan2(x1, x2)) ;
@@ -30,7 +30,7 @@ classdef Xopt < handle
     PythonExe string = "python" % command line python executable
     Optimizer string {mustBeMember(Optimizer,"mobo")} = "mobo" % Optimizer routine supported by Xopt package
     Nworkers {mustBePositive} = 4
-    verbose logical = false
+    verbose logical = true % Verbosity setting for Xopt output (stored in xopt_out property)
     n_initial_samples {mustBePositive} = 5
     n_steps {mustBePositive} = 10
     batch_size {mustBePositive} = 5
@@ -38,23 +38,25 @@ classdef Xopt < handle
   properties(SetObservable)
     xrange = 1 % Allowable range for objective function input variables (must be scalar [use +/- this value for all] or [2,length(x0)])
     yrange = 1 % Allowable range for return variables from objective function (must be scalar [use +/- this value for all] or [2,nobj])
+    refobj % Reference objective function values [default = 0]
   end
   properties(SetAccess=private)
     fdir % directory containing objective function
     objfun
-    x0 = 0 % starting variables for optimizer (dimensionality = number of decision variables)
-    nobj = 1 % number of objectives (number of objective function return arguments)
+    nobj(1,1) = 1 % number of objectives (number of objective function return arguments)
+    nvar(1,1) = 1 % number of decision variables
     results % structure of results returned from optimizer: see Xopt documentation
     xopt_out % Captured command line output from Xopt execution
     xopt_stat % Status return from Xopt execution
+    nfuneval % Number of function evaluations during run
   end
   properties(Access=private)
     pool
   end
   methods
-    function obj = Xopt(funcname,x0,nobj)
+    function obj = Xopt(funcname,nvar,nobj,refobj)
       %XOPT
-      %X = Xopt(functionhandle,x0,nobj)
+      %X = Xopt(functionhandle,nvar,nobj [,refval])
       
       if nargin<3
         error('Incorrect arguments')
@@ -66,8 +68,11 @@ classdef Xopt < handle
       obj.objfun=funcname;
       d = dir(finfo.file);
       obj.fdir = d.folder ;
-      obj.x0 = x0 ;
       obj.nobj=nobj;
+      obj.nvar=nvar;
+      if exist('refval','var')
+        obj.refobj=refobj;
+      end
     end
     function runopt(obj)
       %RUNOPT Run external Xopt optimizer
@@ -83,7 +88,7 @@ classdef Xopt < handle
       
       % Write input files for Xopt run
       if length(obj.xrange)==1
-        xran=[-ones(size(obj.x0)).*obj.xrange; ones(size(obj.x0)).*obj.xrange] ;
+        xran=[-ones(1,obj.nvar).*obj.xrange; ones(1,obj.nvar).*obj.xrange] ;
       else
         xran=obj.xrange;
       end
@@ -102,9 +107,9 @@ classdef Xopt < handle
       str="BOUND_LOW, BOUND_UP = ";
       for ilim=1:2
         str=str+"[";
-        for ix=1:length(obj.x0)
+        for ix=1:obj.nvar
           str=str+"%g";
-          if ix==length(obj.x0)
+          if ix==obj.nvar
             str=str+"]";
           else
             str=str+", ";
@@ -123,17 +128,17 @@ classdef Xopt < handle
       fprintf(pyfile,"def evaluate_func(inputs, matlab_f='xopt_fun', nargout=%d, verbose=%s):\n",obj.nobj,vtxt);
       fprintf(pyfile,"  info = {'some': 'info', 'about': ['the', 'run']}\n\n");
       str="  ";
-      for ix=1:length(obj.x0)
+      for ix=1:obj.nvar
         str=str+"x"+ix;
-        if ix==length(obj.x0)
+        if ix==obj.nvar
           str=str+" = ";
         else
           str=str+", ";
         end
       end
-      for ix=1:length(obj.x0)
+      for ix=1:obj.nvar
         str=str+"float(inputs['x"+ix+"'])";
-        if ix==length(obj.x0)
+        if ix==obj.nvar
           str=str+"\n\n";
         else
           str=str+", ";
@@ -146,13 +151,13 @@ classdef Xopt < handle
       fprintf(pyfile,"  eng = matlab.engine.connect_matlab(eng_id)\n");
       fprintf(pyfile,"  f = getattr(eng, matlab_f)\n");
       str="  fval = f('"+obj.objfun+"',";
-      for ix=1:length(obj.x0)
+      for ix=1:obj.nvar
         str=str+"x"+ix+", ";
       end
       str=str+"nargout="+(obj.nobj+1)+")\n\n";
       fprintf(pyfile,str);
       fprintf(pyfile,"  # Bounds check\n");
-      for ix=1:length(obj.x0)
+      for ix=1:obj.nvar
         fprintf(pyfile,"  if x%d < BOUND_LOW[%d]:\n",ix,ix-1);
         fprintf(pyfile,"    raise ValueError(f'Input less than {BOUND_LOW[%d]} ')\n",ix-1);
         fprintf(pyfile,"  if x%d > BOUND_UP[%d]:\n",ix,ix-1);
@@ -174,9 +179,13 @@ classdef Xopt < handle
       fprintf(yfile,"  name: %s\n",obj.Optimizer);
       fprintf(yfile,"  options:\n");
       str="    ref: [";
-      for ix=1:length(obj.x0)
-        str=str+obj.x0(ix);
-        if ix==length(obj.x0)
+      for iy=1:obj.nobj
+        if isempty(obj.refobj)
+          str=str+"0";
+        else
+          str=str+obj.refobj(iy);
+        end
+        if iy==obj.nobj
           str=str+"]\n";
         else
           str=str+", ";
@@ -197,7 +206,7 @@ classdef Xopt < handle
       fprintf(yfile,"  simulation: xopt_eval\n");
       fprintf(yfile,"  templates: null\n");
       fprintf(yfile,"  variables:\n");
-      for ix=1:length(obj.x0)
+      for ix=1:obj.nvar
         fprintf(yfile,"    x%d: [%g, %g]\n",ix,xran(1,ix),xran(2,ix));
       end
       fprintf(yfile,"  objectives:\n");
@@ -214,6 +223,7 @@ classdef Xopt < handle
       [stat,output] = system(sprintf("mpirun -n %d %s -m mpi4py.futures -m xopt.mpi.run xopt_eval.yaml",obj.Nworkers,obj.PythonExe));
       obj.xopt_out = output ;
       obj.xopt_stat = stat ;
+      obj.nfuneval = length(regexp(output,">>>xopt_fun_call<<<")) ;
       
       % Read results
       if stat==0
@@ -269,13 +279,19 @@ classdef Xopt < handle
   end
   % Set/Get methods
   methods
+    function set.refobj(obj,val)
+      if ~isempty(val) && length(val)~=obj.nobj %#ok<*MCSUP> 
+        error('Must supply %d reference objective function values',obj.nobj);
+      end
+      obj.refobj=val;
+    end
     function set.xrange(obj,val)
       if length(val)==1
         if val<0
           error('If scalar, must set > 0');
         end
       else
-        if length(val)~=length(obj.x0) %#ok<MCSUP>
+        if length(val)~=obj.nvar
           error('Length of xrange must equal length of x0');
         end
       end
@@ -287,7 +303,7 @@ classdef Xopt < handle
           error('If scalar, must set > 0');
         end
       else
-        if length(val)~=obj.nobj %#ok<MCSUP>
+        if length(val)~=obj.nobj
           error('Length of yrange must equal nobj');
         end
       end
