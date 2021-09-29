@@ -19,15 +19,13 @@ import sys
 class Xopt:
     """
     
-    input file should be a dict, JSON, or YAML file with top level keys
+    Object to handle a single optimization problem.
     
-    xopt:
+    Parameters
+    ----------
+    config: dict, YAML text, JSON text
+        input file should be a dict, JSON, or YAML file with top level keys
     
-    algorithm:  
-    
-    simulation:
-    
-    vocs:
           
     """
 

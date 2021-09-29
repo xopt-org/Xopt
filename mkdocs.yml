@@ -1,12 +1,12 @@
 site_name: Xopt
-repo_url: https://github.com/ChristopherMayes/lume-astra
-repo_name: "ChristopherMayes/lume-astra"
+repo_url: https://github.com/ChristopherMayes/Xopt
+repo_name: ChristopherMayes/Xopt
 
 nav:
     - Home: index.md
-    #- Examples:
-    #  - examples/xopt_basic.ipynb
-    #  - examples/bayesian_exploration.ipynb
+    - Examples:
+      - examples/xopt_basic.ipynb
+      - examples/bayesian_exploration.ipynb
     - API:
       - Xopt: api/xopt.md
       - Bayesian: api/bayesian.md
@@ -42,7 +42,7 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/ChristopherMayes/Xopt
-      name: lume-astra
+      name: Xopt
 
 plugins:
     - search
