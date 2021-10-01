@@ -123,7 +123,7 @@ def check_training_data_shape(train_x: [Tensor],
                 f'does not match number of vocs {vocs_type} == ' \
                 f'{len(vocs[vocs_type])}'
         else:
-            if vocs[vocs_type] is not None:
+            if vocs[vocs_type]:
                 raise RuntimeError('Training data for `{vocs_type}` is None')
 
 
@@ -189,7 +189,6 @@ def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
     """
     Wrapper to catch any exceptions
 
-
     inputs: possible inputs to evaluate_f (a single positional argument)
 
     evaluate_f: a function that takes a dict with keys, and returns some output
@@ -203,11 +202,13 @@ def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
         outputs = evaluate_f(inputs, *eval_args)
 
     except Exception as ex:
+        # No need to print a nasty exception
+        logger.warning(f'Exception caught in {__name__}')          
         outputs = {'Exception': str(ex),
                    'Traceback': traceback.print_tb(ex.__traceback__)}
-        err = True
         if verbose:
             print(outputs)
+        err = True
 
     finally:
         result['inputs'] = inputs

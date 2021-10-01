@@ -1,3 +1,5 @@
+from typing import Dict
+from xopt.tools import get_function
 from . import generators
 from .asynch_optimize import asynch_optimize
 from .optimize import optimize
@@ -62,9 +64,12 @@ def bayesian_optimize(vocs, evaluate_f,
 
        """
 
-    assert (isinstance(generator_options, dict) and
-            'acquisition_function' in generator_options)
-    acq_func = generator_options.pop('acquisition_function')
+    try:
+    # Required
+        acq_func = get_function(generator_options.pop('acquisition_function', None))
+    except ValueError:
+        raise ValueError('acquisition_function is a required parameter of generator_options.')
+
     generator = generators.generator.BayesianGenerator(vocs,
                                                        acq_func,
                                                        **generator_options)
@@ -133,7 +138,7 @@ def mobo(vocs, evaluate_f,
         Nested list to provide initial candiates to evaluate,
         overwrites n_initial_samples
 
-    verbose : bool, defualt = True
+    verbose : bool, default = True
         Print out messages during optimization
 
     generator_options : dict
@@ -146,9 +151,9 @@ def mobo(vocs, evaluate_f,
 
     """
 
-    if generator_options is None:
-        generator_options = {}
-
+    # Handle None
+    generator_options = generator_options or {}
+                 
     generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
     return optimize(vocs,
                     evaluate_f,
@@ -222,8 +227,9 @@ def bayesian_exploration(vocs, evaluate_f,
             Dictionary with output data at the end of optimization
 
         """
-    if generator_options is None:
-        generator_options = {}
+    
+    # Handle None
+    generator_options = generator_options or {}
 
     generator = generators.exploration.BayesianExplorationGenerator(vocs,
                                                                     **generator_options)
@@ -320,8 +326,10 @@ def multi_fidelity_optimize(vocs, evaluate_f,
             Dictionary with output data at the end of optimization
 
         """
-    if generator_options is None:
-        generator_options = {}
+    
+    
+    # Handle None
+    generator_options = generator_options or {}
 
     generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
