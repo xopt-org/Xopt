@@ -11,7 +11,7 @@ from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_co
 from xopt import __version__
 from deap import algorithms, base, tools
 
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 
 import numpy as np
 import json
@@ -217,7 +217,7 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     
     except Exception as ex:
         # No need to print a nasty logger exception
-        logger.warning('Exception caught in cnsga_evaluate')
+        logger.warning(f'Exception caught in {__name__}')   
         outputs = {'Exception':  str(traceback.format_exc())}
         
         # Dummy output
