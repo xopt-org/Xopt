@@ -9,7 +9,8 @@ nav:
       - examples/bayesian_exploration.ipynb
     - API:
       - Xopt: api/xopt.md
-      - Bayesian: api/bayesian.md
+      - Bayesian: 
+        - algorithms: api/bayesian/algorithms.md
 
 theme:
   icon:
