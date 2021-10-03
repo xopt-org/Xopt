@@ -65,7 +65,7 @@ def bayesian_optimize(vocs, evaluate_f,
        """
 
     try:
-    # Required
+        # Required
         acq_func = get_function(generator_options.pop('acquisition_function', None))
     except ValueError:
         raise ValueError('acquisition_function is a required parameter of generator_options.')

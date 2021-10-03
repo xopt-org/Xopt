@@ -203,7 +203,7 @@ def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
 
     except Exception as ex:
         # No need to print a nasty exception
-        logger.warning(f'Exception caught in {__name__}')          
+        logger.error(f'Exception caught in {__name__}')          
         outputs = {'Exception': str(ex),
                    'Traceback': traceback.print_tb(ex.__traceback__)}
         if verbose:

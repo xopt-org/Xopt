@@ -217,7 +217,7 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
     
     except Exception as ex:
         # No need to print a nasty logger exception
-        logger.warning(f'Exception caught in {__name__}')   
+        logger.error(f'Exception caught in {__name__}')   
         outputs = {'Exception':  str(traceback.format_exc())}
         
         # Dummy output
