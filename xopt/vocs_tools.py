@@ -167,7 +167,7 @@ def inputs_from_vec(vec, vocs=None):
 
     # Constants    
     if 'constants' in vocs:
-        inputs.update(vocs['constants'])
+        inputs.update(vocs['constants'] or {})
 
     # Handle linked variables
     if 'linked_variables' in vocs and vocs['linked_variables']:

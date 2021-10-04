@@ -43,7 +43,7 @@ def sampler_evaluate(inputs, evaluate_f=None):
 
     except Exception as ex:
         # No need to print a nasty exception
-        logger.warning(f'Exception caught in {__name__}')      
+        logger.error(f'Exception caught in {__name__}')      
         outputs =  {'Exception':  str(traceback.format_exc())}
         err = True
 

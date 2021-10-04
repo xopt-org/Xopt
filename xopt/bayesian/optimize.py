@@ -95,8 +95,10 @@ def optimize(vocs: Dict,
         if not (vocs['linked_variables'] == {} or vocs['linked_variables'] is None):
             raise NotImplementedError('linked variables not implemented yet')
 
-    if tkwargs is None:
-        tkwargs = {}
+    
+    # Handle None, False -> {}
+    tkwargs = tkwargs or {}
+
 
     logger.info(f'started running optimization with generator: {candidate_generator}')
 
