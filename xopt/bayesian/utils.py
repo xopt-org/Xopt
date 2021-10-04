@@ -123,8 +123,8 @@ def check_training_data_shape(train_x: [Tensor],
                 f'does not match number of vocs {vocs_type} == ' \
                 f'{len(vocs[vocs_type])}'
         else:
-            if not vocs[vocs_type]:
-                raise RuntimeError('Training data for `{vocs_type}` is None')
+            if vocs[vocs_type]:
+                raise RuntimeError(f"Training data for `{vocs_type}` is empty, but  `vocs['{vocs_type}'] = {vocs[vocs_type]}`")
 
 
 def get_feasability_constraint_status(train_y: [Tensor],
