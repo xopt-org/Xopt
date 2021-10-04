@@ -128,7 +128,7 @@ Developers
 ===============
 
 Install dependencies:
-`conda install numpy pyyaml deap mpi4py torch botorch gpytorch pandas ipywidgets tqdm`
+`conda install numpy pyyaml deap mpi4py pytorch botorch gpytorch pandas ipywidgets tqdm`
 
 Clone this repository:
 `git clone https://github.com/ChristopherMayes/xopt.git`
