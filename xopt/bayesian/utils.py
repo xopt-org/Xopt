@@ -123,7 +123,7 @@ def check_training_data_shape(train_x: [Tensor],
                 f'does not match number of vocs {vocs_type} == ' \
                 f'{len(vocs[vocs_type])}'
         else:
-            if vocs[vocs_type]:
+            if not vocs[vocs_type]:
                 raise RuntimeError('Training data for `{vocs_type}` is None')
 
 
