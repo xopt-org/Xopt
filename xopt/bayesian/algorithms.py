@@ -1,3 +1,5 @@
+from typing import Dict
+from xopt.tools import get_function
 from . import generators
 from .asynch_optimize import asynch_optimize
 from .optimize import optimize
@@ -15,56 +17,59 @@ def bayesian_optimize(vocs, evaluate_f,
                       verbose=True,
                       generator_options=None):
     """
-       Multi-objective Bayesian optimization
+    Multi-objective Bayesian optimization
 
-       Parameters
-       ----------
-       vocs : dict
-           Varabiles, objectives, constraints and statics dictionary,
-           see xopt documentation for detials
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary,
+        see xopt documentation for detials
 
-       evaluate_f : callable
-           Returns dict of outputs after problem has been evaluated
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
 
-       n_steps : int, default = 1
-           Number of optimization steps to execute
+    n_steps : int, default = 1
+        Number of optimization steps to execute
 
-       n_initial_samples : int, defualt = 1
-           Number of initial samples to take before using the model,
-           overwritten by initial_x
+    n_initial_samples : int, defualt = 1
+        Number of initial samples to take before using the model,
+        overwritten by initial_x
 
-       output_path : str, default = ''
-           Path location to place outputs
+    output_path : str, default = ''
+        Path location to place outputs
 
-       custom_model : callable, optional
-           Function of the form f(train_inputs, train_outputs) that
-           returns a trained custom model
+    custom_model : callable, optional
+        Function of the form f(train_inputs, train_outputs) that
+        returns a trained custom model
 
-       executor : Executor, optional
-           Executor object to run evaluate_f
+    executor : Executor, optional
+        Executor object to run evaluate_f
 
-       restart_file : str, optional
-           File location of JSON file that has previous data
+    restart_file : str, optional
+        File location of JSON file that has previous data
 
-       initial_x : list, optional
-           Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
+    initial_x : list, optional
+        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
 
-       verbose : bool, defualt = True
-           Print out messages during optimization
+    verbose : bool, defualt = True
+        Print out messages during optimization
 
-       generator_options : dict
-           Dictionary of options for MOBO
+    generator_options : dict
+        Dictionary of options for MOBO
 
-       Returns
-       -------
-       results : dict
-           Dictionary with output data at the end of optimization
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
 
-       """
+    """
 
-    assert (isinstance(generator_options, dict) and
-            'acquisition_function' in generator_options)
-    acq_func = generator_options.pop('acquisition_function')
+    try:
+        # Required
+        acq_func = get_function(generator_options.pop('acquisition_function', None))
+    except ValueError:
+        raise ValueError('acquisition_function is a required parameter of generator_options.')
+
     generator = generators.generator.BayesianGenerator(vocs,
                                                        acq_func,
                                                        **generator_options)
@@ -133,7 +138,7 @@ def mobo(vocs, evaluate_f,
         Nested list to provide initial candiates to evaluate,
         overwrites n_initial_samples
 
-    verbose : bool, defualt = True
+    verbose : bool, default = True
         Print out messages during optimization
 
     generator_options : dict
@@ -146,9 +151,9 @@ def mobo(vocs, evaluate_f,
 
     """
 
-    if generator_options is None:
-        generator_options = {}
-
+    # Handle None
+    generator_options = generator_options or {}
+                 
     generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
     return optimize(vocs,
                     evaluate_f,
@@ -176,54 +181,55 @@ def bayesian_exploration(vocs, evaluate_f,
                          verbose=True,
                          generator_options=None):
     """
-        Bayesian Exploration
+    Bayesian Exploration
 
-        Parameters
-        ----------
-        vocs : dict
-            Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
 
-        evaluate_f : callable
-            Returns dict of outputs after problem has been evaluated
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
 
-        n_steps : int, default = 1
-            Number of optimization steps to execute
+    n_steps : int, default = 1
+        Number of optimization steps to execute
 
-        n_initial_samples : int, defualt = 1
-            Number of initial samples to take before using the model, overwritten by initial_x
+    n_initial_samples : int, defualt = 1
+        Number of initial samples to take before using the model, overwritten by initial_x
 
-        output_path : str, default = ''
-            Path location to place outputs
+    output_path : str, default = ''
+        Path location to place outputs
 
-        custom_model : callable, optional
-            Function of the form f(train_inputs, train_outputs) that returns a trained custom model
+    custom_model : callable, optional
+        Function of the form f(train_inputs, train_outputs) that returns a trained custom model
 
-        executor : Executor, optional
-            Executor object to run evaluate_f
+    executor : Executor, optional
+        Executor object to run evaluate_f
 
-        restart_file : str, optional
-            File location of JSON file that has previous data
+    restart_file : str, optional
+        File location of JSON file that has previous data
 
-        initial_x : list, optional
-            Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
+    initial_x : list, optional
+        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
 
-        verbose : bool, defualt = True
-            Print out messages during optimization
+    verbose : bool, defualt = True
+        Print out messages during optimization
 
-        use_gpu : bool, default = False
-            Specify if GPU should be used if available
+    use_gpu : bool, default = False
+        Specify if GPU should be used if available
 
-        generator_options : dict
-            Dictionary of options for MOBO
+    generator_options : dict
+        Dictionary of options for MOBO
 
-        Returns
-        -------
-        results : dict
-            Dictionary with output data at the end of optimization
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
 
-        """
-    if generator_options is None:
-        generator_options = {}
+    """
+    
+    # Handle None
+    generator_options = generator_options or {}
 
     generator = generators.exploration.BayesianExplorationGenerator(vocs,
                                                                     **generator_options)
@@ -254,74 +260,76 @@ def multi_fidelity_optimize(vocs, evaluate_f,
                             verbose=True,
                             generator_options=None):
     """
-        Multi-fidelity optimization using Bayesian optimization
+    Multi-fidelity optimization using Bayesian optimization
 
-        This optimization algorithm attempts to reduce the computational cost of
-        optimizing a scalar function through the use of many low-cost approximate
-        evaluations. We create a GP model that models the function f(x,c) where x
-        represents free parameters and c in the range [0,1] reperestents the `cost`.
-        This algorithm uses the knoweldge gradient approach
-        (https://botorch.org/tutorials/multi_fidelity_bo) to choose points that are
-        likely to provide the most information about the optimimum point at maximum
-        fidelity (c=1).
+    This optimization algorithm attempts to reduce the computational cost of
+    optimizing a scalar function through the use of many low-cost approximate
+    evaluations. We create a GP model that models the function f(x,c) where x
+    represents free parameters and c in the range [0,1] reperestents the `cost`.
+    This algorithm uses the knoweldge gradient approach
+    (https://botorch.org/tutorials/multi_fidelity_bo) to choose points that are
+    likely to provide the most information about the optimimum point at maximum
+    fidelity (c=1).
 
-        Since evaluations have variable cost, we specify a maximum `budget` that
-        stops the algorithm when the total cost exceeds the budget. Cost for a single
-        evaluation is given by `cost` + 'base_cost`.
+    Since evaluations have variable cost, we specify a maximum `budget` that
+    stops the algorithm when the total cost exceeds the budget. Cost for a single
+    evaluation is given by `cost` + 'base_cost`.
 
-        This algoritm is most efficient when used with a parallel executor,
-        as evaluations will be done asynchronously, allowing multiple cheap
-        simulations to run in parallel with expensive ones.
+    This algoritm is most efficient when used with a parallel executor,
+    as evaluations will be done asynchronously, allowing multiple cheap
+    simulations to run in parallel with expensive ones.
 
-        Parameters
-        ----------
-        vocs : dict
-            Varabiles, objectives, constraints and statics dictionary, see xopt
-            documentation for detials
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary, see xopt
+        documentation for detials
 
-        evaluate_f : callable
-            Returns dict of outputs after problem has been evaluated
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
 
-        budget : int, default = 1
-            Optimization budget
+    budget : int, default = 1
+        Optimization budget
 
-        processes : int, defualt = 1
-            Number of parallel processes to use or number of candidates to generate
-            at each step.
+    processes : int, defualt = 1
+        Number of parallel processes to use or number of candidates to generate
+        at each step.
 
-        base_cost : float, defualt = 1.0
-            Base cost of running simulations. Total cost is base + `cost` variable
+    base_cost : float, defualt = 1.0
+        Base cost of running simulations. Total cost is base + `cost` variable
 
-        output_path : str, default = ''
-            Path location to place outputs
+    output_path : str, default = ''
+        Path location to place outputs
 
-        custom_model : callable, optional
-            Function of the form f(train_inputs, train_outputs) that returns a trained
-            custom model
+    custom_model : callable, optional
+        Function of the form f(train_inputs, train_outputs) that returns a trained
+        custom model
 
-        executor : Executor, optional
-            Executor object to run evaluate_f
+    executor : Executor, optional
+        Executor object to run evaluate_f
 
-        restart_file : str, optional
-            File location of JSON file that has previous data
+    restart_file : str, optional
+        File location of JSON file that has previous data
 
-        initial_x : list, optional
-            Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
+    initial_x : list, optional
+        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
 
-        verbose : bool, defualt = True
-            Print out messages during optimization
+    verbose : bool, defualt = True
+        Print out messages during optimization
 
-        generator_options : dict
-            Dictionary of options for MOBO
+    generator_options : dict
+        Dictionary of options for MOBO
 
-        Returns
-        -------
-        results : dict
-            Dictionary with output data at the end of optimization
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
 
-        """
-    if generator_options is None:
-        generator_options = {}
+    """
+    
+    
+    # Handle None
+    generator_options = generator_options or {}
 
     generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
