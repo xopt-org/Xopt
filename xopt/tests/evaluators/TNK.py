@@ -1,3 +1,4 @@
+from typing import Dict
 import numpy as np
 
 VOCS = {
@@ -41,7 +42,7 @@ def TNK(individual):
 
 
 # labeled version
-def evaluate_TNK(inputs, extra_option='abc', **params):
+def evaluate_TNK(inputs:Dict, extra_option='abc', **params):
     info = {'some': 'info', 'about': ['the', 'run']}
     ind = [inputs['x1'], inputs['x2']]
 
