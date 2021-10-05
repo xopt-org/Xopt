@@ -51,8 +51,9 @@ class BayesianExploration(AnalyticAcquisitionFunction):
                 self.sigma = torch.eye(self.model.train_inputs[0].shape[-1]) * 1e6
             else:
                 raise NotImplementedError(
-                    "Get Ryan to make corrections for this type of model in proximal acq, "
-                    "or specify your own sigma matrix"
+                    "Get Ryan (rroussel@slac.stanford.edu) to make corrections for "
+                    "this type of model in proximal acq, or specify your own sigma "
+                    "matrix "
                 )
         else:
             self.sigma = sigma
