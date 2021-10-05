@@ -1,0 +1,10 @@
+[flake8]
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    versioneer.py,
+    xopt/_version.py
+    .ipynb_checkpoints
+max-line-length = 115

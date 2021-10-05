@@ -108,15 +108,6 @@ def configure_algorithm(alg_config: Dict) -> Dict:
         options.update(alg_config['options'])
     defaults = tools.get_function_defaults(f)
     fill_defaults(options, defaults)
-
-    # see if generator_options are in options - functions can be specified in
-    # generator options
-    if 'generator_options' in options:
-        if options['generator_options'] is not None:
-            for name, val in options['generator_options'].items():
-                if isinstance(val, str):
-                    options['generator_options'][name] = tools.get_function(val)
-
                     
     # Reserved keys
     for k in ['vocs', 'executor', 'evaluate_f', 'output_path', 'toolbox']:
@@ -195,10 +186,6 @@ def configure_vocs(vocs_config):
     check_config_against_defaults(vocs_config, VOCS_DEFAULTS)
     fill_defaults(vocs_config, VOCS_DEFAULTS)
 
-    for key in vocs_config:
-        if vocs_config[key] == {}:
-            vocs_config[key] = None
-
     return vocs_config
 
 
@@ -216,7 +203,7 @@ def fill_defaults(dict1, defaults):
     for k, v in defaults.items():
         if k not in dict1:
             dict1[k] = deepcopy(v)
-
+            
     return dict1
 
 

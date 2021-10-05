@@ -1,10 +1,27 @@
+from packaging import version
+import pymoo
+
 from . import vocs_tools
 from .tools import DummyExecutor
 
-from pymoo.model.problem import Problem
-from pymoo.algorithms.nsga2 import NSGA2
-from pymoo.operators.sampling.random_sampling import FloatRandomSampling
-from pymoo.operators.crossover.simulated_binary_crossover import SimulatedBinaryCrossover
+
+DEPRECATED_PYMOO = True
+if version.parse(pymoo.__version__) >= version.parse("0.5.0"):
+    # pymoo reorganized the project with 0.5.0
+    # see more here: https://github.com/anyoptimization/pymoo/releases/tag/0.5.0
+    # from pymoo.core.problem import ElementwiseProblem as Problem
+    from pymoo.core.problem import Problem
+    from pymoo.algorithms.moo.nsga2 import NSGA2
+    from pymoo.operators.sampling.rnd import FloatRandomSampling
+    from pymoo.operators.crossover.sbx import SimulatedBinaryCrossover
+    DEPRECATED_PYMOO = False
+else:
+    # Backwards compatibility with < 0.5.0
+    from pymoo.model.problem import Problem
+    from pymoo.algorithms.nsga2 import NSGA2
+    from pymoo.operators.sampling.random_sampling import FloatRandomSampling
+    from pymoo.operators.crossover.simulated_binary_crossover import SimulatedBinaryCrossover
+
 from pymoo.optimize import minimize
 
 import autograd.numpy as anp
@@ -22,6 +39,7 @@ def dummy_f(n_var=2, n_obj=2, n_constr=2):
     res['G'] = n_constr*[a]
     
     return res
+
 
 class ContinuousProblem(Problem):
     """
@@ -44,23 +62,30 @@ class ContinuousProblem(Problem):
         evaluate_f=None,         
         archive_callback=None,
         rolling_evaluate=True):  
-                 
-        # Require this
-        assert elementwise_evaluation, 'Must have elementwise_evaluation for continuous evaluation '      
-        
+
+        if DEPRECATED_PYMOO:
+            # Require this
+            assert elementwise_evaluation, 'Must have elementwise_evaluation for continuous evaluation '
+
+        init_args = dict(
+            n_var=n_var,
+            n_obj=n_obj,
+            n_constr=n_constr,
+            xl=xl,
+            xu=xu,
+            type_var=type_var,
+            evaluation_of=evaluation_of,
+            # replace_nan_values_of= replace_nan_values_of,
+            parallelization=parallelization,
+            elementwise_evaluation=elementwise_evaluation,
+            callback=callback
+        )
+
+        if not DEPRECATED_PYMOO:
+            init_args.pop('elementwise_evaluation')
+
         # Try to make as similar to normal routine
-        super().__init__(
-                 n_var=n_var,
-                 n_obj=n_obj,
-                 n_constr=n_constr,
-                 xl=xl,
-                 xu=xu,
-                 type_var=type_var,
-                 evaluation_of=evaluation_of,
-                 #replace_nan_values_of= replace_nan_values_of,
-                 parallelization=parallelization,
-                 elementwise_evaluation=elementwise_evaluation,
-                 callback=callback)
+        super().__init__(**init_args)
         
         if not parallelization:
             self.executor = DummyExecutor()
@@ -88,9 +113,12 @@ class ContinuousProblem(Problem):
         Submit n dummy jobs
         """
         return [self.executor.submit(dummy_f, n_var=self.n_var, n_obj=self.n_obj, n_constr=self.n_constr) for i in range(n)]    
-    
+
+    def _evaluate(self, X, out, *args, **kwargs):
+        return self._evaluate_elementwise(X=X, out=out, calc_gradient=None)
+
     #def _evaluate(self, X, out, *args, **kwargs):
-    def _evaluate_elementwise(self, X, calc_gradient, out, *args, **kwargs):        
+    def _evaluate_elementwise(self, X, calc_gradient, out, *args, **kwargs):
         """
         Rolling evaluate.
         
@@ -162,7 +190,7 @@ def cmoo_evaluate(vec, labeled_evaluate_f=None, vocs=None, include_inputs_and_ou
     Otherwise, evaluate_f should return pure numbers as:
         vec -> (objectives, constraints)
 
-    This function will be evaulated by a worker. 
+    This function will be evaluated by a worker.
     
     Any exceptions will be caught, and this will return:
         error = True
