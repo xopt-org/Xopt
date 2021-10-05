@@ -1,22 +1,49 @@
 from typing import Dict
 from xopt.tools import get_function
 from . import generators
-from .asynch_optimize import asynch_optimize
 from .optimize import optimize
 from .models.models import create_multi_fidelity_model
+
+KWARG_DEFAULTS = {'output_path': None,
+                  'custom_model': None,
+                  'executor': None,
+                  'restart_file': None,
+                  'initial_x': None,
+                  'generator_options': {}}
+
+KWARG_DOCSTRING = """
+        output_path : str, default = ''
+           Path location to place outputs
+
+       custom_model : callable, optional
+           Function of the form f(train_inputs, train_outputs) that
+           returns a trained custom model
+
+       executor : Executor, optional
+           Executor object to run evaluate_f
+
+       restart_file : str, optional
+           File location of JSON file that has previous data
+
+       initial_x : list, optional
+           Nested list to provide initial candiates to evaluate, overwrites 
+           n_initial_samples
+
+       verbose : bool, defualt = True
+           Print out messages during optimization
+
+       generator_options : dict
+           Dictionary of options for MOBO
+
+    """
 
 
 def bayesian_optimize(vocs, evaluate_f,
                       n_steps=1,
                       n_initial_samples=1,
-                      output_path=None,
-                      custom_model=None,
-                      executor=None,
-                      restart_file=None,
-                      initial_x=None,
-                      verbose=True,
-                      generator_options=None):
-    """
+                      **kwargs):
+    f"""
+                      
     Multi-objective Bayesian optimization
 
     Parameters
@@ -38,37 +65,25 @@ def bayesian_optimize(vocs, evaluate_f,
     output_path : str, default = ''
         Path location to place outputs
 
-    custom_model : callable, optional
-        Function of the form f(train_inputs, train_outputs) that
-        returns a trained custom model
-
-    executor : Executor, optional
-        Executor object to run evaluate_f
-
-    restart_file : str, optional
-        File location of JSON file that has previous data
-
-    initial_x : list, optional
-        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
-
-    verbose : bool, defualt = True
-        Print out messages during optimization
-
-    generator_options : dict
-        Dictionary of options for MOBO
+    {KWARG_DOCSTRING}
 
     Returns
     -------
     results : dict
         Dictionary with output data at the end of optimization
-
     """
+
+    options = KWARG_DEFAULTS.copy()
+    options.update(kwargs)
+
+    generator_options = options.pop('generator_options')
 
     try:
         # Required
         acq_func = get_function(generator_options.pop('acquisition_function', None))
     except ValueError:
-        raise ValueError('acquisition_function is a required parameter of generator_options.')
+        raise ValueError('acquisition_function is a required parameter of '
+                         'generator_options.')
 
     generator = generators.generator.BayesianGenerator(vocs,
                                                        acq_func,
@@ -78,13 +93,8 @@ def bayesian_optimize(vocs, evaluate_f,
                     generator,
                     n_steps,
                     n_initial_samples,
-                    output_path,
-                    custom_model,
-                    executor,
-                    restart_file,
-                    initial_x,
-                    verbose,
-                    generator.tkwargs
+                    tkwargs=generator.tkwargs,
+                    **options
                     )
 
 
@@ -92,14 +102,8 @@ def mobo(vocs, evaluate_f,
          ref=None,
          n_steps=1,
          n_initial_samples=1,
-         output_path=None,
-         custom_model=None,
-         executor=None,
-         restart_file=None,
-         initial_x=None,
-         verbose=True,
-         generator_options=None):
-    """
+         **kwargs):
+    f"""
     Multi-objective Bayesian optimization
 
     Parameters
@@ -121,28 +125,7 @@ def mobo(vocs, evaluate_f,
         Number of initial samples to take before using the model,
         overwritten by initial_x
 
-    output_path : str, default = ''
-        Path location to place outputs
-
-    custom_model : callable, optional
-        Function of the form f(train_inputs, train_outputs) that returns
-        a trained custom model
-
-    executor : Executor, optional
-        Executor object to run evaluate_f
-
-    restart_file : str, optional
-        File location of JSON file that has previous data
-
-    initial_x : list, optional
-        Nested list to provide initial candiates to evaluate,
-        overwrites n_initial_samples
-
-    verbose : bool, default = True
-        Print out messages during optimization
-
-    generator_options : dict
-        Dictionary of options for MOBO
+    {KWARG_DOCSTRING}
 
     Returns
     -------
@@ -151,37 +134,31 @@ def mobo(vocs, evaluate_f,
 
     """
 
-    # Handle None
-    generator_options = generator_options or {}
-                 
-    generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
+    options = KWARG_DEFAULTS.copy()
+    options.update(kwargs)
+
+    generator_options = options.pop('generator_options')
+
+    generator = generators.mobo.MOBOGenerator(vocs,
+                                              ref,
+                                              **generator_options)
+
     return optimize(vocs,
                     evaluate_f,
                     generator,
                     n_steps,
                     n_initial_samples,
-                    output_path,
-                    custom_model,
-                    executor,
-                    restart_file,
-                    initial_x,
-                    verbose,
-                    generator.tkwargs
+                    tkwargs=generator.tkwargs,
+                    **options
                     )
 
 
 def bayesian_exploration(vocs, evaluate_f,
                          n_steps=1,
                          n_initial_samples=1,
-                         output_path=None,
-                         custom_model=None,
-                         executor=None,
-                         restart_file=None,
-                         initial_x=None,
-                         verbose=True,
-                         generator_options=None):
-    """
-    Bayesian Exploration
+                         **kwargs):
+    f"""
+        Bayesian Exploration
 
     Parameters
     ----------
@@ -197,29 +174,7 @@ def bayesian_exploration(vocs, evaluate_f,
     n_initial_samples : int, defualt = 1
         Number of initial samples to take before using the model, overwritten by initial_x
 
-    output_path : str, default = ''
-        Path location to place outputs
-
-    custom_model : callable, optional
-        Function of the form f(train_inputs, train_outputs) that returns a trained custom model
-
-    executor : Executor, optional
-        Executor object to run evaluate_f
-
-    restart_file : str, optional
-        File location of JSON file that has previous data
-
-    initial_x : list, optional
-        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
-
-    verbose : bool, defualt = True
-        Print out messages during optimization
-
-    use_gpu : bool, default = False
-        Specify if GPU should be used if available
-
-    generator_options : dict
-        Dictionary of options for MOBO
+    {KWARG_DOCSTRING}
 
     Returns
     -------
@@ -227,24 +182,21 @@ def bayesian_exploration(vocs, evaluate_f,
         Dictionary with output data at the end of optimization
 
     """
-    
-    # Handle None
-    generator_options = generator_options or {}
+
+    options = KWARG_DEFAULTS.copy()
+    options.update(kwargs)
+
+    generator_options = options.pop('generator_options')
 
     generator = generators.exploration.BayesianExplorationGenerator(vocs,
                                                                     **generator_options)
     return optimize(vocs,
                     evaluate_f,
                     generator,
-                    n_steps,
-                    n_initial_samples,
-                    output_path,
-                    custom_model,
-                    executor,
-                    restart_file,
-                    initial_x,
-                    verbose,
-                    generator.tkwargs
+                    n_steps=n_steps,
+                    n_initial_samples=n_initial_samples,
+                    tkwargs=generator.tkwargs,
+                    **options
                     )
 
 
@@ -252,15 +204,9 @@ def multi_fidelity_optimize(vocs, evaluate_f,
                             budget=1,
                             processes=1,
                             base_cost=1.0,
-                            output_path=None,
-                            custom_model=create_multi_fidelity_model,
-                            executor=None,
-                            restart_file=None,
-                            initial_x=None,
-                            verbose=True,
-                            generator_options=None):
-    """
-    Multi-fidelity optimization using Bayesian optimization
+                            **kwargs):
+    f"""
+        Multi-fidelity optimization using Bayesian optimization
 
     This optimization algorithm attempts to reduce the computational cost of
     optimizing a scalar function through the use of many low-cost approximate
@@ -298,27 +244,8 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     base_cost : float, defualt = 1.0
         Base cost of running simulations. Total cost is base + `cost` variable
 
-    output_path : str, default = ''
-        Path location to place outputs
+    {KWARG_DOCSTRING}
 
-    custom_model : callable, optional
-        Function of the form f(train_inputs, train_outputs) that returns a trained
-        custom model
-
-    executor : Executor, optional
-        Executor object to run evaluate_f
-
-    restart_file : str, optional
-        File location of JSON file that has previous data
-
-    initial_x : list, optional
-        Nested list to provide initial candiates to evaluate, overwrites n_initial_samples
-
-    verbose : bool, defualt = True
-        Print out messages during optimization
-
-    generator_options : dict
-        Dictionary of options for MOBO
 
     Returns
     -------
@@ -326,26 +253,24 @@ def multi_fidelity_optimize(vocs, evaluate_f,
         Dictionary with output data at the end of optimization
 
     """
-    
-    
-    # Handle None
-    generator_options = generator_options or {}
+    options = KWARG_DEFAULTS.copy()
+    options.update(kwargs)
+
+    generator_options = options.pop('generator_options')
+
+    if options['custom_model'] is None:
+        options['custom_model'] = create_multi_fidelity_model
 
     generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
                                                                  **generator_options)
 
-    return asynch_optimize(vocs,
-                           evaluate_f,
-                           generator,
-                           budget,
-                           processes,
-                           base_cost,
-                           output_path,
-                           custom_model,
-                           executor,
-                           restart_file,
-                           initial_x,
-                           generator.tkwargs
-                           )
-
+    return optimize(vocs,
+                    evaluate_f,
+                    generator,
+                    budget=budget,
+                    processes=processes,
+                    base_cost=base_cost,
+                    tkwargs=generator.tkwargs,
+                    **options
+                    )
