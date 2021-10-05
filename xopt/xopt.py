@@ -45,6 +45,11 @@ class Xopt:
         if config:
             self.config = load_config(self.config)
 
+            # make sure configure has the required keys
+            for name in configure.ALL_DEFAULTS:
+                if name not in self.config:
+                    raise Exception(f'Key {name} is required in config for Xopt')
+
             # load any high level config files
             for ele in ['xopt', 'simulation', 'algorithm', 'vocs']:
                 self.config[ele] = load_config(self.config[ele])
@@ -71,10 +76,6 @@ class Xopt:
         vocs, which contains the simulation name, and templates
 
         """
-        # make sure configure has the required keys
-        for name in configure.ALL_DEFAULTS:
-            if name not in self.config:
-                raise Exception(f'Key {name} is required in config for Xopt')
 
         self.configure_xopt()
         self.configure_algorithm()
