@@ -415,10 +415,13 @@ def get_function(name):
         else:
             raise ValueError(f'global {name} is not callable')
     else:
-        # try to import
-        m_name, f_name = name.rsplit('.', 1)
-        module = importlib.import_module(m_name)
-        f = getattr(module, f_name)
+        if '.' in name:
+            # try to import
+            m_name, f_name = name.rsplit('.', 1)
+            module = importlib.import_module(m_name)
+            f = getattr(module, f_name)
+        else:
+            raise Exception(f'function {name} does not exist')
 
     return f
 
