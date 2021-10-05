@@ -129,7 +129,7 @@ def random_settings(vocs, include_constants=True, include_linked_variables=True)
         settings[key] = x * a + (1 - x) * b
 
     # Constants    
-    if include_constants:
+    if include_constants and vocs['constants']:
         settings.update(vocs['constants'])
 
     # Handle linked variables
@@ -159,7 +159,7 @@ def random_settings_arrays(vocs, n, include_constants=True,
         settings[key] = x * a + (1 - x) * b
 
     # Constants    
-    if include_constants:
+    if include_constants and 'constants' in vocs and vocs['constants']:
         for k, v in vocs['constants'].items():
             settings[k] = np.full(n, v)
 

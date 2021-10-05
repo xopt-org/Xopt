@@ -1,3 +1,5 @@
+from typing import Dict
+from xopt.tools import get_function
 from . import generators
 from .optimize import optimize
 from .models.models import create_multi_fidelity_model
@@ -41,32 +43,41 @@ def bayesian_optimize(vocs, evaluate_f,
                       n_initial_samples=1,
                       **kwargs):
     f"""
-       Generalized Bayesian optimization
+                      
+    Multi-objective Bayesian optimization
 
-       Parameters
-       ----------
-       vocs : dict
-           Varabiles, objectives, constraints and statics dictionary,
-           see xopt documentation for detials
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary,
+        see xopt documentation for detials
 
-       evaluate_f : callable
-           Returns dict of outputs after problem has been evaluated
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
 
-       n_steps : int, default = 1
-           Number of optimization steps to execute
+    n_steps : int, default = 1
+        Number of optimization steps to execute
 
-       n_initial_samples : int, defualt = 1
-           Number of initial samples to take before using the model,
-           overwritten by initial_x
+    n_initial_samples : int, defualt = 1
+        Number of initial samples to take before using the model,
+        overwritten by initial_x
 
-       {KWARG_DOCSTRING}
+    output_path : str, default = ''
+        Path location to place outputs
 
-       Returns
-       -------
-       results : dict
-           Dictionary with output data at the end of optimization
+    {KWARG_DOCSTRING}
 
-       """
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
+    """
+
+    try:
+        # Required
+        acq_func = get_function(generator_options.pop('acquisition_function', None))
+    except ValueError:
+        raise ValueError('acquisition_function is a required parameter of generator_options.')
 
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
@@ -76,6 +87,7 @@ def bayesian_optimize(vocs, evaluate_f,
     assert (isinstance(generator_options, dict) and
             'acquisition_function' in generator_options)
     acq_func = generator_options.pop('acquisition_function')
+
     generator = generators.generator.BayesianGenerator(vocs,
                                                        acq_func,
                                                        **generator_options)
@@ -133,6 +145,7 @@ def mobo(vocs, evaluate_f,
     generator = generators.mobo.MOBOGenerator(vocs,
                                               ref,
                                               **generator_options)
+
     return optimize(vocs,
                     evaluate_f,
                     generator,
@@ -150,28 +163,29 @@ def bayesian_exploration(vocs, evaluate_f,
     f"""
         Bayesian Exploration
 
-        Parameters
-        ----------
-        vocs : dict
-            Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary, see xopt documentation for detials
 
-        evaluate_f : callable
-            Returns dict of outputs after problem has been evaluated
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
 
-        n_steps : int, default = 1
-            Number of optimization steps to execute
+    n_steps : int, default = 1
+        Number of optimization steps to execute
 
-        n_initial_samples : int, defualt = 1
-            Number of initial samples to take before using the model, overwritten by initial_x
+    n_initial_samples : int, defualt = 1
+        Number of initial samples to take before using the model, overwritten by initial_x
 
-        {KWARG_DOCSTRING}
+    {KWARG_DOCSTRING}
 
-        Returns
-        -------
-        results : dict
-            Dictionary with output data at the end of optimization
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
 
-        """
+    """
+    
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
@@ -197,50 +211,51 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     f"""
         Multi-fidelity optimization using Bayesian optimization
 
-        This optimization algorithm attempts to reduce the computational cost of
-        optimizing a scalar function through the use of many low-cost approximate
-        evaluations. We create a GP model that models the function f(x,c) where x
-        represents free parameters and c in the range [0,1] reperestents the `cost`.
-        This algorithm uses the knoweldge gradient approach
-        (https://botorch.org/tutorials/multi_fidelity_bo) to choose points that are
-        likely to provide the most information about the optimimum point at maximum
-        fidelity (c=1).
+    This optimization algorithm attempts to reduce the computational cost of
+    optimizing a scalar function through the use of many low-cost approximate
+    evaluations. We create a GP model that models the function f(x,c) where x
+    represents free parameters and c in the range [0,1] reperestents the `cost`.
+    This algorithm uses the knoweldge gradient approach
+    (https://botorch.org/tutorials/multi_fidelity_bo) to choose points that are
+    likely to provide the most information about the optimimum point at maximum
+    fidelity (c=1).
 
-        Since evaluations have variable cost, we specify a maximum `budget` that
-        stops the algorithm when the total cost exceeds the budget. Cost for a single
-        evaluation is given by `cost` + 'base_cost`.
+    Since evaluations have variable cost, we specify a maximum `budget` that
+    stops the algorithm when the total cost exceeds the budget. Cost for a single
+    evaluation is given by `cost` + 'base_cost`.
 
-        This algoritm is most efficient when used with a parallel executor,
-        as evaluations will be done asynchronously, allowing multiple cheap
-        simulations to run in parallel with expensive ones.
+    This algoritm is most efficient when used with a parallel executor,
+    as evaluations will be done asynchronously, allowing multiple cheap
+    simulations to run in parallel with expensive ones.
 
-        Parameters
-        ----------
-        vocs : dict
-            Varabiles, objectives, constraints and statics dictionary, see xopt
-            documentation for detials
+    Parameters
+    ----------
+    vocs : dict
+        Varabiles, objectives, constraints and statics dictionary, see xopt
+        documentation for detials
 
-        evaluate_f : callable
-            Returns dict of outputs after problem has been evaluated
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
 
-        budget : int, default = 1
-            Optimization budget
+    budget : int, default = 1
+        Optimization budget
 
-        processes : int, defualt = 1
-            Number of parallel processes to use or number of candidates to generate
-            at each step.
+    processes : int, defualt = 1
+        Number of parallel processes to use or number of candidates to generate
+        at each step.
 
-        base_cost : float, defualt = 1.0
-            Base cost of running simulations. Total cost is base + `cost` variable
+    base_cost : float, defualt = 1.0
+        Base cost of running simulations. Total cost is base + `cost` variable
 
-        {KWARG_DOCSTRING}
+    {KWARG_DOCSTRING}
 
-        Returns
-        -------
-        results : dict
-            Dictionary with output data at the end of optimization
 
-        """
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
+
+    """
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
@@ -248,6 +263,7 @@ def multi_fidelity_optimize(vocs, evaluate_f,
 
     if options['custom_model'] is None:
         options['custom_model'] = create_multi_fidelity_model
+
 
     generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
