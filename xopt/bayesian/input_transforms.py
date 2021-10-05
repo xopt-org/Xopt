@@ -14,22 +14,25 @@ class CostAwareNormalize(Normalize):
     """
 
     def __init__(
-            self,
-            d: int,
-            bounds: Optional[Tensor] = None,
-            batch_shape: torch.Size = torch.Size(),  # noqa: B008
-            transform_on_train: bool = True,
-            transform_on_eval: bool = True,
-            transform_on_fantasize: bool = True,
-            reverse: bool = False,
-            min_range: float = 1e-8,
+        self,
+        d: int,
+        bounds: Optional[Tensor] = None,
+        batch_shape: torch.Size = torch.Size(),  # noqa: B008
+        transform_on_train: bool = True,
+        transform_on_eval: bool = True,
+        transform_on_fantasize: bool = True,
+        reverse: bool = False,
+        min_range: float = 1e-8,
     ) -> None:
-        super(CostAwareNormalize, self).__init__(d, bounds, batch_shape,
-                                                 transform_on_train,
-                                                 transform_on_eval,
-                                                 transform_on_fantasize,
-                                                 reverse,
-                                                 )
+        super(CostAwareNormalize, self).__init__(
+            d,
+            bounds,
+            batch_shape,
+            transform_on_train,
+            transform_on_eval,
+            transform_on_fantasize,
+            reverse,
+        )
 
     def _transform(self, X: Tensor) -> Tensor:
         # get last values of X

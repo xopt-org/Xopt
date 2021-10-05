@@ -19,21 +19,22 @@ from ..tools import DummyExecutor
 logger = logging.getLogger(__name__)
 
 
-def optimize(vocs: Dict,
-             evaluate_f: Callable,
-             candidate_generator: BayesianGenerator,
-             n_steps: int = None,
-             n_initial_samples: int = None,
-             processes: int = None,
-             budget: float = None,
-             base_cost: float = None,
-             output_path: Optional[str] = '',
-             custom_model: Optional[Callable] = None,
-             executor: Optional[Executor] = None,
-             restart_file: Optional[str] = None,
-             initial_x: Optional[torch.Tensor] = None,
-             tkwargs: Optional[Dict] = None,
-             ) -> Dict:
+def optimize(
+    vocs: Dict,
+    evaluate_f: Callable,
+    candidate_generator: BayesianGenerator,
+    n_steps: int = None,
+    n_initial_samples: int = None,
+    processes: int = None,
+    budget: float = None,
+    base_cost: float = None,
+    output_path: Optional[str] = "",
+    custom_model: Optional[Callable] = None,
+    executor: Optional[Executor] = None,
+    restart_file: Optional[str] = None,
+    initial_x: Optional[torch.Tensor] = None,
+    tkwargs: Optional[Dict] = None,
+) -> Dict:
     """
     Backend function for model based optimization
 
@@ -87,14 +88,12 @@ def optimize(vocs: Dict,
 
     # raise error if someone tries to use linked variables
     # TODO: implement linked variables
-    if 'linked_variables' in vocs.keys():
-        if not (vocs['linked_variables'] == {} or vocs['linked_variables'] is None):
-            raise NotImplementedError('linked variables not implemented yet')
+    if "linked_variables" in vocs.keys():
+        if not (vocs["linked_variables"] == {} or vocs["linked_variables"] is None):
+            raise NotImplementedError("linked variables not implemented yet")
 
-    
     # Handle None, False -> {}
     tkwargs = tkwargs or {}
-
 
     # check arguments for synch or asynch optimization
     use_synch = use_asynch = False
@@ -103,8 +102,10 @@ def optimize(vocs: Dict,
     elif all([1 if ele is not None else 0 for ele in [budget, processes, base_cost]]):
         use_asynch = True
     else:
-        raise RuntimeError('must specify either n_steps and n_initial_samples or '
-                           'budget, processes, and base_cost')
+        raise RuntimeError(
+            "must specify either n_steps and n_initial_samples or "
+            "budget, processes, and base_cost"
+        )
 
     # set executor
     executor = DummyExecutor() if executor is None else executor
@@ -112,36 +113,38 @@ def optimize(vocs: Dict,
     ##########################################
     # Do optimization
     ##########################################
-    logger.info(f'started running optimization with generator: {candidate_generator}')
+    logger.info(f"started running optimization with generator: {candidate_generator}")
     if use_synch:
-        result = synch(vocs,
-                       evaluate_f,
-                       n_initial_samples,
-                       n_steps,
-                       candidate_generator,
-                       executor,
-                       output_path,
-                       restart_file,
-                       initial_x,
-                       custom_model,
-                       tkwargs,
-                       logger
-                       )
+        result = synch(
+            vocs,
+            evaluate_f,
+            n_initial_samples,
+            n_steps,
+            candidate_generator,
+            executor,
+            output_path,
+            restart_file,
+            initial_x,
+            custom_model,
+            tkwargs,
+            logger,
+        )
     elif use_asynch:
-        result = asynch(vocs,
-                        evaluate_f,
-                        processes,
-                        budget,
-                        candidate_generator,
-                        executor,
-                        base_cost,
-                        output_path,
-                        restart_file,
-                        initial_x,
-                        custom_model,
-                        tkwargs,
-                        logger
-                        )
+        result = asynch(
+            vocs,
+            evaluate_f,
+            processes,
+            budget,
+            candidate_generator,
+            executor,
+            base_cost,
+            output_path,
+            restart_file,
+            initial_x,
+            custom_model,
+            tkwargs,
+            logger,
+        )
     else:
         result = None
 
@@ -152,18 +155,25 @@ def optimize(vocs: Dict,
     corrected_train_y, corrected_train_c = get_corrected_outputs(vocs, train_y, train_c)
 
     # output model
-    model = create_model(train_x, corrected_train_y, corrected_train_c,
-                         vocs, custom_model)
+    model = create_model(
+        train_x, corrected_train_y, corrected_train_c, vocs, custom_model
+    )
 
-    results = {'variables': train_x.cpu(),
-               'objectives': train_y.cpu(),
-               'corrected_objectives': corrected_train_y.cpu(),
-               'constraint_status': constraint_status.cpu(),
-               'feasibility': feas.cpu(),
-               'model': model.cpu()}
+    results = {
+        "variables": train_x.cpu(),
+        "objectives": train_y.cpu(),
+        "corrected_objectives": corrected_train_y.cpu(),
+        "constraint_status": constraint_status.cpu(),
+        "feasibility": feas.cpu(),
+        "model": model.cpu(),
+    }
 
     if train_c is not None:
-        results.update({'constraints': train_c.cpu(),
-                        'corrected_constraints': corrected_train_c.cpu(), })
+        results.update(
+            {
+                "constraints": train_c.cpu(),
+                "corrected_constraints": corrected_train_c.cpu(),
+            }
+        )
 
     return results

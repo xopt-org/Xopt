@@ -9,8 +9,7 @@ class ModelCreationError(Exception):
     pass
 
 
-def get_nan_model(train_x, train_outputs,
-                  input_transform, outcome_transform):
+def get_nan_model(train_x, train_outputs, input_transform, outcome_transform):
     """
     Model that allows for Nans by splitting up each objective/constraint that has nans
     into seperate GP models using IndependentModelList.
@@ -35,12 +34,15 @@ def get_nan_model(train_x, train_outputs,
         temp_train_y = output[not_nan_idx].reshape(-1, 1)
 
         if len(temp_train_y) == 0:
-            raise ModelCreationError('No valid measurements passed to model')
+            raise ModelCreationError("No valid measurements passed to model")
 
         # create single task model and add to list
-        submodel = SingleTaskGP(temp_train_x, temp_train_y,
-                                input_transform=input_transform,
-                                outcome_transform=outcome_transform)
+        submodel = SingleTaskGP(
+            temp_train_x,
+            temp_train_y,
+            input_transform=input_transform,
+            outcome_transform=outcome_transform,
+        )
 
         mll = ExactMarginalLogLikelihood(submodel.likelihood, submodel)
         fit_gpytorch_model(mll)
