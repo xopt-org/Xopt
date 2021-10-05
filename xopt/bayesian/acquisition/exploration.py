@@ -2,7 +2,11 @@ import torch
 from botorch.acquisition import MCAcquisitionFunction, AnalyticAcquisitionFunction
 from botorch.acquisition.analytic import _construct_dist
 from botorch.utils.objective import apply_constraints_nonnegative_soft
-from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform, convert_to_target_pre_hook
+from botorch.utils.transforms import (
+    concatenate_pending_points,
+    t_batch_mode_transform,
+    convert_to_target_pre_hook,
+)
 from botorch.models.gpytorch import GPyTorchModel, ModelListGPyTorchModel
 
 
@@ -19,12 +23,7 @@ class BayesianExploration(AnalyticAcquisitionFunction):
     upper bounds for the i-th constraint, respectively.
     """
 
-    def __init__(
-            self,
-            model,
-            objective_index,
-            constraints=None,
-            sigma=None):
+    def __init__(self, model, objective_index, constraints=None, sigma=None):
         r"""Analytic Constrained Expected Improvement.
         Args:
             model: A fitted single-outcome model.
@@ -51,8 +50,10 @@ class BayesianExploration(AnalyticAcquisitionFunction):
             elif isinstance(self.model, GPyTorchModel):
                 self.sigma = torch.eye(self.model.train_inputs[0].shape[-1]) * 1e6
             else:
-                raise NotImplementedError('Get Ryan to make corrections for this type of model in proximal acq, '
-                                          'or specify your own sigma matrix')
+                raise NotImplementedError(
+                    "Get Ryan to make corrections for this type of model in proximal acq, "
+                    "or specify your own sigma matrix"
+                )
         else:
             self.sigma = sigma
 
@@ -176,12 +177,9 @@ class BayesianExploration(AnalyticAcquisitionFunction):
 
 
 class qBayesianExploration(MCAcquisitionFunction):
-    def __init__(self,
-                 model,
-                 sampler=None,
-                 objective=None,
-                 X_pending=None,
-                 constraints=None):
+    def __init__(
+        self, model, sampler=None, objective=None, X_pending=None, constraints=None
+    ):
         super(qBayesianExploration, self).__init__(model, sampler, objective, X_pending)
         self.constraints = constraints
 
@@ -206,9 +204,12 @@ class qBayesianExploration(MCAcquisitionFunction):
 
         # get feasibility weights
         # NOTE this might slow down optimization by sending the ones matrix to the gpu every step - should investigate
-        feas_weights = apply_constraints_nonnegative_soft(torch.ones(obj.shape, device=obj.device,
-                                                                     dtype=obj.dtype), self.constraints,
-                                                          samples, eta=1e-3)
+        feas_weights = apply_constraints_nonnegative_soft(
+            torch.ones(obj.shape, device=obj.device, dtype=obj.dtype),
+            self.constraints,
+            samples,
+            eta=1e-3,
+        )
 
         be_mean = obj.mean(dim=0)
         be_samples = (obj - be_mean).abs() * feas_weights

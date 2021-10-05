@@ -67,16 +67,16 @@ class SingleTaskMultiFidelityGP(SingleTaskGP):
     """
 
     def __init__(
-            self,
-            train_X: Tensor,
-            train_Y: Tensor,
-            iteration_fidelity: Optional[int] = None,
-            data_fidelity: Optional[int] = None,
-            linear_truncated: bool = True,
-            nu: float = 2.5,
-            likelihood: Optional[Likelihood] = None,
-            outcome_transform: Optional[OutcomeTransform] = None,
-            input_transform: Optional[InputTransform] = None,
+        self,
+        train_X: Tensor,
+        train_Y: Tensor,
+        iteration_fidelity: Optional[int] = None,
+        data_fidelity: Optional[int] = None,
+        linear_truncated: bool = True,
+        nu: float = 2.5,
+        likelihood: Optional[Likelihood] = None,
+        outcome_transform: Optional[OutcomeTransform] = None,
+        input_transform: Optional[InputTransform] = None,
     ) -> None:
         self._init_args = {
             "iteration_fidelity": iteration_fidelity,
@@ -184,16 +184,16 @@ class FixedNoiseMultiFidelityGP(FixedNoiseGP):
     """
 
     def __init__(
-            self,
-            train_X: Tensor,
-            train_Y: Tensor,
-            train_Yvar: Tensor,
-            iteration_fidelity: Optional[int] = None,
-            data_fidelity: Optional[int] = None,
-            linear_truncated: bool = True,
-            nu: float = 2.5,
-            outcome_transform: Optional[OutcomeTransform] = None,
-            input_transform: Optional[InputTransform] = None,
+        self,
+        train_X: Tensor,
+        train_Y: Tensor,
+        train_Yvar: Tensor,
+        iteration_fidelity: Optional[int] = None,
+        data_fidelity: Optional[int] = None,
+        linear_truncated: bool = True,
+        nu: float = 2.5,
+        outcome_transform: Optional[OutcomeTransform] = None,
+        input_transform: Optional[InputTransform] = None,
     ) -> None:
         if iteration_fidelity is None and data_fidelity is None:
             raise UnsupportedError(
@@ -253,12 +253,12 @@ class FixedNoiseMultiFidelityGP(FixedNoiseGP):
 
 
 def _setup_multifidelity_covar_module(
-        dim: int,
-        aug_batch_shape: torch.Size,
-        iteration_fidelity: Optional[int],
-        data_fidelity: Optional[int],
-        linear_truncated: bool,
-        nu: float,
+    dim: int,
+    aug_batch_shape: torch.Size,
+    iteration_fidelity: Optional[int],
+    data_fidelity: Optional[int],
+    linear_truncated: bool,
+    nu: float,
 ) -> Tuple[ScaleKernel, Dict]:
     """Helper function to get the covariance module and associated subset_batch_dict
     for the multifidelity setting.
