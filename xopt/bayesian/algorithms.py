@@ -11,33 +11,6 @@ KWARG_DEFAULTS = {'output_path': None,
                   'initial_x': None,
                   'generator_options': {}}
 
-KWARG_DOCSTRING = """
-        output_path : str, default = ''
-           Path location to place outputs
-
-       custom_model : callable, optional
-           Function of the form f(train_inputs, train_outputs) that
-           returns a trained custom model
-
-       executor : Executor, optional
-           Executor object to run evaluate_f
-
-       restart_file : str, optional
-           File location of JSON file that has previous data
-
-       initial_x : list, optional
-           Nested list to provide initial candiates to evaluate, overwrites 
-           n_initial_samples
-
-       verbose : bool, defualt = True
-           Print out messages during optimization
-
-       generator_options : dict
-           Dictionary of options for MOBO
-
-    """
-
-
 def bayesian_optimize(vocs, evaluate_f,
                       n_steps=1,
                       n_initial_samples=1,
@@ -62,10 +35,9 @@ def bayesian_optimize(vocs, evaluate_f,
         Number of initial samples to take before using the model,
         overwritten by initial_x
 
-    output_path : str, default = ''
-        Path location to place outputs
-
-    {KWARG_DOCSTRING}
+    Other parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimize` arguments 
 
     Returns
     -------
@@ -125,7 +97,9 @@ def mobo(vocs, evaluate_f,
         Number of initial samples to take before using the model,
         overwritten by initial_x
 
-    {KWARG_DOCSTRING}
+    Other parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimize` arguments 
 
     Returns
     -------
@@ -174,7 +148,9 @@ def bayesian_exploration(vocs, evaluate_f,
     n_initial_samples : int, defualt = 1
         Number of initial samples to take before using the model, overwritten by initial_x
 
-    {KWARG_DOCSTRING}
+    Other parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimize` arguments 
 
     Returns
     -------
@@ -244,8 +220,9 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     base_cost : float, defualt = 1.0
         Base cost of running simulations. Total cost is base + `cost` variable
 
-    {KWARG_DOCSTRING}
-
+    Other parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimize` arguments 
 
     Returns
     -------
