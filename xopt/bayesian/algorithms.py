@@ -73,20 +73,17 @@ def bayesian_optimize(vocs, evaluate_f,
         Dictionary with output data at the end of optimization
     """
 
-    try:
-        # Required
-        acq_func = get_function(generator_options.pop('acquisition_function', None))
-    except ValueError:
-        raise ValueError('acquisition_function is a required parameter of generator_options.')
-
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
     generator_options = options.pop('generator_options')
 
-    assert (isinstance(generator_options, dict) and
-            'acquisition_function' in generator_options)
-    acq_func = generator_options.pop('acquisition_function')
+    try:
+        # Required
+        acq_func = get_function(generator_options.pop('acquisition_function', None))
+    except ValueError:
+        raise ValueError('acquisition_function is a required parameter of '
+                         'generator_options.')
 
     generator = generators.generator.BayesianGenerator(vocs,
                                                        acq_func,
@@ -185,7 +182,7 @@ def bayesian_exploration(vocs, evaluate_f,
         Dictionary with output data at the end of optimization
 
     """
-    
+
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
@@ -263,7 +260,6 @@ def multi_fidelity_optimize(vocs, evaluate_f,
 
     if options['custom_model'] is None:
         options['custom_model'] = create_multi_fidelity_model
-
 
     generator_options.update({'fixed_cost': base_cost})
     generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
