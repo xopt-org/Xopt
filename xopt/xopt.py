@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import yaml
 
-import configure
+from . import configure
 from xopt.legacy import reformat_config
 from xopt import __version__
 from xopt.tools import expand_paths, load_config, save_config,\
