@@ -3,7 +3,6 @@ from .evaluators import quad_3d
 from concurrent.futures import ThreadPoolExecutor
 import copy
 
-
 class TestAsynchMultiFidelity:
     VOCS = quad_3d.VOCS
     config = {'vocs': quad_3d.VOCS.copy()}

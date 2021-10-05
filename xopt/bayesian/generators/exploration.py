@@ -83,7 +83,12 @@ class BayesianExplorationGenerator(BayesianGenerator):
                 self.sigma = torch.eye(n_variables, **self.tkwargs) * 1e10
 
             elif not isinstance(self.sigma, torch.Tensor):
-                self.sigma = torch.tensor(self.sigma.copy(), **self.tkwargs)
+                tensor = torch.tensor(self.sigma.copy(), **self.tkwargs)
+                if tensor.shape != torch.Size([n_variables]):
+                    raise ValueError('sigma argument not correct shape, should be 1-d '
+                                     'and have length == number of variables')
+
+                self.sigma = torch.diag(tensor)
 
             constraint_dict = {}
             for i in range(1, n_constraints + 1):
