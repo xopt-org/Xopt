@@ -10,7 +10,6 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-
 # -----------------------
 # -----------------------
 # Algorithm
@@ -56,8 +55,6 @@ ALL_DEFAULTS = {
     'simulation': SIMULATION_DEFAULTS,
     'vocs': VOCS_DEFAULTS
 }
-
-
 
 
 def configure_xopt(xopt_config: Dict) -> None:
@@ -108,13 +105,13 @@ def configure_algorithm(alg_config: Dict) -> Dict:
         options.update(alg_config['options'])
     defaults = tools.get_function_defaults(f)
     fill_defaults(options, defaults)
-                    
+
     # Reserved keys
     for k in ['vocs', 'executor', 'evaluate_f', 'output_path', 'toolbox']:
         if k in options:
-            options.pop(k)                    
-                    
-    # update alg_config with full_options
+            options.pop(k)
+
+            # update alg_config with full_options
     alg_config['options'] = options
     return alg_config
 
@@ -139,39 +136,20 @@ def configure_simulation(sim_config: Dict) -> Dict:
         
     """
     check_config_against_defaults(sim_config, SIMULATION_DEFAULTS)
+    fill_defaults(sim_config, SIMULATION_DEFAULTS)
+    f = tools.get_function(sim_config['evaluate'])
 
-    name = sim_config['name']  # required
-
-    
-    if 'evaluate' in sim_config:
-        f_name = sim_config['evaluate']
-    
-    # Legacy syntax
-    elif 'function' in sim_config:
-        f_name = sim_config['function']
-    else:
-        raise ValueError('simulation must provide a function')
-
-
-    if f_name:
-        f = tools.get_function(f_name)
-    else:
-        f = None
-
-    if 'options' in sim_config:
-        options = sim_config['options']
-    else:
-        options = {}
+    options = sim_config['options'] or {}
 
     n_required_args = tools.get_n_required_fuction_arguments(f)
-    assert n_required_args == 1, f'{name} has {n_required_args}, but should have ' \
+    assert n_required_args == 1, f'function has {n_required_args}, but should have ' \
                                  f'exactly one. '
 
     defaults = tools.get_function_defaults(f)
 
     fill_defaults(options, defaults)
 
-    sim_config.update({'name': name, 'evaluate': f_name, 'options': options})
+    sim_config.update({'evaluate': f, 'options': options})
 
     return sim_config
 
@@ -203,14 +181,11 @@ def fill_defaults(dict1, defaults):
     for k, v in defaults.items():
         if k not in dict1:
             dict1[k] = deepcopy(v)
-            
+
     return dict1
 
 
 def check_config_against_defaults(test_dict, defaults):
-    #if 'verbose' in test_dict:
-    #    warnings.warn('WARNING: verbose keyword is depreciated, use `logging` instead.')
-
     for k in test_dict:
         if k not in defaults:
             raise Exception(
