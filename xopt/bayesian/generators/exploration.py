@@ -15,14 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
-    def __init__(self,
-                 vocs: [Dict],
-                 batch_size: Optional[int] = 1,
-                 sigma: Optional[Union[Tensor, List]] = None,
-                 mc_samples: Optional[int] = 512,
-                 num_restarts: Optional[int] = 20,
-                 raw_samples: Optional[int] = 1024,
-                 use_gpu: Optional[bool] = False) -> None:
+    def __init__(
+        self,
+        vocs: [Dict],
+        batch_size: Optional[int] = 1,
+        sigma: Optional[Union[Tensor, List]] = None,
+        mc_samples: Optional[int] = 512,
+        num_restarts: Optional[int] = 20,
+        raw_samples: Optional[int] = 1024,
+        use_gpu: Optional[bool] = False,
+    ) -> None:
         """
 
         Parameters
@@ -48,20 +50,22 @@ class BayesianExplorationGenerator(BayesianGenerator):
             Flag to use GPU when available
 
         """
-        optimize_options = {'sequential': True}
-        super(BayesianExplorationGenerator,
-              self).__init__(vocs,
-                             self.create_acq,
-                             batch_size,
-                             num_restarts,
-                             raw_samples,
-                             mc_samples=mc_samples,
-                             optimize_options=optimize_options,
-                             use_gpu=use_gpu)
+        optimize_options = {"sequential": True}
+        super(BayesianExplorationGenerator, self).__init__(
+            vocs,
+            self.create_acq,
+            batch_size,
+            num_restarts,
+            raw_samples,
+            mc_samples=mc_samples,
+            optimize_options=optimize_options,
+            use_gpu=use_gpu,
+        )
 
         if batch_size != 1 and sigma is not None:
-            raise UnsupportedError("`not possible to use proximal term in "
-                                   "multi-batch setting")
+            raise UnsupportedError(
+                "`not possible to use proximal term in " "multi-batch setting"
+            )
         self.sigma = sigma
 
     def create_acq(self, model):
@@ -74,19 +78,21 @@ class BayesianExplorationGenerator(BayesianGenerator):
         m is the number of constraints
 
         """
-        n_constraints = len(self.vocs['constraints'])
-        n_variables = len(self.vocs['variables'])
+        n_constraints = len(self.vocs["constraints"])
+        n_variables = len(self.vocs["variables"])
 
         # serialized Bayesian Exploration
-        if self.optimize_options['q'] == 1:
+        if self.optimize_options["q"] == 1:
             if self.sigma is None:
                 self.sigma = torch.eye(n_variables, **self.tkwargs) * 1e10
 
             elif not isinstance(self.sigma, torch.Tensor):
                 tensor = torch.tensor(self.sigma.copy(), **self.tkwargs)
                 if tensor.shape != torch.Size([n_variables]):
-                    raise ValueError('sigma argument not correct shape, should be 1-d '
-                                     'and have length == number of variables')
+                    raise ValueError(
+                        "sigma argument not correct shape, should be 1-d "
+                        "and have length == number of variables"
+                    )
 
                 self.sigma = torch.diag(tensor)
 
@@ -110,7 +116,8 @@ class BayesianExplorationGenerator(BayesianGenerator):
             for i in range(1, n_constraints + 1):
                 constraint_functions += [partial(constr_func, index=-i)]
 
-            acq_func = qBayesianExploration(model, self.sampler, mc_obj,
-                                            constraints=constraint_functions)
+            acq_func = qBayesianExploration(
+                model, self.sampler, mc_obj, constraints=constraint_functions
+            )
 
         return acq_func

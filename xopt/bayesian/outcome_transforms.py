@@ -35,7 +35,7 @@ class OutcomeTransform(Module, ABC):
 
     @abstractmethod
     def forward(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Transform the outcomes in a model's training targets
 
@@ -70,7 +70,7 @@ class OutcomeTransform(Module, ABC):
         )
 
     def untransform(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Un-transform previously transformed outcomes
 
@@ -118,7 +118,7 @@ class ChainedOutcomeTransform(OutcomeTransform, ModuleDict):
         super().__init__(OrderedDict(transforms))
 
     def forward(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Transform the outcomes in a model's training targets
 
@@ -151,7 +151,7 @@ class ChainedOutcomeTransform(OutcomeTransform, ModuleDict):
         )
 
     def untransform(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Un-transform previously transformed outcomes
 
@@ -194,11 +194,11 @@ class NanEnabledStandardize(OutcomeTransform):
     """
 
     def __init__(
-            self,
-            m: int,
-            outputs: Optional[List[int]] = None,
-            batch_shape: torch.Size = torch.Size(),  # noqa: B008
-            min_stdv: float = 1e-8,
+        self,
+        m: int,
+        outputs: Optional[List[int]] = None,
+        batch_shape: torch.Size = torch.Size(),  # noqa: B008
+        min_stdv: float = 1e-8,
     ) -> None:
         r"""Standardize outcomes (zero mean, unit variance).
 
@@ -220,7 +220,7 @@ class NanEnabledStandardize(OutcomeTransform):
         self._min_stdv = min_stdv
 
     def forward(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Standardize outcomes.
 
@@ -296,7 +296,7 @@ class NanEnabledStandardize(OutcomeTransform):
         return new_tf
 
     def untransform(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Un-standardize outcomes.
 
@@ -364,9 +364,9 @@ class NanEnabledStandardize(OutcomeTransform):
                 scale_fac = torch.repeat_interleave(scale_fac, reps, dim=-1)
 
         if (
-                not mvn.islazy
-                # TODO: Figure out attribute namming weirdness here
-                or mvn._MultivariateNormal__unbroadcasted_scale_tril is not None
+            not mvn.islazy
+            # TODO: Figure out attribute namming weirdness here
+            or mvn._MultivariateNormal__unbroadcasted_scale_tril is not None
         ):
             # if already computed, we can save a lot of time using scale_tril
             covar_tf = CholLazyTensor(mvn.scale_tril * scale_fac.unsqueeze(-1))

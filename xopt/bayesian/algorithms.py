@@ -4,19 +4,19 @@ from . import generators
 from .optimize import optimize
 from .models.models import create_multi_fidelity_model
 
-KWARG_DEFAULTS = {'output_path': None,
-                  'custom_model': None,
-                  'executor': None,
-                  'restart_file': None,
-                  'initial_x': None,
-                  'generator_options': {}}
+KWARG_DEFAULTS = {
+    "output_path": None,
+    "custom_model": None,
+    "executor": None,
+    "restart_file": None,
+    "initial_x": None,
+    "generator_options": {},
+}
 
-def bayesian_optimize(vocs, evaluate_f,
-                      n_steps=1,
-                      n_initial_samples=1,
-                      **kwargs):
+
+def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
     f"""
-                      
+
     Multi-objective Bayesian optimization
 
     Parameters
@@ -37,7 +37,7 @@ def bayesian_optimize(vocs, evaluate_f,
 
     Other parameters
     ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments 
+    **kwargs : `~xopt.bayesian.optimize` arguments
 
     Returns
     -------
@@ -48,33 +48,31 @@ def bayesian_optimize(vocs, evaluate_f,
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
-    generator_options = options.pop('generator_options')
+    generator_options = options.pop("generator_options")
 
     try:
         # Required
-        acq_func = get_function(generator_options.pop('acquisition_function', None))
+        acq_func = get_function(generator_options.pop("acquisition_function", None))
     except ValueError:
-        raise ValueError('acquisition_function is a required parameter of '
-                         'generator_options.')
+        raise ValueError(
+            "acquisition_function is a required parameter of " "generator_options."
+        )
 
-    generator = generators.generator.BayesianGenerator(vocs,
-                                                       acq_func,
-                                                       **generator_options)
-    return optimize(vocs,
-                    evaluate_f,
-                    generator,
-                    n_steps,
-                    n_initial_samples,
-                    tkwargs=generator.tkwargs,
-                    **options
-                    )
+    generator = generators.generator.BayesianGenerator(
+        vocs, acq_func, **generator_options
+    )
+    return optimize(
+        vocs,
+        evaluate_f,
+        generator,
+        n_steps,
+        n_initial_samples,
+        tkwargs=generator.tkwargs,
+        **options,
+    )
 
 
-def mobo(vocs, evaluate_f,
-         ref=None,
-         n_steps=1,
-         n_initial_samples=1,
-         **kwargs):
+def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
     f"""
     Multi-objective Bayesian optimization
 
@@ -99,7 +97,7 @@ def mobo(vocs, evaluate_f,
 
     Other parameters
     ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments 
+    **kwargs : `~xopt.bayesian.optimize` arguments
 
     Returns
     -------
@@ -111,26 +109,22 @@ def mobo(vocs, evaluate_f,
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
-    generator_options = options.pop('generator_options')
+    generator_options = options.pop("generator_options")
 
-    generator = generators.mobo.MOBOGenerator(vocs,
-                                              ref,
-                                              **generator_options)
+    generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
 
-    return optimize(vocs,
-                    evaluate_f,
-                    generator,
-                    n_steps,
-                    n_initial_samples,
-                    tkwargs=generator.tkwargs,
-                    **options
-                    )
+    return optimize(
+        vocs,
+        evaluate_f,
+        generator,
+        n_steps,
+        n_initial_samples,
+        tkwargs=generator.tkwargs,
+        **options,
+    )
 
 
-def bayesian_exploration(vocs, evaluate_f,
-                         n_steps=1,
-                         n_initial_samples=1,
-                         **kwargs):
+def bayesian_exploration(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
     f"""
         Bayesian Exploration
 
@@ -150,7 +144,7 @@ def bayesian_exploration(vocs, evaluate_f,
 
     Other parameters
     ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments 
+    **kwargs : `~xopt.bayesian.optimize` arguments
 
     Returns
     -------
@@ -162,25 +156,25 @@ def bayesian_exploration(vocs, evaluate_f,
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
-    generator_options = options.pop('generator_options')
+    generator_options = options.pop("generator_options")
 
-    generator = generators.exploration.BayesianExplorationGenerator(vocs,
-                                                                    **generator_options)
-    return optimize(vocs,
-                    evaluate_f,
-                    generator,
-                    n_steps=n_steps,
-                    n_initial_samples=n_initial_samples,
-                    tkwargs=generator.tkwargs,
-                    **options
-                    )
+    generator = generators.exploration.BayesianExplorationGenerator(
+        vocs, **generator_options
+    )
+    return optimize(
+        vocs,
+        evaluate_f,
+        generator,
+        n_steps=n_steps,
+        n_initial_samples=n_initial_samples,
+        tkwargs=generator.tkwargs,
+        **options,
+    )
 
 
-def multi_fidelity_optimize(vocs, evaluate_f,
-                            budget=1,
-                            processes=1,
-                            base_cost=1.0,
-                            **kwargs):
+def multi_fidelity_optimize(
+    vocs, evaluate_f, budget=1, processes=1, base_cost=1.0, **kwargs
+):
     f"""
         Multi-fidelity optimization using Bayesian optimization
 
@@ -222,7 +216,7 @@ def multi_fidelity_optimize(vocs, evaluate_f,
 
     Other parameters
     ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments 
+    **kwargs : `~xopt.bayesian.optimize` arguments
 
     Returns
     -------
@@ -233,21 +227,23 @@ def multi_fidelity_optimize(vocs, evaluate_f,
     options = KWARG_DEFAULTS.copy()
     options.update(kwargs)
 
-    generator_options = options.pop('generator_options')
+    generator_options = options.pop("generator_options")
 
-    if options['custom_model'] is None:
-        options['custom_model'] = create_multi_fidelity_model
+    if options["custom_model"] is None:
+        options["custom_model"] = create_multi_fidelity_model
 
-    generator_options.update({'fixed_cost': base_cost})
-    generator = generators.multi_fidelity.MultiFidelityGenerator(vocs,
-                                                                 **generator_options)
+    generator_options.update({"fixed_cost": base_cost})
+    generator = generators.multi_fidelity.MultiFidelityGenerator(
+        vocs, **generator_options
+    )
 
-    return optimize(vocs,
-                    evaluate_f,
-                    generator,
-                    budget=budget,
-                    processes=processes,
-                    base_cost=base_cost,
-                    tkwargs=generator.tkwargs,
-                    **options
-                    )
+    return optimize(
+        vocs,
+        evaluate_f,
+        generator,
+        budget=budget,
+        processes=processes,
+        base_cost=base_cost,
+        tkwargs=generator.tkwargs,
+        **options,
+    )

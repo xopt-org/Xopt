@@ -13,9 +13,12 @@ from ...vocs_tools import get_bounds
 
 
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
-    input_normalize = Normalize(len(vocs['variables']),
-                                torch.tensor(get_bounds(vocs),
-                                             ).to(train_x))
+    input_normalize = Normalize(
+        len(vocs["variables"]),
+        torch.tensor(
+            get_bounds(vocs),
+        ).to(train_x),
+    )
 
     # create model
     if custom_model is None:
@@ -27,13 +30,17 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
         # test if there are nans in the training data
         if torch.any(torch.isnan(train_outputs)):
             output_standardize = NanEnabledStandardize(m=1)
-            model = get_nan_model(train_x, train_outputs,
-                                  input_normalize, output_standardize)
+            model = get_nan_model(
+                train_x, train_outputs, input_normalize, output_standardize
+            )
         else:
             output_standardize = Standardize(m=train_outputs.shape[-1])
-            model = SingleTaskGP(train_x, train_outputs,
-                                 input_transform=input_normalize,
-                                 outcome_transform=output_standardize)
+            model = SingleTaskGP(
+                train_x,
+                train_outputs,
+                input_transform=input_normalize,
+                outcome_transform=output_standardize,
+            )
 
             mll = ExactMarginalLogLikelihood(model.likelihood, model)
             fit_gpytorch_model(mll)
@@ -46,11 +53,13 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
 
 
 def create_multi_fidelity_model(train_x, train_y, train_c, vocs):
-    assert list(vocs['variables'])[-1] == 'cost', 'last variable in vocs["variables"] ' \
-                                                  'must be "cost" '
+    assert list(vocs["variables"])[-1] == "cost", (
+        'last variable in vocs["variables"] ' 'must be "cost" '
+    )
 
-    input_transform = Normalize(len(vocs['variables']),
-                                torch.tensor(get_bounds(vocs)).to(train_x))
+    input_transform = Normalize(
+        len(vocs["variables"]), torch.tensor(get_bounds(vocs)).to(train_x)
+    )
     outcome_transform = Standardize(m=1)
 
     model = SingleTaskMultiFidelityGP(
@@ -59,7 +68,7 @@ def create_multi_fidelity_model(train_x, train_y, train_c, vocs):
         input_transform=input_transform,
         outcome_transform=outcome_transform,
         linear_truncated=False,
-        iteration_fidelity=len(vocs['variables']) - 1
+        iteration_fidelity=len(vocs["variables"]) - 1,
     )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
