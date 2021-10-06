@@ -16,8 +16,7 @@ KWARG_DEFAULTS = {
 
 def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
     """
-
-    Multi-objective Bayesian optimization
+    Bayesian optimization
 
     Parameters
     ----------
@@ -35,14 +34,14 @@ def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs
         Number of initial samples to take before using the model,
         overwritten by initial_x
 
-    Other parameters
-    ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments
-
     Returns
     -------
     results : dict
         Dictionary with output data at the end of optimization
+
+    Other Parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimizer` properties
     """
 
     options = KWARG_DEFAULTS.copy()
@@ -55,7 +54,7 @@ def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs
         acq_func = get_function(generator_options.pop("acquisition_function", None))
     except ValueError:
         raise ValueError(
-            "acquisition_function is a required parameter of " "generator_options."
+            "acquisition_function is a required parameter of generator_options."
         )
 
     generator = generators.generator.BayesianGenerator(
@@ -95,14 +94,14 @@ def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
         Number of initial samples to take before using the model,
         overwritten by initial_x
 
-    Other parameters
-    ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments
-
     Returns
     -------
     results : dict
         Dictionary with output data at the end of optimization
+
+    Other Parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimizer` properties
 
     """
 
@@ -126,7 +125,7 @@ def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
 
 def bayesian_exploration(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
     """
-        Bayesian Exploration
+    Bayesian Exploration
 
     Parameters
     ----------
@@ -142,14 +141,14 @@ def bayesian_exploration(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwa
     n_initial_samples : int, defualt = 1
         Number of initial samples to take before using the model, overwritten by initial_x
 
-    Other parameters
-    ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments
-
     Returns
     -------
     results : dict
         Dictionary with output data at the end of optimization
+
+    Other Parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimizer` properties
 
     """
 
@@ -176,7 +175,7 @@ def multi_fidelity_optimize(
     vocs, evaluate_f, budget=1, processes=1, base_cost=1.0, **kwargs
 ):
     """
-        Multi-fidelity optimization using Bayesian optimization
+    Multi-fidelity optimization using Bayesian optimization
 
     This optimization algorithm attempts to reduce the computational cost of
     optimizing a scalar function through the use of many low-cost approximate
@@ -214,14 +213,14 @@ def multi_fidelity_optimize(
     base_cost : float, defualt = 1.0
         Base cost of running simulations. Total cost is base + `cost` variable
 
-    Other parameters
-    ----------------
-    **kwargs : `~xopt.bayesian.optimize` arguments
-
     Returns
     -------
     results : dict
         Dictionary with output data at the end of optimization
+
+    Other Parameters
+    ----------------
+    **kwargs : `~xopt.bayesian.optimizer` properties
 
     """
     options = KWARG_DEFAULTS.copy()
@@ -247,3 +246,4 @@ def multi_fidelity_optimize(
         tkwargs=generator.tkwargs,
         **options,
     )
+
