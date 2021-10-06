@@ -16,3 +16,6 @@ private_tests/*
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# local mkdocs
+site
