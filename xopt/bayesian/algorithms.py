@@ -15,7 +15,7 @@ KWARG_DEFAULTS = {
 
 
 def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
-    f"""
+    """
 
     Multi-objective Bayesian optimization
 
@@ -73,7 +73,7 @@ def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs
 
 
 def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
-    f"""
+    """
     Multi-objective Bayesian optimization
 
     Parameters
@@ -125,7 +125,7 @@ def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
 
 
 def bayesian_exploration(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
-    f"""
+    """
         Bayesian Exploration
 
     Parameters
@@ -175,7 +175,7 @@ def bayesian_exploration(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwa
 def multi_fidelity_optimize(
     vocs, evaluate_f, budget=1, processes=1, base_cost=1.0, **kwargs
 ):
-    f"""
+    """
         Multi-fidelity optimization using Bayesian optimization
 
     This optimization algorithm attempts to reduce the computational cost of
