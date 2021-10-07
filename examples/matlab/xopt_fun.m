@@ -9,7 +9,7 @@ nlhs=nargout-1;
 % Form function call
 fcall="[";
 for ilhs=1:nlhs
-  fcall=fcall+"O"+ilhs;
+  fcall=fcall+"varargout{"+ilhs+"}";
   if ilhs<nlhs
     fcall=fcall+",";
   end
@@ -28,14 +28,16 @@ for iarg=1:nrhs
   eval("X"+iarg+"=varargin{iarg+1};");
 end
 eval(fcall);
-for iarg=1:nlhs
-  eval("varargout{iarg}="+"O"+iarg+";");
-end
 varargout{nargout}=1; % data OK
 for iarg=1:nlhs
   if isnan(varargout{iarg}) || isinf(varargout{iarg})
     varargout{nargout}=-1; % data NOT OK
-    varargout{iarg}=0;
+    break
   end
 end
-disp('>>>xopt_fun_call<<<')
+if varargout{nargout}<0
+  for iarg=1:nlhs
+    varargout{iarg}=1000000;
+  end
+end
+% fprintf('xopt_fun: x1: %g x2: %g y1: %g y2: %g c1: %g\n',varargin{2},varargin{3},varargout{1},varargout{2},varargout{3});

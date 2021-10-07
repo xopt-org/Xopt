@@ -25,15 +25,21 @@ classdef Xopt < handle
   %  c1=1; % use c1 to apply any constraint (constraint considered failed if c1<0)
   %  NB: If any outputs set to NaN or inf, then optimizer will skip this data point
   %
-  % Currently supports the following algorithms within Xopt: MOBO
+  % Currently supports the following algorithms within Xopt: mobo cnsga
   properties
     PythonExe string = "python" % command line python executable
-    Optimizer string {mustBeMember(Optimizer,"mobo")} = "mobo" % Optimizer routine supported by Xopt package
+    Optimizer string {mustBeMember(Optimizer,["mobo" "cnsga"])} = "cnsga" % Optimizer routine supported by Xopt package
     Nworkers {mustBePositive} = 4
     verbose logical = true % Verbosity setting for Xopt output (stored in xopt_out property)
-    n_initial_samples {mustBePositive} = 5
-    n_steps {mustBePositive} = 10
-    batch_size {mustBePositive} = 5
+    n_initial_samples {mustBePositive} = 5 % used by MOBO algorithm
+    n_steps {mustBePositive} = 10 % used by MOBO algorithm
+    batch_size {mustBePositive} = 5 % used by MOBO algorithm
+    max_generations {mustBePositive} = 200 % used by CNSGA algorithm (defaults to 200*nvar)
+    population_size {mustBePositive} = 80 % used by CNSGA algorithm
+    crossover_probability {mustBePositive} = 0.8 % used by CNSGA algorithm
+    mutation_probability {mustBePositive} = 0.2 % used by CNSGA algorithm
+    selection string = "auto" % used by CNSGA algorithm
+    population = "null" % used by CNSGA algorithm
   end
   properties(SetObservable)
     xrange = 1 % Allowable range for objective function input variables (must be scalar [use +/- this value for all] or [2,length(x0)])
@@ -70,6 +76,7 @@ classdef Xopt < handle
       obj.fdir = d.folder ;
       obj.nobj=nobj;
       obj.nvar=nvar;
+      obj.max_generations = 200*nvar;
       if exist('refval','var')
         obj.refobj=refobj;
       end
@@ -124,7 +131,11 @@ classdef Xopt < handle
       fprintf(pyfile,str,xran(1,:),xran(2,:));
       fprintf(pyfile,"X_RANGE = [%g, %g]\n",min(xran(:)),max(xran(:)));
       fprintf(pyfile,"Y_RANGE = [%g, %g]\n\n",min(yran(:)),max(yran(:)));
-      fprintf(pyfile,"# labeled version\n");
+      fprintf(pyfile,"# Matlab wrapper\n");
+      fprintf(pyfile,"rank = comm.Get_rank()\n");
+      fprintf(pyfile,"eng_id = names[rank]\n");
+      fprintf(pyfile,"eng = matlab.engine.connect_matlab(eng_id)\n\n");
+      fprintf(pyfile,"# evaluation function\n");
       fprintf(pyfile,"def evaluate_func(inputs, matlab_f='xopt_fun', nargout=%d, verbose=%s):\n",obj.nobj,vtxt);
       fprintf(pyfile,"  info = {'some': 'info', 'about': ['the', 'run']}\n\n");
       str="  ";
@@ -145,10 +156,6 @@ classdef Xopt < handle
         end
       end
       fprintf(pyfile,str);
-      fprintf(pyfile,"  # Matlab wrapper\n");
-      fprintf(pyfile,"  rank = comm.Get_rank()\n");
-      fprintf(pyfile,"  eng_id = names[rank]\n");
-      fprintf(pyfile,"  eng = matlab.engine.connect_matlab(eng_id)\n");
       fprintf(pyfile,"  f = getattr(eng, matlab_f)\n");
       str="  fval = f('"+obj.objfun+"',";
       for ix=1:obj.nvar
@@ -170,6 +177,7 @@ classdef Xopt < handle
       end
       str = str+sprintf("\n    'c1': fval[%d]}\n\n",obj.nobj) ;
       fprintf(pyfile,str);
+%       fprintf(pyfile,"  print(outputs,x1,x2)\n");
       fprintf(pyfile,"  return outputs\n");
       fclose(pyfile);
       % YAML File
@@ -178,25 +186,36 @@ classdef Xopt < handle
       fprintf(yfile,"algorithm:\n");
       fprintf(yfile,"  name: %s\n",obj.Optimizer);
       fprintf(yfile,"  options:\n");
-      str="    ref: [";
-      for iy=1:obj.nobj
-        if isempty(obj.refobj)
-          str=str+"0";
-        else
-          str=str+obj.refobj(iy);
-        end
-        if iy==obj.nobj
-          str=str+"]\n";
-        else
-          str=str+", ";
-        end
+      switch obj.Optimizer
+        case "cnsga"
+          fprintf(yfile,"    max_generations: %d\n",obj.max_generations);
+          fprintf(yfile,"    population_size: %d\n",obj.population_size);
+          fprintf(yfile,"    crossover_probability: %f\n",obj.crossover_probability);
+          fprintf(yfile,"    mutation_probability: %f\n",obj.mutation_probability);
+          fprintf(yfile,"    selection: "+obj.selection+"\n");
+          fprintf(yfile,"    verbose: %s\n",vtxt);
+          fprintf(yfile,"    population: "+obj.population+"\n\n");
+        case "mobo"
+          str="    ref: [";
+          for iy=1:obj.nobj
+            if isempty(obj.refobj)
+              str=str+"0";
+            else
+              str=str+obj.refobj(iy);
+            end
+            if iy==obj.nobj
+              str=str+"]\n";
+            else
+              str=str+", ";
+            end
+          end
+          fprintf(yfile,str);
+          fprintf(yfile,"    n_initial_samples: %d\n",obj.n_initial_samples);
+          fprintf(yfile,"    n_steps: %d\n",obj.n_steps);
+          fprintf(yfile,"    verbose: %s\n",vtxt);
+          fprintf(yfile,"    generator_options:\n");
+          fprintf(yfile,"      batch_size: %d\n\n",obj.batch_size);
       end
-      fprintf(yfile,str);
-      fprintf(yfile,"    n_initial_samples: %d\n",obj.n_initial_samples);
-      fprintf(yfile,"    n_steps: %d\n",obj.n_steps);
-      fprintf(yfile,"    verbose: %s\n",vtxt);
-      fprintf(yfile,"    generator_options:\n");
-      fprintf(yfile,"      batch_size: %d\n\n",obj.batch_size);
       fprintf(yfile,"simulation:\n");
       fprintf(yfile,"  name: xopt_eval\n");
       fprintf(yfile,"  evaluate: xopt_eval.evaluate_func\n\n");

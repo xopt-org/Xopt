@@ -7,6 +7,12 @@ BOUND_LOW, BOUND_UP = [0.0, 0.0], [3.14159, 3.14159]
 X_RANGE = [0, 1.4]
 Y_RANGE = [0, 1.4]
 
+# Matlab wrapper
+rank = comm.Get_rank()
+names = matlab.engine.find_matlab()
+eng_id = names[rank]
+eng = matlab.engine.connect_matlab(eng_id)
+
 # labeled version
 def evaluate_TNK(inputs, matlab_f='testeval', nargout=2, verbose=False):
     info = {'some': 'info', 'about': ['the', 'run']}
@@ -15,11 +21,6 @@ def evaluate_TNK(inputs, matlab_f='testeval', nargout=2, verbose=False):
     
     objectives = (x1, x2)
       
-    # Matlab wrapper
-    rank = comm.Get_rank()
-    names = matlab.engine.find_matlab()
-    eng_id = names[rank]
-    eng = matlab.engine.connect_matlab(eng_id)
     if verbose:
         print(f'Connecting rank {rank} to engine {eng_id}')
     

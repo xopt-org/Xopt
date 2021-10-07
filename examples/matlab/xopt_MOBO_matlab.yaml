@@ -1,15 +1,26 @@
 xopt: {output_path: null, verbose: true}
 
+#algorithm:
+#  name: mobo
+#  options: 
+#    ref: [1.4, 1.4]
+#    n_initial_samples: 5
+#    n_steps: 10
+#    verbose: True      
+#    generator_options:
+#        batch_size: 1
+
 algorithm:
-  name: mobo
-  options: 
-    ref: [1.4, 1.4]
-    n_initial_samples: 5
-    n_steps: 10
-    verbose: True      
-    generator_options:
-        batch_size: 1
-  
+  name: cnsga
+  options:
+    max_generations: 50
+    population_size: 128 
+    crossover_probability: 0.9 
+    mutation_probability: 1.0
+    selection: auto 
+    verbose: true
+    population: null
+
 simulation: 
   name: example_MOBO_matlab
   evaluate: example_MOBO_matlab.evaluate_TNK  
