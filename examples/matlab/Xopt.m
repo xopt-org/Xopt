@@ -19,7 +19,7 @@ classdef Xopt < handle
   % e.g.
   %  X = Xopt("myobjfun",2,2)
   %  With the following objective function:
-  %  [y1,y2,c1] = function myobjfun(x1,x2)
+  %  function [y1,y2,c1] = myobjfun(x1,x2)
   %  y1=  x1.^2 + x2.^2 - 1.0 - 0.1 * cos(16 .* atan2(x1, x2)) ;
   %  y2 = (x1 - 0.5).^2 + (x2 - 0.5).^2 ;
   %  c1=1; % use c1 to apply any constraint (constraint considered failed if c1<0)
@@ -35,7 +35,7 @@ classdef Xopt < handle
     n_steps {mustBePositive} = 10 % used by MOBO algorithm
     batch_size {mustBePositive} = 5 % used by MOBO algorithm
     max_generations {mustBePositive} = 200 % used by CNSGA algorithm (defaults to 200*nvar)
-    population_size {mustBePositive} = 80 % used by CNSGA algorithm
+    population_size {mustBePositive} = 40 % used by CNSGA algorithm (should be multiple of 4)
     crossover_probability {mustBePositive} = 0.8 % used by CNSGA algorithm
     mutation_probability {mustBePositive} = 0.2 % used by CNSGA algorithm
     selection string = "auto" % used by CNSGA algorithm
@@ -51,7 +51,8 @@ classdef Xopt < handle
     objfun
     nobj(1,1) = 1 % number of objectives (number of objective function return arguments)
     nvar(1,1) = 1 % number of decision variables
-    results % structure of results returned from optimizer: see Xopt documentation
+    results % contains final population variables and objective function values
+    rawresults % structure of results returned from optimizer: see Xopt documentation
     xopt_out % Captured command line output from Xopt execution
     xopt_stat % Status return from Xopt execution
     nfuneval % Number of function evaluations during run
@@ -85,6 +86,7 @@ classdef Xopt < handle
       %RUNOPT Run external Xopt optimizer
       % See results property for returned results data
       
+      % Reset results
       obj.results=[];
       
       % Ensure Matlab Engine(s) running (& initialize objective functions in workers)
@@ -182,7 +184,7 @@ classdef Xopt < handle
       fclose(pyfile);
       % YAML File
       yfile = fopen('xopt_eval.yaml','w') ;
-      fprintf(yfile,"xopt: {output_path: null, verbose: true}\n\n");
+      fprintf(yfile,"xopt: {output_path: ., verbose: true}\n\n");
       fprintf(yfile,"algorithm:\n");
       fprintf(yfile,"  name: %s\n",obj.Optimizer);
       fprintf(yfile,"  options:\n");
@@ -286,14 +288,46 @@ classdef Xopt < handle
     end
     function GetResults(obj)
       %GETRESULTS Read results from Xopt run
-      if ~exist('results.json','file')
-        error('No results exist');
+      obj.results=[];
+      switch obj.Optimizer
+        case "cnsga"
+          popfiles = dir('pop*.json') ;
+          if isempty(popfiles)
+            error('No results from Xopt run detected');
+          end
+          [~,ifile]=max([popfiles.datenum]);
+          fid = fopen(popfiles(ifile).name) ;
+          raw = fread(fid,inf);
+          str = char(raw');
+          fclose(fid);
+          popres = jsondecode(str);
+          for ivar=1:obj.nvar
+            obj.results.variables(ivar,:) = popres.variables.("x"+ivar) ;
+          end
+          for iobj=1:obj.nobj
+            obj.results.objectives(iobj,:) = [popres.outputs.("y"+iobj)] ;
+          end
+          obj.rawresults = popres ;
+          delete('pop*.json'); delete('gen*.json'); delete('initial*.json');
+        case "mobo"
+          if ~exist('results.json','file')
+            error('No results from Xopt run detected');
+          end
+          fid = fopen('results.json');
+          raw = fread(fid,inf);
+          str = char(raw');
+          fclose(fid);
+          res = jsondecode(str) ;
+          feas=logical(res.feasibility); feas=feas(:)';
+          for ivar=1:obj.nvar
+            obj.results.variables(ivar,:) = res.variables.("x"+ivar)(feas) ;
+          end
+          for iobj=1:obj.nobj
+            obj.results.objectives(iobj,:) = res.objectives.("y"+iobj)(feas) ;
+          end
+          obj.rawresults = res ;
+          delete('results.json');
       end
-      fid = fopen('results.json');
-      raw = fread(fid,inf);
-      str = char(raw');
-      fclose(fid);
-      obj.results = jsondecode(str);
     end
   end
   % Set/Get methods
