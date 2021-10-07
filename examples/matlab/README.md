@@ -3,6 +3,7 @@
 * Requires Matlab and Matlab parallel computing toolbox (see Matlab documentation for your release to check for compative Python version).
 * Tested with R2021b and Python v.3.8 or v.3.9
 * Uses Matlab Python Engine to call user-provided Matlab function for objective function calls.
+* Uses mpirun to execute Xopt code
 
 ## Contents
 
