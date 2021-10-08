@@ -51,7 +51,7 @@ def load_xopt_data(xopt_json, verbose=False):
     return data
 
 
-def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible=False):
+def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible=True):
     """
     Loads many JSON files, concatenates and returns dict of DataFrame .
     
@@ -69,7 +69,7 @@ def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible=False):
     # Concatenate
     cdat = pd.concat([alldat['inputs'], alldat['outputs']], axis=1)
     nc = len(cdat)
-    if add_feasible:
+    if add_feasible and 'feasible' not in cdat:
         cdat['feasible'] = feasible(vocs['constraints'], cdat)
         if verbose:
             print(cdat['feasible'].sum(), 'feasible out of', len(cdat))

@@ -131,13 +131,16 @@ def configure_simulation(sim_config: Dict) -> Dict:
     Example:
     
      {'name': 'astra_with_generator',
-     'function': 'astra.evaluate.evaluate_astra_with_generator',
+     'evaluate': 'astra.evaluate.evaluate_astra_with_generator',
      'options': {'archive_path': '.', 'merit_f': None}}
         
     """
     check_config_against_defaults(sim_config, SIMULATION_DEFAULTS)
     fill_defaults(sim_config, SIMULATION_DEFAULTS)
-    f = tools.get_function(sim_config['evaluate'])
+    
+    f_name = sim_config['evaluate']
+    
+    f = tools.get_function(f_name)
 
     options = sim_config['options'] or {}
 
@@ -149,7 +152,7 @@ def configure_simulation(sim_config: Dict) -> Dict:
 
     fill_defaults(options, defaults)
 
-    sim_config.update({'evaluate': f, 'options': options})
+    sim_config.update({'evaluate': f_name, 'options': options})
 
     return sim_config
 

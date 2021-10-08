@@ -33,6 +33,13 @@ Xopt does **not** provide:
 - your custom simulation via an `evaluate` function.
 
 
+**`Documentation`** |
+------------------- |
+[![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://ChristopherMayes.github.io/Xopt/index.html)  |
+
+#<!-- https://christophermayes.github.io/Xopt/ -->
+
+
 
 Configuring an Xopt run
 ===============
@@ -123,18 +130,26 @@ conda search xopt --channel conda-forge
 
 
 
-
 Developers
-===============
+==========
 
-Install dependencies:
-`conda install numpy pyyaml deap mpi4py pytorch botorch gpytorch pandas ipywidgets tqdm`
 
 Clone this repository:
-`git clone https://github.com/ChristopherMayes/xopt.git`
+```shell
+git clone https://github.com/ChristopherMayes/Xopt.git
+```
+
+Create an environment `xopt-dev` with all the dependencies:
+```shell
+conda env create -f environment.yml
+```
+
 
 Install as editable:
-`pip install -e .`
+```shell
+conda activate xopt-dev
+pip install --no-dependencies -e .
+```
 
 
 
