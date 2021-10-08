@@ -16,6 +16,7 @@ arbitrary evaluation functions to advanced algorithms with minimal coding with
 support for multi-threaded or MPI-enabled execution.
 
 Currenty **Xopt** provides:
+
 - optimization algorithms:
   - `cnsga` Continuous NSGA-II with constraints.
   - `bayesian_optimization` Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
