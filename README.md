@@ -6,7 +6,15 @@
 
 
 Xopt
-===============
+====
+
+
+**`Documentation`** |
+------------------- |
+[![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://ChristopherMayes.github.io/Xopt/index.html)  |
+
+
+
 
 Flexible optimization of arbitrary problems in Python.
 
@@ -33,11 +41,16 @@ Xopt does **not** provide:
 - your custom simulation via an `evaluate` function.
 
 
-**`Documentation`** |
-------------------- |
-[![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://ChristopherMayes.github.io/Xopt/index.html)  |
 
-#<!-- https://christophermayes.github.io/Xopt/ -->
+
+
+
+Current release info
+====================
+
+| Name | Downloads | Version | Platforms |
+| --- | --- | --- | --- |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) |
 
 
 
@@ -47,7 +60,7 @@ Xopt runs are specified via a dictionary that can be directly imported from a YA
 
 ```yaml
 xopt: 
-  output_path: null
+  output_path: .
 
 algorithm:
   name: cnsga
@@ -57,7 +70,6 @@ algorithm:
     crossover_probability: 0.9
     mutation_probability: 1.0
     selection: auto
-    verbose: true
     population: null
   
 simulation: 
@@ -81,6 +93,20 @@ vocs:
 ```
 
 
+Using MPI
+===============
+Example MPI run, with `xopt.yaml` as the only user-defined file:
+```b
+mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+```
+
+The complete configuration of a simulation optimization is given by a proper YAML file:
+
+
+
+
+
+
 Defining evaluation function
 ===============
 Xopt can interface with arbitrary evaluate functions (defined in Python) with the 
@@ -93,16 +119,6 @@ specified in `variables, constants, linked_variables` and returns a dictionary
 containing **at least** the 
 keys contained in `objectives, constraints`. Extra dictionary keys are tracked and 
 used in the evaluate function but are not modified by xopt.
-
-Using MPI
-===============
-Example MPI run, with `xopt.yaml` as the only user-defined file:
-```b
-mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
-```
-
-The complete configuration of a simulation optimization is given by a proper YAML file:
-
 
 
 
@@ -150,19 +166,4 @@ Install as editable:
 conda activate xopt-dev
 pip install --no-dependencies -e .
 ```
-
-
-
-## Cori (NERSC) setup
-
-```
-conda install -c conda-forge xopt
-```
-Follow instructions to build mpi4py:
-https://docs.nersc.gov/programming/high-level-environments/python/
-Note that there is a bug in Jupyterhub terminals. Type:
-```
-module swap PrgEnv-gnu PrgEnv-gnu
-```
-to get the C compiler activated. 
 
