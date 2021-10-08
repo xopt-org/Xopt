@@ -18,6 +18,11 @@ def bayesian_optimize(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs
     """
     Bayesian optimization
 
+    Bayesian optimization with an arbitrary acquisition function. Required to pass a
+    generator_options dict with the keyword `acquisition_function` that points to a
+    valid botorch.acquisition.AcquisitionFunction object or a callable that returns
+    an object of that type, see examples/bayes_opt.
+
     Parameters
     ----------
     vocs : dict
@@ -75,6 +80,18 @@ def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
     """
     Multi-objective Bayesian optimization
 
+    This algorithm attempts to determine the Pareto front of a multi-objective
+    problem using multi-objective Bayesian optimization. The acquisition function is
+    the expected hypervolume improvement (EHVI), implemented in botorch. Allows for
+    the specification of unknown constraints and proximal biasing.
+
+    See https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.24.062801
+    and https://botorch.org/tutorials/multi_objective_bo for details.
+
+    Note: while this algorithm can be used with parallel evaluations, optimization of
+    the acquistion function can become prohibitively expensive given the number of
+    objectives, points on the Pareto front and number of parallelized evaluations.
+
     Parameters
     ----------
     vocs : dict
@@ -126,6 +143,14 @@ def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
 def bayesian_exploration(vocs, evaluate_f, n_steps=1, n_initial_samples=1, **kwargs):
     """
     Bayesian Exploration
+
+    This optimization algorithm attempts to efficiently characterize a target
+    function by sampling points that maximize model uncertainty. By combining this
+    acquisition function with a Gaussian process model that uses automatic relevance
+    determination (ARD) we increase the number of samples along the fastest changing
+    axis of the function. Natively incorperates inequality constraints.
+
+    See https://www.nature.com/articles/s41467-021-25757-3 for detials.
 
     Parameters
     ----------
