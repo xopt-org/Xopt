@@ -78,12 +78,12 @@ def save_config(data, filename, verbose=True):
             json.dump(data, f, ensure_ascii=True, indent='  ',
                      cls=NpEncoder)
         if verbose:
-            print(f'Config written as JSON to {filename}')
+            logger.info(f'Config written as JSON to {filename}')
     elif filename.endswith('yaml'):
         with open(filename, 'w') as f:
             yaml.dump(data, f, default_flow_style=None, sort_keys=False)
         if verbose:
-            print(f'Config written as YAML to {filename}')
+            logger.info(f'Config written as YAML to {filename}')
     else:
         raise
 
@@ -102,7 +102,7 @@ def save_vocs(vocs_dict, filePath=None):
         name = vocs_dict['name'] + '.json'
     with open(name, 'w') as outfile:
         json.dump(vocs_dict, outfile, ensure_ascii=True, indent='  ')
-    print(name, 'written')
+    logger.info(name, 'written')
 
 
 def load_vocs(filePath):
@@ -234,7 +234,7 @@ def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True,
         if any([k2.endswith(x) for x in suffixes]):
             if not v:
                 if verbose:
-                    print(f'Warning: No path set for key {k}')
+                    logger.warning(f'Warning: No path set for key {k}')
                 continue
             if not isinstance(v, str):
                 # Not a path
@@ -245,7 +245,7 @@ def expand_paths(nested_dict, suffixes=['_file', '_path', '_bin'], verbose=True,
                 d[k] = file
             else:
                 if verbose:
-                    print(f'Warning: Path {v} does not exist for key {k}')
+                    logger.warning(f'Warning: Path {v} does not exist for key {k}')
 
     return unflatten_dict(d, sep=sep)
 
@@ -383,9 +383,9 @@ def update_nested_dict(d, settings, verbose=False):
     for key, value in settings.items():
         if verbose:
             if key in flat_params:
-                print(f'Replacing param {key} with value {value}')
+                logger.info(f'Replacing param {key} with value {value}')
             else:
-                print(f'New param {key} with value {value}')
+                logger.info(f'New param {key} with value {value}')
         flat_params[key] = value
 
     new_dict = unflatten_dict(flat_params)

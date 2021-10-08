@@ -267,7 +267,7 @@ def pop_init(vocs, data):
     # Pop must be a multiple of 4. Trim off any extras
     n_extra = len(vecs) % 4
     if n_extra > 0:
-        print(f'Warnning: trimming {n_extra} from initial population to make a multiple of 4.')
+        logger.warning(f'Warning: trimming {n_extra} from initial population to make a multiple of 4.')
         vecs = vecs[:-n_extra]
    
     assert len(vecs) > 0, 'Population is empty'
@@ -354,22 +354,23 @@ def get_vecs(inds):
 #--------------------------------------------    
 #--------------------------------------------
 
-def cnsga(executor=None,
-          vocs=None,
-          population=None,
-          toolbox=None,
-          seed=None,
+def cnsga(
           evaluate_f=None,
-          output_path=None,
+          vocs=None,
+          executor=None,
+          population=None,
+          output_path=None,    
           max_generations = 2,
           population_size = 4,
           crossover_probability = 0.9,
           mutation_probability = 1.0,
           selection='auto',
-          verbose=None,
+          verbose=None, # deprecated
+          toolbox=None,
+          seed=None,    
           show_progress=False):
     """  
-    Continuous NSGA-II, NSGA-III
+    Continuous NSGA-II constrained, multi-objective optimization algorithm.
     
     Futures method, uses an executor as defined in:
     https://www.python.org/dev/peps/pep-3148/
@@ -387,6 +388,66 @@ def cnsga(executor=None,
         pop_{i}.json
     will be written for each generation i, and the best population at that generation.
     These files can be used for restarting the function. 
+    
+    
+    Parameters
+    ----------
+    evaluate_f : callable
+        Returns dict of outputs after problem has been evaluated
+        
+    vocs : dict
+        Variables, objectives, constraints and statics dict.
+        
+    executor : Executor, default=None
+        Executor object to run evaluate_f        
+
+    population : dict or str, default=None
+        Population dict or JSON filename to restart the algorithm from.
+        If None, an initial population will be randomly generated.
+        
+    output_path : str, default=None
+        Path to write output JSON files to. 
+
+    population_size : int, default=4
+        Population size. 
+        Must be a multiple of 4
+
+    max_generations : int, default = 2
+        Maximum number of generations to advance. 
+
+    n_initial_samples : int, default = 1
+        Number of initial samples to take before using the model,
+        overwritten by initial_x
+        
+    toolbox : deap.toolbox, default = None
+        Optional toolbox from DEAP to use for further customizing the algorithm.
+        Otherwise, vocs will be used to create the toolbox.
+        
+    seed: int, default=None
+        random seed
+        
+    crossover_probability : float, default = 0.9
+        Crossover probability
+    
+    mutation_probability : float, default = 1.0
+        Mutation probability
+    
+    selection : str
+        Selection algorith to use, one of:
+            'auto' (default)
+            'nsga2'
+            'spea2'
+
+    verbose: bool, default=None
+        Deprecated, do not use.
+
+    show_progress : bool, default=False
+        If True, will show a progress bar for each generation
+
+    Returns
+    -------
+    results : dict
+        Dictionary with output data at the end of optimization
     
     
     """
@@ -528,7 +589,7 @@ def cnsga(executor=None,
                 if len(new_vecs) == 0:
                     pbar.close()
                     
-                    pbar = tqdm(total=(len(futures)))                        
+                    pbar = tqdm(total=(len(futures)), desc=f"Generation {generation}")                        
                     
                     t1 = time.time()
                     dt = t1-t0
