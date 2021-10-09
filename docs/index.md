@@ -18,21 +18,21 @@ support for multi-threaded or MPI-enabled execution.
 Currenty **Xopt** provides:
 
 - optimization algorithms:
-  - `cnsga` Continuous NSGA-II with constraints.
-  - `bayesian_optimization` Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
-  - `mobo` Multi-objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
-  - `bayesian_exploration` Bayesian exploration.
-  - `multi_fidelity` Multi-fidelity Single objective Bayesian optimization.
+     - `cnsga` Continuous NSGA-II with constraints.
+     - `bayesian_optimization` Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
+     - `mobo` Multi-objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
+     - `bayesian_exploration` Bayesian exploration.
+     - `multi_fidelity` Multi-fidelity Single objective Bayesian optimization.
 - sampling algorithms:
-  - `random sampler`
+     - `random sampler`
 - Convenient YAML/JSON based input format.
 - Driver programs:
-  - `xopt.mpi.run` Parallel MPI execution using this input format.
+     - `xopt.mpi.run` Parallel MPI execution using this input format.
 
  **Xopt** does **not** provide: 
 - your custom simulation via an `evaluate` function.
 
-Rather, **Xopt** asks you to define this function 
+Rather, **Xopt** asks you to define this function.
 
 Configuring an Xopt run
 ===============
@@ -78,8 +78,8 @@ Defining evaluation function
 ===============
 Xopt can interface with arbitrary evaluate functions (defined in Python) with the 
 following form:
-```
-evaluate(params[Dict]) -> Dict
+```python
+evaluate(inputs: Dict) -> Dict
 ```
 Evaluate functions must accept a dictionary object that **at least** has the keys 
 specified in `variables, constants, linked_variables` and returns a dictionary 
@@ -93,7 +93,3 @@ Example MPI run, with `xopt.yaml` as the only user-defined file:
 ```b
 mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 ```
-
-The complete configuration of a simulation optimization is given by a proper YAML file:
-
-
