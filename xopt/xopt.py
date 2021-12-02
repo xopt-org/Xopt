@@ -1,5 +1,5 @@
-
-
+import json
+import os
 from copy import deepcopy
 
 import yaml
@@ -7,8 +7,8 @@ import yaml
 from . import configure
 from xopt.legacy import reformat_config
 from xopt import __version__
-from xopt.tools import expand_paths, load_config, save_config,\
-    random_settings, get_function, isotime
+from xopt.tools import expand_paths, load_config, save_config, \
+    random_settings, get_function, isotime, NpEncoder
 
 import logging
 logger = logging.getLogger(__name__)
@@ -149,10 +149,17 @@ class Xopt:
         if self.results and 'population' in opts:
             opts['population'] = self.results
 
+        # save config to json file used for results
+        output_path = self.config['xopt']['output_path']
+        print(output_path)
+        dump_dict = {"config": self.config}
+        with open(os.path.join(output_path, "results.json"), "w") as outfile:
+            json.dump(dump_dict, outfile, cls=NpEncoder)
+
         self.results = self.run_f(vocs=self.vocs,
                                   evaluate_f=self.evaluate,
                                   executor=executor,
-                                  output_path=self.config['xopt']['output_path'],
+                                  output_path=output_path,
                                   **opts)
 
     def random_inputs(self):

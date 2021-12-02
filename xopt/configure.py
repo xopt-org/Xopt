@@ -25,7 +25,7 @@ KNOWN_ALGORITHMS = {
 
 # defaults for required dict keys
 XOPT_DEFAULTS = {
-    'output_path': '.'
+    'output_path': ''
 }
 
 SIMULATION_DEFAULTS = {
@@ -60,6 +60,9 @@ ALL_DEFAULTS = {
 def configure_xopt(xopt_config: Dict) -> None:
     check_config_against_defaults(xopt_config, XOPT_DEFAULTS)
     xopt_config = fill_defaults(xopt_config, XOPT_DEFAULTS)
+    if xopt_config['output_path'] is None:
+        xopt_config['output_path'] = ''
+
     return xopt_config
 
 

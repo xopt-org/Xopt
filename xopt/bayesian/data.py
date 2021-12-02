@@ -110,12 +110,13 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
 
     results["inputs"] = inputs
     results["outputs"] = outputs
-    # outputs = deepcopy(config)
-    # outputs['results'] = results
-    output_path = "" if output_path is None else output_path
-    # TODO: Combine into one function for xopt
-    with open(os.path.join(output_path, "results.json"), "w") as outfile:
-        json.dump(results, outfile, cls=NpEncoder)
+
+    # rewrite results file with current data
+    json_filename = os.path.join(output_path, "results.json")
+    with open(json_filename, 'r') as file:
+        results['config'] = json.load(file)['config']
+    with open(json_filename, 'w') as file:
+        json.dump(results, file, cls=NpEncoder)
 
 
 def get_data_json(json_filename, vocs, **tkwargs):
