@@ -11,6 +11,7 @@ from xopt.tools import expand_paths, load_config, save_config, \
     random_settings, get_function, isotime, NpEncoder
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 import sys
@@ -101,15 +102,14 @@ class Xopt:
     def configure_algorithm(self):
         """ configure algorithm """
         self.config['algorithm'] = configure.configure_algorithm(self.config[
-                                                                    'algorithm'])
+                                                                     'algorithm'])
 
     def configure_simulation(self):
         self.config['simulation'] = configure.configure_simulation(self.config[
-                                                                    'simulation'])
+                                                                       'simulation'])
 
     def configure_vocs(self):
         self.config['vocs'] = configure.configure_vocs(self.config['vocs'])
-
 
     # --------------------------
     # Saving and Loading from file
@@ -149,18 +149,27 @@ class Xopt:
         if self.results and 'population' in opts:
             opts['population'] = self.results
 
-        # save config to json file used for results
+        # save config to json file used for results - if file exists overwrite
         output_path = self.config['xopt']['output_path']
-        print(output_path)
-        dump_dict = {"config": self.config}
-        with open(os.path.join(output_path, "results.json"), "w") as outfile:
-            json.dump(dump_dict, outfile, cls=NpEncoder)
 
-        self.results = self.run_f(vocs=self.vocs,
-                                  evaluate_f=self.evaluate,
-                                  executor=executor,
-                                  output_path=output_path,
-                                  **opts)
+        try:
+            self.results = self.run_f(vocs=self.vocs,
+                                      evaluate_f=self.evaluate,
+                                      executor=executor,
+                                      output_path=output_path,
+                                      **opts)
+        except Exception as e:
+            logger.exception(e)
+            raise e
+
+        finally:
+            # add config to json results file
+            with open(os.path.join(output_path, "results.json"), "r") as outfile:
+                dump_dict = json.load(outfile)
+
+            dump_dict['config'] = self.config
+            with open(os.path.join(output_path, "results.json"), "w") as outfile:
+                json.dump(dump_dict, outfile, cls=NpEncoder)
 
     def random_inputs(self):
         return random_settings(self.vocs)
