@@ -114,8 +114,6 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     # rewrite results file with current data
     output_path = output_path or ''
     json_filename = os.path.join(output_path, "results.json")
-    with open(json_filename, 'r') as file:
-        results['config'] = json.load(file)['config']
 
     with open(json_filename, 'w') as file:
         json.dump(results, file, cls=NpEncoder)
