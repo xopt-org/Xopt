@@ -158,10 +158,6 @@ class Xopt:
                                       executor=executor,
                                       output_path=output_path,
                                       **opts)
-        except Exception as e:
-            logger.exception(e)
-            raise e
-
         finally:
             # add config to json results file
             with open(os.path.join(output_path, "results.json"), "r") as outfile:
