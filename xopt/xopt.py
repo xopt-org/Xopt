@@ -1,19 +1,9 @@
-
-
-from copy import deepcopy
-
-import yaml
-
-from . import configure
-from xopt.legacy import reformat_config
-from xopt import __version__
-from xopt.tools import expand_paths, load_config, save_config,\
-    random_settings, get_function, isotime
-
+import concurrent
 import logging
-logger = logging.getLogger(__name__)
 
-import sys
+import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 class Xopt:
@@ -28,183 +18,85 @@ class Xopt:
     
           
     """
+    _evaluator = None
+    _generator = None
+    _futures = []
+    _history = None
+    _vocs = {}
+    _is_done = False
+    asynch = False
+    timeout = 1.0
 
     def __init__(self, config=None):
+        # initialize Xopt object
+        self.process_config(config)
 
-        # Internal state
-
-        # Main configuration is in this nested dict
-        self.config = deepcopy(config)
-        self.configured = False
-
-        self.results = None
-
-        self.run_f = None
-        self.evaluate_f = None
-
-        if config:
-            self.config = load_config(self.config)
-
-            # make sure configure has the required keys
-            for name in configure.ALL_DEFAULTS:
-                if name not in self.config:
-                    raise Exception(f'Key {name} is required in config for Xopt')
-
-            # load any high level config files
-            for ele in ['xopt', 'simulation', 'algorithm', 'vocs']:
-                self.config[ele] = load_config(self.config[ele])
-
-            # reformat old config files if needed
-            self.config = reformat_config(self.config)
-
-            # do configuration
-            self.configure_all()
-
+        if self.asynch:
+            self.return_when = concurrent.futures.FIRST_COMPLETED
         else:
-            # Make a template, so the user knows what is available
-            logger.info('Initializing with defaults')
-            self.config = deepcopy(configure.ALL_DEFAULTS)
+            self.return_when = concurrent.futures.ALL_COMPLETED
 
-    def configure_all(self):
+    def run(self):
+        """run until either xopt is done"""
+        while not self._is_done:
+            self.step()
+
+    def step(self):
         """
-        Configure everything
-
-        Configuration order:
-        xopt
-        algorithm
-        simulation
-        vocs, which contains the simulation name, and templates
-
+        run one optimization cycle
+        - get future objects
+        - recreate history dataframe
+        - determine the number of candidates to request from the generator
+        - pass history dataframe and candidate request to generator
+        - submit candidates to evaluator
         """
 
-        self.configure_xopt()
-        self.configure_algorithm()
-        self.configure_simulation()
-        self.configure_vocs()
+        # query futures and measure how many are still active
+        finished_futures, unfinished_futures = concurrent.futures.wait(
+            self.futures,
+            self.timeout,
+            self.return_when
+        )
 
-        # expand all paths
-        self.config = expand_paths(self.config, ensure_exists=True)
+        self._history = self.create_dataframe(self.futures)
 
-        # Get the actual functions
-        self.run_f = get_function(self.algorithm['function'])
-        self.evaluate_f = get_function(self.simulation['evaluate'])
+        # calculate number of new candidates to generate
+        if self.asynch:
+            n_generate = self.evaluator.max_workers - len(unfinished_futures)
+        else:
+            n_generate = self.evaluator.max_workers
 
-        self.configured = True
+        # generate samples and submit to evaluator
+        new_samples = self.generator.generate(self.history, n_generate)
+        self._futures += [self.evaluator.submit(*new_samples)]
 
-    # --------------------------
-    # Configure
-    def configure_xopt(self):
-        """ configure xopt """
-        # check and fill defaults
-        configure.configure_xopt(self.config['xopt'])
-
-    def configure_algorithm(self):
-        """ configure algorithm """
-        self.config['algorithm'] = configure.configure_algorithm(self.config[
-                                                                    'algorithm'])
-
-    def configure_simulation(self):
-        self.config['simulation'] = configure.configure_simulation(self.config[
-                                                                    'simulation'])
-
-    def configure_vocs(self):
-        self.config['vocs'] = configure.configure_vocs(self.config['vocs'])
-
-
-    # --------------------------
-    # Saving and Loading from file
-    def load(self, config):
-        """Load config from file (JSON or YAML) or data"""
-        self.config = load_config(config)
-        self.configure_all()
-
-    def save(self, file):
-        """Save config to file (JSON or YAML)"""
-        save_config(self.config, file)
-
-    # Conveniences
-    @property
-    def algorithm(self):
-        return self.config['algorithm']
-
-    @property
-    def simulation(self):
-        return self.config['simulation']
+    def process_config(self, config):
+        """process the config file and create the evaluator, vocs, generator objects"""
+        pass
 
     @property
     def vocs(self):
-        return self.config['vocs']
+        return self._vocs
 
-    # --------------------------
-    # Run
+    @property
+    def evaluator(self):
+        return self._evaluator
 
-    def run(self, executor=None):
-        assert self.configured, 'Not configured to run.'
+    @property
+    def generator(self):
+        return self._generator
 
-        logger.info(f'Starting at time {isotime()}')
+    @property
+    def futures(self):
+        return self._futures
 
-        opts = self.algorithm['options']
+    @property
+    def history(self):
+        return self._history
 
-        # Special for genetic algorithms
-        if self.results and 'population' in opts:
-            opts['population'] = self.results
+    @classmethod
+    def create_dataframe(cls, futures) -> pd.DataFrame:
+        """collect results and status from futures list"""
+        pass
 
-        self.results = self.run_f(vocs=self.vocs,
-                                  evaluate_f=self.evaluate,
-                                  executor=executor,
-                                  output_path=self.config['xopt']['output_path'],
-                                  **opts)
 
-    def random_inputs(self):
-        return random_settings(self.vocs)
-
-    def random_evaluate(self, check_vocs=True):
-        """
-        Makes random inputs and runs evaluate.
-        
-        If check_vocs, will check that all keys in vocs constraints and objectives
-        are in output.
-        """
-        inputs = self.random_inputs()
-        outputs = self.evaluate(inputs)
-        if check_vocs:
-            err_keys = []
-            for k in self.vocs['objectives']:
-                if k not in outputs:
-                    err_keys.append(k)
-            for k in self.vocs['constraints']:
-                if k not in outputs:
-                    err_keys.append(k)
-            assert len(err_keys) == 0, f'Required keys not found in output: {err_keys}'
-
-        return outputs
-
-    def evaluate(self, inputs):
-        """Evaluate should take one argument: A dict of inputs. """
-        options = self.simulation['options']
-        evaluate_f = self.evaluate_f
-        if options:
-            return evaluate_f(inputs, **options)
-        else:
-            return evaluate_f(inputs)
-
-    def __getitem__(self, config_item):
-        """
-        Get a configuration attribute
-        """
-        return self.config[config_item]
-
-    def __repr__(self):
-        s = f"""
-            Xopt 
-________________________________           
-Version: {__version__}
-Configured: {self.configured}
-Config as YAML:
-"""
-        # return s+pprint.pformat(self.config)
-        return s + yaml.dump(self.config, default_flow_style=None,
-                             sort_keys=False)
-
-    def __str__(self):
-        return self.__repr__()
