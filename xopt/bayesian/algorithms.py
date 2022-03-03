@@ -3,6 +3,7 @@ from xopt.tools import get_function
 from . import generators
 from .optimize import optimize
 from .models.models import create_multi_fidelity_model
+from xopt.vocs import VOCS
 
 KWARG_DEFAULTS = {
     "output_path": None,
@@ -126,6 +127,8 @@ def mobo(vocs, evaluate_f, ref=None, n_steps=1, n_initial_samples=1, **kwargs):
     options.update(kwargs)
 
     generator_options = options.pop("generator_options")
+
+    vocs = VOCS.parse_obj(vocs)
 
     generator = generators.mobo.MOBOGenerator(vocs, ref, **generator_options)
 

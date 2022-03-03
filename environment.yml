@@ -6,6 +6,7 @@ dependencies:
   - python=3.9
   - deap
   - numpy
+  - pydantic
   - pyyaml
   - pytorch
   - botorch

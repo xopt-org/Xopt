@@ -62,7 +62,7 @@ def weight_list(objective_dict):
 def get_bounds(vocs: Dict) -> np.ndarray:
     # get initial bounds
     return np.vstack(
-        [np.array(ele) for _, ele in vocs['variables'].items()]).T
+        [np.array(ele) for _, ele in vocs.variables.items()]).T
 
 
 # -------------------------------------------------------
@@ -162,12 +162,12 @@ def inputs_from_vec(vec, vocs=None):
         return dict(zip(vkeys, vec))
 
     # labeled inputs -> labeled outputs evaluate_f
-    vkeys = skeys(vocs['variables'])
+    vkeys = skeys(vocs.variables)
     inputs = dict(zip(vkeys, vec))
 
     # Constants    
     if 'constants' in vocs:
-        inputs.update(vocs['constants'] or {})
+        inputs.update(vocs.constants or {})
 
     # Handle linked variables
     if 'linked_variables' in vocs and vocs['linked_variables']:
@@ -189,9 +189,9 @@ def vec_from_inputs(inputs, labels=None):
 
 def random_inputs(vocs, n=None, include_constants=True, include_linked_variables=True):
     """
-    Uniform sampling of the variables described in vocs['variables'] = min, max.
+    Uniform sampling of the variables described in vocs.variables = min, max.
     Returns a dict of inputs. 
-    If include_constants, the vocs['constants'] are added to the dict. 
+    If include_constants, the vocs.constants are added to the dict. 
     
     
     Optional:
@@ -199,14 +199,14 @@ def random_inputs(vocs, n=None, include_constants=True, include_linked_variables
     
     """
     inputs = {}
-    for key, val in vocs['variables'].items():
+    for key, val in vocs.variables.items():
         a, b = val
         x = np.random.random(n)
         inputs[key] = x * a + (1 - x) * b
 
     # Constants    
     if include_constants:
-        inputs.update(vocs['constants'])
+        inputs.update(vocs.constants)
 
     # Handle linked variables
     if include_linked_variables and 'linked_variables' in vocs and vocs[

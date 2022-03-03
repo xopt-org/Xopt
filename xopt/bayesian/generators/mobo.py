@@ -44,7 +44,7 @@ class MOBOGenerator(BayesianGenerator):
                 "reference point must be " "Union[Tensor, List, np.ndarray, Tuple]"
             )
 
-        if len(ref) != len(vocs["objectives"]):
+        if len(ref) != len(vocs.objectives):
             raise ValueError("reference point must match dim of objectives")
 
         self._corrected_ref = None
@@ -121,8 +121,8 @@ class MOBOGenerator(BayesianGenerator):
     def get_corrected_ref(self, ref):
         new_ref = ref.clone()
         for j, name in zip(
-            range(len(self.vocs["objectives"])), self.vocs["objectives"].keys()
+            range(len(self.vocs.objectives)), self.vocs.objectives.keys()
         ):
-            if self.vocs["objectives"][name] == "MINIMIZE":
+            if self.vocs.objectives[name] == "MINIMIZE":
                 new_ref[j] = -new_ref[j]
         return new_ref

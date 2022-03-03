@@ -19,16 +19,16 @@ class TestGenerator:
     def test_generator(self):
         vocs = TNK.VOCS
 
-        train_x = torch.rand(2, len(vocs['variables']))
-        train_y = torch.ones(2, len(vocs['objectives']) +
-                                len(vocs['constraints']))
+        train_x = torch.rand(2, len(vocs.variables))
+        train_y = torch.ones(2, len(vocs.objectives) +
+                                len(vocs.constraints))
 
         model_1d = SingleTaskGP(train_x, train_y[:, 0].reshape(-1, 1))
         model_md = SingleTaskGP(train_x, train_y)
 
         beta = 0.01
         ucb = UpperConfidenceBound(model_1d, beta)
-        test_x = torch.zeros(1, len(vocs['variables']))
+        test_x = torch.zeros(1, len(vocs.variables))
         test_ucb_value = ucb(test_x)
 
         gen = BayesianGenerator(vocs, UpperConfidenceBound,

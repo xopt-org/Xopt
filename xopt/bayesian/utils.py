@@ -88,7 +88,7 @@ def submit_candidates(
     sampler_evaluate_args: Dict,
     candidate_index_start: Optional[int] = 1,
 ) -> Dict:
-    variable_names = list(vocs["variables"])
+    variable_names = list(vocs.variables)
 
     # add an extra axis if there is only one candidate
     candidates = torch.atleast_2d(candidates)
@@ -96,8 +96,8 @@ def submit_candidates(
     fut = {}
     for candidate in candidates:
         setting = dict(zip(variable_names, candidate.cpu().numpy()))
-        if vocs["constants"] is not None:
-            setting.update(vocs["constants"])
+        if vocs.constants is not None:
+            setting.update(vocs.constants)
 
         fut.update(
             {
@@ -123,14 +123,14 @@ def check_training_data_shape(
                 f"shape currently is {ele.shape} "
             )
 
-            assert ele.shape[-1] == len(vocs[vocs_type]), (
+            assert ele.shape[-1] == len(getattr(vocs, vocs_type)), (
                 f"current shape of training "
                 f"data ({ele.shape}) "
                 f"does not match number of vocs {vocs_type} == "
-                f"{len(vocs[vocs_type])}"
+                f"{len(getattr(vocs, vocs_type))}"
             )
         else:
-            if vocs[vocs_type]:
+            if getattr(vocs, vocs_type):
                 raise RuntimeError(
                     f"Training data for `{vocs_type}` is empty, but  `vocs['{vocs_type}'] = {vocs[vocs_type]}`"
                 )
@@ -154,7 +154,7 @@ def get_corrected_outputs(vocs, train_y, train_c):
     scale and invert outputs depending on maximization/minimization, etc.
     """
 
-    objectives = vocs["objectives"]
+    objectives = vocs.objectives
     objective_names = list(objectives.keys())
 
     # need to multiply -1 for each axis that we are using 'MINIMIZE' for an objective
@@ -164,32 +164,32 @@ def get_corrected_outputs(vocs, train_y, train_c):
 
     # negate objective measurements that want to be minimized
     for j, name in zip(range(len(objective_names)), objective_names):
-        if vocs["objectives"][name] == "MINIMIZE":
+        if vocs.objectives[name] == "MINIMIZE":
             corrected_train_y[:, j] = -train_y[:, j]
 
-        # elif vocs['objectives'][name] == 'MAXIMIZE' or vocs['objectives'][name] == 'None':
+        # elif vocs.objectives[name] == 'MAXIMIZE' or vocs.objectives[name] == 'None':
         #    pass
         else:
             pass
-            # logger.warning(f'Objective goal {vocs["objectives"][name]} not found, defaulting to MAXIMIZE')
+            # logger.warning(f'Objective goal {vocs.objectives[name]} not found, defaulting to MAXIMIZE')
 
     if train_c is not None:
-        constraints = vocs["constraints"]
+        constraints = vocs.constraints
         constraint_names = list(constraints.keys())
         corrected_train_c = train_c.clone()
 
         # negate constraints that use 'GREATER_THAN'
         for k, name in zip(range(len(constraint_names)), constraint_names):
-            if vocs["constraints"][name][0] == "GREATER_THAN":
-                corrected_train_c[:, k] = vocs["constraints"][name][1] - train_c[:, k]
+            if vocs.constraints[name][0] == "GREATER_THAN":
+                corrected_train_c[:, k] = vocs.constraints[name][1] - train_c[:, k]
 
-            elif vocs["constraints"][name][0] == "LESS_THAN":
+            elif vocs.constraints[name][0] == "LESS_THAN":
                 corrected_train_c[:, k] = -(
-                    vocs["constraints"][name][1] - train_c[:, k]
+                    vocs.constraints[name][1] - train_c[:, k]
                 )
             else:
                 logger.warning(
-                    f'Constraint goal {vocs["constraints"][name]} not found, defaulting to LESS_THAN'
+                    f'Constraint goal {vocs.constraints[name]} not found, defaulting to LESS_THAN'
                 )
     else:
         corrected_train_c = None
@@ -264,7 +264,7 @@ def collect_results(futures, vocs, **tkwargs):
     train_x = []
     train_y = []
 
-    if vocs["constraints"] is not None:
+    if vocs.constraints is not None:
         train_c = []
     else:
         train_c = None
@@ -277,12 +277,12 @@ def collect_results(futures, vocs, **tkwargs):
 
     for result in results:
         if not result["error"]:
-            train_x += [[result["inputs"][ele] for ele in vocs["variables"].keys()]]
-            train_y += [[result["outputs"][ele] for ele in vocs["objectives"].keys()]]
+            train_x += [[result["inputs"][ele] for ele in vocs.variables.keys()]]
+            train_y += [[result["outputs"][ele] for ele in vocs.objectives.keys()]]
 
-            if vocs["constraints"] is not None:
+            if vocs.constraints is not None:
                 train_c += [
-                    [result["outputs"][ele] for ele in vocs["constraints"].keys()]
+                    [result["outputs"][ele] for ele in vocs.constraints.keys()]
                 ]
 
             inputs += [result["inputs"]]
@@ -295,7 +295,7 @@ def collect_results(futures, vocs, **tkwargs):
 
     train_x = torch.tensor(train_x, **tkwargs)
     train_y = torch.tensor(train_y, **tkwargs)
-    if vocs["constraints"] is not None:
+    if vocs.constraints is not None:
         train_c = torch.tensor(train_c, **tkwargs)
 
     logger.debug("done collecting results")

@@ -10,6 +10,8 @@ from .optim.asynch import asynch
 from .optim.synch import synch
 from .utils import get_corrected_outputs, get_feasability_constraint_status
 from ..tools import DummyExecutor
+from xopt.vocs import VOCS
+
 
 """
     Main optimization function for Bayesian optimization
@@ -85,12 +87,13 @@ def optimize(
     results : dict
         Dictionary with output data at the end of optimization
     """
-
+    
+    
+    vocs = VOCS.parse_obj(vocs) 
     # raise error if someone tries to use linked variables
     # TODO: implement linked variables
-    if "linked_variables" in vocs.keys():
-        if not (vocs["linked_variables"] == {} or vocs["linked_variables"] is None):
-            raise NotImplementedError("linked variables not implemented yet")
+    if vocs.linked_variables:
+        raise NotImplementedError(f"linked variables not implemented yet: {vocs.linked_variables}")
 
     # Handle None, False -> {}
     tkwargs = tkwargs or {}

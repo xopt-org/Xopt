@@ -84,11 +84,14 @@ def save_data_dict(vocs, full_data, inputs, outputs, output_path):
     # add results to config dict and save to json
     results = {}
 
+    vocs = dict(vocs) # Convert to dict so below still works. TODO: rework
+
     names = ["variables", "objectives"]
 
     if vocs["constraints"] is not None:
         names += ["constraints"]
     i = 0
+
     for name in names:
         val = {}
         for ele in vocs[name].keys():
@@ -160,7 +163,7 @@ def save_data_pd(config, full_data):
             first_layer += [name]
             second_layer += [ele]
 
-    for ele in vocs["constraints"].keys():
+    for ele in vocs.constraints.keys():
         first_layer += ["constraints"]
         second_layer += [ele + "_stat"]
     first_layer += ["constraints"]

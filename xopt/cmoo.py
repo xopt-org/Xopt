@@ -214,15 +214,15 @@ def cmoo_evaluate(vec, labeled_evaluate_f=None, vocs=None, include_inputs_and_ou
             inputs0 = inputs.copy()       # Make a copy, because the evaluate function might modify the inputs.
             outputs = labeled_evaluate_f(inputs0)
         
-            obj_eval = vocs_tools.evaluate_objectives(vocs['objectives'], outputs)
-            con_eval = vocs_tools.evaluate_constraints(vocs['constraints'], outputs)
+            obj_eval = vocs_tools.evaluate_objectives(vocs.objectives, outputs)
+            con_eval = vocs_tools.evaluate_constraints(vocs.constraints, outputs)
             
         else:
         # Pure number function
             obj_eval, con_eval = evaluate_f(vec)
        
         # Form numpy arrays with correct signs
-        obj_eval = -np.array(vocs_tools.weight_list(vocs['objectives']))*np.array(obj_eval)
+        obj_eval = -np.array(vocs_tools.weight_list(vocs.objectives))*np.array(obj_eval)
         con_eval = -1*np.array(con_eval)
     
         err = False
@@ -235,8 +235,8 @@ def cmoo_evaluate(vec, labeled_evaluate_f=None, vocs=None, include_inputs_and_ou
         
         # Dummy output
         err = True
-        obj_eval = np.full(len(vocs['objectives']), 1e30) 
-        con_eval = np.full(len(vocs['constraints']), 1e30) 
+        obj_eval = np.full(len(vocs.objectives), 1e30) 
+        con_eval = np.full(len(vocs.constraints), 1e30) 
 
     finally:
          # Add these to result
@@ -255,7 +255,7 @@ def cmoo_evaluate(vec, labeled_evaluate_f=None, vocs=None, include_inputs_and_ou
 
 
 def continuous_problem_init(vocs):
-    var, obj, constr = vocs['variables'], vocs['objectives'], vocs['constraints']
+    var, obj, constr = vocs.variables, vocs.objectives, vocs.constraints
     
     init = {}
     init['n_var'] = len(var)

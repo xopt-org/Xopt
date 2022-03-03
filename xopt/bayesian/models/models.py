@@ -13,8 +13,9 @@ from ...vocs_tools import get_bounds
 
 
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
+
     input_normalize = Normalize(
-        len(vocs["variables"]),
+        len(vocs.variables),
         torch.tensor(
             get_bounds(vocs),
         ).to(train_x),
@@ -53,12 +54,12 @@ def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
 
 
 def create_multi_fidelity_model(train_x, train_y, train_c, vocs):
-    assert list(vocs["variables"])[-1] == "cost", (
-        'last variable in vocs["variables"] ' 'must be "cost" '
+    assert list(vocs.variables)[-1] == "cost", (
+        'last variable in vocs.variables ' 'must be "cost" '
     )
 
     input_transform = Normalize(
-        len(vocs["variables"]), torch.tensor(get_bounds(vocs)).to(train_x)
+        len(vocs.variables), torch.tensor(get_bounds(vocs)).to(train_x)
     )
     outcome_transform = Standardize(m=1)
 
@@ -68,7 +69,7 @@ def create_multi_fidelity_model(train_x, train_y, train_c, vocs):
         input_transform=input_transform,
         outcome_transform=outcome_transform,
         linear_truncated=False,
-        iteration_fidelity=len(vocs["variables"]) - 1,
+        iteration_fidelity=len(vocs.variables) - 1,
     )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)

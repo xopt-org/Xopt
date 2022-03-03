@@ -169,10 +169,10 @@ class Xopt:
         outputs = self.evaluate(inputs)
         if check_vocs:
             err_keys = []
-            for k in self.vocs['objectives']:
+            for k in self.vocs.objectives:
                 if k not in outputs:
                     err_keys.append(k)
-            for k in self.vocs['constraints']:
+            for k in self.vocs.constraints:
                 if k not in outputs:
                     err_keys.append(k)
             assert len(err_keys) == 0, f'Required keys not found in output: {err_keys}'

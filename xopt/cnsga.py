@@ -9,6 +9,8 @@ from xopt import creator, vocs_tools, fitness_with_constraints
 from xopt import creator, vocs_tools, fitness_with_constraints
 from xopt.tools import full_path, random_settings_arrays, DummyExecutor, load_config, NpEncoder
 from xopt import __version__
+from xopt.vocs import VOCS
+
 from deap import algorithms, base, tools
 
 from tqdm.auto import tqdm
@@ -89,7 +91,7 @@ def cnsga_toolbox(vocs, selection='auto'):
 
     """
     
-    var, obj, con = vocs['variables'], vocs['objectives'], vocs['constraints']
+    var, obj, con = vocs.variables, vocs.objectives, vocs.constraints
     n_var = len(var)
     n_obj = len(obj)
     n_con = len(con)
@@ -205,8 +207,8 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
             inputs0 = inputs.copy()       # Make a copy, because the evaluate function might modify the inputs.
             outputs = evaluate_f(inputs0)
         
-            obj_eval = vocs_tools.evaluate_objectives(vocs['objectives'], outputs)
-            con_eval = vocs_tools.evaluate_constraints(vocs['constraints'], outputs)
+            obj_eval = vocs_tools.evaluate_objectives(vocs.objectives, outputs)
+            con_eval = vocs_tools.evaluate_constraints(vocs.constraints, outputs)
             
         else:
         # Pure number function
@@ -222,8 +224,8 @@ def cnsga_evaluate(vec, evaluate_f=None, vocs=None, include_inputs_and_outputs=T
         
         # Dummy output
         err = True
-        obj_eval = [0.0]*len(vocs['objectives'])
-        con_eval = [-666.0]*len(vocs['constraints'])
+        obj_eval = [0.0]*len(vocs.objectives)
+        con_eval = [-666.0]*len(vocs.constraints)
     
     finally:
          # Add these to result
@@ -249,18 +251,18 @@ def pop_init(vocs, data):
     """
     Initialize a pop (list of creator.Indivituals) from vocs and keyed data.
     
-    Data should have keys as in vocs['variables'] as arrays. 
+    Data should have keys as in vocs.variables as arrays. 
     """
 
     # Get keys to look for in data
-    varkeys = vocs_tools.skeys(vocs['variables'])
+    varkeys = vocs_tools.skeys(vocs.variables)
 
     # extract vecs
     vecs = np.array([data[k] for k in varkeys]).T 
     
     # Check bounds
     for i, v in enumerate(varkeys):
-        low, up = vocs['variables'][v]
+        low, up = vocs.variables[v]
         assert vecs[:,i].min() >= low, 'Data below lower bound' 
         assert vecs[:,i].max() <= up,  'Data above upper bound' 
   
@@ -308,7 +310,7 @@ def pop_to_data(vocs, pop, generation=0):
     
     data = {'variables':{}, 'generation':generation, 'vocs':vocs}
 
-    vlist =  vocs_tools.skeys(vocs['variables']) # get the correct order
+    vlist =  vocs_tools.skeys(vocs.variables) # get the correct order
     for i, v in enumerate(vlist):
         data['variables'][v] = [ind[i] for ind in pop]
     
@@ -451,6 +453,8 @@ def cnsga(
     
     
     """
+
+    if vocs: vocs = VOCS.parse_obj(vocs)
 
     
     random.seed(seed)

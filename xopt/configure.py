@@ -5,6 +5,7 @@ Tools to configure an xopt run
 from copy import deepcopy
 
 from xopt import tools
+from xopt.vocs import VOCS
 import logging
 from typing import Dict
 
@@ -164,10 +165,10 @@ def configure_simulation(sim_config: Dict) -> Dict:
 
 def configure_vocs(vocs_config):
     # Allows for .json or .yaml filenames as values.
-    check_config_against_defaults(vocs_config, VOCS_DEFAULTS)
-    fill_defaults(vocs_config, VOCS_DEFAULTS)
+    #check_config_against_defaults(vocs_config, VOCS_DEFAULTS)
+    #fill_defaults(vocs_config, VOCS_DEFAULTS)
 
-    return vocs_config
+    return VOCS.parse_obj(vocs_config)
 
 
 # --------------------------------

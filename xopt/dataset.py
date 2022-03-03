@@ -5,7 +5,6 @@ Tools to create datsets with pandas
 """
 
 import pandas as pd
-
 import json
 
 KLIST = ['inputs', 'outputs', 'error']
@@ -70,7 +69,7 @@ def load_all_xopt_data(xopt_json_list, verbose=False, add_feasible=True):
     cdat = pd.concat([alldat['inputs'], alldat['outputs']], axis=1)
     nc = len(cdat)
     if add_feasible and 'feasible' not in cdat:
-        cdat['feasible'] = feasible(vocs['constraints'], cdat)
+        cdat['feasible'] = feasible(vocs["constraints"], cdat)
         if verbose:
             print(cdat['feasible'].sum(), 'feasible out of', len(cdat))
 

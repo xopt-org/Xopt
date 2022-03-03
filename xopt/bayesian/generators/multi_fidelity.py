@@ -43,7 +43,7 @@ class MultiFidelityGenerator(BayesianGenerator):
             use_gpu=use_gpu,
         )
 
-        if list(self.vocs["variables"])[-1] != "cost":
+        if list(self.vocs.variables)[-1] != "cost":
             raise ValueError("`cost` must be the last keyword in vocs[variables]")
 
         self.num_fantasies = num_fantasies
@@ -69,8 +69,8 @@ class MultiFidelityGenerator(BayesianGenerator):
 
         curr_val_acqf = FixedFeatureAcquisitionFunction(
             acq_function=self.base_acq(model),
-            d=len(self.vocs["variables"]),
-            columns=[len(self.vocs["variables"]) - 1],
+            d=len(self.vocs.variables),
+            columns=[len(self.vocs.variables) - 1],
             values=[1],
         )
 
@@ -122,8 +122,8 @@ class MultiFidelityGenerator(BayesianGenerator):
         bounds = torch.tensor(get_bounds(self.vocs), **self.tkwargs)
         rec_acqf = FixedFeatureAcquisitionFunction(
             acq_function=self.base_acq(model),
-            d=len(self.vocs["variables"]),
-            columns=[len(self.vocs["variables"]) - 1],
+            d=len(self.vocs.variables),
+            columns=[len(self.vocs.variables) - 1],
             values=[1],
         )
 
