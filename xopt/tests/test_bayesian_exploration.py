@@ -50,3 +50,9 @@ class TestClassBayesExp:
         X.algorithm['options']['generator_options']['sigma'] = [1, 1]
         with pytest.raises(UnsupportedError):
             X.run()
+
+    def test_initial_x(self):
+        test_config = copy.deepcopy(self.config)
+        X = Xopt(test_config)
+        X.algorithm['options']['initial_x'] = [1, 1]
+        X.run()

@@ -1,4 +1,5 @@
-from xopt.tools import full_path, new_date_filename, random_settings, DummyExecutor, NpEncoder
+from xopt.tools import full_path, new_date_filename, random_settings, DummyExecutor, \
+    NpEncoder
 from xopt import __version__
 from deap.base import Toolbox
 import json
@@ -8,6 +9,7 @@ import os, sys
 import traceback
 import warnings
 import logging
+
 logger = logging.getLogger(__name__)
 
 sampler_logo = f"""
@@ -43,8 +45,8 @@ def sampler_evaluate(inputs, evaluate_f=None):
 
     except Exception as ex:
         # No need to print a nasty exception
-        logger.error(f'Exception caught in {__name__}')      
-        outputs =  {'Exception':  str(traceback.format_exc())}
+        logger.error(f'Exception caught in {__name__}')
+        outputs = {'Exception': str(traceback.format_exc())}
         err = True
 
     finally:
@@ -68,9 +70,8 @@ def random_sampler(vocs, evaluate_f,
     """
 
     if verbose is not None:
-        warnings.warn('xopt.cnsga verbose option has been deprecated')       
-    
-    
+        warnings.warn('xopt.cnsga verbose option has been deprecated')
+
     toolbox = Toolbox()
     toolbox.register('evaluate', sampler_evaluate, evaluate_f=evaluate_f)
 
@@ -98,7 +99,8 @@ def random_sampler(vocs, evaluate_f,
             pass
 
             #  Initial batch
-    futures = [executor.submit(toolbox.evaluate, random_settings(vocs)) for _ in range(chunk_size)]
+    futures = [executor.submit(toolbox.evaluate, random_settings(vocs)) for _ in
+               range(chunk_size)]
 
     # Continuous loop
     ii = 0
