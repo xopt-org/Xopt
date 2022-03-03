@@ -201,9 +201,11 @@ ________________________________
 Version: {__version__}
 Configured: {self.configured}
 Config as YAML:
-"""
-        # return s+pprint.pformat(self.config)
-        return s + yaml.dump(self.config, default_flow_style=None,
+"""        
+        # Cast to dicts for nice printout
+        config = {k:dict(v) for k, v in  self.config.items()}
+        
+        return s + yaml.dump(config, default_flow_style=None,
                              sort_keys=False)
 
     def __str__(self):
