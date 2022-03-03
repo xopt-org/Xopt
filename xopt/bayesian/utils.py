@@ -220,8 +220,7 @@ def sampler_evaluate(inputs, evaluate_f, *eval_args, verbose=False):
             "Exception": str(ex),
             "Traceback": traceback.print_tb(ex.__traceback__),
         }
-        if verbose:
-            print(outputs)
+        logger.error(outputs)
         err = True
 
     finally:
