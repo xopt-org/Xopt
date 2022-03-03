@@ -133,14 +133,16 @@ def get_data_json(json_filename, vocs, **tkwargs):
     def replace_none(l):
         return [math.nan if x is None else x for x in l]
 
+    # TODO: rework this and unify with other algorithms
     for name in names:
-        if vocs[name]:
+        d = getattr(vocs, name)
+        if d:
             data_sets[name] = torch.hstack(
                 [
                     torch.tensor(replace_none(data[name][ele]), **tkwargs).reshape(
                         -1, 1
                     )
-                    for ele in vocs[name].keys()
+                    for ele in d.keys()
                 ]
             )
         else:

@@ -6,6 +6,7 @@ import torch
 from botorch.models import SingleTaskGP
 from .evaluators import TNK
 
+import xopt.vocs
 
 def _good_test(model, beta):
     return UpperConfidenceBound(model, beta)
@@ -17,7 +18,7 @@ def _bad_test(model):
 
 class TestGenerator:
     def test_generator(self):
-        vocs = TNK.VOCS
+        vocs = xopt.vocs.VOCS.parse_obj(TNK.VOCS)
 
         train_x = torch.rand(2, len(vocs.variables))
         train_y = torch.ones(2, len(vocs.objectives) +
