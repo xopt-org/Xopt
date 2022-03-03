@@ -15,7 +15,7 @@ from ...vocs_tools import get_bounds
 def create_model(train_x, train_y, train_c, vocs, custom_model=None, **kwargs):
     input_normalize = Normalize(
         len(vocs["variables"]),
-        torch.tensor(
+        bounds=torch.tensor(
             get_bounds(vocs),
         ).to(train_x),
     )

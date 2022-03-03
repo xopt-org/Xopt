@@ -69,7 +69,7 @@ class BayesianExploration(AnalyticAcquisitionFunction):
             design points `X`.
         """
 
-        posterior = self._get_posterior(X=X)
+        posterior = self.model.posterior(X=X)
         means = posterior.mean.squeeze(dim=-2)  # (b) x m
         sigmas = posterior.variance.squeeze(dim=-2).sqrt().clamp_min(1e-9)  # (b) x m
 
