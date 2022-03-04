@@ -78,8 +78,8 @@ class BayesianExplorationGenerator(BayesianGenerator):
         m is the number of constraints
 
         """
-        n_constraints = len(self.vocs["constraints"])
-        n_variables = len(self.vocs["variables"])
+        n_constraints = len(self.vocs.constraints)
+        n_variables = len(self.vocs.variables)
 
         # serialized Bayesian Exploration
         if self.optimize_options["q"] == 1:

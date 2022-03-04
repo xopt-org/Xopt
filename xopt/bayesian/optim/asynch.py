@@ -31,7 +31,7 @@ def asynch(
 
     # check if variable cost is specified in VOCS
     fixed_cost = False
-    if "cost" not in vocs["variables"]:
+    if "cost" not in vocs.variables:
         fixed_cost = True
 
     # define queue for evaluation

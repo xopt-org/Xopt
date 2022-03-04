@@ -1,12 +1,12 @@
 import torch
 from ..bayesian.models.models import create_model
 import numpy as np
-
+from xopt.vocs import VOCS
 
 class TestModelCreation:
-    vocs = {'variables': {'x1': [0, 1],
+    vocs = VOCS(variables = {'x1': [0, 1],
                           'x2': [0, 1],
-                          'x3': [0, 1]}}
+                          'x3': [0, 1]} ) 
 
     def test_create_model(self):
         train_x = torch.rand(5, 3)

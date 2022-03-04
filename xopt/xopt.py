@@ -169,10 +169,10 @@ class Xopt:
         outputs = self.evaluate(inputs)
         if check_vocs:
             err_keys = []
-            for k in self.vocs['objectives']:
+            for k in self.vocs.objectives:
                 if k not in outputs:
                     err_keys.append(k)
-            for k in self.vocs['constraints']:
+            for k in self.vocs.constraints:
                 if k not in outputs:
                     err_keys.append(k)
             assert len(err_keys) == 0, f'Required keys not found in output: {err_keys}'
@@ -201,9 +201,11 @@ ________________________________
 Version: {__version__}
 Configured: {self.configured}
 Config as YAML:
-"""
-        # return s+pprint.pformat(self.config)
-        return s + yaml.dump(self.config, default_flow_style=None,
+"""        
+        # Cast to dicts for nice printout
+        config = {k:dict(v) for k, v in  self.config.items()}
+        
+        return s + yaml.dump(config, default_flow_style=None,
                              sort_keys=False)
 
     def __str__(self):

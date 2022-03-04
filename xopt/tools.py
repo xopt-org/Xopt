@@ -117,20 +117,20 @@ def load_vocs(filePath):
 
 def random_settings(vocs, include_constants=True, include_linked_variables=True):
     """
-    Uniform sampling of the variables described in vocs['variables'] = min, max.
+    Uniform sampling of the variables described in vocs.variables = min, max.
     Returns a dict of settings. 
-    If include_constants, the vocs['constants'] are added to the dict. 
+    If include_constants, the vocs.constants are added to the dict. 
     
     """
     settings = {}
-    for key, val in vocs['variables'].items():
+    for key, val in vocs.variables.items():
         a, b = val
         x = np.random.random()
         settings[key] = x * a + (1 - x) * b
 
     # Constants    
-    if include_constants and vocs['constants']:
-        settings.update(vocs['constants'])
+    if include_constants and vocs.constants:
+        settings.update(vocs.constants)
 
     # Handle linked variables
     if include_linked_variables and 'linked_variables' in vocs and vocs[
@@ -146,21 +146,21 @@ def random_settings_arrays(vocs, n, include_constants=True,
     """
     Similar to random_settings, but with arrays of size n. 
     
-    Uniform sampling of the variables described in vocs['variables'] = min, max.
+    Uniform sampling of the variables described in vocs.variables = min, max.
     Returns a dict of settings, with each settings as an array. 
 
-    If include_constants, the vocs['constants'] are added to the dict as full arrays.
+    If include_constants, the vocs.constants are added to the dict as full arrays.
     
     """
     settings = {}
-    for key, val in vocs['variables'].items():
+    for key, val in vocs.variables.items():
         a, b = val
         x = np.random.random(n)
         settings[key] = x * a + (1 - x) * b
 
     # Constants    
-    if include_constants and 'constants' in vocs and vocs['constants']:
-        for k, v in vocs['constants'].items():
+    if include_constants and 'constants' in vocs and vocs.constants:
+        for k, v in vocs.constants.items():
             settings[k] = np.full(n, v)
 
     # Handle linked variables
@@ -314,6 +314,8 @@ class NpEncoder(json.JSONEncoder):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
+        elif hasattr(obj, "dict"): # Works with PyDantic models
+            return obj.dict()                
         else:
             return super(NpEncoder, self).default(obj)
 

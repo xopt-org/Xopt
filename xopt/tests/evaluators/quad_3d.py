@@ -6,8 +6,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 VOCS = {
-    'name': '1D test',
-    'description': '1D test function (with optional multi-fidelity) for debugging',
     'variables': {
         'x1': [0, 0.2],
         'x2': [0, 0.2],
@@ -15,11 +13,9 @@ VOCS = {
         'cost': [0, 1.0]
     },
     'objectives': {
-        'y1': 'MINIMIZE',
+        'y1': 'MINIMIZE'
 
-    },
-    'constraints': {},
-    'constants': {}
+    }
 }
 
 

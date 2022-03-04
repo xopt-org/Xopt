@@ -10,14 +10,15 @@ from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.optim.optimize import optimize_acqf
 from botorch.sampling.samplers import SobolQMCNormalSampler
 
-from ...vocs_tools import get_bounds
+from xopt.vocs import VOCS
+from xopt.vocs_tools import get_bounds
 
 logger = logging.getLogger(__name__)
 
 
 class Generator(ABC):
     def __init__(self, vocs: Dict) -> None:
-        self.vocs = vocs
+        self.vocs = VOCS.parse_obj(vocs)
 
     @abstractmethod
     def generate(self, model: Model) -> torch.Tensor:
@@ -111,11 +112,11 @@ class BayesianGenerator(Generator):
 
         self.optimize_options.update(optimize_options)
 
-        self.n_objectives = len(self.vocs["objectives"])
+        self.n_objectives = len(self.vocs.objectives)
 
         self.n_constraints = 0
-        if self.vocs["constraints"] is not None:
-            self.n_constraints = len(self.vocs["constraints"])
+        if self.vocs.constraints is not None:
+            self.n_constraints = len(self.vocs.constraints)
 
     def generate(self, model: Model, q: Optional[int] = None) -> torch.Tensor:
         """
@@ -139,11 +140,11 @@ class BayesianGenerator(Generator):
 
         # check model input dims and outputs
         if isinstance(model, ModelListGP):
-            if model.train_inputs[0][0].shape[-1] != len(self.vocs["variables"]):
+            if model.train_inputs[0][0].shape[-1] != len(self.vocs.variables):
                 raise BotorchError("model input training data does not match `vocs`")
 
         else:
-            if model.train_inputs[0].shape[-1] != len(self.vocs["variables"]):
+            if model.train_inputs[0].shape[-1] != len(self.vocs.variables):
                 raise BotorchError("model input training data does not match `vocs`")
 
         if isinstance(model, ModelListGP):
