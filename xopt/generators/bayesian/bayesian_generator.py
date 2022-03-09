@@ -4,7 +4,7 @@ from typing import List, Dict
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
-from botorch.models import SingleTaskGP, ModelListGP
+from botorch.models import SingleTaskGP, ModelListGP, ModelList
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim import optimize_acqf
 from gpytorch import Module
@@ -22,11 +22,13 @@ class BayesianGenerator(Generator, ABC):
     def __init__(
             self,
             vocs: VOCS,
+            n_initial: int = 1,
             model_kw: Dict = None,
             acqf_kw: Dict = None,
             optim_kw: Dict = None
     ):
         super(BayesianGenerator, self).__init__(vocs)
+        self.n_initial = n_initial
 
         # set default kwargs
         model_kw = model_kw or {}
@@ -58,7 +60,7 @@ class BayesianGenerator(Generator, ABC):
         # if no data exists use random generator to generate candidates
         if data.empty:
             gen = RandomGenerator(self.vocs)
-            return gen.generate(data, n_candidates)
+            return gen.generate(data, self.n_initial)
 
         else:
             self._model = self.get_model(data)
