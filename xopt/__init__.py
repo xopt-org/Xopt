@@ -1,4 +1,4 @@
 from .evaluator import Evaluator
 from .generator import Generator
 from .vocs import VOCS
-from .xopt import Xopt
+from .base import XoptBase
