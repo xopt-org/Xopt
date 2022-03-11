@@ -1,5 +1,5 @@
 from xopt.resources.testing import TEST_VOCS_DATA, TEST_VOCS_BASE, test_callable
-from xopt import Xopt, Evaluator
+from xopt import XoptBase, Evaluator
 from xopt.generators.bayesian.upper_confidence_bound import \
     UpperConfidenceBoundGenerator
 
@@ -16,7 +16,7 @@ class TestUpperConfidenceBoundGenerator:
         evaluator = Evaluator(test_callable)
         generator = UpperConfidenceBoundGenerator(TEST_VOCS_BASE)
 
-        xopt = Xopt(generator, evaluator, TEST_VOCS_BASE)
+        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()

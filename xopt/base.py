@@ -10,7 +10,7 @@ from .vocs import VOCS
 logger = logging.getLogger(__name__)
 
 
-class Xopt:
+class XoptBase:
     """
     
     Object to handle a single optimization problem.
@@ -33,7 +33,7 @@ class Xopt:
             generator: Generator, evaluator: Evaluator, vocs: VOCS,
             asynch=False
     ):
-        # initialize Xopt object
+        # initialize XoptBase object
         self._generator = generator
         self._evaluator = evaluator
         self._vocs = vocs
