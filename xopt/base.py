@@ -12,16 +12,17 @@ logger = logging.getLogger(__name__)
 
 class XoptBase:
     """
-    
+
     Object to handle a single optimization problem.
-    
+
     Parameters
     ----------
     config: dict, YAML text, JSON text
         input file should be a dict, JSON, or YAML file with top level keys
-    
-          
+
+
     """
+
     _futures = []
     _samples = []
     _history = None
@@ -29,9 +30,7 @@ class XoptBase:
     timeout = 1.0
 
     def __init__(
-            self,
-            generator: Generator, evaluator: Evaluator, vocs: VOCS,
-            asynch=False
+        self, generator: Generator, evaluator: Evaluator, vocs: VOCS, asynch=False
     ):
         # initialize XoptBase object
         self._generator = generator
@@ -61,9 +60,7 @@ class XoptBase:
 
         # query futures and measure how many are still active
         finished_futures, unfinished_futures = concurrent.futures.wait(
-            self.futures,
-            self.timeout,
-            self.return_when
+            self.futures, self.timeout, self.return_when
         )
 
         # calculate number of new candidates to generate
@@ -114,4 +111,3 @@ class XoptBase:
             data += [new_dict]
 
         return pd.DataFrame(data)
-

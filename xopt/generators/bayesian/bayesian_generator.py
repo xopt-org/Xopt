@@ -20,15 +20,16 @@ class BayesianGenerator(Generator, ABC):
     _acquisition = None
 
     def __init__(
-            self,
-            vocs: VOCS,
-            n_initial: int = 1,
-            model_kw: Dict = None,
-            acqf_kw: Dict = None,
-            optim_kw: Dict = None
+        self,
+        vocs: VOCS,
+        n_initial: int = 1,
+        model_kw: Dict = None,
+        acqf_kw: Dict = None,
+        optim_kw: Dict = None,
     ):
         super(BayesianGenerator, self).__init__(vocs)
         self.n_initial = n_initial
+        self.tkwargs = {"dtype": torch.double, "device": "cpu"}
 
         # set default kwargs
         model_kw = model_kw or {}
@@ -41,17 +42,14 @@ class BayesianGenerator(Generator, ABC):
         self.acqf_kw.update(acqf_kw)
 
         # kwargs for optimizing acquisition function
-        self.optim_kw = {
-            "num_restarts": 5,
-            "raw_samples": 20
-        }
+        self.optim_kw = {"num_restarts": 5, "raw_samples": 20}
         self.optim_kw.update(optim_kw)
 
         # kwargs for specifying model construction
         bounds = self.get_bounds()
         self.model_kw = {
             "input_transform": Normalize(len(bounds[0]), bounds=bounds),
-            "outcome_transform": Standardize(1)
+            "outcome_transform": Standardize(1),
         }
         self.model_kw.update(model_kw)
 
@@ -81,6 +79,7 @@ class BayesianGenerator(Generator, ABC):
 
         """
         inputs, outputs = self.get_training_data(data)
+
         n_outputs = outputs.shape[-1]
         if n_outputs > 1:
             model_list = []
@@ -98,23 +97,20 @@ class BayesianGenerator(Generator, ABC):
             fit_gpytorch_model(mll)
         return model
 
+    def get_bounds(self):
+        """overwrite get bounds to transform numpy array into tensor"""
+        return torch.tensor(super().get_bounds(), **self.tkwargs)
+
+    def get_training_data(self, data: pd.DataFrame):
+        """overwrite get training data to transform numpy array into tensor"""
+        inputs, outputs = super().get_training_data(data)
+        return torch.tensor(inputs, **self.tkwargs), torch.tensor(
+            outputs, **self.tkwargs
+        )
+
     @abstractmethod
     def get_acquisition(self, model):
         pass
-
-    def get_bounds(self):
-        return torch.vstack(
-            [torch.tensor(ele) for _, ele in self.vocs.variables.items()]
-        ).T
-
-    def get_training_data(self, data: pd.DataFrame):
-        inputs = torch.from_numpy(data[self.vocs.variables.keys()].to_numpy())
-        outputs = torch.from_numpy(data[
-                                       list(self.vocs.objectives.keys()) +
-                                       list(self.vocs.constraints.keys())].to_numpy()
-                                   )
-
-        return inputs, outputs
 
     @property
     def model(self):

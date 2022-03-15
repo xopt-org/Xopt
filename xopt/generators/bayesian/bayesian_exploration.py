@@ -1,7 +1,10 @@
 from typing import Optional
 
-from botorch.acquisition import qUpperConfidenceBound, MCAcquisitionObjective, \
-    MCAcquisitionFunction
+from botorch.acquisition import (
+    qUpperConfidenceBound,
+    MCAcquisitionObjective,
+    MCAcquisitionFunction,
+)
 from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
@@ -34,27 +37,21 @@ class BayesianExplorationGenerator(BayesianGenerator):
         """
 
         super(BayesianExplorationGenerator, self).__init__(
-            vocs,
-            n_initial=n_initial,
-            model_kw=kwargs,
-            acqf_kw={}
+            vocs, n_initial=n_initial, model_kw=kwargs, acqf_kw={}
         )
 
     def get_acquisition(self, model):
-        return qPosteriorVariance(
-            model,
-            **self.acqf_kw
-        )
+        return qPosteriorVariance(model, **self.acqf_kw)
 
 
 class qPosteriorVariance(MCAcquisitionFunction):
     def __init__(
-            self,
-            model: Model,
-            sampler: Optional[MCSampler] = None,
-            objective: Optional[MCAcquisitionObjective] = None,
-            posterior_transform: Optional[PosteriorTransform] = None,
-            X_pending: Optional[Tensor] = None,
+        self,
+        model: Model,
+        sampler: Optional[MCSampler] = None,
+        objective: Optional[MCAcquisitionObjective] = None,
+        posterior_transform: Optional[PosteriorTransform] = None,
+        X_pending: Optional[Tensor] = None,
     ) -> None:
         r"""q-Upper Confidence Bound.
         Args:

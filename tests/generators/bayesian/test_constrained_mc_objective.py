@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 from xopt.generators.bayesian.utils import create_constrained_mc_objective
@@ -8,8 +10,9 @@ import torch
 class TestConstrainedMCObjective:
     def test_basic(self):
         # add a second constraint to the base vocs
-        TEST_VOCS_BASE.constraints["c2"] = ["LESS_THAN", 0.5]
-        obj = create_constrained_mc_objective(TEST_VOCS_BASE)
+        test_vocs_copy = deepcopy(TEST_VOCS_BASE)
+        test_vocs_copy.constraints["c2"] = ["LESS_THAN", 0.5]
+        obj = create_constrained_mc_objective(test_vocs_copy)
 
         # test large sample shape
         test_samples = torch.randn(3, 4, 5, 3).double()
@@ -34,7 +37,7 @@ class TestConstrainedMCObjective:
         ts4 = torch.tensor([-1.0, -10.0, 10.0]).unsqueeze(0).double()
 
         for ele in [ts2, ts3, ts4]:
-            assert obj(ele) == torch.tensor(0.0)
+            assert obj(ele) == torch.tensor(-100.0)
 
 
 

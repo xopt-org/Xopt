@@ -6,8 +6,8 @@ import yaml
 
 # Enums for objectives and constraints
 class ObjectiveEnum(str, Enum):
-    MINIMIZE = 'MINIMIZE'
-    MAXIMIZE = 'MAXIMIZE'
+    MINIMIZE = "MINIMIZE"
+    MAXIMIZE = "MAXIMIZE"
 
     # Allow any case
     @classmethod
@@ -18,8 +18,8 @@ class ObjectiveEnum(str, Enum):
 
 
 class ConstraintEnum(str, Enum):
-    LESS_THAN = 'LESS_THAN'
-    GREATER_THAN = 'GREATER_THAN'
+    LESS_THAN = "LESS_THAN"
+    GREATER_THAN = "GREATER_THAN"
 
     # Allow any case
     @classmethod
@@ -32,7 +32,8 @@ class ConstraintEnum(str, Enum):
 class VOCS(BaseModel):
     variables: Dict[str, conlist(float, min_items=2, max_items=2)] = None
     constraints: Dict[
-        str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)] = None
+        str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
+    ] = None
     objectives: Dict[str, ObjectiveEnum] = None
     constants: Dict[str, Any] = None
     linked_variables: Dict[str, str] = None

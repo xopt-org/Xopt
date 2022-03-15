@@ -1,9 +1,7 @@
 from botorch.acquisition import qUpperConfidenceBound
-from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
-from torch import Tensor
 
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt import VOCS
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
@@ -28,14 +26,8 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         """
 
         super(UpperConfidenceBoundGenerator, self).__init__(
-            vocs,
-            n_initial=n_initial,
-            model_kw=kwargs,
-            acqf_kw={'beta': beta}
+            vocs, n_initial=n_initial, model_kw=kwargs, acqf_kw={"beta": beta}
         )
 
     def get_acquisition(self, model):
-        return qUpperConfidenceBound(
-            model,
-            **self.acqf_kw
-        )
+        return qUpperConfidenceBound(model, **self.acqf_kw)

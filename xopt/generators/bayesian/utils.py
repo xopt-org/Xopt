@@ -16,7 +16,7 @@ def create_constrained_mc_objective(vocs):
     n_constraints = len(constraint_names)
     weights = torch.zeros(n_objectives + n_constraints).double()
     for idx, ele in enumerate(vocs.objectives):
-        if vocs.objectives[ele] == 'MINIMIZE':
+        if vocs.objectives[ele] == "MINIMIZE":
             weights[idx] = -1.0
         else:
             weights[idx] = 1.0
@@ -26,24 +26,22 @@ def create_constrained_mc_objective(vocs):
 
     def constraint_function(Z, index=-1):
         name = constraint_names[index]
-        if vocs.constraints[name][0] == 'GREATER_THAN':
+        if vocs.constraints[name][0] == "GREATER_THAN":
             return vocs.constraints[name][1] - Z[..., n_objectives + index]
-        elif vocs.constraints[name][0] == 'LESS_THAN':
+        elif vocs.constraints[name][0] == "LESS_THAN":
             return Z[..., n_objectives + index] - vocs.constraints[name][1]
         else:
-            raise RuntimeError(f'constraint type {vocs.constraints[name][0]} not '
-                               'implemented for constrained bayes opt')
+            raise RuntimeError(
+                f"constraint type {vocs.constraints[name][0]} not "
+                "implemented for constrained bayes opt"
+            )
 
     constraint_callables = []
     for i in range(n_constraints):
         constraint_callables += [partial(constraint_function, index=i)]
 
     constrained_obj = ConstrainedMCObjective(
-        objective=obj_callable,
-        constraints=constraint_callables,
-        infeasible_cost=100.0
+        objective=obj_callable, constraints=constraint_callables, infeasible_cost=100.0
     )
 
     return constrained_obj
-
-
