@@ -1,7 +1,6 @@
 from typing import Optional
 
 from botorch.acquisition import (
-    qUpperConfidenceBound,
     MCAcquisitionObjective,
     MCAcquisitionFunction,
 )
@@ -11,37 +10,30 @@ from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt import VOCS
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
-    def __init__(self, vocs: VOCS, n_initial=1, **kwargs):
+    def __init__(self, vocs: VOCS, **kwargs):
         """
         Generator using UpperConfidenceBound acquisition function
 
         Parameters
         ----------
         vocs: dict
-            Standard vocs dictionary for xopt
-
-        beta: float, default: 2.0
-            Beta value for UCB acquisition function
-
-        maximize: bool, default: False
-            If True attempt to maximize the function
+            Standard vocs for xopt
 
         **kwargs
-            Keyword arguments passed to SingleTaskGP model
+            Keyword arguments passed to generator options
 
         """
 
-        super(BayesianExplorationGenerator, self).__init__(
-            vocs, n_initial=n_initial, model_kw=kwargs, acqf_kw={}
-        )
+        super(BayesianExplorationGenerator, self).__init__(vocs)
+        self.options.update(**kwargs)
 
     def get_acquisition(self, model):
-        return qPosteriorVariance(model, **self.acqf_kw)
+        return qPosteriorVariance(model, **self.options["acqf_kw"])
 
 
 class qPosteriorVariance(MCAcquisitionFunction):
@@ -56,7 +48,6 @@ class qPosteriorVariance(MCAcquisitionFunction):
         r"""q-Upper Confidence Bound.
         Args:
             model: A fitted model.
-            beta: Controls tradeoff between mean and standard deviation in UCB.
             sampler: The sampler used to draw base samples. Defaults to
                 `SobolQMCNormalSampler(num_samples=512, collapse_batch_dims=True)`
             objective: The MCAcquisitionObjective under which the samples are

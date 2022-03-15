@@ -10,7 +10,7 @@ class RandomGenerator(Generator):
     def __init__(self, vocs):
         super(RandomGenerator, self).__init__(vocs)
 
-    def generate(self, data: pd.DataFrame, n_candidates) -> List[Dict]:
+    def generate(self, n_candidates) -> List[Dict]:
         """generate uniform random data points"""
         problem_dim = len(self.vocs.variables)
         random_vals = np.random.rand(n_candidates, problem_dim)

@@ -70,9 +70,12 @@ class XoptBase:
             n_generate = self.evaluator.max_workers
 
         # generate samples and submit to evaluator
-        new_samples = self.generator.generate(self.history, n_generate)
+        new_samples = self.generator.generate(n_generate)
         self._samples += new_samples
         self._futures += self.evaluator.submit(new_samples)
+
+        # add current data to generator
+        self.generator.add_data(self.history)
 
     def process_config(self, config):
         """process the config file and create the evaluator, vocs, generator objects"""
