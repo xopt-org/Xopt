@@ -6,12 +6,14 @@ from typing import List, Dict
 
 class Generator(ABC):
     _is_done = False
+    _data = pd.DataFrame()
+    options = {}
 
     def __init__(self, vocs):
         self._vocs = vocs
 
     @abstractmethod
-    def generate(self, data: pd.DataFrame, n_candidates) -> List[Dict]:
+    def generate(self, n_candidates) -> List[Dict]:
         """
         generate `n_candidates` candidates
 
@@ -23,8 +25,15 @@ class Generator(ABC):
         return self._is_done
 
     @property
+    def data(self):
+        return self._data
+
+    @property
     def vocs(self):
         return self._vocs
+
+    def add_data(self, data: pd.DataFrame):
+        self._data = data
 
     def convert_numpy_candidates(self, candidates: np.array):
         """
@@ -46,14 +55,21 @@ class Generator(ABC):
         """
         return np.vstack([np.array(ele) for _, ele in self.vocs.variables.items()]).T
 
-    def get_training_data(self, data: pd.DataFrame):
+    def get_training_data(self, data: pd.DataFrame = None):
         """
         get training data from dataframe (usually supplied by xopt base)
 
         """
+        if data is None:
+            data = self.data
+
+        objective_names = list(self.vocs.objectives.keys())
+        if self.vocs.constraints is not None:
+            constraint_names = list(self.vocs.constraints.keys())
+        else:
+            constraint_names = []
+
         inputs = data[self.vocs.variables.keys()].to_numpy()
-        outputs = data[
-            list(self.vocs.objectives.keys()) + list(self.vocs.constraints.keys())
-        ].to_numpy()
+        outputs = data[objective_names + constraint_names].to_numpy()
 
         return inputs, outputs
