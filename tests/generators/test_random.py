@@ -1,5 +1,3 @@
-import pandas as pd
-
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 
@@ -9,7 +7,7 @@ class TestRandomGenerator:
         gen = RandomGenerator(TEST_VOCS_BASE)
 
         # generate samples
-        samples = gen.generate(pd.DataFrame(), 10)
+        samples = gen.generate(10)
         assert len(samples) == 10
 
 

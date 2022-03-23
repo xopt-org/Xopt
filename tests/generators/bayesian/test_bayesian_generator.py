@@ -1,3 +1,4 @@
+import pytest
 import torch
 from unittest.mock import patch
 from unittest import TestCase
@@ -14,6 +15,14 @@ class TestBayesianGenerator(TestCase):
     def test_init(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
 
+        # test with kwarg
+        gen = BayesianGenerator(TEST_VOCS_BASE, raw_samples=10)
+        assert gen.options.optim.raw_samples == 10
+
+        # test with bad kwarg
+        with pytest.raises(RuntimeError):
+            gen = BayesianGenerator(TEST_VOCS_BASE, ra_samples=10)
+
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
@@ -25,7 +34,7 @@ class TestBayesianGenerator(TestCase):
         gen = BayesianGenerator(TEST_VOCS_BASE)
         bounds = gen.get_bounds()
         assert torch.allclose(bounds, torch.tensor([[0.0, 0.0], [1.0, 10.0]],
-                              dtype=torch.double))
+                                                   dtype=torch.double))
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_training_data(self):

@@ -6,6 +6,7 @@ import pandas as pd
 from .generator import Generator
 from .evaluator import Evaluator
 from .vocs import VOCS
+from .utils import add_constraint_information
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +75,8 @@ class XoptBase:
         self._samples += new_samples
         self._futures += self.evaluator.submit(new_samples)
 
-        # add current data to generator
-        self.generator.add_data(self.history)
-
-    def process_config(self, config):
-        """process the config file and create the evaluator, vocs, generator objects"""
-        pass
+        # set current data to generator
+        self.generator.data = self.history
 
     @property
     def vocs(self):
@@ -113,4 +110,4 @@ class XoptBase:
 
             data += [new_dict]
 
-        return pd.DataFrame(data)
+        return add_constraint_information(pd.DataFrame(data), self.vocs)

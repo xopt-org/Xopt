@@ -11,17 +11,44 @@ class TestBayesianExplorationGenerator:
         gen = BayesianExplorationGenerator(TEST_VOCS_BASE)
 
     def test_generate(self):
-        gen = BayesianExplorationGenerator(TEST_VOCS_BASE)
+        gen = BayesianExplorationGenerator(
+            TEST_VOCS_BASE,
+            raw_samples=1,
+            num_restarts=1,
+            sampler=SobolQMCNormalSampler(1)
+        )
 
-        sampler = SobolQMCNormalSampler(num_samples=1)
-        gen.options["acqf_kw"].update({"sampler": sampler})
-        gen.options["optim_kw"].update({"num_restarts": 1, "raw_samples": 1})
-        candidate = gen.generate(TEST_VOCS_DATA, 5)
+        gen.data = TEST_VOCS_DATA
+        candidate = gen.generate(5)
         assert len(candidate) == 5
 
     def test_in_xopt(self):
         evaluator = Evaluator(test_callable)
-        generator = BayesianExplorationGenerator(TEST_VOCS_BASE)
+        generator = BayesianExplorationGenerator(
+            TEST_VOCS_BASE,
+            raw_samples=1,
+            num_restarts=1,
+            sampler=SobolQMCNormalSampler(1)
+        )
+
+        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+
+        # initialize with single initial candidate
+        xopt.step()
+
+        # now use bayes opt
+        for _ in range(1):
+            xopt.step()
+
+    def test_in_xopt_w_proximal(self):
+        evaluator = Evaluator(test_callable)
+        generator = BayesianExplorationGenerator(
+            TEST_VOCS_BASE,
+            raw_samples=1,
+            num_restarts=1,
+            sampler=SobolQMCNormalSampler(1),
+            proximal_lengthscales=[1.0, 1.0]
+        )
 
         xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
 

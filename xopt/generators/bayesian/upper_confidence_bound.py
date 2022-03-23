@@ -2,10 +2,15 @@ from botorch.acquisition import qUpperConfidenceBound
 
 from xopt import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from .options import AcqOptions, BayesianOptions
+
+
+class UCBOptions(AcqOptions):
+    beta: float = 2.0
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
-    def __init__(self, vocs: VOCS, beta=2.0, **kwargs):
+    def __init__(self, vocs: VOCS, **kwargs):
         """
         Generator using UpperConfidenceBound acquisition function
 
@@ -24,10 +29,11 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
             Keyword arguments passed to SingleTaskGP model
 
         """
+        options = BayesianOptions(
+            acq=UCBOptions()
+        )
 
-        super(UpperConfidenceBoundGenerator, self).__init__(vocs)
-        self.options.update(kwargs)
-        self.options["acqf_kw"].update({"beta": beta})
+        super(UpperConfidenceBoundGenerator, self).__init__(vocs, options, **kwargs)
 
-    def get_acquisition(self, model):
-        return qUpperConfidenceBound(model, **self.options["acqf_kw"])
+    def _get_acquisition(self, model):
+        return qUpperConfidenceBound(model, **self.options.acq.dict())
