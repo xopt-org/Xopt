@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from xopt.generators.bayesian.utils import create_constrained_mc_objective, create_mobo_objective
+from xopt.generators.bayesian.objectives import create_constrained_mc_objective, create_mobo_objective
 from xopt.resources.testing import TEST_VOCS_BASE
 import torch
 

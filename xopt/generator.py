@@ -28,12 +28,14 @@ class Generator(ABC):
     def data(self):
         return self._data
 
+    @data.setter
+    def data(self, value: pd.DataFrame):
+        assert isinstance(value, pd.DataFrame)
+        self._data = value
+
     @property
     def vocs(self):
         return self._vocs
-
-    def add_data(self, data: pd.DataFrame):
-        self._data = data
 
     def convert_numpy_candidates(self, candidates: np.array):
         """
