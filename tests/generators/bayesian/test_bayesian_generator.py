@@ -30,13 +30,6 @@ class TestBayesianGenerator(TestCase):
         assert isinstance(model, ModelListGP)
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
-    def test_get_bounds(self):
-        gen = BayesianGenerator(TEST_VOCS_BASE)
-        bounds = gen.get_bounds()
-        assert torch.allclose(bounds, torch.tensor([[0.0, 0.0], [1.0, 10.0]],
-                                                   dtype=torch.double))
-
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_training_data(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
         inputs, outputs = gen.get_training_data(TEST_VOCS_DATA)

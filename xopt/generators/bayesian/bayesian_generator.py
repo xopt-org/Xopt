@@ -36,7 +36,7 @@ class BayesianGenerator(Generator, ABC):
             self.options.acq.objective = create_constrained_mc_objective(self.vocs)
 
         if self.options.model.input_transform is None:
-            bounds = self.get_bounds()
+            bounds = torch.tensor(vocs.bounds, **self.options.tkwargs)
             self.options.model.input_transform = Normalize(
                 len(bounds[0]), bounds=bounds
             )
@@ -55,7 +55,9 @@ class BayesianGenerator(Generator, ABC):
             return gen.generate(self.options.n_initial)
 
         else:
-            bounds = self.get_bounds()
+            bounds = torch.tensor(
+                self.vocs.bounds, **self.options.tkwargs
+            )
 
             # update internal model with internal data
             model = self.get_model(self.data)
@@ -97,10 +99,6 @@ class BayesianGenerator(Generator, ABC):
 
         return model
 
-    def get_bounds(self):
-        """overwrite get bounds to transform numpy array into tensor"""
-        return torch.tensor(super().get_bounds(), **self.options.tkwargs)
-
     def get_training_data(self, data: pd.DataFrame = None):
         """overwrite get training data to transform numpy array into tensor"""
         inputs, outputs = super().get_training_data(data)
@@ -119,17 +117,13 @@ class BayesianGenerator(Generator, ABC):
                 )
             )
         else:
-            acq = self._get_acquisition(self.model)
+            acq = self._get_acquisition(model)
 
         return acq
 
     @abstractmethod
     def _get_acquisition(self, model):
         pass
-
-    @property
-    def model(self):
-        return self._model
 
 
 class MCBayesianGenerator(BayesianGenerator, ABC):

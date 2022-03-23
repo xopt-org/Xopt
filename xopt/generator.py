@@ -49,14 +49,6 @@ class Generator(ABC):
 
         return list_candidates
 
-    def get_bounds(self):
-        """
-        returns the optimization bounds taken from vocs,
-        returns a numpy array of the shape (2, d) where d is the number of input
-        parameters
-        """
-        return np.vstack([np.array(ele) for _, ele in self.vocs.variables.items()]).T
-
     def get_training_data(self, data: pd.DataFrame = None):
         """
         get training data from dataframe (usually supplied by xopt base)
