@@ -1,3 +1,4 @@
+import numpy as np
 from pydantic import BaseModel, conlist
 from enum import Enum
 from typing import Dict, Union, List, Tuple, Any
@@ -48,3 +49,10 @@ class VOCS(BaseModel):
 
     def as_yaml(self):
         return yaml.dump(self.dict(), default_flow_style=None, sort_keys=False)
+
+    @property
+    def bounds(self):
+        return np.vstack([np.array(ele) for _, ele in self.variables.items()]).T
+
+
+
