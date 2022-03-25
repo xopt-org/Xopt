@@ -13,10 +13,6 @@ class TestXopt:
 
         xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
         xopt.step()
-        assert set(xopt.history.keys()) == {*TEST_VOCS_BASE.variables,
-                                            *TEST_VOCS_BASE.objectives,
-                                            *TEST_VOCS_BASE.constraints, "done"
-                                            }
 
         for _ in range(10):
             xopt.step()
