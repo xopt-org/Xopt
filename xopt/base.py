@@ -16,12 +16,6 @@ class XoptBase:
 
     Object to handle a single optimization problem.
 
-    Parameters
-    ----------
-    config: dict, YAML text, JSON text
-        input file should be a dict, JSON, or YAML file with top level keys
-
-
     """
 
     _futures = []
