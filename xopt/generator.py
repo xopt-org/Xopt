@@ -37,17 +37,35 @@ class Generator(ABC):
     def vocs(self):
         return self._vocs
 
-    def convert_numpy_candidates(self, candidates: np.array):
+    def convert_numpy_to_inputs(self, inputs: np.ndarray) -> List[Dict]:
         """
-        Convert a numpy array of candidate locations to a
-        list of dicts to pass to executors. Assumes that the columns of the array
-        match the order of variable keys in VOCS
-        """
-        list_candidates = []
-        for candidate in candidates:
-            list_candidates += [dict(zip(self.vocs.variables.keys(), candidate))]
+        convert 2D numpy array to list of dicts (inputs) for evaluation
+        Assumes that the columns of the array match correspond to
+        `sorted(self.vocs.variables.keys())
 
-        return list_candidates
+        """
+        df = pd.DataFrame(inputs, columns=sorted(self.vocs.variables.keys()))
+        return self.convert_dataframe_to_inputs(df)
+
+    def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> List[Dict]:
+        """
+        Convert a dataframe candidate locations to a
+        list of dicts to pass to executors.
+        """
+        # make sure that the df keys contain the vocs variables
+        if not set(self.vocs.variables.keys()).issubset(set(inputs.keys())):
+            raise RuntimeError(f"input dataframe must at least contain the vocs "
+                               f"variables")
+
+        in_copy = inputs.copy()
+
+        # append constants
+        constants = self.vocs.constants
+        if constants is not None:
+            for name, val in constants.items():
+                in_copy[name] = val
+
+        return in_copy.to_dict("records")
 
     def get_training_data(self, data: pd.DataFrame = None):
         """
@@ -57,13 +75,13 @@ class Generator(ABC):
         if data is None:
             data = self.data
 
-        objective_names = list(self.vocs.objectives.keys())
+        objective_names = list(sorted(self.vocs.objectives.keys()))
         if self.vocs.constraints is not None:
-            constraint_names = list(self.vocs.constraints.keys())
+            constraint_names = list(sorted(self.vocs.constraints.keys()))
         else:
             constraint_names = []
 
-        inputs = data[self.vocs.variables.keys()].to_numpy()
+        inputs = data[sorted(self.vocs.variables.keys())].to_numpy()
         outputs = data[objective_names + constraint_names].to_numpy()
 
         return inputs, outputs

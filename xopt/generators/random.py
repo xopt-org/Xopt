@@ -16,9 +16,11 @@ class RandomGenerator(Generator):
         random_vals = np.random.rand(n_candidates, problem_dim)
 
         # scale according to vocs limits
-        for idx, item in enumerate(self.vocs.variables.items()):
+        varibles = self.vocs.variables
+        sorted_dict = {k: varibles[k] for k in sorted(varibles)}
+        for idx, item in enumerate(sorted_dict.items()):
             random_vals[:, idx] = (
                 random_vals[:, idx] * (item[1][1] - item[1][0]) + item[1][0]
             )
 
-        return self.convert_numpy_candidates(random_vals)
+        return self.convert_numpy_to_inputs(random_vals)
