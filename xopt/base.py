@@ -1,6 +1,6 @@
 import concurrent
 import logging
-from typing import Type
+from typing import Type, List, Dict
 
 import pandas as pd
 from .generator import Generator
@@ -43,6 +43,14 @@ class XoptBase:
         while not self._is_done:
             self.step()
 
+    def submit(self, samples: List[Dict]):
+        """
+        submit a list of dicts to the evaluator
+        (also appends submissions to futures attribute)
+
+        """
+        self._futures += self.evaluator.submit(samples)
+
     def step(self):
         """
         run one optimization cycle
@@ -66,8 +74,8 @@ class XoptBase:
 
         # generate samples and submit to evaluator
         new_samples = self.generator.generate(n_generate)
+        self.submit(new_samples)
         self._samples += new_samples
-        self._futures += self.evaluator.submit(new_samples)
 
         # set current data to generator
         self.generator.data = self.history

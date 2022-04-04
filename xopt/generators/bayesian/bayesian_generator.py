@@ -68,7 +68,7 @@ class BayesianGenerator(Generator, ABC):
                 q=n_candidates,
                 **self.options.optim.dict()
             )
-            return self.convert_numpy_candidates(candidates.detach().numpy())
+            return self.convert_numpy_to_inputs(candidates.detach().numpy())
 
     def get_model(self, data: pd.DataFrame = None) -> Module:
         """
