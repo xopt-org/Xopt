@@ -51,8 +51,41 @@ class VOCS(BaseModel):
         return yaml.dump(self.dict(), default_flow_style=None, sort_keys=False)
 
     @property
-    def bounds(self):
-        return np.vstack([np.array(ele) for _, ele in self.variables.items()]).T
+    def bounds(self ):
+        """
+        Returns a bounds array (mins, maxs) of shape (2, n_variables)
+        Arrays of lower and upper bounds can be extracted by:
+            mins, maxs = vocs.bounds
+        """
+        return np.array([v for _, v in sorted(self.variables.items())]).T        
+        #return np.vstack([np.array(ele) for _, ele in self.variables.items()]).T
 
+    def random_inputs(self, n=None, include_constants=True, include_linked_variables=True):
+        """
+        Uniform sampling of the variables.
 
+        Returns a dict of inputs. 
+        
+        If include_constants, the vocs.constants are added to the dict. 
+
+        Optional:
+            n (integer) to make arrays of inputs, of size n. 
+        
+        """
+        inputs = {}
+        for key, val in self.variables.items(): # No need to sort here
+            a, b = val
+            x = np.random.random(n)
+            inputs[key] = x * a + (1 - x) * b
+
+        # Constants    
+        if include_constants:
+            inputs.update(self.constants)
+
+        # Handle linked variables
+        if self.linked_variables:
+            for k, v in self.linked_variables.items():
+                inputs[k] = inputs[v]
+
+        return inputs
 
