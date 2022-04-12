@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel, conlist
 from enum import Enum
 from typing import Dict, Union, List, Tuple, Any
@@ -51,34 +52,47 @@ class VOCS(BaseModel):
         return yaml.dump(self.dict(), default_flow_style=None, sort_keys=False)
 
     @property
-    def bounds(self ):
+    def bounds(self):
         """
         Returns a bounds array (mins, maxs) of shape (2, n_variables)
         Arrays of lower and upper bounds can be extracted by:
             mins, maxs = vocs.bounds
         """
-        return np.array([v for _, v in sorted(self.variables.items())]).T        
-        #return np.vstack([np.array(ele) for _, ele in self.variables.items()]).T
+        return np.array([v for _, v in sorted(self.variables.items())]).T
 
-    def random_inputs(self, n=None, include_constants=True, include_linked_variables=True):
+    @property
+    def variable_names(self):
+        return list(sorted(self.variables.keys()))
+
+    @property
+    def objective_names(self):
+        return list(sorted(self.objectives.keys()))
+
+    @property
+    def constraint_names(self):
+        return list(sorted(self.constraints.keys()))
+
+    def random_inputs(
+        self, n=None, include_constants=True, include_linked_variables=True
+    ):
         """
         Uniform sampling of the variables.
 
-        Returns a dict of inputs. 
-        
-        If include_constants, the vocs.constants are added to the dict. 
+        Returns a dict of inputs.
+
+        If include_constants, the vocs.constants are added to the dict.
 
         Optional:
-            n (integer) to make arrays of inputs, of size n. 
-        
+            n (integer) to make arrays of inputs, of size n.
+
         """
         inputs = {}
-        for key, val in self.variables.items(): # No need to sort here
+        for key, val in self.variables.items():  # No need to sort here
             a, b = val
             x = np.random.random(n)
             inputs[key] = x * a + (1 - x) * b
 
-        # Constants    
+        # Constants
         if include_constants:
             inputs.update(self.constants)
 
@@ -89,3 +103,60 @@ class VOCS(BaseModel):
 
         return inputs
 
+    def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> List[Dict]:
+        """
+        Convert a dataframe candidate locations to a
+        list of dicts to pass to executors.
+        """
+        # make sure that the df keys contain the vocs variables
+        if not set(self.variable_names).issubset(set(inputs.keys())):
+            raise RuntimeError(
+                f"input dataframe must at least contain the vocs " f"variables"
+            )
+
+        in_copy = inputs.copy()
+
+        # append constants
+        constants = self.constants
+        if constants is not None:
+            for name, val in constants.items():
+                in_copy[name] = val
+
+        return in_copy.to_dict("records")
+
+    def convert_numpy_to_inputs(self, inputs: np.ndarray) -> List[Dict]:
+        """
+        convert 2D numpy array to list of dicts (inputs) for evaluation
+        Assumes that the columns of the array match correspond to
+        `sorted(self.vocs.variables.keys())
+
+        """
+        df = pd.DataFrame(inputs, columns=self.variable_names)
+        return self.convert_dataframe_to_inputs(df)
+
+    def get_training_data(self, data: pd.DataFrame):
+        """
+        get training data from dataframe (usually supplied by xopt base)
+
+        """
+        inputs = data[self.variable_names].to_numpy()
+        outputs = data[self.objective_names + self.constraint_names].to_numpy()
+
+        return inputs, outputs
+
+    def append_constraints(self, data: pd.DataFrame):
+        """
+        transform constraints from dataframe to imply feasibility if value is < 0
+        according to vocs
+        """
+        for name, value in self.constraints.items():
+            if value[0] == "GREATER_THAN":
+                data[f"{name}_f"] = -(data[name] - value[1])
+            else:
+                data[f"{name}_f"] = data[name] - value[1]
+
+        # add feasibility metric if all values are <= 0
+        data["feasibility"] = (
+            data[[f"{ele}_f" for ele in self.constraint_names]] <= 0
+        ).all(axis=1)
+        return data

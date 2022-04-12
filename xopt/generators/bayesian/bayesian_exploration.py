@@ -11,10 +11,10 @@ from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_tr
 from torch import Tensor
 
 from xopt import VOCS
-from xopt.generators.bayesian.bayesian_generator import MCBayesianGenerator
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
 
-class BayesianExplorationGenerator(MCBayesianGenerator):
+class BayesianExplorationGenerator(BayesianGenerator):
     def __init__(self, vocs: VOCS, **kwargs):
         """
         Generator using UpperConfidenceBound acquisition function
@@ -29,7 +29,7 @@ class BayesianExplorationGenerator(MCBayesianGenerator):
 
         """
 
-        super(BayesianExplorationGenerator, self).__init__(vocs,**kwargs)
+        super(BayesianExplorationGenerator, self).__init__(vocs, **kwargs)
 
     def _get_acquisition(self, model):
         return qPosteriorVariance(model, **self.options.acq.dict())

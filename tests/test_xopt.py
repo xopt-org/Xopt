@@ -1,6 +1,6 @@
 from xopt import XoptBase, Evaluator
 from xopt.generators.random import RandomGenerator
-from xopt.resources.testing import TEST_VOCS_BASE, test_callable
+from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 
 
 class TestXopt:
@@ -8,7 +8,7 @@ class TestXopt:
         pass
 
     def test_random(self):
-        evaluator = Evaluator(test_callable)
+        evaluator = Evaluator(xtest_callable)
         generator = RandomGenerator(TEST_VOCS_BASE)
 
         xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)

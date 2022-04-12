@@ -20,16 +20,14 @@ class MOBOGenerator(BayesianGenerator):
         # create weighted mc objective according to vocs
         objective = create_mobo_objective(vocs)
 
-        options = BayesianOptions(
-            acq=MOBOOptions()
-        )
+        options = BayesianOptions(acq=MOBOOptions())
         options.acq.objective = objective
 
         super(MOBOGenerator, self).__init__(vocs, options, **kwargs)
 
     def _get_acquisition(self, model):
         # get reference point from data
-        inputs, outputs = self.get_training_data()
+        inputs, outputs = self.get_training_data(self.data)
         if self.options.acq.use_data_as_reference:
             weighted_points = self.options.acq.objective(outputs)
             self.options.acq.ref_point = torch.min(

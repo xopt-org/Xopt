@@ -42,9 +42,9 @@ class ProximalAcquisitionFunction(AcquisitionFunction):
     """
 
     def __init__(
-            self,
-            acq_function: AcquisitionFunction,
-            proximal_weights: Tensor,
+        self,
+        acq_function: AcquisitionFunction,
+        proximal_weights: Tensor,
     ) -> None:
         r"""Derived Acquisition Function weighted by proximity to recently
         observed point.
@@ -155,8 +155,8 @@ def _validate_model(model: Model, proximal_weights: Tensor):
 
     # check to make sure that weights match the training data shape
     if (
-            len(proximal_weights.shape) != 1
-            or proximal_weights.shape[0] != train_inputs.shape[-1]
+        len(proximal_weights.shape) != 1
+        or proximal_weights.shape[0] != train_inputs.shape[-1]
     ):
         raise ValueError(
             "`proximal_weights` must be a one dimensional tensor with "

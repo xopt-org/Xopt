@@ -112,4 +112,4 @@ class XoptBase:
 
             data += [new_dict]
 
-        return add_constraint_information(pd.DataFrame(data), self.vocs)
+        return pd.DataFrame(data)

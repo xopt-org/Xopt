@@ -14,7 +14,7 @@ def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
     constraints = vocs.constraints
 
     for name, value in constraints.items():
-        if value[0] == 'GREATER_THAN':
+        if value[0] == "GREATER_THAN":
             temp_data[name] = -(data[name] - value[1])
         else:
             temp_data[name] = data[name] - value[1]
@@ -26,6 +26,3 @@ def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
     data["feas"] = data[[f"{ele}_feas" for ele in constraints]].all(axis=1)
 
     return data
-
-
-

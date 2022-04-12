@@ -44,12 +44,8 @@ def create_constrained_mc_objective(vocs):
     NOTE: we assume that corresponding model outputs are ordered according to vocs
     ordering
     """
-    n_objectives = len(vocs.objectives)
-    if vocs.constraints is not None:
-        constraint_names = list(vocs.constraints.keys())
-    else:
-        constraint_names = []
-    n_constraints = len(constraint_names)
+    n_objectives = len(vocs.objective_names)
+    n_constraints = len(vocs.constraint_names)
     weights = torch.zeros(n_objectives + n_constraints).double()
     for idx, ele in enumerate(vocs.objectives):
         if vocs.objectives[ele] == "MINIMIZE":
@@ -90,10 +86,10 @@ def create_mobo_objective(vocs):
 
 class FeasibilityObjective(GenericMCObjective):
     def __init__(
-            self,
-            constraints: List[Callable[[Tensor], Tensor]],
-            infeasible_cost: float = 0.0,
-            eta: float = 1e-3,
+        self,
+        constraints: List[Callable[[Tensor], Tensor]],
+        infeasible_cost: float = 0.0,
+        eta: float = 1e-3,
     ) -> None:
         def ones_callable(X):
             return torch.ones(X.shape[:-1])

@@ -5,9 +5,7 @@ from torch import Tensor
 
 
 class Identity(AcquisitionFunction):
-    def __init__(
-        self, model
-    ) -> None:
+    def __init__(self, model) -> None:
 
         super().__init__(model)
 

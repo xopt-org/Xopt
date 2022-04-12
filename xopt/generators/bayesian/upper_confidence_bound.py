@@ -29,9 +29,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
             Keyword arguments passed to SingleTaskGP model
 
         """
-        options = BayesianOptions(
-            acq=UCBOptions()
-        )
+        options = BayesianOptions(acq=UCBOptions())
 
         super(UpperConfidenceBoundGenerator, self).__init__(vocs, options, **kwargs)
 

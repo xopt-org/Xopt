@@ -4,7 +4,7 @@ import pandas as pd
 from xopt import VOCS
 
 
-def test_callable(input_dict):
+def xtest_callable(input_dict):
     x1 = input_dict["x1"]
     x2 = input_dict["x2"]
 
@@ -28,6 +28,6 @@ cnames = (
     + list(TEST_VOCS_BASE.constraints.keys())
 )
 test_init_data = {"x1": np.random.rand(10), "x2": np.random.rand(10) * 10.0}
-test_init_data.update(test_callable(test_init_data))
+test_init_data.update(xtest_callable(test_init_data))
 
 TEST_VOCS_DATA = pd.DataFrame(test_init_data)
