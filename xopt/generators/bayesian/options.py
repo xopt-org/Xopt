@@ -60,11 +60,12 @@ class BayesianOptions(BaseModel):
         set_recursive(self)
 
         if len(all_kwargs):
-            raise RuntimeError(f'keys {list(all_kwargs.keys())} not found, will not be '
-                               f'updated!')
+            raise RuntimeError(
+                f"keys {list(all_kwargs.keys())} not found, will not be " f"updated!"
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     options = BayesianOptions()
     options.optim.raw_samples = 30
     print(options.dict())

@@ -23,10 +23,7 @@ class BayesianGenerator(Generator, ABC):
     _acquisition = None
 
     def __init__(
-            self,
-            vocs: VOCS,
-            options: BayesianOptions = BayesianOptions(),
-            **kwargs
+        self, vocs: VOCS, options: BayesianOptions = BayesianOptions(), **kwargs
     ):
         super(BayesianGenerator, self).__init__(vocs)
 
@@ -55,9 +52,7 @@ class BayesianGenerator(Generator, ABC):
             return gen.generate(self.options.n_initial)
 
         else:
-            bounds = torch.tensor(
-                self.vocs.bounds, **self.options.tkwargs
-            )
+            bounds = torch.tensor(self.vocs.bounds, **self.options.tkwargs)
 
             # update internal model with internal data
             model = self.get_model(self.data)
@@ -68,12 +63,13 @@ class BayesianGenerator(Generator, ABC):
                 q=n_candidates,
                 **self.options.optim.dict()
             )
-            return self.convert_numpy_to_inputs(candidates.detach().numpy())
+            return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
 
     def get_model(self, data: pd.DataFrame = None) -> Module:
         """
         Returns a SingleTaskGP (or ModelList set of independent SingleTaskGPs
         depending on the number of outputs, if data is None
+
 
         """
 
@@ -99,9 +95,9 @@ class BayesianGenerator(Generator, ABC):
 
         return model
 
-    def get_training_data(self, data: pd.DataFrame = None):
+    def get_training_data(self, data: pd.DataFrame) -> (torch.Tensor, torch.Tensor):
         """overwrite get training data to transform numpy array into tensor"""
-        inputs, outputs = super().get_training_data(data)
+        inputs, outputs = self.vocs.get_training_data(data)
         return torch.tensor(inputs, **self.options.tkwargs), torch.tensor(
             outputs, **self.options.tkwargs
         )
@@ -112,9 +108,8 @@ class BayesianGenerator(Generator, ABC):
             acq = ProximalAcquisitionFunction(
                 self._get_acquisition(model),
                 torch.tensor(
-                    self.options.proximal_lengthscales,
-                    **self.options.tkwargs
-                )
+                    self.options.proximal_lengthscales, **self.options.tkwargs
+                ),
             )
         else:
             acq = self._get_acquisition(model)
@@ -124,8 +119,3 @@ class BayesianGenerator(Generator, ABC):
     @abstractmethod
     def _get_acquisition(self, model):
         pass
-
-
-class MCBayesianGenerator(BayesianGenerator, ABC):
-    def __init__(self, vocs, **kwargs):
-        super(MCBayesianGenerator, self).__init__(vocs, **kwargs)

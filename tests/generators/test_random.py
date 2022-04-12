@@ -9,5 +9,3 @@ class TestRandomGenerator:
         # generate samples
         samples = gen.generate(10)
         assert len(samples) == 10
-
-

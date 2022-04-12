@@ -23,7 +23,7 @@ IGNORE = {
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
-SUB_DIRS = ['cnsga', 'mobo', 'bayes_exp', 'multi_fidelity']
+SUB_DIRS = ["cnsga", "mobo", "bayes_exp", "multi_fidelity"]
 
 
 def parse_ipynb(file: Path) -> str:
@@ -33,9 +33,11 @@ def parse_ipynb(file: Path) -> str:
     exporter = PythonExporter()
     script, _ = exporter.from_notebook_node(nb)
 
-    if 'pinfo' in script:
-        raise ValueError(f'`pinfo` command (`?`) in notebook {file} freezes execution, '
-                         'cannot proceed, please remove')
+    if "pinfo" in script:
+        raise ValueError(
+            f"`pinfo` command (`?`) in notebook {file} freezes execution, "
+            "cannot proceed, please remove"
+        )
 
     return script
 
@@ -91,7 +93,7 @@ def run_tutorials(
 
     for sub_dir in SUB_DIRS:
         tutorial_dir = Path(tutorial_base).joinpath(sub_dir)
-        print(f'In directory {sub_dir}')
+        print(f"In directory {sub_dir}")
         os.chdir(tutorial_dir)
         for tutorial in tutorial_dir.iterdir():
             if not tutorial.is_file or tutorial.suffix != ".ipynb":
@@ -113,7 +115,7 @@ def run_tutorials(
 
 if __name__ == "__main__":
     ########################
-    #WARNING!!!!!!!! - calling pinfo magic command crashes
+    # WARNING!!!!!!!! - calling pinfo magic command crashes
     # evaluation for some reason
     ########################
 

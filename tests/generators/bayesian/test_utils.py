@@ -2,7 +2,10 @@ from copy import deepcopy
 
 import pytest
 
-from xopt.generators.bayesian.objectives import create_constrained_mc_objective, create_mobo_objective
+from xopt.generators.bayesian.objectives import (
+    create_constrained_mc_objective,
+    create_mobo_objective,
+)
 from xopt.resources.testing import TEST_VOCS_BASE
 import torch
 
@@ -54,7 +57,3 @@ class TestUtils:
         output = obj(test_samples)
         assert torch.allclose(output[..., 1], test_samples[..., 1])
         assert torch.allclose(output[..., 0], -test_samples[..., 0])
-
-
-
-

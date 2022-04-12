@@ -5,6 +5,7 @@ import pandas as pd
 
 from xopt.generator import Generator
 
+
 class RandomGenerator(Generator):
     def __init__(self, vocs):
         super(RandomGenerator, self).__init__(vocs)
