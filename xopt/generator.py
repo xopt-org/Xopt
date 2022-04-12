@@ -30,8 +30,7 @@ class Generator(ABC):
 
     @data.setter
     def data(self, value: pd.DataFrame):
-        assert isinstance(value, pd.DataFrame)
-        self._data = value
+        self._data = pd.DataFrame(value)
 
     @property
     def vocs(self):
