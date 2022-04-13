@@ -160,3 +160,65 @@ class VOCS(BaseModel):
             data[[f"{ele}_f" for ele in self.constraint_names]] <= 0
         ).all(axis=1)
         return data
+
+
+
+
+
+# --------------------------------
+# dataframe utilities
+
+NAN_CONST = -666
+OBJECTIVE_WEIGHT = {'MINIMIZE': 1.0, 'MAXIMIZE': -1.0}
+
+
+def objective_data(vocs, data, prefix='objective_'):
+    """
+    Use objective dict and data (dataframe) to generate objective data (dataframe)
+
+    Weights are applied to convert all objectives into mimimization form.
+
+    Returns a dataframe with the objective data intented to be minimized.
+
+    """
+    data = pd.DataFrame(data)
+    objective_dict = vocs.objectives
+
+    odata = pd.DataFrame()
+    for k in sorted(list(objective_dict)):
+        operator = objective_dict[k].upper()
+        if operator not in OBJECTIVE_WEIGHT:
+            raise ValueError(f'Unknown objective operator: {operator}')
+
+        weight = OBJECTIVE_WEIGHT[operator]
+        odata[prefix + k] = weight*data[k]
+        
+    return odata
+
+def constraint_data(vocs, data, prefix='constraint_'):
+    """
+    Use constraint dict and data (dataframe) to generate constraint data (dataframe)
+    A constraint is satisfied if the evaluation is > 0.
+
+    Returns a dataframe with the constraint data.
+    """
+
+    data = pd.DataFrame(data) # cast to dataframe
+    constraint_dict = vocs.constraints
+
+    cdata = pd.DataFrame()
+    for k in sorted(list(constraint_dict)):
+        x = data[k]
+        op, d = constraint_dict[k]
+        op = op.upper()  # Allow any case
+
+        if op == 'GREATER_THAN':  # x > d -> x-d > 0
+            cvalues = (x - d)
+        elif op == 'LESS_THAN':  # x < d -> d-x > 0
+            cvalues = (d - x)
+        else:
+            raise ValueError(f'Unknown constraint operator: {op}')
+
+        cdata[prefix+k] = cvalues.fillna(NAN_CONST)
+
+    return cdata
