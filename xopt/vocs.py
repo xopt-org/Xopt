@@ -194,10 +194,11 @@ def objective_data(vocs, data, prefix='objective_'):
         
     return odata
 
+
 def constraint_data(vocs, data, prefix='constraint_'):
     """
     Use constraint dict and data (dataframe) to generate constraint data (dataframe)
-    A constraint is satisfied if the evaluation is > 0.
+    A constraint is satisfied if the evaluation is < 0.
 
     Returns a dataframe with the constraint data.
     """
@@ -206,18 +207,35 @@ def constraint_data(vocs, data, prefix='constraint_'):
     constraint_dict = vocs.constraints
 
     cdata = pd.DataFrame()
-    for k in vocs.constraint_names::
+    for k in vocs.constraint_names:
         x = data[k]
         op, d = vocs.constraints[k]
         op = op.upper()  # Allow any case
 
         if op == 'GREATER_THAN':  # x > d -> x-d > 0
-            cvalues = (x - d)
+            cvalues = -(x - d)
         elif op == 'LESS_THAN':  # x < d -> d-x > 0
-            cvalues = (d - x)
+            cvalues = -(d - x)
         else:
             raise ValueError(f'Unknown constraint operator: {op}')
 
         cdata[prefix+k] = cvalues.fillna(NAN_CONST)
 
     return cdata
+
+
+def feasibility_data(vocs, data, prefix="feasibility_"):
+    """
+    Use constraint dict and data to identify feasible points in the the dataset.
+
+    Returns a dataframe with the feasibility data.
+    """
+    data = pd.DataFrame(data)
+    c_prefix = "constraint_"
+    cdata = constraint_data(vocs, data, prefix=c_prefix)
+    fdata = pd.DataFrame()
+    for k in vocs.constraint_names:
+        fdata[prefix+k] = cdata[c_prefix+k] <= 0
+    # if all row values are true, then the row is feasible
+    fdata["feasibility"] = fdata.all(axis=1)
+    return fdata
