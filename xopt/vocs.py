@@ -178,8 +178,15 @@ class VOCS(BaseModel):
         return inputs, outputs
 
 
+    def objective_data(self, data, prefix='objective_'):
+        return form_objective_data(self.objectives, data, prefix)
 
 
+    def constraint_data(self, data, prefix='constraint_'):
+        return form_constraint_data(self.constraints, data, prefix)
+
+    def feasibility_data(self, data, prefix='feasibility_'):
+        return form_feasibility_data(self, data, prefix)
 
 
 # --------------------------------
@@ -189,7 +196,7 @@ NAN_CONST = -666
 OBJECTIVE_WEIGHT = {'MINIMIZE': 1.0, 'MAXIMIZE': -1.0}
 
 
-def objective_data(vocs, data, prefix='objective_'):
+def form_objective_data(objectives: Dict, data, prefix='objective_'):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
@@ -201,8 +208,8 @@ def objective_data(vocs, data, prefix='objective_'):
     data = pd.DataFrame(data)
 
     odata = pd.DataFrame()
-    for k in vocs.objective_names:
-        operator = vocs.objectives[k].upper()
+    for k in sorted(list(objectives)):
+        operator = objectives[k].upper()
         if operator not in OBJECTIVE_WEIGHT:
             raise ValueError(f'Unknown objective operator: {operator}')
 
@@ -212,7 +219,7 @@ def objective_data(vocs, data, prefix='objective_'):
     return odata
 
 
-def constraint_data(vocs, data, prefix='constraint_'):
+def form_constraint_data(constraints: Dict, data, prefix='constraint_'):
     """
     Use constraint dict and data (dataframe) to generate constraint data (dataframe)
     A constraint is satisfied if the evaluation is < 0.
@@ -221,12 +228,12 @@ def constraint_data(vocs, data, prefix='constraint_'):
     """
 
     data = pd.DataFrame(data) # cast to dataframe
-    constraint_dict = vocs.constraints
+    constraint_dict = constraints
 
     cdata = pd.DataFrame()
-    for k in vocs.constraint_names:
+    for k in sorted(list(constraints)):
         x = data[k]
-        op, d = vocs.constraints[k]
+        op, d = constraints[k]
         op = op.upper()  # Allow any case
 
         if op == 'GREATER_THAN':  # x > d -> x-d > 0
@@ -235,11 +242,12 @@ def constraint_data(vocs, data, prefix='constraint_'):
             cvalues = -(d - x)
         else:
             raise ValueError(f'Unknown constraint operator: {op}')
-
+        
+        cdata[prefix+k] = cvalues
     return cdata
 
 
-def feasibility_data(vocs, data, prefix="feasibility_"):
+def form_feasibility_data(vocs, data, prefix="feasibility_"):
     """
     Use constraint dict and data to identify feasible points in the the dataset.
 
@@ -247,7 +255,7 @@ def feasibility_data(vocs, data, prefix="feasibility_"):
     """
     data = pd.DataFrame(data)
     c_prefix = "constraint_"
-    cdata = constraint_data(vocs, data, prefix=c_prefix)
+    cdata = vocs.constraint_data(data, prefix=c_prefix)
     fdata = pd.DataFrame()
     for k in vocs.constraint_names:
         fdata[prefix+k] = cdata[c_prefix+k] <= 0
