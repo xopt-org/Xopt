@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict
-from pydantic import BaseModel
 
 import pandas as pd
 import torch
@@ -12,10 +11,9 @@ from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from xopt import Generator, VOCS
-from xopt.generators.random import RandomGenerator
-from .objectives import create_constrained_mc_objective
-from .options import BayesianOptions, AcqOptions, ModelOptions
 from .custom_acq.proximal import ProximalAcquisitionFunction
+from .objectives import create_constrained_mc_objective
+from .options import BayesianOptions
 
 
 class BayesianGenerator(Generator, ABC):
@@ -48,8 +46,7 @@ class BayesianGenerator(Generator, ABC):
 
         # if no data exists use random generator to generate candidates
         if self.data.empty:
-            gen = RandomGenerator(self.vocs)
-            return gen.generate(self.options.n_initial)
+            return self.vocs.random_inputs(n_candidates)
 
         else:
             bounds = torch.tensor(self.vocs.bounds, **self.options.tkwargs)
