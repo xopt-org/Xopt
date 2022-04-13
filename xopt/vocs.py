@@ -182,11 +182,10 @@ def objective_data(vocs, data, prefix='objective_'):
 
     """
     data = pd.DataFrame(data)
-    objective_dict = vocs.objectives
 
     odata = pd.DataFrame()
-    for k in sorted(list(objective_dict)):
-        operator = objective_dict[k].upper()
+    for k in vocs.objective_names:
+        operator = vocs.objectives[k].upper()
         if operator not in OBJECTIVE_WEIGHT:
             raise ValueError(f'Unknown objective operator: {operator}')
 
@@ -207,9 +206,9 @@ def constraint_data(vocs, data, prefix='constraint_'):
     constraint_dict = vocs.constraints
 
     cdata = pd.DataFrame()
-    for k in sorted(list(constraint_dict)):
+    for k in vocs.constraint_names::
         x = data[k]
-        op, d = constraint_dict[k]
+        op, d = vocs.constraints[k]
         op = op.upper()  # Allow any case
 
         if op == 'GREATER_THAN':  # x > d -> x-d > 0
