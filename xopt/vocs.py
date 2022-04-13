@@ -72,6 +72,26 @@ class VOCS(BaseModel):
     def constraint_names(self):
         return list(sorted(self.constraints.keys()))
 
+    @property
+    def n_variables(self):
+        return len(self.variables)
+
+    @property
+    def n_constants(self):
+        return len(self.constants)
+
+    @property
+    def n_inputs(self):
+        return self.n_variables + self.n_constants
+
+    @property
+    def n_objectives(self):
+        return len(self.objectives)
+
+    @property
+    def n_constraints(self):
+        return len(self.constraints)
+
     def random_inputs(
         self, n=None, include_constants=True, include_linked_variables=True
     ):
@@ -97,9 +117,10 @@ class VOCS(BaseModel):
             inputs.update(self.constants)
 
         # Handle linked variables
-        if self.linked_variables:
-            for k, v in self.linked_variables.items():
-                inputs[k] = inputs[v]
+        if include_linked_variables:
+            if self.linked_variables:
+                for k, v in self.linked_variables.items():
+                    inputs[k] = inputs[v]
 
         return inputs
 
@@ -144,22 +165,6 @@ class VOCS(BaseModel):
 
         return inputs, outputs
 
-    def append_constraints(self, data: pd.DataFrame):
-        """
-        transform constraints from dataframe to imply feasibility if value is < 0
-        according to vocs
-        """
-        for name, value in self.constraints.items():
-            if value[0] == "GREATER_THAN":
-                data[f"{name}_f"] = -(data[name] - value[1])
-            else:
-                data[f"{name}_f"] = data[name] - value[1]
-
-        # add feasibility metric if all values are <= 0
-        data["feasibility"] = (
-            data[[f"{ele}_f" for ele in self.constraint_names]] <= 0
-        ).all(axis=1)
-        return data
 
 
 
