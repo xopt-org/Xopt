@@ -13,7 +13,7 @@ class Generator(ABC):
         self._vocs = vocs
 
     @abstractmethod
-    def generate(self, n_candidates) -> List[Dict]:
+    def generate(self, n_candidates) -> pd.DataFrame:
         """
         generate `n_candidates` candidates
 

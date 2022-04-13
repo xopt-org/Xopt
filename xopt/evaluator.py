@@ -2,6 +2,8 @@ from concurrent.futures import Executor, ThreadPoolExecutor, Future
 from threading import Lock
 from typing import Callable, List, Dict
 
+import pandas as pd
+
 
 class Evaluator:
     def __init__(self, function: Callable, executor: Executor = None, max_workers=1):
@@ -18,13 +20,16 @@ class Evaluator:
             self.max_workers = max_workers
         self.function = function
 
-    def submit(self, candidates: List[Dict]):
+        self._n_submitted = 0
+
+    def submit(self, candidates: pd.DataFrame):
         """submit candidates to executor"""
         futures = []
-        for candidate in candidates:
-            futures += [self._executor.submit(self.function, candidate)]
+        for candidate in candidates.to_dict("records"):
+            future = self._executor.submit(self.function, candidate)
+            futures.append(future)
 
-        return futures
+        return pd.Series(futures, index=candidates.index)
 
 
 class DummyExecutor(Executor):

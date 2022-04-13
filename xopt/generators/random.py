@@ -12,4 +12,4 @@ class RandomGenerator(Generator):
 
     def generate(self, n_candidates) -> List[Dict]:
         """generate uniform random data points"""
-        return [self.vocs.random_inputs() for _ in range(n_candidates)]
+        return self.vocs.random_inputs(n_candidates)

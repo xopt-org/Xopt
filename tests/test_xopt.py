@@ -16,5 +16,7 @@ class TestXopt:
 
         for _ in range(10):
             xopt.step()
-        history = xopt.history
-        assert len(history) == 11
+        data = xopt.data
+        assert len(data) == 11
+
+        print(data)

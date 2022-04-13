@@ -73,6 +73,14 @@ class VOCS(BaseModel):
         return list(sorted(self.constraints.keys()))
 
     @property
+    def constant_names(self):
+        return list(sorted(self.constants.keys()))
+
+    @property
+    def all_names(self):
+        return self.variable_names + self.constant_names + self.objective_names + self.constraint_names
+
+    @property
     def n_variables(self):
         return len(self.variables)
 
@@ -91,6 +99,10 @@ class VOCS(BaseModel):
     @property
     def n_constraints(self):
         return len(self.constraints)
+
+    @property
+    def n_outputs(self):
+        return self.n_objectives + self.n_constraints
 
     def random_inputs(
         self, n=None, include_constants=True, include_linked_variables=True
@@ -122,9 +134,9 @@ class VOCS(BaseModel):
                 for k, v in self.linked_variables.items():
                     inputs[k] = inputs[v]
 
-        return inputs
+        return pd.DataFrame(inputs, index=range(n))
 
-    def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> List[Dict]:
+    def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> pd.DataFrame:
         """
         Convert a dataframe candidate locations to a
         list of dicts to pass to executors.
@@ -143,9 +155,9 @@ class VOCS(BaseModel):
             for name, val in constants.items():
                 in_copy[name] = val
 
-        return in_copy.to_dict("records")
+        return in_copy
 
-    def convert_numpy_to_inputs(self, inputs: np.ndarray) -> List[Dict]:
+    def convert_numpy_to_inputs(self, inputs: np.ndarray) -> pd.DataFrame:
         """
         convert 2D numpy array to list of dicts (inputs) for evaluation
         Assumes that the columns of the array match correspond to
@@ -160,8 +172,8 @@ class VOCS(BaseModel):
         get training data from dataframe (usually supplied by xopt base)
 
         """
-        inputs = data[self.variable_names].to_numpy()
-        outputs = data[self.objective_names + self.constraint_names].to_numpy()
+        inputs = data[self.variable_names].to_numpy(np.float64)
+        outputs = data[self.objective_names + self.constraint_names].to_numpy(np.float64)
 
         return inputs, outputs
 
@@ -223,8 +235,6 @@ def constraint_data(vocs, data, prefix='constraint_'):
             cvalues = -(d - x)
         else:
             raise ValueError(f'Unknown constraint operator: {op}')
-
-        cdata[prefix+k] = cvalues.fillna(NAN_CONST)
 
     return cdata
 

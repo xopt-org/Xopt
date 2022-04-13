@@ -10,7 +10,6 @@ class TestVOCS(object):
         from xopt.vocs import VOCS
 
         vocs = VOCS()
-        assert vocs.constraint_names == []
 
     def test_from_yaml(self):
         Y = """
@@ -40,20 +39,11 @@ class TestVOCS(object):
         assert vocs.constraints['e'] == ['LESS_THAN', 2]
         assert vocs.constraints['f'] == ['GREATER_THAN', 0]
 
+        assert vocs.n_inputs == 3
+        assert vocs.n_outputs == 4
+
     def test_random_inputs(self):
         vocs = TEST_VOCS_BASE
         n_samples = 10
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
-
-    def test_append_constraints(self):
-        vocs = TEST_VOCS_BASE
-        data = TEST_VOCS_DATA.copy()
-        vocs.append_constraints(data)
-
-        assert np.array_equal(
-            (data[[f"{ele}_f" for ele in vocs.constraint_names]] <= 0)
-            .to_numpy()
-            .flatten(),
-            data["feasibility"].to_numpy(),
-        )
