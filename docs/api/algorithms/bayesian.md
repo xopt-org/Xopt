@@ -1,1 +1,1 @@
-::: xopt.bayesian.algorithms
+::: xopt.generators.bayesian
