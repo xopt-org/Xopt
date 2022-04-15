@@ -8,7 +8,7 @@ import pandas as pd
 class Evaluator:
     def __init__(self, function: Callable, executor: Executor = None, max_workers=1):
         """
-        light wrapper around the executor class, by default it uses a thread pool
+        light wrapper around the executor class, by default it uses a dummy 
         executor with max_workers=1
 
         """
@@ -22,14 +22,18 @@ class Evaluator:
 
         self._n_submitted = 0
 
-    def submit(self, candidates: pd.DataFrame):
-        """submit candidates to executor"""
-        futures = []
-        for candidate in candidates.to_dict("records"):
-            future = self._executor.submit(self.function, candidate)
-            futures.append(future)
+    def submit(self, inputs):
+        return self._executor.submit(self.function, inputs)
 
-        return pd.Series(futures, index=candidates.index)
+    def submit_data(self, input_data: pd.DataFrame):
+        """submit dataframe of inputs to executor"""
+        input_data = pd.DataFrame(input_data) # cast to dataframe
+        futures = {}
+        for index, row in input_data.iterrows():
+            future = self.submit(dict(row))
+            futures[index] = future
+
+        return futures
 
 
 class DummyExecutor(Executor):

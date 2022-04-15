@@ -5,12 +5,13 @@ from typing import List, Dict
 
 
 class Generator(ABC):
-    _is_done = False
-    _data = pd.DataFrame()
-    options = {}
 
     def __init__(self, vocs):
         self._vocs = vocs
+
+        self._is_done = False
+        self._data = pd.DataFrame()
+        self.options = {}
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:
