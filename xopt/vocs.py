@@ -70,10 +70,14 @@ class VOCS(BaseModel):
 
     @property
     def constraint_names(self):
+        if self.constraints is None:
+            return []
         return list(sorted(self.constraints.keys()))
 
     @property
     def constant_names(self):
+        if self.constants is None:
+            return []
         return list(sorted(self.constants.keys()))
 
     @property
@@ -125,16 +129,16 @@ class VOCS(BaseModel):
             inputs[key] = x * a + (1 - x) * b
 
         # Constants
-        if include_constants:
+        if include_constants and self.constants is not None:
             inputs.update(self.constants)
 
         # Handle linked variables
-        if include_linked_variables:
-            if self.linked_variables:
-                for k, v in self.linked_variables.items():
-                    inputs[k] = inputs[v]
+        if include_linked_variables and self.linked_variables is not None:
+            for k, v in self.linked_variables.items():
+                inputs[k] = inputs[v]
 
-        return pd.DataFrame(inputs, index=range(n))
+        #return pd.DataFrame(inputs, index=range(n))
+        return inputs
 
     def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> pd.DataFrame:
         """

@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 import concurrent
 import logging
 from typing import Type, List, Dict
@@ -7,6 +9,8 @@ from .generator import Generator
 from .evaluator import Evaluator
 from .vocs import VOCS
 from .utils import add_constraint_information
+
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -18,40 +22,51 @@ class XoptBase:
 
     """
 
-    _futures = pd.Series()
-    _is_done = False
-    timeout = 1.0
-
     def __init__(
-            self, generator: Generator, evaluator: Evaluator, vocs: VOCS, asynch=False
+            self,
+            generator: Generator,
+            evaluator: Evaluator,
+            vocs: VOCS,
+            asynch=False, 
+            timeout=None,
     ):
         # initialize XoptBase object
         self._generator = generator
         self._evaluator = evaluator
         self._vocs = vocs
         self.asynch = asynch
+        self.timeout = timeout
+
+        self._data = None
+        self._futures = {} # unfinished futures
+        self._input_data = None # dataframe for unfinished futures inputs
+        self._ix_last = -1 # index of last sample generated
+        self._is_done = False
+
 
         if self.asynch:
             self.return_when = concurrent.futures.FIRST_COMPLETED
         else:
             self.return_when = concurrent.futures.ALL_COMPLETED
 
-        # initialize dataframe
-        self.data = pd.DataFrame(columns=self.vocs.all_names)
 
     def run(self):
         """run until either xopt is done or the generator is done"""
         while not self._is_done:
             self.step()
 
-    def submit(self, samples: pd.DataFrame):
-        """
-        submit a list of dicts to the evaluator
-        (also appends submissions to futures attribute)
+    def submit_data(self, input_data: pd.DataFrame):
 
-        """
-        self._futures = pd.concat([self._futures, self.evaluator.submit(samples)])
-        self.data = pd.concat([self.data, samples])
+        input_data = pd.DataFrame(input_data, copy=True) # copy for reindexing
+
+        # Reindex input dataframe
+        input_data.index = np.arange(self._ix_last+1, self._ix_last +1 + len(input_data))
+        self._ix_last += len(input_data)
+        self._input_data = pd.concat([self._input_data, input_data])
+
+        # submit data to evaluator. Futures are keyed on the index of the input data.
+        futures = self.evaluator.submit_data(input_data)
+        self._futures.update(futures)
 
     def step(self):
         """
@@ -61,14 +76,14 @@ class XoptBase:
         - pass history dataframe and candidate request to generator
         - submit candidates to evaluator
         """
-        if not self._futures.empty:
+        if self._futures:
             # wait for futures to finish (depending on return_when)
             _, unfinished_futures = concurrent.futures.wait(
-                self._futures, self.timeout, self.return_when
+                self._futures.values(), self.timeout, self.return_when
             )
 
             # update dataframe with results from finished futures
-            self.update_dataframe()
+            self.update_data()
 
             # calculate number of new candidates to generate
             if self.asynch:
@@ -78,16 +93,18 @@ class XoptBase:
         else:
             n_generate = self.evaluator.max_workers
 
-        # update data in generator
+        # update data in generator (CM: ?? Does the generator expect this?)
         self.generator.data = self.data
 
         # generate samples and submit to evaluator
-        new_samples = self.generator.generate(n_generate)
+        new_samples = pd.DataFrame(self.generator.generate(n_generate))
 
-        # modify index of new samples to align with old samples
-        new_samples.index = new_samples.index + len(self.data)
+        # submit new samples to evaluator
+        self.submit_data(new_samples)
 
-        self.submit(new_samples)
+    @property
+    def data(self):
+        return self._data
 
     @property
     def vocs(self):
@@ -101,13 +118,38 @@ class XoptBase:
     def generator(self):
         return self._generator
 
-    def update_dataframe(self):
-        """
-        update dataframe with results from finished futures
-        """
-        results = pd.DataFrame(
-            list(self._futures.map(lambda x: x.result())),
-            index=self._futures.index
-        )
+    def update_data(self, raises=False):
+        # Get done indexes. 
+        ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
-        self.data.update(results)
+        # Collect done inputs
+        input_data_done = self._input_data.loc[ix_done]
+
+        output_data = []
+        for ix in ix_done:
+            future = self._futures.pop(ix) # remove from futures
+
+            # Handle exceptions
+            try:
+                outputs = future.result() 
+                outputs['xopt_error'] = False
+                outputs['xopt_error_str'] = ''
+            except Exception as e:
+                error_str = traceback.format_exc() 
+                outputs = {'xopt_error': True, 'xopt_error_str': error_str}
+
+            output_data.append(outputs)
+        output_data = pd.DataFrame(output_data, index=ix_done)
+
+        # Form completed evaluation
+        new_data = pd.concat([input_data_done, output_data], axis=1)
+
+        # Add to internal dataframe
+        self._data = pd.concat([self._data, new_data], axis=0)
+
+        # Cleanup
+        self._input_data.drop(ix_done, inplace=True)
+
+        # Return for convenience
+        return new_data
+0
