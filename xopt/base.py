@@ -1,14 +1,11 @@
 import numpy as np
-import pandas as pd
 import concurrent
 import logging
-from typing import Type, List, Dict
 
 import pandas as pd
-from .generator import Generator
+from xopt.generators.generator import Generator
 from .evaluator import Evaluator
 from .vocs import VOCS
-from .utils import add_constraint_information
 
 import traceback
 
@@ -23,12 +20,12 @@ class XoptBase:
     """
 
     def __init__(
-            self,
-            generator: Generator,
-            evaluator: Evaluator,
-            vocs: VOCS,
-            asynch=False, 
-            timeout=None,
+        self,
+        generator: Generator,
+        evaluator: Evaluator,
+        vocs: VOCS,
+        asynch=False,
+        timeout=None,
     ):
         # initialize XoptBase object
         self._generator = generator
@@ -38,17 +35,15 @@ class XoptBase:
         self.timeout = timeout
 
         self._data = None
-        self._futures = {} # unfinished futures
-        self._input_data = None # dataframe for unfinished futures inputs
-        self._ix_last = -1 # index of last sample generated
+        self._futures = {}  # unfinished futures
+        self._input_data = None  # dataframe for unfinished futures inputs
+        self._ix_last = -1  # index of last sample generated
         self._is_done = False
-
 
         if self.asynch:
             self.return_when = concurrent.futures.FIRST_COMPLETED
         else:
             self.return_when = concurrent.futures.ALL_COMPLETED
-
 
     def run(self):
         """run until either xopt is done or the generator is done"""
@@ -57,10 +52,12 @@ class XoptBase:
 
     def submit_data(self, input_data: pd.DataFrame):
 
-        input_data = pd.DataFrame(input_data, copy=True) # copy for reindexing
+        input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
         # Reindex input dataframe
-        input_data.index = np.arange(self._ix_last+1, self._ix_last +1 + len(input_data))
+        input_data.index = np.arange(
+            self._ix_last + 1, self._ix_last + 1 + len(input_data)
+        )
         self._ix_last += len(input_data)
         self._input_data = pd.concat([self._input_data, input_data])
 
@@ -93,7 +90,7 @@ class XoptBase:
         else:
             n_generate = self.evaluator.max_workers
 
-        # update data in generator (CM: ?? Does the generator expect this?)
+        # update data in generator
         self.generator.data = self.data
 
         # generate samples and submit to evaluator
@@ -119,7 +116,7 @@ class XoptBase:
         return self._generator
 
     def update_data(self, raises=False):
-        # Get done indexes. 
+        # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
         # Collect done inputs
@@ -127,16 +124,16 @@ class XoptBase:
 
         output_data = []
         for ix in ix_done:
-            future = self._futures.pop(ix) # remove from futures
+            future = self._futures.pop(ix)  # remove from futures
 
             # Handle exceptions
             try:
-                outputs = future.result() 
-                outputs['xopt_error'] = False
-                outputs['xopt_error_str'] = ''
+                outputs = future.result()
+                outputs["xopt_error"] = False
+                outputs["xopt_error_str"] = ""
             except Exception as e:
-                error_str = traceback.format_exc() 
-                outputs = {'xopt_error': True, 'xopt_error_str': error_str}
+                error_str = traceback.format_exc()
+                outputs = {"xopt_error": True, "xopt_error_str": error_str}
 
             output_data.append(outputs)
         output_data = pd.DataFrame(output_data, index=ix_done)
@@ -152,4 +149,6 @@ class XoptBase:
 
         # Return for convenience
         return new_data
+
+
 0

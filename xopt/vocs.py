@@ -82,7 +82,12 @@ class VOCS(BaseModel):
 
     @property
     def all_names(self):
-        return self.variable_names + self.constant_names + self.objective_names + self.constraint_names
+        return (
+            self.variable_names
+            + self.constant_names
+            + self.objective_names
+            + self.constraint_names
+        )
 
     @property
     def n_variables(self):
@@ -137,7 +142,7 @@ class VOCS(BaseModel):
             for k, v in self.linked_variables.items():
                 inputs[k] = inputs[v]
 
-        #return pd.DataFrame(inputs, index=range(n))
+        # return pd.DataFrame(inputs, index=range(n))
         return inputs
 
     def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> pd.DataFrame:
@@ -177,30 +182,29 @@ class VOCS(BaseModel):
 
         """
         inputs = data[self.variable_names].to_numpy(np.float64)
-        outputs = data[self.objective_names + self.constraint_names].to_numpy(np.float64)
+        outputs = data[self.objective_names + self.constraint_names].to_numpy(
+            np.float64
+        )
 
         return inputs, outputs
 
-
-    def objective_data(self, data, prefix='objective_'):
+    def objective_data(self, data, prefix="objective_"):
         return form_objective_data(self.objectives, data, prefix)
 
-
-    def constraint_data(self, data, prefix='constraint_'):
+    def constraint_data(self, data, prefix="constraint_"):
         return form_constraint_data(self.constraints, data, prefix)
 
-    def feasibility_data(self, data, prefix='feasibility_'):
+    def feasibility_data(self, data, prefix="feasibility_"):
         return form_feasibility_data(self, data, prefix)
 
 
 # --------------------------------
 # dataframe utilities
 
-NAN_CONST = -666
-OBJECTIVE_WEIGHT = {'MINIMIZE': 1.0, 'MAXIMIZE': -1.0}
+OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_objective_data(objectives: Dict, data, prefix='objective_'):
+def form_objective_data(objectives: Dict, data, prefix="objective_"):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
@@ -215,15 +219,15 @@ def form_objective_data(objectives: Dict, data, prefix='objective_'):
     for k in sorted(list(objectives)):
         operator = objectives[k].upper()
         if operator not in OBJECTIVE_WEIGHT:
-            raise ValueError(f'Unknown objective operator: {operator}')
+            raise ValueError(f"Unknown objective operator: {operator}")
 
         weight = OBJECTIVE_WEIGHT[operator]
-        odata[prefix + k] = weight*data[k]
-        
+        odata[prefix + k] = weight * data[k]
+
     return odata
 
 
-def form_constraint_data(constraints: Dict, data, prefix='constraint_'):
+def form_constraint_data(constraints: Dict, data, prefix="constraint_"):
     """
     Use constraint dict and data (dataframe) to generate constraint data (dataframe)
     A constraint is satisfied if the evaluation is < 0.
@@ -231,7 +235,7 @@ def form_constraint_data(constraints: Dict, data, prefix='constraint_'):
     Returns a dataframe with the constraint data.
     """
 
-    data = pd.DataFrame(data) # cast to dataframe
+    data = pd.DataFrame(data)  # cast to dataframe
     constraint_dict = constraints
 
     cdata = pd.DataFrame()
@@ -240,14 +244,14 @@ def form_constraint_data(constraints: Dict, data, prefix='constraint_'):
         op, d = constraints[k]
         op = op.upper()  # Allow any case
 
-        if op == 'GREATER_THAN':  # x > d -> x-d > 0
+        if op == "GREATER_THAN":  # x > d -> x-d > 0
             cvalues = -(x - d)
-        elif op == 'LESS_THAN':  # x < d -> d-x > 0
+        elif op == "LESS_THAN":  # x < d -> d-x > 0
             cvalues = -(d - x)
         else:
-            raise ValueError(f'Unknown constraint operator: {op}')
-        
-        cdata[prefix+k] = cvalues
+            raise ValueError(f"Unknown constraint operator: {op}")
+
+        cdata[prefix + k] = cvalues
     return cdata
 
 
@@ -262,7 +266,7 @@ def form_feasibility_data(vocs, data, prefix="feasibility_"):
     cdata = vocs.constraint_data(data, prefix=c_prefix)
     fdata = pd.DataFrame()
     for k in vocs.constraint_names:
-        fdata[prefix+k] = cdata[c_prefix+k] <= 0
+        fdata[prefix + k] = cdata[c_prefix + k] <= 0
     # if all row values are true, then the row is feasible
     fdata["feasibility"] = fdata.all(axis=1)
     return fdata

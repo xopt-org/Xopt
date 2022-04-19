@@ -22,8 +22,11 @@ class Evaluator:
 
         self._n_submitted = 0
 
-    def submit(self, inputs):
-        return self._executor.submit(self.function, inputs)
+    def submit(self, input: Dict):
+        """submit a single input to the executor"""
+        if not isinstance(input, dict):
+            raise ValueError("input must be a dictionary")
+        return self._executor.submit(self.function, input)
 
     def submit_data(self, input_data: pd.DataFrame):
         """submit dataframe of inputs to executor"""

@@ -1,13 +1,13 @@
 from typing import Dict, List
 
 import torch
-
 from botorch.acquisition.objective import MCAcquisitionObjective
 from botorch.models.transforms.input import InputTransform
 from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.sampling import MCSampler, SobolQMCNormalSampler
 from pydantic import BaseModel
-from torch import Tensor
+
+from xopt.generators.options import GeneratorOptions
 
 
 class AcqOptions(BaseModel):
@@ -35,7 +35,7 @@ class ModelOptions(BaseModel):
         arbitrary_types_allowed = True
 
 
-class BayesianOptions(BaseModel):
+class BayesianOptions(GeneratorOptions):
     optim: OptimOptions = OptimOptions()
     acq: AcqOptions = AcqOptions()
     model: ModelOptions = ModelOptions()
@@ -43,26 +43,7 @@ class BayesianOptions(BaseModel):
     n_initial: int = 3
     proximal_lengthscales: List[float] = None
 
-    def update(self, **kwargs):
-        all_kwargs = kwargs
 
-        def set_recursive(d: BaseModel):
-            if not isinstance(d, dict):
-                for name, val in d.__fields__.items():
-                    attr = getattr(d, name)
-                    if isinstance(attr, BaseModel):
-                        set_recursive(attr)
-                    elif name in kwargs.keys():
-                        setattr(d, name, all_kwargs.pop(name))
-                    else:
-                        pass
-
-        set_recursive(self)
-
-        if len(all_kwargs):
-            raise RuntimeError(
-                f"keys {list(all_kwargs.keys())} not found, will not be " f"updated!"
-            )
 
 
 if __name__ == "__main__":
