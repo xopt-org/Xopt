@@ -46,7 +46,7 @@ class BayesianGenerator(Generator, ABC):
 
         # if no data exists use random generator to generate candidates
         if self.data.empty:
-            return self.vocs.random_inputs(n_candidates)
+            return self.vocs.random_inputs(self.options.n_initial)
 
         else:
             bounds = torch.tensor(self.vocs.bounds, **self.options.tkwargs)

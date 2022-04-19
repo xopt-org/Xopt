@@ -14,8 +14,6 @@ class GeneratorOptions(BaseModel):
     # The version of the generator.
     version: str = "0.0.1"
 
-    all_keys: List[str] = []
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.check_for_duplicate_keys()
