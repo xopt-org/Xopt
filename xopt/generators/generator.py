@@ -1,17 +1,17 @@
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
+from .options import GeneratorOptions
 from typing import List, Dict
 
 
 class Generator(ABC):
-
     def __init__(self, vocs):
         self._vocs = vocs
 
         self._is_done = False
         self._data = pd.DataFrame()
-        self.options = {}
+        self.options = GeneratorOptions()
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:

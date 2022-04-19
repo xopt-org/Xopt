@@ -11,6 +11,6 @@ class TestEvaluator:
 
         evaluator = Evaluator(f)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=['x1', 'x2'])
-        futures = evaluator.submit(candidates)
+        futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 

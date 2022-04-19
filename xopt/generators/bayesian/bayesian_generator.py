@@ -17,13 +17,13 @@ from .options import BayesianOptions
 
 
 class BayesianGenerator(Generator, ABC):
-    _model = None
-    _acquisition = None
-
     def __init__(
         self, vocs: VOCS, options: BayesianOptions = BayesianOptions(), **kwargs
     ):
         super(BayesianGenerator, self).__init__(vocs)
+
+        self._model = None
+        self._acquisition = None
 
         self.options = options
 
@@ -67,7 +67,6 @@ class BayesianGenerator(Generator, ABC):
         Returns a SingleTaskGP (or ModelList set of independent SingleTaskGPs
         depending on the number of outputs, if data is None
 
-
         """
 
         inputs, outputs = self.get_training_data(data)
@@ -100,6 +99,9 @@ class BayesianGenerator(Generator, ABC):
         )
 
     def get_acquisition(self, model):
+        """
+        Returns a function that can be used to evaluate the acquisition function
+        """
         # add proximal biasing if requested
         if self.options.proximal_lengthscales is not None:
             acq = ProximalAcquisitionFunction(
