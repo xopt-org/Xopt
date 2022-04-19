@@ -188,6 +188,10 @@ class VOCS(BaseModel):
 
         return inputs, outputs
 
+    # Extract optimization data (in correct column order)
+    def variable_data(self, data, prefix='variable_'):
+        return form_variable_data(self.variables, data, prefix=prefix)
+
     def objective_data(self, data, prefix="objective_"):
         return form_objective_data(self.objectives, data, prefix)
 
@@ -202,6 +206,18 @@ class VOCS(BaseModel):
 # dataframe utilities
 
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
+
+
+def form_variable_data(variables: Dict, data, prefix='variable_'):
+    """
+    Use variables dict to form a dataframe. 
+    """
+    data = pd.DataFrame(data)
+    vdata = pd.DataFrame()
+    for k in sorted(list(variables)):
+        vdata[prefix + k] = data[k]
+
+    return vdata
 
 
 def form_objective_data(objectives: Dict, data, prefix="objective_"):
