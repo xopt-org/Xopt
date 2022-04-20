@@ -28,7 +28,8 @@ class BayesianExplorationGenerator(BayesianGenerator):
             Keyword arguments passed to generator options
 
         """
-
+        if vocs.n_objectives != 1:
+            raise ValueError("vocs must have one objective for exploration")
         super(BayesianExplorationGenerator, self).__init__(vocs, **kwargs)
 
     def _get_acquisition(self, model):

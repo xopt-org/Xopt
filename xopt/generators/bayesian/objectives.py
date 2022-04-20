@@ -44,10 +44,8 @@ def create_constrained_mc_objective(vocs):
     NOTE: we assume that corresponding model outputs are ordered according to vocs
     ordering
     """
-    n_objectives = len(vocs.objective_names)
-    n_constraints = len(vocs.constraint_names)
-    weights = torch.zeros(n_objectives + n_constraints).double()
-    for idx, ele in enumerate(vocs.objectives):
+    weights = torch.zeros(vocs.n_outputs).double()
+    for idx, ele in enumerate(vocs.objective_names):
         if vocs.objectives[ele] == "MINIMIZE":
             weights[idx] = -1.0
         else:
