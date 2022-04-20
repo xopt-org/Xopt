@@ -52,17 +52,17 @@ class BayesianGenerator(Generator, ABC):
             bounds = torch.tensor(self.vocs.bounds, **self.options.tkwargs)
 
             # update internal model with internal data
-            model = self.get_model(self.data)
+            self.train_model(self.data)
 
-            candidates, _ = optimize_acqf(
-                acq_function=self.get_acquisition(model),
+            candidates, out = optimize_acqf(
+                acq_function=self.get_acquisition(self._model),
                 bounds=bounds,
                 q=n_candidates,
                 **self.options.optim.dict()
             )
             return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
 
-    def get_model(self, data: pd.DataFrame = None) -> Module:
+    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
         Returns a SingleTaskGP (or ModelList set of independent SingleTaskGPs
         depending on the number of outputs, if data is None
@@ -89,6 +89,8 @@ class BayesianGenerator(Generator, ABC):
             mll = ExactMarginalLogLikelihood(model.likelihood, model)
             fit_gpytorch_model(mll)
 
+        if update_internal:
+            self._model = model
         return model
 
     def get_training_data(self, data: pd.DataFrame) -> (torch.Tensor, torch.Tensor):
@@ -118,3 +120,7 @@ class BayesianGenerator(Generator, ABC):
     @abstractmethod
     def _get_acquisition(self, model):
         pass
+
+    @property
+    def model(self):
+        return self._model

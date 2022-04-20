@@ -25,7 +25,7 @@ class TestBayesianGenerator(TestCase):
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
-        model = gen.get_model(TEST_VOCS_DATA)
+        model = gen.train_model(TEST_VOCS_DATA)
         assert isinstance(model, ModelListGP)
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())

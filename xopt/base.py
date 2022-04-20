@@ -144,6 +144,9 @@ class XoptBase:
         # Add to internal dataframe
         self._data = pd.concat([self._data, new_data], axis=0)
 
+        # add to generator data
+        self.generator.data = self.data
+
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
 

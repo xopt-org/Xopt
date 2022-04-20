@@ -4,7 +4,7 @@ import numpy as np
 
 from xopt import VOCS
 
-vocs = VOCS(
+tnk_vocs = VOCS(
     **{
         "variables": {"x1": [0, 3.14159], "x2": [0, 3.14159]},
         "objectives": {"y1": "MINIMIZE", "y2": "MINIMIZE"},

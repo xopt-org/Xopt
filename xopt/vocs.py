@@ -75,6 +75,10 @@ class VOCS(BaseModel):
         return list(sorted(self.constraints.keys()))
 
     @property
+    def output_names(self):
+        return self.objective_names + self.constraint_names
+
+    @property
     def constant_names(self):
         if self.constants is None:
             return []
