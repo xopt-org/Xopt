@@ -195,11 +195,11 @@ class VOCS(BaseModel):
     def objective_data(self, data, prefix="objective_"):
         return form_objective_data(self.objectives, data, prefix)
 
-    def constraint_data(self, data, prefix="constraint_"):
+    def constraint_data(self, data, prefix="constraint_"):     
         return form_constraint_data(self.constraints, data, prefix)
 
-    def feasibility_data(self, data, prefix="feasibility_"):
-        return form_feasibility_data(self, data, prefix)
+    def feasibility_data(self, data, prefix="feasible_"):
+        return form_feasibility_data(self.constraints, data, prefix)
 
 
 # --------------------------------
@@ -212,6 +212,9 @@ def form_variable_data(variables: Dict, data, prefix='variable_'):
     """
     Use variables dict to form a dataframe. 
     """
+    if not variables:
+        return None
+
     data = pd.DataFrame(data)
     vdata = pd.DataFrame()
     for k in sorted(list(variables)):
@@ -229,6 +232,9 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
     Returns a dataframe with the objective data intented to be minimized.
 
     """
+    if not objectives:
+        return None
+
     data = pd.DataFrame(data)
 
     odata = pd.DataFrame()
@@ -250,6 +256,8 @@ def form_constraint_data(constraints: Dict, data, prefix="constraint_"):
 
     Returns a dataframe with the constraint data.
     """
+    if not constraints:
+        return None
 
     data = pd.DataFrame(data)  # cast to dataframe
     constraint_dict = constraints
@@ -271,18 +279,23 @@ def form_constraint_data(constraints: Dict, data, prefix="constraint_"):
     return cdata
 
 
-def form_feasibility_data(vocs, data, prefix="feasibility_"):
+def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     """
     Use constraint dict and data to identify feasible points in the the dataset.
 
     Returns a dataframe with the feasibility data.
     """
+    if not constraints:
+        df = pd.DataFrame(index=data.index)
+        df['feasible'] = True
+        return df
+
     data = pd.DataFrame(data)
     c_prefix = "constraint_"
-    cdata = vocs.constraint_data(data, prefix=c_prefix)
+    cdata = form_constraint_data(constraints, data, prefix=c_prefix)
     fdata = pd.DataFrame()
-    for k in vocs.constraint_names:
+    for k in sorted(list(constraints)):
         fdata[prefix + k] = cdata[c_prefix + k] <= 0
     # if all row values are true, then the row is feasible
-    fdata["feasibility"] = fdata.all(axis=1)
+    fdata["feasible"] = fdata.all(axis=1)
     return fdata
