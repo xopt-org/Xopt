@@ -21,6 +21,16 @@ class Generator(ABC):
         """
         pass
 
+    @abstractmethod
+    def update_data(self, new_data: pd.DataFrame):
+        """
+        update dataframe with results from new evaluations.
+
+        This is intended for generators that maintain their own data.
+
+        """
+        pass
+
     @property
     def is_done(self):
         return self._is_done
