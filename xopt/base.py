@@ -21,6 +21,7 @@ class XoptBase:
 
     def __init__(
         self,
+        *,
         generator: Generator,
         evaluator: Evaluator,
         vocs: VOCS,
@@ -35,6 +36,7 @@ class XoptBase:
         self.timeout = timeout
 
         self._data = None
+        self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
         self._ix_last = -1  # index of last sample generated
@@ -80,10 +82,10 @@ class XoptBase:
             )
 
             # update dataframe with results from finished futures
-            new_data = self.update_data()
+            self.update_data()
 
-            # The generator can optionally use this. 
-            self.generator.update_data(new_data)
+            # The generator can optionally use new data 
+            self.generator.add_data(self.new_data)
 
             # calculate number of new candidates to generate
             if self.asynch:
@@ -105,6 +107,10 @@ class XoptBase:
     @property
     def data(self):
         return self._data
+
+    @property
+    def new_data(self):
+        return self._new_data
 
     @property
     def vocs(self):
@@ -144,14 +150,12 @@ class XoptBase:
         # Form completed evaluation
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
-        # Add to internal dataframe
+        # Add to internal dataframes
         self._data = pd.concat([self._data, new_data], axis=0)
+        self._new_data = new_data
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
 
-        # Return for convenience
-        return new_data
 
 
-0

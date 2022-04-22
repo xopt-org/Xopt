@@ -62,7 +62,7 @@ class CNSGAGenerator(Generator):
         return inputs.to_dict(orient='records')
 
 
-    def update_data(self, new_data: pd.DataFrame):
+    def add_data(self, new_data: pd.DataFrame):
         self.offspring = pd.concat([self.offspring, new_data])
 
         # Next generation
