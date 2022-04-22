@@ -80,7 +80,10 @@ class XoptBase:
             )
 
             # update dataframe with results from finished futures
-            self.update_data()
+            new_data = self.update_data()
+
+            # The generator can optionally use this. 
+            self.generator.update_data(new_data)
 
             # calculate number of new candidates to generate
             if self.asynch:
@@ -143,9 +146,6 @@ class XoptBase:
 
         # Add to internal dataframe
         self._data = pd.concat([self._data, new_data], axis=0)
-
-        # add to generator data
-        self.generator.data = self.data
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
