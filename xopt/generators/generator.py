@@ -5,6 +5,7 @@ from .options import GeneratorOptions
 from typing import List, Dict
 
 
+
 class Generator(ABC):
     def __init__(self, vocs):
         self._vocs = vocs
@@ -21,8 +22,7 @@ class Generator(ABC):
         """
         pass
 
-    @abstractmethod
-    def update_data(self, new_data: pd.DataFrame):
+    def add_data(self, new_data: pd.DataFrame):
         """
         update dataframe with results from new evaluations.
 
