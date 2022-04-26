@@ -21,11 +21,12 @@ class MOBOOptions(BayesianOptions):
 
 class MOBOGenerator(BayesianGenerator):
     def __init__(self, vocs: VOCS, options: MOBOOptions = MOBOOptions()):
-        super(MOBOGenerator, self).__init__(vocs, options)
+        if not isinstance(options, MOBOOptions):
+            raise ValueError("options must be a MOBOOptions object")
 
-        # create weighted mc objective according to vocs
         objective = create_mobo_objective(vocs)
         options.acq.objective = objective
+        super(MOBOGenerator, self).__init__(vocs, options)
 
     def _get_acquisition(self, model):
         # get reference point from data

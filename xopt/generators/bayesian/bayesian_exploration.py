@@ -12,10 +12,11 @@ from torch import Tensor
 
 from xopt.vocs import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.options import BayesianOptions
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
-    def __init__(self, vocs: VOCS, **kwargs):
+    def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
         """
         Generator using UpperConfidenceBound acquisition function
 
@@ -24,13 +25,15 @@ class BayesianExplorationGenerator(BayesianGenerator):
         vocs: dict
             Standard vocs for xopt
 
-        **kwargs
-            Keyword arguments passed to generator options
-
+        options: BayesianOptions
+            Options for the generator
         """
+        if not isinstance(options, BayesianOptions):
+            raise ValueError("options must be a BayesianOptions object")
+
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for exploration")
-        super(BayesianExplorationGenerator, self).__init__(vocs, **kwargs)
+        super(BayesianExplorationGenerator, self).__init__(vocs, options)
 
     def _get_acquisition(self, model):
         return qPosteriorVariance(model, **self.options.acq.dict())

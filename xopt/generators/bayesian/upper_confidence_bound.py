@@ -9,8 +9,12 @@ class UpperConfidenceBoundOptions(AcqOptions):
     beta: float = 2.0
 
 
+class UCBOptions(BayesianOptions):
+    acq = UpperConfidenceBoundOptions()
+
+
 class UpperConfidenceBoundGenerator(BayesianGenerator):
-    def __init__(self, vocs: VOCS, **kwargs):
+    def __init__(self, vocs: VOCS, options: UCBOptions = UCBOptions()):
         """
         Generator using UpperConfidenceBound acquisition function
 
@@ -19,19 +23,12 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         vocs: dict
             Standard vocs dictionary for xopt
 
-        beta: float, default: 2.0
-            Beta value for UCB acquisition function
-
-        maximize: bool, default: False
-            If True attempt to maximize the function
-
-        **kwargs
-            Keyword arguments passed to SingleTaskGP model
-
+        options: UpperConfidenceBoundOptions
+            Specific options for this generator
         """
-        options = BayesianOptions(acq=UpperConfidenceBoundOptions())
-
-        super(UpperConfidenceBoundGenerator, self).__init__(vocs, options, **kwargs)
+        if not isinstance(options, UCBOptions):
+            raise ValueError("options must be a UCBOptions object")
+        super(UpperConfidenceBoundGenerator, self).__init__(vocs, options)
 
     def _get_acquisition(self, model):
         return qUpperConfidenceBound(model, **self.options.acq.dict())
