@@ -10,7 +10,7 @@ from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
-from xopt.vocs import VOCS
+from xopt import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
 
