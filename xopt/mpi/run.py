@@ -12,7 +12,7 @@ mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 
 """
 
-from xopt import XoptBase, xopt_logo
+from xopt import Xopt, xopt_logo
 
 from mpi4py.futures import MPIPoolExecutor
 from mpi4py import MPI
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # logger.info('_________________________________')
     logger.info(f"Parallel execution with {mpi_size} workers")
 
-    X = XoptBase(infile)
+    X = Xopt(infile)
     # print(X)
     sys.stdout.flush()
     with MPIPoolExecutor() as executor:

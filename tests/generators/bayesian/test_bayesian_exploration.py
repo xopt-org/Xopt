@@ -3,7 +3,7 @@ from botorch.sampling import SobolQMCNormalSampler
 
 from xopt.generators.bayesian import BayesianExplorationGenerator
 from xopt.resources.testing import TEST_VOCS_DATA, TEST_VOCS_BASE, xtest_callable
-from xopt import XoptBase, Evaluator
+from xopt import Xopt, Evaluator
 
 
 class TestBayesianExplorationGenerator:
@@ -31,7 +31,7 @@ class TestBayesianExplorationGenerator:
             sampler=SobolQMCNormalSampler(1),
         )
 
-        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+        xopt = Xopt(generator, evaluator, TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()
@@ -50,7 +50,7 @@ class TestBayesianExplorationGenerator:
             proximal_lengthscales=[1.0, 1.0],
         )
 
-        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+        xopt = Xopt(generator, evaluator, TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()
