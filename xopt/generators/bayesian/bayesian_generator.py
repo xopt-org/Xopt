@@ -1,24 +1,28 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import Dict, List
 
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
-from botorch.models import SingleTaskGP, ModelListGP
+from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim import optimize_acqf
 from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
-from xopt.vocs import VOCS
 from xopt.generator import Generator
 from xopt.generators.bayesian.custom_acq.proximal import ProximalAcquisitionFunction
 from xopt.generators.bayesian.objectives import create_constrained_mc_objective
 from xopt.generators.bayesian.options import BayesianOptions
 
+from xopt.vocs import VOCS
+
 
 class BayesianGenerator(Generator, ABC):
     def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
+        if not isinstance(options, BayesianOptions):
+            raise ValueError("options must be of type BayesianOptions")
+
         super(BayesianGenerator, self).__init__(vocs, options)
 
         self._model = None
@@ -35,7 +39,6 @@ class BayesianGenerator(Generator, ABC):
 
         if self.options.model.outcome_transform is None:
             self.options.model.outcome_transform = Standardize(1)
-
 
     def generate(self, n_candidates: int) -> List[Dict]:
 

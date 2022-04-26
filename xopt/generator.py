@@ -22,6 +22,9 @@ class GeneratorOptions(BaseModel):
 
 class Generator(ABC):
     def __init__(self, vocs: VOCS, options: GeneratorOptions = GeneratorOptions()):
+        if not isinstance(options, GeneratorOptions):
+            raise TypeError("options must be of type GeneratorOptions")
+
         self._vocs = vocs
 
         self._is_done = False
