@@ -3,16 +3,17 @@ import concurrent
 import logging
 
 import pandas as pd
-from xopt.generators.generator import Generator
-from .evaluator import Evaluator
-from .vocs import VOCS
+from xopt.generator import Generator
+from xopt.evaluator import Evaluator
+from xopt.vocs import VOCS
+from xopt.input import process_yaml
 
 import traceback
 
 logger = logging.getLogger(__name__)
 
 
-class XoptBase:
+class Xopt:
     """
 
     Object to handle a single optimization problem.
@@ -28,7 +29,7 @@ class XoptBase:
         asynch=False,
         timeout=None,
     ):
-        # initialize XoptBase object
+        # initialize Xopt object
         self._generator = generator
         self._evaluator = evaluator
         self._vocs = vocs
@@ -156,6 +157,12 @@ class XoptBase:
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
+
+    def from_yaml(self, yaml_file):
+        generator, evaluator, vocs = process_yaml(yaml_file)
+        self._generator = generator
+        self._evaluator = evaluator
+        self._vocs = vocs
 
 
 
