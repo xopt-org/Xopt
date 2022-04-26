@@ -1,9 +1,9 @@
-from .evaluator import Evaluator
-from xopt.generators.generator import Generator
-from .vocs import VOCS
-from .base import XoptBase
+from xopt import _version
+from xopt.base import Xopt
+from xopt.vocs import VOCS
+from xopt.evaluator import Evaluator
+from xopt.generator import Generator
 
-from . import _version
 __version__ = _version.get_versions()['version']
 
 from xopt.log import configure_logger

@@ -3,9 +3,10 @@ import concurrent
 import logging
 
 import pandas as pd
-from xopt.generators.generator import Generator
-from .evaluator import Evaluator
-from .vocs import VOCS
+from xopt.generator import Generator
+from xopt.evaluator import Evaluator
+from xopt.vocs import VOCS
+from xopt.input import process_yaml
 
 import traceback
 
@@ -156,6 +157,7 @@ class XoptBase:
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
+
 
 
 
