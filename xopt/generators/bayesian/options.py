@@ -7,7 +7,7 @@ from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.sampling import MCSampler, SobolQMCNormalSampler
 from pydantic import BaseModel
 
-from xopt.generators.options import GeneratorOptions
+from xopt.generator import GeneratorOptions
 
 
 class AcqOptions(BaseModel):

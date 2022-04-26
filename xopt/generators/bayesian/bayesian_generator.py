@@ -10,22 +10,19 @@ from botorch.optim import optimize_acqf
 from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
-from xopt import Generator, VOCS
-from .custom_acq.proximal import ProximalAcquisitionFunction
-from .objectives import create_constrained_mc_objective
-from .options import BayesianOptions
+from xopt.vocs import VOCS
+from xopt.generator import Generator
+from xopt.generators.bayesian.custom_acq.proximal import ProximalAcquisitionFunction
+from xopt.generators.bayesian.objectives import create_constrained_mc_objective
+from xopt.generators.bayesian.options import BayesianOptions
 
 
 class BayesianGenerator(Generator, ABC):
-    def __init__(
-        self, vocs: VOCS, options: BayesianOptions = BayesianOptions(), **kwargs
-    ):
-        super(BayesianGenerator, self).__init__(vocs)
+    def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
+        super(BayesianGenerator, self).__init__(vocs, options)
 
         self._model = None
         self._acquisition = None
-
-        self.options = options
 
         if self.options.acq.objective is None:
             self.options.acq.objective = create_constrained_mc_objective(self.vocs)
@@ -39,8 +36,6 @@ class BayesianGenerator(Generator, ABC):
         if self.options.model.outcome_transform is None:
             self.options.model.outcome_transform = Standardize(1)
 
-        # update generator options w/kwargs
-        self.options.update(**kwargs)
 
     def generate(self, n_candidates: int) -> List[Dict]:
 
