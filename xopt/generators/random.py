@@ -1,6 +1,8 @@
+from typing import List, Dict
+
 import pandas as pd
 
-from xopt.generator import Generator
+from xopt.generators.generator import Generator
 
 
 class RandomGenerator(Generator):

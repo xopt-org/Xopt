@@ -1,32 +1,18 @@
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
-from xopt.vocs import VOCS
-
+from .options import GeneratorOptions
 from typing import List, Dict
 
-from pydantic import BaseModel
-
-
-class GeneratorOptions(BaseModel):
-    """
-    Options for the generator.
-    """
-
-    # The name of the generator.
-    name: str = None
-
-    # The version of the generator.
-    version: str = None
 
 
 class Generator(ABC):
-    def __init__(self, vocs: VOCS, options: GeneratorOptions = GeneratorOptions()):
+    def __init__(self, vocs):
         self._vocs = vocs
 
         self._is_done = False
         self._data = pd.DataFrame()
-        self.options = options
+        self.options = GeneratorOptions()
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:

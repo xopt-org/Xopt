@@ -3,7 +3,8 @@ import pytest
 
 class TestGeneratorOptions():
     def test_generator_options(self):
-        from xopt.options import GeneratorOptions
+        from xopt.generators.options import GeneratorOptions
+        from pydantic import BaseModel
         opt = GeneratorOptions()
 
         # try to construt a generator object with duplicate keys

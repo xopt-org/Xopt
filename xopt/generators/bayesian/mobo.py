@@ -3,29 +3,27 @@ from typing import List
 import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
 
-from xopt.vocs import VOCS
+from xopt import VOCS
 from xopt.generators.bayesian import BayesianGenerator
-from xopt.generators.bayesian.objectives import create_mobo_objective, \
-    create_constraint_callables
+from .objectives import create_mobo_objective, create_constraint_callables
 from .options import BayesianOptions, AcqOptions
 
 
-class MOBOAcqOptions(AcqOptions):
+class MOBOOptions(AcqOptions):
     ref_point: List[float] = None
     use_data_as_reference: bool = True
 
 
-class MOBOOptions(BayesianOptions):
-    acq = MOBOAcqOptions()
-
-
 class MOBOGenerator(BayesianGenerator):
-    def __init__(self, vocs: VOCS, options: MOBOOptions = MOBOOptions()):
-        super(MOBOGenerator, self).__init__(vocs, options)
+    def __init__(self, vocs: VOCS, **kwargs):
 
         # create weighted mc objective according to vocs
         objective = create_mobo_objective(vocs)
+
+        options = BayesianOptions(acq=MOBOOptions())
         options.acq.objective = objective
+
+        super(MOBOGenerator, self).__init__(vocs, options, **kwargs)
 
     def _get_acquisition(self, model):
         # get reference point from data
