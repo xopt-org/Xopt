@@ -13,25 +13,25 @@ class TestBayesianExplorationGenerator:
     def test_generate(self):
         gen = BayesianExplorationGenerator(
             TEST_VOCS_BASE,
-            raw_samples=1,
-            num_restarts=1,
-            sampler=SobolQMCNormalSampler(1),
         )
-
+        gen.options.optim.raw_samples = 1
+        gen.options.optim.num_restarts = 1
+        gen.options.acq.monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
         candidate = gen.generate(5)
         assert len(candidate) == 5
 
     def test_in_xopt(self):
         evaluator = Evaluator(xtest_callable)
-        generator = BayesianExplorationGenerator(
+        gen = BayesianExplorationGenerator(
             TEST_VOCS_BASE,
-            raw_samples=1,
-            num_restarts=1,
-            sampler=SobolQMCNormalSampler(1),
         )
+        gen.options.optim.raw_samples = 1
+        gen.options.optim.num_restarts = 1
+        gen.options.acq.monte_carlo_samples = 1
+        gen.data = TEST_VOCS_DATA
 
-        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+        xopt = XoptBase(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()
@@ -42,15 +42,16 @@ class TestBayesianExplorationGenerator:
 
     def test_in_xopt_w_proximal(self):
         evaluator = Evaluator(xtest_callable)
-        generator = BayesianExplorationGenerator(
+        gen = BayesianExplorationGenerator(
             TEST_VOCS_BASE,
-            raw_samples=1,
-            num_restarts=1,
-            sampler=SobolQMCNormalSampler(1),
-            proximal_lengthscales=[1.0, 1.0],
         )
+        gen.options.optim.raw_samples = 1
+        gen.options.optim.num_restarts = 1
+        gen.options.acq.monte_carlo_samples = 1
+        gen.options.acq.proximal_lengthscales = [1.0, 1.0]
+        gen.data = TEST_VOCS_DATA
 
-        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+        xopt = XoptBase(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()

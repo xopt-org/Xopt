@@ -6,7 +6,6 @@ import pandas as pd
 from xopt.generator import Generator
 from xopt.evaluator import Evaluator
 from xopt.vocs import VOCS
-from xopt.input import process_yaml
 
 import traceback
 

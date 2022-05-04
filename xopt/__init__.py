@@ -1,5 +1,5 @@
 from xopt import _version
-from xopt.base import Xopt
+from xopt.base import XoptBase
 from xopt.vocs import VOCS
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator

@@ -3,10 +3,12 @@ from botorch.acquisition import qUpperConfidenceBound
 from xopt.vocs import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
+from xopt.generators.bayesian.objectives import create_constrained_mc_objective
+from pydantic import Field
 
 
 class UpperConfidenceBoundOptions(AcqOptions):
-    beta: float = 2.0
+    beta: float = Field(2.0, description="Beta parameter for UCB optimization")
 
 
 class UCBOptions(BayesianOptions):
@@ -28,7 +30,19 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         """
         if not isinstance(options, UCBOptions):
             raise ValueError("options must be a UCBOptions object")
+
+        if vocs.n_objectives != 1:
+            raise ValueError("vocs must have one objective for optimization")
+
         super(UpperConfidenceBoundGenerator, self).__init__(vocs, options)
 
+    def _get_objective(self):
+        return create_constrained_mc_objective(self.vocs)
+
     def _get_acquisition(self, model):
-        return qUpperConfidenceBound(model, **self.options.acq.dict())
+        return qUpperConfidenceBound(
+            model,
+            sampler=self._sampler,
+            objective=self._objective,
+            beta=self.options.acq.beta,
+        )

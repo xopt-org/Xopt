@@ -5,44 +5,59 @@ from botorch.acquisition.objective import MCAcquisitionObjective
 from botorch.models.transforms.input import InputTransform
 from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.sampling import MCSampler, SobolQMCNormalSampler
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from xopt.generator import GeneratorOptions
 
 
 class AcqOptions(BaseModel):
-    # objective creation
-    objective: MCAcquisitionObjective = None
+    """Options for defining the acquisition function in BO"""
 
     # monte carlo options
-    sampler: MCSampler = SobolQMCNormalSampler(num_samples=512)
+    monte_carlo_samples = Field(512, description="number of monte carlo samples to use")
 
-    class Config:
-        arbitrary_types_allowed = True
-
+    proximal_lengthscales: List[float] = Field(
+        None, description="lengthscales for proximal biasing"
+    )
 
 class OptimOptions(BaseModel):
-    num_restarts: int = 5
-    raw_samples: int = 20
-    sequential: bool = True
+    """Options for optimizing the acquisition function in BO"""
+
+    num_restarts: int = Field(
+        5, description="number of restarts during acquistion " "function optimization"
+    )
+    raw_samples: int = Field(
+        20, description="number of raw samples used to seed optimization"
+    )
+    sequential: bool = Field(
+        True,
+        description="flag to use sequential optimization for q-batch point "
+        "selection",
+    )
 
 
 class ModelOptions(BaseModel):
-    input_transform: InputTransform = None
-    outcome_transform: OutcomeTransform = None
+    """Options for defining the GP model in BO"""
 
-    class Config:
-        arbitrary_types_allowed = True
+    # input_transform: InputTransform = Field(
+    #    None, description="transform applied to GP input model data", exclude=True
+    # )
+    # outcome_transform: OutcomeTransform = Field(
+    #    None, description="transform applied to GP outcome model data", exclude=True
+    # )
+
+    # class Config:
+    #    arbitrary_types_allowed = True
 
 
 class BayesianOptions(GeneratorOptions):
     optim: OptimOptions = OptimOptions()
     acq: AcqOptions = AcqOptions()
     model: ModelOptions = ModelOptions()
-    tkwargs: Dict = {"device": "cpu", "dtype": torch.double}
-    n_initial: int = 3
-    proximal_lengthscales: List[float] = None
 
+    n_initial: int = Field(
+        3, description="number of random initial points to measure during first step"
+    )
 
 
 
@@ -50,3 +65,5 @@ if __name__ == "__main__":
     options = BayesianOptions()
     options.optim.raw_samples = 30
     print(options.dict())
+
+    print(BayesianOptions.schema())
