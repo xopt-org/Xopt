@@ -11,30 +11,33 @@ from xopt.generators.bayesian.upper_confidence_bound import (
 class TestUpperConfidenceBoundGenerator:
     def test_init(self):
         ucb_gen = UpperConfidenceBoundGenerator(TEST_VOCS_BASE)
-        print(ucb_gen.options)
+        ucb_gen.options.dict()
+        ucb_gen.options.schema()
 
     def test_generate(self):
-        ucb_gen = UpperConfidenceBoundGenerator(
+        gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
-            raw_samples=1,
-            num_restarts=1,
-            sampler=SobolQMCNormalSampler(1),
         )
+        gen.options.optim.raw_samples = 1
+        gen.options.optim.num_restarts = 1
+        gen.options.acq.monte_carlo_samples = 1
+        gen.data = TEST_VOCS_DATA
 
-        ucb_gen.data = TEST_VOCS_DATA
-        candidate = ucb_gen.generate(5)
-        assert len(candidate) == 5
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+
+        candidate = gen.generate(2)
+        assert len(candidate) == 2
 
     def test_in_xopt(self):
         evaluator = Evaluator(xtest_callable)
         ucb_gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
-            raw_samples=1,
-            num_restarts=1,
-            sampler=SobolQMCNormalSampler(1),
         )
+        ucb_gen.options.optim.raw_samples = 1
+        ucb_gen.options.optim.num_restarts = 1
 
-        xopt = XoptBase(ucb_gen, evaluator, TEST_VOCS_BASE)
+        xopt = XoptBase(generator=ucb_gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()
@@ -45,15 +48,14 @@ class TestUpperConfidenceBoundGenerator:
 
     def test_in_xopt_w_proximal(self):
         evaluator = Evaluator(xtest_callable)
-        generator = UpperConfidenceBoundGenerator(
+        ucb_gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
-            raw_samples=1,
-            num_restarts=1,
-            sampler=SobolQMCNormalSampler(1),
-            proximal_lengthscales=[1.0, 1.0],
         )
+        ucb_gen.options.optim.raw_samples = 1
+        ucb_gen.options.optim.num_restarts = 1
+        ucb_gen.options.acq.proximal_lengthscales = [1.0,1.0]
 
-        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+        xopt = XoptBase(generator=ucb_gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # initialize with single initial candidate
         xopt.step()

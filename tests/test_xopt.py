@@ -11,7 +11,7 @@ class TestXopt:
         evaluator = Evaluator(xtest_callable)
         generator = RandomGenerator(TEST_VOCS_BASE)
 
-        xopt = XoptBase(generator, evaluator, TEST_VOCS_BASE)
+        xopt = XoptBase(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         xopt.step()
 
         for _ in range(10):

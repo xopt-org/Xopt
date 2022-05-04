@@ -14,14 +14,6 @@ class TestBayesianGenerator(TestCase):
     def test_init(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
 
-        # test with kwarg
-        gen = BayesianGenerator(TEST_VOCS_BASE, raw_samples=10)
-        assert gen.options.optim.raw_samples == 10
-
-        # test with bad kwarg
-        with pytest.raises(RuntimeError):
-            gen = BayesianGenerator(TEST_VOCS_BASE, ra_samples=10)
-
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
