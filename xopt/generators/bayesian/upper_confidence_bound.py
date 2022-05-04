@@ -42,7 +42,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         return qUpperConfidenceBound(
             model,
-            sampler=self._sampler,
-            objective=self._objective,
+            sampler=self.sampler,
+            objective=self.objective,
             beta=self.options.acq.beta,
         )

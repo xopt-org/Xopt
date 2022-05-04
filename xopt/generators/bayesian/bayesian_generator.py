@@ -7,6 +7,7 @@ from botorch import fit_gpytorch_model
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim import optimize_acqf
+from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
@@ -26,19 +27,20 @@ class BayesianGenerator(Generator, ABC):
 
         self._model = None
         self._acquisition = None
-        self._sampler = None
-        self._objective = self._get_objective()
+        self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
+        self.objective = self._get_objective()
 
         # as a default normalize the inputs for the GP model
         bounds = torch.tensor(vocs.bounds)
-        self._input_transform = Normalize(
-            len(bounds[0]), bounds=bounds
-        )
+        self._input_transform = Normalize(len(bounds[0]), bounds=bounds)
 
         # as a default standardize the outcomes for the GP model
         self._outcome_transform = Standardize(1)
 
         self._tkwargs = {"dtype": torch.double, "device": "cpu"}
+
+    def add_data(self, new_data: pd.DataFrame):
+        self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> List[Dict]:
 
@@ -52,11 +54,24 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
+            # generate starting points for optimization
+            inputs, _ = self.get_training_data(self.data)
+            batch_initial_points = sample_truncated_normal_perturbations(
+                inputs[-1].unsqueeze(0),
+                n_discrete_points=self.options.optim.raw_samples,
+                sigma=0.1,
+                bounds=bounds,
+            )
+            batch_initial_points = batch_initial_points.reshape(
+                -1, 1, self.vocs.n_variables
+            ).expand(-1, n_candidates, -1)
+
             candidates, out = optimize_acqf(
                 acq_function=self.get_acquisition(self._model),
                 bounds=bounds,
                 q=n_candidates,
-                **self.options.optim.dict()
+                batch_initial_conditions=batch_initial_points,
+                num_restarts=self.options.optim.num_restarts,
             )
             return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
 
@@ -66,7 +81,8 @@ class BayesianGenerator(Generator, ABC):
         depending on the number of outputs, if data is None
 
         """
-
+        if data is None:
+            data = self.data
         inputs, outputs = self.get_training_data(data)
 
         n_outputs = outputs.shape[-1]
@@ -103,16 +119,14 @@ class BayesianGenerator(Generator, ABC):
         Returns a function that can be used to evaluate the acquisition function
         """
         # re-create sampler/objective from options
-        self._sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
-        self._objective = self._get_objective()
+        self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
+        self.objective = self._get_objective()
 
         # add proximal biasing if requested
         if self.options.acq.proximal_lengthscales is not None:
             acq = ProximalAcquisitionFunction(
                 self._get_acquisition(model),
-                torch.tensor(
-                    self.options.acq.proximal_lengthscales, **self._tkwargs
-                ),
+                torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
             )
         else:
             acq = self._get_acquisition(model)

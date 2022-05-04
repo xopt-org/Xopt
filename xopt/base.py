@@ -81,11 +81,8 @@ class XoptBase:
                 self._futures.values(), self.timeout, self.return_when
             )
 
-            # update dataframe with results from finished futures
+            # update dataframe with results from finished futures + generator data
             self.update_data()
-
-            # The generator can optionally use new data 
-            self.generator.add_data(self.new_data)
 
             # calculate number of new candidates to generate
             if self.asynch:
@@ -94,9 +91,6 @@ class XoptBase:
                 n_generate = self.evaluator.max_workers
         else:
             n_generate = self.evaluator.max_workers
-
-        # update data in generator
-        self.generator.data = self.data
 
         # generate samples and submit to evaluator
         new_samples = pd.DataFrame(self.generator.generate(n_generate))
@@ -154,8 +148,13 @@ class XoptBase:
         self._data = pd.concat([self._data, new_data], axis=0)
         self._new_data = new_data
 
+        # The generator can optionally use new data
+        self.generator.add_data(self._new_data)
+
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
+
+
 
 
 
