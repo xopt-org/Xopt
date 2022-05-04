@@ -42,7 +42,7 @@ class MOBOGenerator(BayesianGenerator):
         # get reference point from data
         inputs, outputs = self.get_training_data(self.data)
         if self.options.acq.use_data_as_reference:
-            weighted_points = self._objective(outputs)
+            weighted_points = self.objective(outputs)
             self.options.acq.ref_point = torch.min(
                 weighted_points, dim=0
             ).values.tolist()
@@ -55,7 +55,9 @@ class MOBOGenerator(BayesianGenerator):
             X_baseline=inputs,
             prune_baseline=True,
             constraints=constraint_callables,
-            **self.options.acq.dict()
+            ref_point=self.options.acq.ref_point,
+            sampler=self.sampler,
+            objective=self.objective
         )
 
         return acq

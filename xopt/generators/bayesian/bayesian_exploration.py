@@ -39,8 +39,8 @@ class BayesianExplorationGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         return qPosteriorVariance(
             model,
-            sampler=self._sampler,
-            objective=self._objective,
+            sampler=self.sampler,
+            objective=self.objective,
         )
 
     def _get_objective(self):
