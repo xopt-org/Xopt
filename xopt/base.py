@@ -27,6 +27,7 @@ class XoptBase:
         vocs: VOCS,
         asynch=False,
         timeout=None,
+        strict=False
     ):
         # initialize XoptBase object
         self._generator = generator
@@ -34,6 +35,7 @@ class XoptBase:
         self._vocs = vocs
         self.asynch = asynch
         self.timeout = timeout
+        self.strict = strict
 
         self._data = None
         self._new_data = None
@@ -41,6 +43,7 @@ class XoptBase:
         self._input_data = None  # dataframe for unfinished futures inputs
         self._ix_last = -1  # index of last sample generated
         self._is_done = False
+        self.n_unfinished_futures = 0
 
         if self.asynch:
             self.return_when = concurrent.futures.FIRST_COMPLETED
@@ -70,25 +73,14 @@ class XoptBase:
     def step(self):
         """
         run one optimization cycle
-        - get current set of future objects
+
+
         - determine the number of candidates to request from the generator
         - pass history dataframe and candidate request to generator
         - submit candidates to evaluator
         """
-        if self._futures:
-            # wait for futures to finish (depending on return_when)
-            _, unfinished_futures = concurrent.futures.wait(
-                self._futures.values(), self.timeout, self.return_when
-            )
-
-            # update dataframe with results from finished futures + generator data
-            self.update_data()
-
-            # calculate number of new candidates to generate
-            if self.asynch:
-                n_generate = self.evaluator.max_workers - len(unfinished_futures)
-            else:
-                n_generate = self.evaluator.max_workers
+        if self.asynch:
+            n_generate = self.evaluator.max_workers - self.n_unfinished_futures
         else:
             n_generate = self.evaluator.max_workers
 
@@ -98,27 +90,33 @@ class XoptBase:
         # submit new samples to evaluator
         self.submit_data(new_samples)
 
-    @property
-    def data(self):
-        return self._data
+        # process futures after waiting for one or all to be completed
+        # get number of uncompleted futures when done waiting
+        self.n_unfinished_futures = self.process_futures()
 
-    @property
-    def new_data(self):
-        return self._new_data
+    def process_futures(self):
+        """
+        wait for futures to finish (specified by asynch) and then internal dataframes
+        of xopt and generator, finally return the number of unfinished futures
 
-    @property
-    def vocs(self):
-        return self._vocs
+        """
+        # wait for futures to finish (depending on return_when)
+        finished_futures, unfinished_futures = concurrent.futures.wait(
+            self._futures.values(), self.timeout, self.return_when
+        )
 
-    @property
-    def evaluator(self):
-        return self._evaluator
+        # if strict, raise exception if any future raises an exception
+        if self.strict:
+            for f in finished_futures:
+                if f.exception() is not None:
+                    raise f.exception()
 
-    @property
-    def generator(self):
-        return self._generator
+        # update dataframe with results from finished futures + generator data
+        self.update_data()
 
-    def update_data(self, raises=False):
+        return len(unfinished_futures)
+
+    def update_data(self):
         # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
@@ -154,8 +152,22 @@ class XoptBase:
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
 
+    @property
+    def data(self):
+        return self._data
 
+    @property
+    def new_data(self):
+        return self._new_data
 
+    @property
+    def vocs(self):
+        return self._vocs
 
+    @property
+    def evaluator(self):
+        return self._evaluator
 
-
+    @property
+    def generator(self):
+        return self._generator
