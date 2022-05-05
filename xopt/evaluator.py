@@ -3,7 +3,7 @@ from threading import Lock
 from typing import Callable, List, Dict
 
 import pandas as pd
-from pydantic import BaseModel
+from xopt import BaseModel
 
 
 class EvaluatorOptions(BaseModel):

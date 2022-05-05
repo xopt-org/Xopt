@@ -5,7 +5,8 @@ from botorch.acquisition.objective import MCAcquisitionObjective
 from botorch.models.transforms.input import InputTransform
 from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.sampling import MCSampler, SobolQMCNormalSampler
-from pydantic import BaseModel, Field
+from xopt import BaseModel
+from pydantic import Field
 
 from xopt.generator import GeneratorOptions
 
