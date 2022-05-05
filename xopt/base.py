@@ -6,10 +6,26 @@ import pandas as pd
 from xopt.generator import Generator
 from xopt.evaluator import Evaluator
 from xopt.vocs import VOCS
+from xopt.errors import XoptError
+from pydantic import BaseModel, Field
 
 import traceback
 
 logger = logging.getLogger(__name__)
+
+
+class XoptOptions(BaseModel):
+    asynch: bool = Field(
+        False, description="flag to evaluate and submit evaluations asynchronously"
+    )
+    strict: bool = Field(
+        False,
+        description="flag to indicate if exceptions raised during evaluation "
+                    "should stop Xopt",
+    )
+    timeout: float = Field(
+        None, description="maximum waiting time during `Xopt.step()`"
+    )
 
 
 class XoptBase:
@@ -22,20 +38,21 @@ class XoptBase:
     def __init__(
         self,
         *,
-        generator: Generator,
-        evaluator: Evaluator,
-        vocs: VOCS,
-        asynch=False,
-        timeout=None,
-        strict=False
+        generator: Generator = None,
+        evaluator: Evaluator = None,
+        vocs: VOCS = None,
+        options: XoptOptions = XoptOptions()
     ):
         # initialize XoptBase object
         self._generator = generator
         self._evaluator = evaluator
         self._vocs = vocs
-        self.asynch = asynch
-        self.timeout = timeout
-        self.strict = strict
+
+        # do options
+        if not isinstance(options, XoptOptions):
+            raise ValueError("options must of type `XoptOptions`")
+
+        self.options = options
 
         self._data = None
         self._new_data = None
@@ -45,10 +62,15 @@ class XoptBase:
         self._is_done = False
         self.n_unfinished_futures = 0
 
-        if self.asynch:
+        if self.options.asynch:
             self.return_when = concurrent.futures.FIRST_COMPLETED
         else:
             self.return_when = concurrent.futures.ALL_COMPLETED
+
+    def from_yaml(self, filename: str):
+        # populate Xopt with info from yaml file
+        pass
+        #generator, evaluator, vocs, options = read_yaml(filename)
 
     def run(self):
         """run until either xopt is done or the generator is done"""
@@ -56,7 +78,10 @@ class XoptBase:
             self.step()
 
     def submit_data(self, input_data: pd.DataFrame):
+        """
+        Submit data to evaluator and append results to internal futures list
 
+        """
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
         # Reindex input dataframe
@@ -74,12 +99,19 @@ class XoptBase:
         """
         run one optimization cycle
 
-
         - determine the number of candidates to request from the generator
-        - pass history dataframe and candidate request to generator
+        - pass candidate request to generator
         - submit candidates to evaluator
+        - wait until all (asynch == False) or at least one (asynch == True) evaluation
+            is finished
+        - update data storage and generator data storage (if applicable)
+
         """
-        if self.asynch:
+        # check internals
+        self.check_components()
+
+        # get number of candidates to generate
+        if self.options.asynch:
             n_generate = self.evaluator.max_workers - self.n_unfinished_futures
         else:
             n_generate = self.evaluator.max_workers
@@ -102,11 +134,11 @@ class XoptBase:
         """
         # wait for futures to finish (depending on return_when)
         finished_futures, unfinished_futures = concurrent.futures.wait(
-            self._futures.values(), self.timeout, self.return_when
+            self._futures.values(), self.options.timeout, self.return_when
         )
 
         # if strict, raise exception if any future raises an exception
-        if self.strict:
+        if self.options.strict:
             for f in finished_futures:
                 if f.exception() is not None:
                     raise f.exception()
@@ -151,6 +183,17 @@ class XoptBase:
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
+
+    def check_components(self):
+        """check to make sure everything is in place to step"""
+        if self.generator is None:
+            raise XoptError("Xopt generator not specified")
+
+        if self.evaluator is None:
+            raise XoptError("Xopt evaluator not specified")
+
+        if self.vocs is None:
+            raise XoptError("Xopt VOCS is not specified")
 
     @property
     def data(self):

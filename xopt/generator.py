@@ -5,7 +5,7 @@ from xopt.vocs import VOCS
 
 from typing import List, Dict
 
-from pydantic import BaseModel
+from xopt import BaseModel
 
 
 class GeneratorOptions(BaseModel):
