@@ -13,3 +13,6 @@ class XoptOptions(BaseModel):
     timeout: float = Field(
         None, description="maximum waiting time during `Xopt.step()`"
     )
+    dump_file: str = Field(
+        None, description="file to dump the results of the evaluations"
+    )
