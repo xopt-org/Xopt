@@ -37,3 +37,14 @@ class TestXopt:
             xopt.step()
         data = xopt.data
         assert len(data) == 11
+
+    def test_checkpointing(self):
+        evaluator = Evaluator(xtest_callable)
+        generator = RandomGenerator(TEST_VOCS_BASE)
+
+        xopt = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        xopt.options.dump_file = "test_checkpointing.yaml"
+        xopt.step()
+
+        for _ in range(5):
+            xopt.step()

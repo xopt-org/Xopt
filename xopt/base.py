@@ -25,12 +25,12 @@ class Xopt:
     """
 
     def __init__(
-            self,
-            *,
-            generator: Generator = None,
-            evaluator: Evaluator = None,
-            vocs: VOCS = None,
-            options: XoptOptions = XoptOptions()
+        self,
+        *,
+        generator: Generator = None,
+        evaluator: Evaluator = None,
+        vocs: VOCS = None,
+        options: XoptOptions = XoptOptions()
     ):
         # initialize XoptBase object
         self._generator = generator
@@ -143,6 +143,9 @@ class Xopt:
         # update dataframe with results from finished futures + generator data
         self.update_data()
 
+        # dump data to file if specified
+        self.dump_data()
+
         return len(unfinished_futures)
 
     def update_data(self):
@@ -191,6 +194,22 @@ class Xopt:
 
         if self.vocs is None:
             raise XoptError("Xopt VOCS is not specified")
+
+    def dump_data(self):
+        # dump data to YAML file with metadata
+        if self.options.dump_file is not None:
+            output = {
+                "data": self.data.to_dict(),
+                "config": {
+                    "xopt": self.options.dict(),
+                    "generator": self.generator.options.dict(),
+                    #"evaluator": self.evaluator.options.to_dict(),
+                    "vocs": self.vocs.dict(),
+                },
+            }
+
+            with open(self.options.dump_file, "w") as f:
+                yaml.dump(output, f)
 
     @property
     def data(self):
