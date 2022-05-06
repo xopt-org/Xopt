@@ -1,4 +1,8 @@
 from xopt import _version
+from xopt.base import Xopt
+from xopt.evaluator import Evaluator
+from xopt.generator import Generator
+from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()['version']
 
@@ -12,10 +16,3 @@ def output_notebook():
     configure_logger()
 
 
-# globally modify pydantic base model to not allow extra keys
-from pydantic import BaseModel as PydanticBaseModel
-
-
-class BaseModel(PydanticBaseModel):
-    class Config:
-        extra = 'forbid'

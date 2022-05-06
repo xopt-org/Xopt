@@ -5,10 +5,10 @@ from xopt.vocs import VOCS
 
 from typing import List, Dict
 
-from xopt import BaseModel
+from xopt.pydantic import XoptBaseModel
 
 
-class GeneratorOptions(BaseModel):
+class GeneratorOptions(XoptBaseModel):
     """
     Options for the generator.
     """

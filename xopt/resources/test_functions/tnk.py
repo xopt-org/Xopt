@@ -2,7 +2,7 @@ from typing import Dict
 
 import numpy as np
 
-from xopt import VOCS
+from xopt.vocs import VOCS
 
 tnk_vocs = VOCS(
     **{

@@ -3,32 +3,21 @@ import concurrent
 import logging
 
 import pandas as pd
+import yaml
+
 from xopt.generator import Generator
 from xopt.evaluator import Evaluator
+from xopt.input import read_dict
 from xopt.vocs import VOCS
 from xopt.errors import XoptError
-from pydantic import BaseModel, Field
+from xopt.options import XoptOptions
 
 import traceback
 
 logger = logging.getLogger(__name__)
 
 
-class XoptOptions(BaseModel):
-    asynch: bool = Field(
-        False, description="flag to evaluate and submit evaluations asynchronously"
-    )
-    strict: bool = Field(
-        False,
-        description="flag to indicate if exceptions raised during evaluation "
-                    "should stop Xopt",
-    )
-    timeout: float = Field(
-        None, description="maximum waiting time during `Xopt.step()`"
-    )
-
-
-class XoptBase:
+class Xopt:
     """
 
     Object to handle a single optimization problem.
@@ -36,12 +25,12 @@ class XoptBase:
     """
 
     def __init__(
-        self,
-        *,
-        generator: Generator = None,
-        evaluator: Evaluator = None,
-        vocs: VOCS = None,
-        options: XoptOptions = XoptOptions()
+            self,
+            *,
+            generator: Generator = None,
+            evaluator: Evaluator = None,
+            vocs: VOCS = None,
+            options: XoptOptions = XoptOptions()
     ):
         # initialize XoptBase object
         self._generator = generator
@@ -67,10 +56,18 @@ class XoptBase:
         else:
             self.return_when = concurrent.futures.ALL_COMPLETED
 
-    def from_yaml(self, filename: str):
-        # populate Xopt with info from yaml file
-        pass
-        #generator, evaluator, vocs, options = read_yaml(filename)
+    def from_yaml(self, yaml_input: str):
+        """
+        Load XoptBase object from a yaml dictionary
+
+        """
+        generator, evaluator, vocs, options = read_dict(yaml.safe_load(yaml_input))
+        self.__init__(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=vocs,
+            options=options,
+        )
 
     def run(self):
         """run until either xopt is done or the generator is done"""

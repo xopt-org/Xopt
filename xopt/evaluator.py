@@ -3,10 +3,10 @@ from threading import Lock
 from typing import Callable, List, Dict
 
 import pandas as pd
-from xopt import BaseModel
+from xopt.pydantic import XoptBaseModel
 
 
-class EvaluatorOptions(BaseModel):
+class EvaluatorOptions(XoptBaseModel):
     """
     Evaluator model.
     """
