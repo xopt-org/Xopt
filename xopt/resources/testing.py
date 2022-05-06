@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from xopt import VOCS
+from xopt.vocs import VOCS
 
 
 def xtest_callable(input_dict: dict) -> dict:

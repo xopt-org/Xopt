@@ -1,17 +1,12 @@
-from typing import Dict, List
+from typing import List
 
-import torch
-from botorch.acquisition.objective import MCAcquisitionObjective
-from botorch.models.transforms.input import InputTransform
-from botorch.models.transforms.outcome import OutcomeTransform
-from botorch.sampling import MCSampler, SobolQMCNormalSampler
-from xopt import BaseModel
 from pydantic import Field
 
 from xopt.generator import GeneratorOptions
+from xopt.pydantic import XoptBaseModel
 
 
-class AcqOptions(BaseModel):
+class AcqOptions(XoptBaseModel):
     """Options for defining the acquisition function in BO"""
 
     # monte carlo options
@@ -21,7 +16,8 @@ class AcqOptions(BaseModel):
         None, description="lengthscales for proximal biasing"
     )
 
-class OptimOptions(BaseModel):
+
+class OptimOptions(XoptBaseModel):
     """Options for optimizing the acquisition function in BO"""
 
     num_restarts: int = Field(
@@ -33,11 +29,11 @@ class OptimOptions(BaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-        "selection",
+                    "selection",
     )
 
 
-class ModelOptions(BaseModel):
+class ModelOptions(XoptBaseModel):
     """Options for defining the GP model in BO"""
 
     # input_transform: InputTransform = Field(
@@ -59,7 +55,6 @@ class BayesianOptions(GeneratorOptions):
     n_initial: int = Field(
         3, description="number of random initial points to measure during first step"
     )
-
 
 
 if __name__ == "__main__":

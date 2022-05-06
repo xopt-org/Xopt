@@ -1,26 +1,27 @@
 import pytest
 
-from xopt import XoptBase, Evaluator
+from xopt import Xopt, Evaluator
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 
 
-def bad_function(input):
-    raise ValueError
-
 class TestXopt:
     def test_init(self):
-        pass
+        Xopt()
 
     def test_strict(self):
-        eval = Evaluator(bad_function)
+        def bad_function(inval):
+            raise ValueError
+
+        evaluator = Evaluator(bad_function)
         gen = RandomGenerator(TEST_VOCS_BASE)
-        X = XoptBase(generator=gen, evaluator=eval, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # should be able to run with strict=False (default)
         X.step()
 
-        X2 = XoptBase(generator=gen, evaluator=eval, vocs=TEST_VOCS_BASE, strict=True)
+        X2 = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X2.options.strict = True
 
         with pytest.raises(ValueError):
             X2.step()
@@ -29,7 +30,7 @@ class TestXopt:
         evaluator = Evaluator(xtest_callable)
         generator = RandomGenerator(TEST_VOCS_BASE)
 
-        xopt = XoptBase(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        xopt = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         xopt.step()
 
         for _ in range(10):
