@@ -1,6 +1,9 @@
 import importlib
+import json
+from copy import deepcopy
 from typing import Tuple, Dict
 
+import pandas as pd
 import yaml
 
 from xopt.options import XoptOptions
@@ -8,27 +11,39 @@ from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.utils import get_generator_and_defaults
 from xopt.vocs import VOCS
+from xopt.errors import XoptError
 
 
-def read_yaml(filename: str) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
-    with open(filename) as file:
-        config = yaml.safe_load(file)
+def load_state_yaml(yaml_output):
+    # get data and config from yaml
+    data = None
+    if "data" in yaml_output.keys():
+        data = pd.read_json(json.dumps(yaml_output["data"]))
+        yaml_output.pop("data")
 
-    return read_dict(config)
+    generator, evaluator, vocs, options = read_config_dict(yaml_output)
+    return generator, evaluator, vocs, options, data
 
 
-def read_dict(config) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
+def read_config_dict(config) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
     # read a yaml file and output objects for creating Xopt object
+
+    # get copy of config
+    config = deepcopy(config)
 
     options = XoptOptions(**config["xopt"])
     vocs = VOCS(**config["vocs"])
 
     # create generator
     generator_type, generator_options = get_generator_and_defaults(
-        config["generator"]["name"]
+        config["generator"].pop("name")
     )
+    # TODO: use version number in some way
+    if "version" in config["generator"].keys():
+        config["generator"].pop("version")
+
     generator = generator_type(
-        vocs, generator_options.parse_obj(config["generator"]["options"])
+        vocs, generator_options.parse_obj(config["generator"])
     )
 
     # create evaluator
@@ -36,6 +51,22 @@ def read_dict(config) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
     evaluator = Evaluator(func)
 
     return generator, evaluator, vocs, options
+
+
+def state_to_dict(X):
+    # dump data to dict with config metadata
+    output = {
+        "data": json.loads(X.data.to_json()),
+        "xopt": X.options.dict(),
+        "generator": {
+            "name": X.generator.options.__config__.title,
+            "version": X.generator.options.__config__.version,
+            **json.loads(X.generator.options.json())
+        },
+        "evaluator": json.loads(X.evaluator.options.json()),
+        "vocs": X.vocs.dict(),
+    }
+    return output
 
 
 def get_function(name):

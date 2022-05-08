@@ -42,9 +42,22 @@ class TestXopt:
         evaluator = Evaluator(xtest_callable)
         generator = RandomGenerator(TEST_VOCS_BASE)
 
-        xopt = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
-        xopt.options.dump_file = "test_checkpointing.yaml"
-        xopt.step()
+        X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X.options.dump_file = "test_checkpointing.yaml"
+        X.step()
 
         for _ in range(5):
-            xopt.step()
+            X.step()
+
+        # try to load the state from nothing
+        X2 = Xopt.from_yaml_file(X.options.dump_file)
+
+        for _ in range(5):
+            X2.step()
+
+        assert len(X2.data) == 11
+        assert X2._ix_last == 11
+
+        # clean up
+        import os
+        os.remove(X.options.dump_file)

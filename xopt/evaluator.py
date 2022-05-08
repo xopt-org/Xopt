@@ -1,35 +1,71 @@
-from concurrent.futures import Executor, ThreadPoolExecutor, Future
+from concurrent.futures import Executor, ThreadPoolExecutor, Future, ProcessPoolExecutor
+from enum import Enum
 from threading import Lock
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Any
+from inspect import getfile
+from types import FunctionType
 
 import pandas as pd
+from pydantic import BaseModel
+
 from xopt.pydantic import XoptBaseModel
+
+
+class ExecutorEnum(str, Enum):
+    thread_pool_executor = "ThreadPoolExecutor"
+    process_pool_executor = "ProcessPoolExecutor"
+    normal_executor = "NormalExecutor"
 
 
 class EvaluatorOptions(XoptBaseModel):
     """
     Evaluator model.
     """
-    function: Callable = None
+
+    function: Callable[[...], dict]
+    function_kwargs: dict = {}
     max_workers: int = 1
+    executor: ExecutorEnum = ExecutorEnum.normal_executor
+
+    class Config:
+        use_enum_values = True
+        json_encoders = {FunctionType: lambda x: x.__module__ + "." + x.__name__}
 
 
 class Evaluator:
-    def __init__(self, function: Callable, executor: Executor = None, max_workers=1):
+    def __init__(
+        self,
+        function: Callable,
+        max_workers: int = 1,
+        executor: ExecutorEnum = ExecutorEnum.normal_executor,
+    ):
         """
-        light wrapper around the executor class, by default it uses a dummy 
+        wrapper around the executor class, by default it uses a dummy
         executor with max_workers=1
 
         """
-        if executor is None:
+        self.options = EvaluatorOptions(
+            function=function, max_workers=max_workers, executor=executor
+        )
+        if self.options.executor == ExecutorEnum.normal_executor:
             self._executor = DummyExecutor()
             self.max_workers = 1
-        else:
-            self._executor = executor
-            self.max_workers = max_workers
-        self.function = function
+        elif self.options.executor == ExecutorEnum.thread_pool_executor:
+            self._executor = ThreadPoolExecutor(max_workers=self.options.max_workers)
+            self.max_workers = self.options.max_workers
+        elif self.options.executor == ExecutorEnum.process_pool_executor:
+            self._executor = ProcessPoolExecutor(max_workers=self.options.max_workers)
+        self.function = self.options.function
 
         self._n_submitted = 0
+
+    @classmethod
+    def from_options(cls, options: EvaluatorOptions):
+        return cls(
+            function=options.function,
+            max_workers=options.max_workers,
+            executor=options.executor,
+        )
 
     def submit(self, input: Dict):
         """submit a single input to the executor"""
@@ -39,7 +75,7 @@ class Evaluator:
 
     def submit_data(self, input_data: pd.DataFrame):
         """submit dataframe of inputs to executor"""
-        input_data = pd.DataFrame(input_data) # cast to dataframe
+        input_data = pd.DataFrame(input_data)  # cast to dataframe
         futures = {}
         for index, row in input_data.iterrows():
             future = self.submit(dict(row))
