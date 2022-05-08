@@ -1,6 +1,6 @@
 import pytest
 
-from xopt.input import read_yaml, read_dict, get_function
+from xopt.io import read_config_dict, get_function
 from xopt.base import Xopt
 import yaml
 
@@ -10,9 +10,8 @@ xopt:
     timeout: 1.0
 generator:
     name: MOBO
-    options:
-        optim: 
-            num_restarts: 100
+    optim: 
+        num_restarts: 100
 evaluator:
     function: xopt.resources.test_functions.tnk.evaluate_TNK
 
@@ -32,7 +31,7 @@ class TestXoptInput:
         config = yaml.safe_load(YAML)
 
         outputs = dict(
-            zip(("generator", "evaluator", "vocs", "options"), read_dict(config))
+            zip(("generator", "evaluator", "vocs", "options"), read_config_dict(config))
         )
         X = Xopt(**outputs)
 
@@ -42,20 +41,16 @@ class TestXoptInput:
         assert X.options.asynch is True
 
         # test bad options
-        config["generator"]["options"]["random"] = "BAD"
+        config["generator"]["random"] = "BAD"
         with pytest.raises(ValueError):
-            read_dict(config)
+            read_config_dict(config)
 
     def test_input_from_yaml(self):
         # dump yaml to file
         with open("test.yaml", "w") as f:
             f.write(YAML)
 
-        # read yaml from file
-        outputs = dict(
-            zip(("generator", "evaluator", "vocs", "options"), read_yaml("test.yaml"))
-        )
-        X = Xopt(**outputs)
+        X = Xopt.from_yaml_file("test.yaml")
 
         assert X.evaluator.function == \
                get_function("xopt.resources.test_functions.tnk.evaluate_TNK")
@@ -65,8 +60,3 @@ class TestXoptInput:
         # clean up
         import os
         os.remove("test.yaml")
-
-    def test_loading_xopt(self):
-        X = Xopt()
-        X.from_yaml(YAML)
-        X.step()

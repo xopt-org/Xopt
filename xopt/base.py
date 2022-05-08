@@ -7,7 +7,7 @@ import yaml
 
 from xopt.generator import Generator
 from xopt.evaluator import Evaluator
-from xopt.input import read_dict
+from xopt.io import read_config_dict, state_to_dict, load_state_yaml
 from xopt.vocs import VOCS
 from xopt.errors import XoptError
 from xopt.options import XoptOptions
@@ -43,7 +43,7 @@ class Xopt:
 
         self.options = options
 
-        self._data = None
+        self._data = pd.DataFrame([])
         self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
@@ -56,18 +56,38 @@ class Xopt:
         else:
             self.return_when = concurrent.futures.ALL_COMPLETED
 
-    def from_yaml(self, yaml_input: str):
+    @classmethod
+    def from_yaml(cls, yaml_string: str):
         """
-        Load XoptBase object from a yaml dictionary
+        Load XoptBase object from a yaml string
+        """
 
-        """
-        generator, evaluator, vocs, options = read_dict(yaml.safe_load(yaml_input))
-        self.__init__(
+        generator, evaluator, vocs, options, data = load_state_yaml(yaml_string)
+        obj = cls(
             generator=generator,
             evaluator=evaluator,
             vocs=vocs,
             options=options,
         )
+
+        # add data if available add it to the object
+        if data is not None:
+            obj._data = data
+            obj._ix_last = len(data)
+
+        return obj
+
+    @classmethod
+    def from_yaml_file(cls, yaml_filename: str):
+        """
+        Load XoptBase object from a yaml dictionary
+
+        """
+        with open(yaml_filename) as f:
+            yaml_output = yaml.safe_load(f)
+
+        return cls.from_yaml(yaml_output)
+
 
     def run(self):
         """run until either xopt is done or the generator is done"""
@@ -144,7 +164,7 @@ class Xopt:
         self.update_data()
 
         # dump data to file if specified
-        self.dump_data()
+        self.dump_state()
 
         return len(unfinished_futures)
 
@@ -195,19 +215,9 @@ class Xopt:
         if self.vocs is None:
             raise XoptError("Xopt VOCS is not specified")
 
-    def dump_data(self):
-        # dump data to YAML file with metadata
+    def dump_state(self):
         if self.options.dump_file is not None:
-            output = {
-                "data": self.data.to_dict(),
-                "config": {
-                    "xopt": self.options.dict(),
-                    "generator": self.generator.options.dict(),
-                    #"evaluator": self.evaluator.options.to_dict(),
-                    "vocs": self.vocs.dict(),
-                },
-            }
-
+            output = state_to_dict(self)
             with open(self.options.dump_file, "w") as f:
                 yaml.dump(output, f)
 

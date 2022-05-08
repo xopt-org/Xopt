@@ -12,12 +12,12 @@ class GeneratorOptions(XoptBaseModel):
     """
     Options for the generator.
     """
+    class Config:
+        # The name of the generator.
+        name = None
 
-    # The name of the generator.
-    name: str = None
-
-    # The version of the generator.
-    version: str = None
+        # The version of the generator.
+        version = None
 
 
 class Generator(ABC):
