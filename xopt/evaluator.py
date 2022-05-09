@@ -1,14 +1,15 @@
+import logging
 from concurrent.futures import Executor, ThreadPoolExecutor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
-from typing import Callable, List, Dict, Any
-from inspect import getfile
 from types import FunctionType
+from typing import Callable, Dict
 
 import pandas as pd
-from pydantic import BaseModel
 
 from xopt.pydantic import XoptBaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutorEnum(str, Enum):
@@ -48,12 +49,15 @@ class Evaluator:
             function=function, max_workers=max_workers, executor=executor
         )
         if self.options.executor == ExecutorEnum.normal_executor:
+            logger.debug("using normal executor")
             self._executor = DummyExecutor()
             self.max_workers = 1
         elif self.options.executor == ExecutorEnum.thread_pool_executor:
+            logger.debug(f"using thread pool executor with max_workers={self.options.max_workers}")
             self._executor = ThreadPoolExecutor(max_workers=self.options.max_workers)
             self.max_workers = self.options.max_workers
         elif self.options.executor == ExecutorEnum.process_pool_executor:
+            logger.debug(f"using process pool executor with max_workers={self.options.max_workers}")
             self._executor = ProcessPoolExecutor(max_workers=self.options.max_workers)
         self.function = self.options.function
 
