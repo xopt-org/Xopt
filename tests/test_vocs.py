@@ -33,11 +33,11 @@ class TestVOCS(object):
         assert vocs.objectives == {"c": "MAXIMIZE", "d": "MINIMIZE"}
         assert vocs.constants == {"g": 1234}
 
-        assert vocs.objectives['c'] == ObjectiveEnum.MAXIMIZE
-        assert vocs.objectives['d'] == ObjectiveEnum.MINIMIZE
+        assert vocs.objectives["c"] == ObjectiveEnum.MAXIMIZE
+        assert vocs.objectives["d"] == ObjectiveEnum.MINIMIZE
 
-        assert vocs.constraints['e'] == ['LESS_THAN', 2]
-        assert vocs.constraints['f'] == ['GREATER_THAN', 0]
+        assert vocs.constraints["e"] == ["LESS_THAN", 2]
+        assert vocs.constraints["f"] == ["GREATER_THAN", 0]
 
         assert vocs.n_inputs == 3
         assert vocs.n_outputs == 4
@@ -48,9 +48,26 @@ class TestVOCS(object):
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
-    def test_numpy_inputs(self):
+    def test_serialization(self):
         vocs = TEST_VOCS_BASE
-        vocs.variables['a'] = np.array([1, 2])
-
         vocs.json()
 
+        vocs.variables["a"] = np.array([1, 2])
+        vocs.json()
+
+    def test_properties(self):
+        vocs = TEST_VOCS_BASE
+        assert vocs.n_variables == 2
+        assert vocs.n_inputs == 3
+        assert vocs.n_outputs == 2
+        assert vocs.n_constraints == 1
+        assert vocs.n_objectives == 1
+        assert vocs.variable_names == ["x1", "x2"]
+        assert vocs.objective_names == ["y1"]
+
+        # modify the vocs and retest
+        vocs.variables = {name: vocs.variables[name] for name in ["x1"]}
+        assert vocs.n_variables == 1
+        assert vocs.n_inputs == 2
+        assert vocs.n_outputs == 2
+        assert vocs.variable_names == ["x1"]
