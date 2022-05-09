@@ -29,6 +29,7 @@ class EvaluatorOptions(XoptBaseModel):
     executor: ExecutorEnum = ExecutorEnum.normal_executor
 
     class Config:
+        extra = "forbid"
         use_enum_values = True
         json_encoders = {FunctionType: lambda x: x.__module__ + "." + x.__name__}
 
@@ -39,6 +40,7 @@ class Evaluator:
         function: Callable,
         max_workers: int = 1,
         executor: str = "NormalExecutor",
+        **kwargs,
     ):
         """
         wrapper around the executor class, by default it uses a dummy
@@ -46,7 +48,10 @@ class Evaluator:
 
         """
         self.options = EvaluatorOptions(
-            function=function, max_workers=max_workers, executor=executor
+            function=function,
+            max_workers=max_workers,
+            executor=executor,
+            function_kwargs=kwargs,
         )
         if self.options.executor == ExecutorEnum.normal_executor:
             logger.debug("using normal executor")
@@ -79,7 +84,9 @@ class Evaluator:
         """submit a single input to the executor"""
         if not isinstance(input, dict):
             raise ValueError("input must be a dictionary")
-        return self._executor.submit(self.function, input)
+        return self._executor.submit(
+            self.function, input, **self.options.function_kwargs
+        )
 
     def submit_data(self, input_data: pd.DataFrame):
         """submit dataframe of inputs to executor"""

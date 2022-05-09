@@ -1,0 +1,77 @@
+data:
+  c1:
+    '1': 0.5094185264
+    '2': 0.8160153747
+    '3': 0.6667447492
+    '4': 1.0
+  cnt1:
+    '1': 1.0
+    '2': 1.0
+    '3': 1.0
+    '4': 1.0
+  x1:
+    '1': 0.5094185264
+    '2': 0.8160153747
+    '3': 0.6667447492
+    '4': 1.0
+  x2:
+    '1': 1.9778461617
+    '2': 0.6428187832
+    '3': 9.32643436
+    '4': 10.0
+  xopt_error:
+    '1': false
+    '2': false
+    '3': false
+    '4': false
+  xopt_error_str:
+    '1': ''
+    '2': ''
+    '3': ''
+    '4': ''
+  y1:
+    '1': 1.9778461617
+    '2': 0.6428187832
+    '3': 9.32643436
+    '4': 10.0
+evaluator:
+  executor: NormalExecutor
+  function: xopt.resources.testing.xtest_callable
+  function_kwargs: {}
+  max_workers: 1
+generator:
+  acq:
+    beta: 2.0
+    monte_carlo_samples: 1
+    proximal_lengthscales:
+    - 1.0
+    - 1.0
+  model: {}
+  n_initial: 3
+  name: upper_confidence_bound
+  optim:
+    num_restarts: 1
+    raw_samples: 1
+    sequential: true
+vocs:
+  constants:
+    cnt1: 1.0
+  constraints:
+    c1:
+    - GREATER_THAN
+    - 0.5
+  linked_variables: {}
+  objectives:
+    y1: MINIMIZE
+  variables:
+    x1:
+    - 0.0
+    - 1.0
+    x2:
+    - 0.0
+    - 10.0
+xopt:
+  asynch: false
+  dump_file: test_checkpointing.yaml
+  strict: true
+  timeout: null
