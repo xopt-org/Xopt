@@ -34,7 +34,7 @@ class Xopt:
         options: XoptOptions = XoptOptions()
     ):
         """
-        Initialize Xopt object
+        Initialize Xopt object using either a config dictionary or explicitly
 
         Args:
             config: dict containing configuration information
@@ -44,6 +44,8 @@ class Xopt:
             options: XoptOptions object
 
         """
+        logger.info("Initializing Xopt object")
+
         # if config is provided, load it
         data = None
         if config is not None:
@@ -54,11 +56,15 @@ class Xopt:
         self._evaluator = evaluator
         self._vocs = vocs
 
+        logger.debug(f"Xopt generator: {self._generator}")
+        logger.debug(f"Xopt evaluator: {self._evaluator}")
+
         # do options
         if not isinstance(options, XoptOptions):
             raise ValueError("options must of type `XoptOptions`")
 
         self.options = options
+        logger.debug(f"Xopt options: {self.options.dict()}")
 
         self._data = data if data is not None else pd.DataFrame()
         self._new_data = None
@@ -68,9 +74,10 @@ class Xopt:
         self._is_done = False
         self.n_unfinished_futures = 0
 
-
         # check internals
         self.check_components()
+
+        logger.info("Xopt object initialized")
 
     def run(self):
         """run until either xopt is done or the generator is done"""
@@ -79,7 +86,10 @@ class Xopt:
 
     def submit_data(self, input_data: pd.DataFrame):
         """
-        Submit data to evaluator and append results to internal futures list
+        Submit data to evaluator and append results to internal dataframe.
+
+        Args:
+            input_data: dataframe containing input data
 
         """
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
@@ -107,6 +117,7 @@ class Xopt:
         - update data storage and generator data storage (if applicable)
 
         """
+        logger.info("Running Xopt step")
 
         # get number of candidates to generate
         if self.options.asynch:
@@ -115,14 +126,18 @@ class Xopt:
             n_generate = self.evaluator.max_workers
 
         # generate samples and submit to evaluator
+        logger.debug(f"Generating {n_generate} candidates")
         new_samples = pd.DataFrame(self.generator.generate(n_generate))
 
         # submit new samples to evaluator
+        logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
         self.submit_data(new_samples)
 
         # process futures after waiting for one or all to be completed
         # get number of uncompleted futures when done waiting
+        logger.debug("Waiting for futures to complete")
         self.n_unfinished_futures = self.process_futures()
+        logger.debug(f"done. {self.n_unfinished_futures} futures remaining")
 
     def process_futures(self):
         """
@@ -147,14 +162,27 @@ class Xopt:
                     raise f.exception()
 
         # update dataframe with results from finished futures + generator data
+        logger.debug("Updating dataframes with results")
         self.update_data()
 
         # dump data to file if specified
+        logger.debug("Dumping data to file")
         self.dump_state()
 
         return len(unfinished_futures)
 
     def update_data(self):
+        """
+        process finished futures and update dataframes
+
+        Dataframes are updated in the following order:
+        - xopt._data
+        - xopt._new_data
+
+        Data is added to the dataframe in the following order:
+        - generator._data
+
+        """
         # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
@@ -202,6 +230,7 @@ class Xopt:
             raise XoptError("Xopt VOCS is not specified")
 
     def dump_state(self):
+        """dump data to file"""
         if self.options.dump_file is not None:
             output = state_to_dict(self)
             with open(self.options.dump_file, "w") as f:
