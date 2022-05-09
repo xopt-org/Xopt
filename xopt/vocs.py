@@ -1,9 +1,12 @@
+from enum import Enum
+from typing import Dict, Union, Any
+
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, conlist
-from enum import Enum
-from typing import Dict, Union, List, Tuple, Any
 import yaml
+from pydantic import conlist
+
+from xopt.pydantic import XoptBaseModel
 
 
 # Enums for objectives and constraints
@@ -31,7 +34,7 @@ class ConstraintEnum(str, Enum):
                 return member
 
 
-class VOCS(BaseModel):
+class VOCS(XoptBaseModel):
     variables: Dict[str, conlist(float, min_items=2, max_items=2)] = None
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)

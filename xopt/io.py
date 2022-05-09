@@ -57,14 +57,14 @@ def state_to_dict(X):
     # dump data to dict with config metadata
     output = {
         "data": json.loads(X.data.to_json()),
-        "xopt": X.options.dict(),
+        "xopt": json.loads(X.options.json()),
         "generator": {
             "name": X.generator.options.__config__.title,
             "version": X.generator.options.__config__.version,
             **json.loads(X.generator.options.json())
         },
         "evaluator": json.loads(X.evaluator.options.json()),
-        "vocs": X.vocs.dict(),
+        "vocs": json.loads(X.vocs.json()),
     }
     return output
 

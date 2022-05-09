@@ -47,3 +47,10 @@ class TestVOCS(object):
         n_samples = 10
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
+
+    def test_numpy_inputs(self):
+        vocs = TEST_VOCS_BASE
+        vocs.variables['a'] = np.array([1, 2])
+
+        vocs.json()
+
