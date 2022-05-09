@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 
@@ -43,20 +45,21 @@ class TestVOCS(object):
         assert vocs.n_outputs == 4
 
     def test_random_inputs(self):
-        vocs = TEST_VOCS_BASE
+        vocs = deepcopy(TEST_VOCS_BASE)
         n_samples = 10
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
     def test_serialization(self):
-        vocs = TEST_VOCS_BASE
+        vocs = deepcopy(TEST_VOCS_BASE)
         vocs.json()
 
         vocs.variables["a"] = np.array([1, 2])
         vocs.json()
 
     def test_properties(self):
-        vocs = TEST_VOCS_BASE
+        vocs = deepcopy(TEST_VOCS_BASE)
+
         assert vocs.n_variables == 2
         assert vocs.n_inputs == 3
         assert vocs.n_outputs == 2
