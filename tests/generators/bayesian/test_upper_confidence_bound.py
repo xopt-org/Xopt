@@ -53,7 +53,7 @@ class TestUpperConfidenceBoundGenerator:
         )
         ucb_gen.options.optim.raw_samples = 1
         ucb_gen.options.optim.num_restarts = 1
-        ucb_gen.options.acq.proximal_lengthscales = [1.0,1.0]
+        ucb_gen.options.acq.proximal_lengthscales = [1.0, 1.0]
 
         xopt = Xopt(generator=ucb_gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
