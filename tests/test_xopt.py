@@ -6,6 +6,7 @@ import yaml
 from xopt import Evaluator, Xopt
 from xopt.errors import XoptError
 from xopt.generators.random import RandomGenerator
+from xopt.options import XoptOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
 
 
@@ -27,6 +28,37 @@ class TestXopt:
         evaluator = Evaluator(dummy)
         gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
         X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+
+    def test_asynch(self):
+        evaluator = Evaluator(xtest_callable)
+        generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
+            options=XoptOptions(asynch=True),
+        )
+        n_steps = 5
+        for i in range(n_steps):
+            X.step()
+        assert len(X.data) == n_steps
+
+        # now use a threadpool evaluator with different number of max workers
+        for mw in [2]:
+            evaluator = Evaluator(
+                xtest_callable, executor="ThreadPoolExecutor", max_workers=mw
+            )
+            X2 = Xopt(
+                generator=generator,
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
+                options=XoptOptions(asynch=True),
+            )
+
+            n_steps = 5
+            for i in range(n_steps):
+                X2.step()
+            assert len(X2.data) == n_steps
 
     def test_strict(self):
         def bad_function(inval):

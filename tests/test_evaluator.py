@@ -37,5 +37,7 @@ class TestEvaluator:
             "max_workers": 1,
         }
 
-        options = EvaluatorOptions(**test_dict)
-
+        for ele in ["ThreadPoolExecutor", "ProcessPoolExecutor"]:
+            test_dict["executor"] = ele
+            options = EvaluatorOptions(**test_dict)
+            options.json()

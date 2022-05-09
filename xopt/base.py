@@ -68,10 +68,6 @@ class Xopt:
         self._is_done = False
         self.n_unfinished_futures = 0
 
-        if self.options.asynch:
-            self.return_when = concurrent.futures.FIRST_COMPLETED
-        else:
-            self.return_when = concurrent.futures.ALL_COMPLETED
 
         # check internals
         self.check_components()
@@ -134,9 +130,14 @@ class Xopt:
         of xopt and generator, finally return the number of unfinished futures
 
         """
+        if self.options.asynch:
+            return_when = concurrent.futures.FIRST_COMPLETED
+        else:
+            return_when = concurrent.futures.ALL_COMPLETED
+
         # wait for futures to finish (depending on return_when)
         finished_futures, unfinished_futures = concurrent.futures.wait(
-            self._futures.values(), self.options.timeout, self.return_when
+            self._futures.values(), self.options.timeout, return_when
         )
 
         # if strict, raise exception if any future raises an exception
