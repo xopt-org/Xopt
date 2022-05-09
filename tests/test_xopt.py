@@ -1,9 +1,10 @@
+import math
 from copy import copy, deepcopy
 
 import pytest
 import yaml
 
-from xopt import Evaluator, Xopt
+from xopt import Evaluator, Xopt, VOCS
 from xopt.errors import XoptError
 from xopt.generators.random import RandomGenerator
 from xopt.options import XoptOptions
@@ -28,6 +29,45 @@ class TestXopt:
         evaluator = Evaluator(dummy)
         gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
         X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+
+    def test_function_checking(self):
+        def f(x, a=True):
+            if a:
+                return {"f": x["x1"] ** 2 + x["x2"] ** 2}
+            else:
+                return {"f": False}
+
+        def g(x, a=True):
+            return False
+
+        vocs = VOCS(
+            variables={"x": [0, 2 * math.pi]},
+            objectives={"f": "MINIMIZE"},
+        )
+
+        # init with generator and evaluator
+        evaluator = Evaluator(f)
+        generator = RandomGenerator(vocs)
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=vocs,
+            options=XoptOptions(strict=True),
+        )
+        with pytest.raises(KeyError):
+            X.step()
+
+        # init with generator and evaluator
+        evaluator = Evaluator(g)
+        generator = RandomGenerator(vocs)
+        X2 = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=vocs,
+            options=XoptOptions(strict=True),
+        )
+        with pytest.raises(XoptError):
+            X2.step()
 
     def test_asynch(self):
         evaluator = Evaluator(xtest_callable)

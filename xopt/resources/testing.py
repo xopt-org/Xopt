@@ -42,6 +42,8 @@ generator:
     
 evaluator:
     function: xopt.resources.testing.xtest_callable
+    function_kwargs:
+        a: 5
 
 vocs:
     variables:
