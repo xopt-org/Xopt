@@ -124,6 +124,13 @@ class BayesianGenerator(Generator, ABC):
 
         # add proximal biasing if requested
         if self.options.acq.proximal_lengthscales is not None:
+            n_lengthscales = len(self.options.acq.proximal_lengthscales)
+            if n_lengthscales != self.vocs.n_variables:
+                raise ValueError(
+                    f"Number of proximal lengthscales ({n_lengthscales}) must match "
+                    f"number of variables {self.vocs.n_variables}"
+                )
+
             acq = ProximalAcquisitionFunction(
                 self._get_acquisition(model),
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),

@@ -27,12 +27,29 @@ class Xopt:
     def __init__(
         self,
         *,
+        config: dict = None,
         generator: Generator = None,
         evaluator: Evaluator = None,
         vocs: VOCS = None,
         options: XoptOptions = XoptOptions()
     ):
-        # initialize XoptBase object
+        """
+        Initialize Xopt object
+
+        Args:
+            config: dict containing configuration information
+            generator: Generator object
+            evaluator: Evaluator object
+            vocs: VOCS object
+            options: XoptOptions object
+
+        """
+        # if config is provided, load it
+        data = None
+        if config is not None:
+            generator, evaluator, vocs, options, data = load_state_yaml(config)
+
+        # initialize Xopt object
         self._generator = generator
         self._evaluator = evaluator
         self._vocs = vocs
@@ -43,11 +60,11 @@ class Xopt:
 
         self.options = options
 
-        self._data = pd.DataFrame([])
+        self._data = data if data is not None else pd.DataFrame()
         self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
-        self._ix_last = -1  # index of last sample generated
+        self._ix_last = len(self._data)  # index of last sample generated
         self._is_done = False
         self.n_unfinished_futures = 0
 
@@ -56,38 +73,8 @@ class Xopt:
         else:
             self.return_when = concurrent.futures.ALL_COMPLETED
 
-    @classmethod
-    def from_yaml(cls, yaml_string: str):
-        """
-        Load XoptBase object from a yaml string
-        """
-
-        generator, evaluator, vocs, options, data = load_state_yaml(yaml_string)
-        obj = cls(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=vocs,
-            options=options,
-        )
-
-        # add data if available add it to the object
-        if data is not None:
-            obj._data = data
-            obj._ix_last = len(data)
-
-        return obj
-
-    @classmethod
-    def from_yaml_file(cls, yaml_filename: str):
-        """
-        Load XoptBase object from a yaml dictionary
-
-        """
-        with open(yaml_filename) as f:
-            yaml_output = yaml.safe_load(f)
-
-        return cls.from_yaml(yaml_output)
-
+        # check internals
+        self.check_components()
 
     def run(self):
         """run until either xopt is done or the generator is done"""
@@ -124,8 +111,6 @@ class Xopt:
         - update data storage and generator data storage (if applicable)
 
         """
-        # check internals
-        self.check_components()
 
         # get number of candidates to generate
         if self.options.asynch:
