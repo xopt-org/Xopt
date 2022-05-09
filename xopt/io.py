@@ -21,8 +21,7 @@ def load_state_yaml(
     # get data and config from yaml dict
     data = None
     if "data" in yaml_input.keys():
-        data = pd.read_json(json.dumps(yaml_input["data"]))
-        yaml_input.pop("data")
+        data = pd.read_json(json.dumps(yaml_input.pop("data")))
 
     generator, evaluator, vocs, options = read_config_dict(yaml_input)
     return generator, evaluator, vocs, options, data
