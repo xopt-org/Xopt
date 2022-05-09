@@ -59,8 +59,7 @@ def state_to_dict(X):
         "data": json.loads(X.data.to_json()),
         "xopt": json.loads(X.options.json()),
         "generator": {
-            "name": X.generator.options.__config__.title,
-            "version": X.generator.options.__config__.version,
+            "name": X.generator.alias,
             **json.loads(X.generator.options.json()),
         },
         "evaluator": json.loads(X.evaluator.options.json()),
