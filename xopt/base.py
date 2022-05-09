@@ -193,17 +193,23 @@ class Xopt:
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
 
-            # check to make sure that the output of the future is a dict
-            if not isinstance(future.result(), dict):
-                raise XoptError(f"Evaluator function must return a dict, got type "
-                                f"{type(future.result())} instead")
-
             # Handle exceptions inside the future result
             try:
+                # check to make sure that the output of the future is a dict
                 outputs = future.result()
+
+                #if not isinstance(outputs, dict):
+                #    raise XoptError(f"Evaluator function must return a dict, got type "
+                #                    f"{type(future.result())} instead")
+
                 outputs["xopt_error"] = False
                 outputs["xopt_error_str"] = ""
             except Exception as e:
+
+                # if the exception is an XoptError, re-raise it
+                if isinstance(e, XoptError):
+                    raise e
+
                 error_str = traceback.format_exc()
                 outputs = {"xopt_error": True, "xopt_error_str": error_str}
 

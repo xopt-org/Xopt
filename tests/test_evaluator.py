@@ -44,7 +44,7 @@ class TestEvaluator:
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 
-        test_dict.update({"a": 2})
+        test_dict.update({"a": False})
         evaluator = Evaluator(**test_dict)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
