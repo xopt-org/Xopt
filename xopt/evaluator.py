@@ -53,11 +53,15 @@ class Evaluator:
             self._executor = DummyExecutor()
             self.max_workers = 1
         elif self.options.executor == ExecutorEnum.thread_pool_executor:
-            logger.debug(f"using thread pool executor with max_workers={self.options.max_workers}")
+            logger.debug(
+                f"using thread pool executor with max_workers={self.options.max_workers}"
+            )
             self._executor = ThreadPoolExecutor(max_workers=self.options.max_workers)
             self.max_workers = self.options.max_workers
         elif self.options.executor == ExecutorEnum.process_pool_executor:
-            logger.debug(f"using process pool executor with max_workers={self.options.max_workers}")
+            logger.debug(
+                f"using process pool executor with max_workers={self.options.max_workers}"
+            )
             self._executor = ProcessPoolExecutor(max_workers=self.options.max_workers)
         self.function = self.options.function
 

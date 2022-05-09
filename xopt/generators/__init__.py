@@ -7,7 +7,7 @@ from xopt.generators.bayesian import (
 from xopt.generators.ga import CNSGAGenerator
 from xopt.generators.random import RandomGenerator
 
-#add generators here to be registered
+# add generators here to be registered
 registered_generators = [
     UpperConfidenceBoundGenerator,
     MOBOGenerator,

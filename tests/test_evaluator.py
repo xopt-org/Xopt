@@ -12,7 +12,7 @@ class TestEvaluator:
 
     def test_submit(self):
         evaluator = Evaluator(self.f)
-        candidates = pd.DataFrame(np.random.rand(10, 2), columns=['x1', 'x2'])
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 
@@ -22,12 +22,12 @@ class TestEvaluator:
             "max_workers": 1,
         }
         evaluator = Evaluator(**test_dict)
-        candidates = pd.DataFrame(np.random.rand(10, 2), columns=['x1', 'x2'])
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 
         evaluator = Evaluator.from_options(EvaluatorOptions(**test_dict))
-        candidates = pd.DataFrame(np.random.rand(10, 2), columns=['x1', 'x2'])
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 

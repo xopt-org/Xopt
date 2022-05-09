@@ -28,6 +28,3 @@ class Test_IO:
 
     def test_load_state_yaml(self):
         load_state_yaml(yaml.safe_load(copy(TEST_YAML)))
-
-
-

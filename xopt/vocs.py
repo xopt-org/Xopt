@@ -196,13 +196,13 @@ class VOCS(XoptBaseModel):
         return inputs, outputs
 
     # Extract optimization data (in correct column order)
-    def variable_data(self, data, prefix='variable_'):
+    def variable_data(self, data, prefix="variable_"):
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(self, data, prefix="objective_"):
         return form_objective_data(self.objectives, data, prefix)
 
-    def constraint_data(self, data, prefix="constraint_"):     
+    def constraint_data(self, data, prefix="constraint_"):
         return form_constraint_data(self.constraints, data, prefix)
 
     def feasibility_data(self, data, prefix="feasible_"):
@@ -215,9 +215,9 @@ class VOCS(XoptBaseModel):
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_variable_data(variables: Dict, data, prefix='variable_'):
+def form_variable_data(variables: Dict, data, prefix="variable_"):
     """
-    Use variables dict to form a dataframe. 
+    Use variables dict to form a dataframe.
     """
     if not variables:
         return None
@@ -294,7 +294,7 @@ def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     """
     if not constraints:
         df = pd.DataFrame(index=data.index)
-        df['feasible'] = True
+        df["feasible"] = True
         return df
 
     data = pd.DataFrame(data)

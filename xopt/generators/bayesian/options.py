@@ -29,7 +29,7 @@ class OptimOptions(XoptBaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-                    "selection",
+        "selection",
     )
 
 

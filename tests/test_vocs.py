@@ -15,14 +15,12 @@ class TestVOCS(object):
 
         # test various configurations
         vocs = VOCS(
-            variables={'x': [0, 1]},
-            objectives={'f': "MINIMIZE"},
+            variables={"x": [0, 1]},
+            objectives={"f": "MINIMIZE"},
         )
         assert vocs.n_inputs == 1
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
-
-
 
     def test_from_yaml(self):
         Y = """

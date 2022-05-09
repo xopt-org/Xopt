@@ -16,6 +16,7 @@ class GeneratorOptions(XoptBaseModel):
     """
     Options for the generator.
     """
+
     pass
 
 
@@ -30,9 +31,7 @@ class Generator(ABC):
             vocs: The vocs to use.
             options: The options to use.
         """
-        logger.info(
-            f"Initializing generator {self.alias},"
-        )
+        logger.info(f"Initializing generator {self.alias},")
 
         if not isinstance(options, GeneratorOptions):
             raise TypeError("options must be of type GeneratorOptions")
