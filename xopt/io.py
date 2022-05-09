@@ -1,31 +1,34 @@
 import importlib
 import json
 from copy import deepcopy
-from typing import Tuple, Dict
+from typing import Dict, Tuple, Union
 
 import pandas as pd
 import yaml
 
-from xopt.options import XoptOptions
+from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
+
+from xopt.options import XoptOptions
 from xopt.utils import get_generator_and_defaults
 from xopt.vocs import VOCS
-from xopt.errors import XoptError
 
 
-def load_state_yaml(yaml_output):
-    # get data and config from yaml
+def load_state_yaml(
+    yaml_input: dict,
+) -> Tuple[Generator, Evaluator, VOCS, XoptOptions, Union[pd.DataFrame, None]]:
+    # get data and config from yaml dict
     data = None
-    if "data" in yaml_output.keys():
-        data = pd.read_json(json.dumps(yaml_output["data"]))
-        yaml_output.pop("data")
+    if "data" in yaml_input.keys():
+        data = pd.read_json(json.dumps(yaml_input["data"]))
+        yaml_input.pop("data")
 
-    generator, evaluator, vocs, options = read_config_dict(yaml_output)
+    generator, evaluator, vocs, options = read_config_dict(yaml_input)
     return generator, evaluator, vocs, options, data
 
 
-def read_config_dict(config) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
+def read_config_dict(config: dict) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
     # read a yaml file and output objects for creating Xopt object
 
     # get copy of config
@@ -42,9 +45,7 @@ def read_config_dict(config) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
     if "version" in config["generator"].keys():
         config["generator"].pop("version")
 
-    generator = generator_type(
-        vocs, generator_options.parse_obj(config["generator"])
-    )
+    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]))
 
     # create evaluator
     func = get_function(config["evaluator"]["function"])
@@ -61,7 +62,7 @@ def state_to_dict(X):
         "generator": {
             "name": X.generator.options.__config__.title,
             "version": X.generator.options.__config__.version,
-            **json.loads(X.generator.options.json())
+            **json.loads(X.generator.options.json()),
         },
         "evaluator": json.loads(X.evaluator.options.json()),
         "vocs": json.loads(X.vocs.json()),
