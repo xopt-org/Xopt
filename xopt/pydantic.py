@@ -8,4 +8,6 @@ class XoptBaseModel(BaseModel):
         extra = 'forbid'
         json_encoders = {
             np.ndarray: lambda x: x.tolist(),
+            np.int64: lambda x: int(x),
+            np.float64: lambda x: float(x),
         }
