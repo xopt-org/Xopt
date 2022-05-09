@@ -35,13 +35,13 @@ class ConstraintEnum(str, Enum):
 
 
 class VOCS(XoptBaseModel):
-    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = None
+    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {}
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
-    ] = None
-    objectives: Dict[str, ObjectiveEnum] = None
-    constants: Dict[str, Any] = None
-    linked_variables: Dict[str, str] = None
+    ] = {}
+    objectives: Dict[str, ObjectiveEnum] = {}
+    constants: Dict[str, Any] = {}
+    linked_variables: Dict[str, str] = {}
 
     class Config:
         validate_assignment = True  # Not sure this helps in this case
