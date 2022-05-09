@@ -20,7 +20,7 @@ class Test_IO:
 
         X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         state_dict = state_to_dict(X)
-        assert state_dict["generator"]["name"] == generator.options.__config__.title
+        assert state_dict["generator"]["name"] == generator.alias
 
         # read from dict
         gen, ev, vcs, options = read_config_dict(state_dict)

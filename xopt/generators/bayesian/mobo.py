@@ -27,13 +27,18 @@ class MOBOAcqOptions(AcqOptions):
 class MOBOOptions(BayesianOptions):
     acq = MOBOAcqOptions()
 
-
 class MOBOGenerator(BayesianGenerator):
+    alias = "mobo"
+
     def __init__(self, vocs: VOCS, options: MOBOOptions = MOBOOptions()):
         if not isinstance(options, MOBOOptions):
             raise ValueError("options must be a MOBOOptions object")
 
         super(MOBOGenerator, self).__init__(vocs, options)
+
+    @staticmethod
+    def default_options() -> MOBOOptions:
+        return MOBOOptions()
 
     def _get_objective(self):
         return create_mobo_objective(self.vocs)

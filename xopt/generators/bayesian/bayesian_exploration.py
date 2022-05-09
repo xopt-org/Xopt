@@ -10,13 +10,20 @@ from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
+from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.objectives import create_constrained_mc_objective
 from xopt.vocs import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.options import BayesianOptions
 
 
+class BayesianExplorationOptions(GeneratorOptions):
+    pass
+
+
 class BayesianExplorationGenerator(BayesianGenerator):
+    alias = "bayesian_exploration"
+
     def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
         """
         Generator using UpperConfidenceBound acquisition function
@@ -35,6 +42,10 @@ class BayesianExplorationGenerator(BayesianGenerator):
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for exploration")
         super(BayesianExplorationGenerator, self).__init__(vocs, options)
+
+    @staticmethod
+    def default_options() -> BayesianOptions:
+        return BayesianOptions()
 
     def _get_acquisition(self, model):
         return qPosteriorVariance(

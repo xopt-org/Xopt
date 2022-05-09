@@ -1,5 +1,8 @@
+from typing import Type
+
 from botorch.acquisition import qUpperConfidenceBound
 
+from xopt.generator import GeneratorOptions
 from xopt.vocs import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
@@ -16,6 +19,9 @@ class UCBOptions(BayesianOptions):
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
+    alias = "upper_confidence_bound"
+
+
     def __init__(self, vocs: VOCS, options: UCBOptions = UCBOptions()):
         """
         Generator using UpperConfidenceBound acquisition function
@@ -35,6 +41,10 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
             raise ValueError("vocs must have one objective for optimization")
 
         super(UpperConfidenceBoundGenerator, self).__init__(vocs, options)
+
+    @staticmethod
+    def default_options() -> UCBOptions:
+        return UCBOptions()
 
     def _get_objective(self):
         return create_constrained_mc_objective(self.vocs)

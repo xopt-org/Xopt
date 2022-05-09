@@ -1,6 +1,6 @@
 from xopt.resources.testing import TEST_VOCS_DATA, TEST_VOCS_BASE
 from xopt.utils import add_constraint_information, get_generator_and_defaults
-from xopt.generators import registry
+from xopt.generators import generators
 
 
 class TestUtils:
@@ -8,5 +8,5 @@ class TestUtils:
         out = add_constraint_information(TEST_VOCS_DATA, TEST_VOCS_BASE)
 
     def test_get_generators(self):
-        for name in registry.keys():
+        for name in generators.keys():
             get_generator_and_defaults(name)

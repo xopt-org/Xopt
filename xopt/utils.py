@@ -1,11 +1,11 @@
 import pandas as pd
 
 from .vocs import VOCS
-from xopt.generators import registry
+from xopt.generators import generators, generator_default_options
 
 
 def get_generator_and_defaults(name: str):
-    return registry[name]
+    return generators[name], generator_default_options[name]
 
 
 def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
