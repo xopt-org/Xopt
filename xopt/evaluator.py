@@ -37,7 +37,7 @@ class Evaluator:
         self,
         function: Callable,
         max_workers: int = 1,
-        executor: ExecutorEnum = ExecutorEnum.normal_executor,
+        executor: str = "NormalExecutor",
     ):
         """
         wrapper around the executor class, by default it uses a dummy
