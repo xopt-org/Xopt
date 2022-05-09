@@ -1,11 +1,18 @@
 import pandas as pd
 
+from xopt.generators import generator_default_options, generators
+
+from .errors import XoptError
 from .vocs import VOCS
-from xopt.generators import generators, generator_default_options
 
 
 def get_generator_and_defaults(name: str):
-    return generators[name], generator_default_options[name]
+    try:
+        return generators[name], generator_default_options[name]
+    except KeyError:
+        raise XoptError(
+            f"No generator named {name}, available generators are {list(generators.keys())}"
+        )
 
 
 def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
