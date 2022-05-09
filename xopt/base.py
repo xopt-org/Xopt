@@ -31,7 +31,7 @@ class Xopt:
         generator: Generator = None,
         evaluator: Evaluator = None,
         vocs: VOCS = None,
-        options: XoptOptions = XoptOptions()
+        options: XoptOptions = XoptOptions(),
     ):
         """
         Initialize Xopt object using either a config dictionary or explicitly

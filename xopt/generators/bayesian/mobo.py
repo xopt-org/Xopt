@@ -27,6 +27,7 @@ class MOBOAcqOptions(AcqOptions):
 class MOBOOptions(BayesianOptions):
     acq = MOBOAcqOptions()
 
+
 class MOBOGenerator(BayesianGenerator):
     alias = "mobo"
 
@@ -62,7 +63,7 @@ class MOBOGenerator(BayesianGenerator):
             constraints=constraint_callables,
             ref_point=self.options.acq.ref_point,
             sampler=self.sampler,
-            objective=self.objective
+            objective=self.objective,
         )
 
         return acq

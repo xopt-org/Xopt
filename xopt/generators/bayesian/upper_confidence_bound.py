@@ -21,7 +21,6 @@ class UCBOptions(BayesianOptions):
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
 
-
     def __init__(self, vocs: VOCS, options: UCBOptions = UCBOptions()):
         """
         Generator using UpperConfidenceBound acquisition function

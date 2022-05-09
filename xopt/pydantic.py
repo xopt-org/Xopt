@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class XoptBaseModel(BaseModel):
     class Config:
-        extra = 'forbid'
+        extra = "forbid"
         json_encoders = {
             np.ndarray: lambda x: x.tolist(),
             np.int64: lambda x: int(x),
