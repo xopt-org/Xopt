@@ -6,6 +6,7 @@ from xopt.errors import XoptError
 from xopt.options import XoptOptions
 
 from xopt import _version
+
 __version__ = _version.get_versions()["version"]
 
 import pandas as pd
@@ -200,12 +201,13 @@ class Xopt:
 
             # Handle exceptions inside the future result
             try:
-                # check to make sure that the output of the future is a dict
+                # if the future raised an exception, it gets raised here
                 outputs = future.result()
 
-                #if not isinstance(outputs, dict):
-                #    raise XoptError(f"Evaluator function must return a dict, got type "
-                #                    f"{type(future.result())} instead")
+                # check to make sure the output is a dict - if so raise XoptError
+                if not isinstance(outputs, dict):
+                    raise XoptError(f"Evaluator function must return a dict, got type "
+                                    f"{type(future.result())} instead")
 
                 outputs["xopt_error"] = False
                 outputs["xopt_error_str"] = ""
@@ -274,7 +276,8 @@ class Xopt:
 
     @classmethod
     def from_dict(cls, config_dict):
-        return cls(**xopt_kwargs_from_dict(config_dict))
+        pass
+        #return cls(**xopt_kwargs_from_dict(config_dict))
 
     @classmethod
     def from_yaml(cls, yaml_str):
@@ -282,25 +285,18 @@ class Xopt:
             yaml_str = open(yaml_str)
         return cls.from_dict(yaml.safe_load(yaml_str))
 
-
-
     def __repr__(self):
         s = f"""
             Xopt 
 ________________________________           
 Version: {__version__}
 Config as YAML:
-"""        
+"""
         # Cast to dicts for nice printout
-        #config = {k:dict(v) for k, v in  self.config.items()}
+        # config = {k:dict(v) for k, v in  self.config.items()}
         config = state_to_dict(self)
-        
-        return s + yaml.dump(config, default_flow_style=None,
-                             sort_keys=False)
+
+        return s + yaml.dump(config, default_flow_style=None, sort_keys=False)
 
     def __str__(self):
-        return self.__repr__()        
-
-
-        
-
+        return self.__repr__()
