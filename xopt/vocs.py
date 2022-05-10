@@ -256,10 +256,15 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
     return odata
 
 
-def form_constraint_data(constraints: Dict, data, prefix="constraint_"):
+def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constraint_"):
     """
     Use constraint dict and data (dataframe) to generate constraint data (dataframe)
     A constraint is satisfied if the evaluation is < 0.
+
+    Args:
+        constraints: Dictonary of constraints
+        data: Dataframe with the data to be evaluated
+        prefix: Prefix to use for the transformed data in the dataframe
 
     Returns a dataframe with the constraint data.
     """
@@ -267,7 +272,6 @@ def form_constraint_data(constraints: Dict, data, prefix="constraint_"):
         return None
 
     data = pd.DataFrame(data)  # cast to dataframe
-    constraint_dict = constraints
 
     cdata = pd.DataFrame()
     for k in sorted(list(constraints)):

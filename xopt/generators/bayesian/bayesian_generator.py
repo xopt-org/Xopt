@@ -13,7 +13,7 @@ from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.custom_acq.proximal import ProximalAcquisitionFunction
+from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
@@ -29,13 +29,6 @@ class BayesianGenerator(Generator, ABC):
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
         self.objective = self._get_objective()
-
-        # as a default normalize the inputs for the GP model
-        bounds = torch.tensor(vocs.bounds)
-        self._input_transform = Normalize(len(bounds[0]), bounds=bounds)
-
-        # as a default standardize the outcomes for the GP model
-        self._outcome_transform = Standardize(1)
 
         self._tkwargs = {"dtype": torch.double, "device": "cpu"}
 
@@ -75,22 +68,30 @@ class BayesianGenerator(Generator, ABC):
             )
             return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
 
-    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
+    def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
         """
         Returns a SingleTaskGP (or ModelList set of independent SingleTaskGPs
         depending on the number of outputs, if data is None
 
         """
-        if data is None:
-            data = self.data
+
         inputs, outputs = self.get_training_data(data)
 
-        n_outputs = outputs.shape[-1]
+        n_outputs = self.vocs.n_outputs
         if n_outputs > 1:
             model_list = []
             for i in range(n_outputs):
+                # as a default normalize the inputs for the GP model
+                bounds = torch.tensor(self.vocs.bounds, **self._tkwargs).T[0]
+                input_transform = Normalize(1, bounds=bounds.unsqueeze(1))
+                outcome_transform = Standardize(1)
+
                 m = SingleTaskGP(
-                    inputs, outputs[:, i].unsqueeze(1), **self.options.model.dict()
+                    inputs,
+                    outputs[:, i].unsqueeze(1),
+                    input_transform=input_transform,
+                    outcome_transform=outcome_transform,
+                    **self.options.model.dict(),
                 )
                 mll = ExactMarginalLogLikelihood(m.likelihood, m)
                 fit_gpytorch_model(mll)
@@ -98,7 +99,17 @@ class BayesianGenerator(Generator, ABC):
 
             model = ModelListGP(*model_list)
         else:
-            model = SingleTaskGP(inputs, outputs, **self.options.model.dict())
+            bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
+            input_transform = Normalize(self.vocs.n_variables, bounds=bounds)
+            outcome_transform = Standardize(1)
+
+            model = SingleTaskGP(
+                inputs,
+                outputs,
+                input_transform=input_transform,
+                outcome_transform=outcome_transform,
+                **self.options.model.dict(),
+            )
 
             mll = ExactMarginalLogLikelihood(model.likelihood, model)
             fit_gpytorch_model(mll)
@@ -108,7 +119,13 @@ class BayesianGenerator(Generator, ABC):
         return model
 
     def get_training_data(self, data: pd.DataFrame) -> (torch.Tensor, torch.Tensor):
-        """overwrite get training data to transform numpy array into tensor"""
+        """
+        get training data from dataframe
+        - transform constraint data into standard form where values < 0 imply
+        feasibility
+
+
+        """
         inputs, outputs = self.vocs.get_training_data(data)
         return torch.tensor(inputs, **self._tkwargs), torch.tensor(
             outputs, **self._tkwargs

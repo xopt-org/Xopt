@@ -3,7 +3,7 @@ import pandas as pd
 from abc import ABC, abstractmethod
 from xopt.vocs import VOCS
 
-from typing import List, Dict, Type
+from typing import List, Dict, Type, TypeVar
 
 from xopt.pydantic import XoptBaseModel
 
@@ -20,10 +20,15 @@ class GeneratorOptions(XoptBaseModel):
     pass
 
 
+_GeneratorOptions = TypeVar("_GeneratorOptions", bound=GeneratorOptions)
+
+
 class Generator(ABC):
     alias = None
 
-    def __init__(self, vocs: VOCS, options: GeneratorOptions = GeneratorOptions()):
+    def __init__(
+            self, vocs: VOCS, options: Type[_GeneratorOptions] = GeneratorOptions()
+    ):
         """
         Initialize the generator.
 
