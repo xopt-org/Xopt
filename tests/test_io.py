@@ -5,7 +5,7 @@ import yaml
 from xopt import Evaluator, Xopt
 from xopt.generators import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML
-from xopt.io import state_to_dict, read_config_dict, load_state_yaml
+from xopt.io import state_to_dict, parse_config
 from xopt.evaluator import EvaluatorOptions
 
 
@@ -23,8 +23,8 @@ class Test_IO:
         assert state_dict["generator"]["name"] == generator.alias
 
         # read from dict
-        gen, ev, vcs, options = read_config_dict(state_dict)
-        assert ev.options.function == dummy
+        config =  parse_config(state_dict)
+        assert config["evaluator"].options.function == dummy
 
-    def test_load_state_yaml(self):
-        load_state_yaml(yaml.safe_load(copy(TEST_YAML)))
+    def test_parse_config(self):
+        parse_config(yaml.safe_load(copy(TEST_YAML)))

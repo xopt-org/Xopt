@@ -1,18 +1,20 @@
-import numpy as np
-import concurrent
-import logging
-
-import pandas as pd
-import yaml
-
 from xopt.generator import Generator
 from xopt.evaluator import Evaluator
-from xopt.io import read_config_dict, state_to_dict, load_state_yaml
+from xopt.io import state_to_dict, parse_config
 from xopt.vocs import VOCS
 from xopt.errors import XoptError
 from xopt.options import XoptOptions
 
+
+import pandas as pd
+import numpy as np
+import yaml
+import json
+
+import concurrent
+import logging
 import traceback
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -26,30 +28,33 @@ class Xopt:
 
     def __init__(
         self,
-        *,
         config: dict = None,
+        *,
         generator: Generator = None,
         evaluator: Evaluator = None,
         vocs: VOCS = None,
         options: XoptOptions = XoptOptions(),
+        data: pd.DataFrame = None,
     ):
         """
         Initialize Xopt object using either a config dictionary or explicitly
 
         Args:
-            config: dict containing configuration information
+            config: dict, or YAML or JSON str or file. This overrides all other arguments.
+
             generator: Generator object
             evaluator: Evaluator object
             vocs: VOCS object
             options: XoptOptions object
+            data: initial data to use
 
         """
         logger.info("Initializing Xopt object")
 
-        # if config is provided, load it
-        data = None
+        # if config is provided, load it and re-init. Otherwise, init normally.
         if config is not None:
-            generator, evaluator, vocs, options, data = load_state_yaml(config)
+            self.__init__(**parse_config(config))
+            return
 
         # initialize Xopt object
         self._generator = generator
@@ -59,14 +64,12 @@ class Xopt:
         logger.debug(f"Xopt generator: {self._generator}")
         logger.debug(f"Xopt evaluator: {self._evaluator}")
 
-        # do options
         if not isinstance(options, XoptOptions):
             raise ValueError("options must of type `XoptOptions`")
-
         self.options = options
         logger.debug(f"Xopt options: {self.options.dict()}")
 
-        self._data = data if data is not None else pd.DataFrame()
+        self._data = pd.DataFrame(data)
         self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
@@ -266,3 +269,17 @@ class Xopt:
     @property
     def generator(self):
         return self._generator
+
+    @classmethod
+    def from_dict(cls, config_dict):
+        return cls(**xopt_kwargs_from_dict(config_dict))
+
+    @classmethod
+    def from_yaml(cls, yaml_str):
+        if os.path.exists(yaml_str):
+            yaml_str = open(yaml_str)
+        return cls.from_dict(yaml.safe_load(yaml_str))
+
+
+        
+
