@@ -1,9 +1,10 @@
+import pandas as pd
 import pytest
 import torch
 from unittest.mock import patch
 from unittest import TestCase
 
-from botorch.models import ModelListGP
+from botorch.models.gpytorch import GPyTorchModel
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
@@ -18,7 +19,18 @@ class TestBayesianGenerator(TestCase):
     def test_get_model(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
         model = gen.train_model(TEST_VOCS_DATA)
-        assert isinstance(model, ModelListGP)
+        assert isinstance(model, GPyTorchModel)
+
+        # test evaluating the model
+        test_pts = torch.tensor(
+            pd.DataFrame(
+                TEST_VOCS_BASE.random_inputs(
+                    5, False, False
+                )).to_numpy()
+        )
+        with torch.no_grad():
+            post = model(test_pts)
+            assert post.mean.shape == torch.Size([2, 5])
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_training_data(self):
