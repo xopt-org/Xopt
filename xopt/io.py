@@ -58,7 +58,7 @@ def xopt_kwargs_from_dict(config: dict) -> Tuple[Generator, Evaluator, VOCS, Xop
     if "version" in config["generator"].keys():
         config["generator"].pop("version")
 
-    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]))
+    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]["options"]))
 
     # create evaluator
     func = get_function(config["evaluator"]["function"])
