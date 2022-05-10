@@ -5,6 +5,8 @@ from xopt.vocs import VOCS
 from xopt.errors import XoptError
 from xopt.options import XoptOptions
 
+from xopt import _version
+__version__ = _version.get_versions()["version"]
 
 import pandas as pd
 import numpy as np
@@ -279,6 +281,25 @@ class Xopt:
         if os.path.exists(yaml_str):
             yaml_str = open(yaml_str)
         return cls.from_dict(yaml.safe_load(yaml_str))
+
+
+
+    def __repr__(self):
+        s = f"""
+            Xopt 
+________________________________           
+Version: {__version__}
+Config as YAML:
+"""        
+        # Cast to dicts for nice printout
+        #config = {k:dict(v) for k, v in  self.config.items()}
+        config = state_to_dict(self)
+        
+        return s + yaml.dump(config, default_flow_style=None,
+                             sort_keys=False)
+
+    def __str__(self):
+        return self.__repr__()        
 
 
         
