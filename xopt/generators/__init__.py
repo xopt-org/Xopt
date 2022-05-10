@@ -12,7 +12,7 @@ registered_generators = [
     UpperConfidenceBoundGenerator,
     MOBOGenerator,
     BayesianExplorationGenerator,
-    # CNSGAGenerator,
+    #CNSGAGenerator,
     RandomGenerator,
 ]
 
