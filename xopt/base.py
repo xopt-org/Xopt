@@ -286,17 +286,21 @@ class Xopt:
         return cls.from_dict(yaml.safe_load(yaml_str))
 
     def __repr__(self):
+
+        config = state_to_dict(self)
+        data = config.pop("data")
+        n_data = len(data)
+
+
         s = f"""
             Xopt 
 ________________________________           
 Version: {__version__}
+Data size: {n_data}
 Config as YAML:
 """
-        # Cast to dicts for nice printout
-        # config = {k:dict(v) for k, v in  self.config.items()}
-        config = state_to_dict(self)
-
         return s + yaml.dump(config, default_flow_style=None, sort_keys=False)
+
 
     def __str__(self):
         return self.__repr__()
