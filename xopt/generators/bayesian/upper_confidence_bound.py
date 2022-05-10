@@ -1,13 +1,10 @@
-from typing import Type
-
 from botorch.acquisition import qUpperConfidenceBound
-
-from xopt.generator import GeneratorOptions
-from xopt.vocs import VOCS
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
-from xopt.generators.bayesian.objectives import create_constrained_mc_objective
 from pydantic import Field
+
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.objectives import create_constrained_mc_objective
+from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
+from xopt.vocs import VOCS
 
 
 class UpperConfidenceBoundOptions(AcqOptions):
