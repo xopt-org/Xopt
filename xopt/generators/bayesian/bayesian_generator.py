@@ -13,9 +13,9 @@ from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
+from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 
 
 class BayesianGenerator(Generator, ABC):
@@ -37,6 +37,10 @@ class BayesianGenerator(Generator, ABC):
 
     def generate(self, n_candidates: int) -> List[Dict]:
 
+        if n_candidates > 1:
+            raise NotImplementedError("Bayesian algorithms don't support parallel "
+                                      "candidate generation")
+
         # if no data exists use random generator to generate candidates
         if self.data.empty:
             return self.vocs.random_inputs(self.options.n_initial)
@@ -55,9 +59,6 @@ class BayesianGenerator(Generator, ABC):
                 sigma=0.1,
                 bounds=bounds,
             )
-            batch_initial_points = batch_initial_points.reshape(
-                -1, 1, self.vocs.n_variables
-            ).expand(-1, n_candidates, -1)
 
             candidates, out = optimize_acqf(
                 acq_function=self.get_acquisition(self._model),
@@ -66,7 +67,9 @@ class BayesianGenerator(Generator, ABC):
                 batch_initial_conditions=batch_initial_points,
                 num_restarts=self.options.optim.num_restarts,
             )
-            return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
+            return self.vocs.convert_numpy_to_inputs(
+                candidates.unsqueeze(0).detach().numpy()
+            )
 
     def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
         """
@@ -76,43 +79,24 @@ class BayesianGenerator(Generator, ABC):
         """
 
         inputs, outputs = self.get_training_data(data)
+        input_transform = Normalize(
+            self.vocs.n_variables, bounds=torch.tensor(self.vocs.bounds)
+        )
+        outcome_transform = Standardize(self.vocs.n_outputs)
 
-        n_outputs = self.vocs.n_outputs
-        if n_outputs > 1:
-            model_list = []
-            for i in range(n_outputs):
-                # as a default normalize the inputs for the GP model
-                bounds = torch.tensor(self.vocs.bounds, **self._tkwargs).T[0]
-                input_transform = Normalize(1, bounds=bounds.unsqueeze(1))
-                outcome_transform = Standardize(1)
+        # create a batched single task GP model to represent independent outputs
+        train_X = inputs
+        train_Y = outputs
 
-                m = SingleTaskGP(
-                    inputs,
-                    outputs[:, i].unsqueeze(1),
-                    input_transform=input_transform,
-                    outcome_transform=outcome_transform,
-                    **self.options.model.dict(),
-                )
-                mll = ExactMarginalLogLikelihood(m.likelihood, m)
-                fit_gpytorch_model(mll)
-                model_list += [m]
+        model = SingleTaskGP(
+            train_X,
+            train_Y,
+            input_transform=input_transform,
+            outcome_transform=outcome_transform,
+        )
 
-            model = ModelListGP(*model_list)
-        else:
-            bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
-            input_transform = Normalize(self.vocs.n_variables, bounds=bounds)
-            outcome_transform = Standardize(1)
-
-            model = SingleTaskGP(
-                inputs,
-                outputs,
-                input_transform=input_transform,
-                outcome_transform=outcome_transform,
-                **self.options.model.dict(),
-            )
-
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            fit_gpytorch_model(mll)
+        mll = ExactMarginalLogLikelihood(model.likelihood, model)
+        fit_gpytorch_model(mll)
 
         if update_internal:
             self._model = model

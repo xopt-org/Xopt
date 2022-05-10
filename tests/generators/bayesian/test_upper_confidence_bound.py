@@ -26,8 +26,8 @@ class TestUpperConfidenceBoundGenerator:
         candidate = gen.generate(1)
         assert len(candidate) == 1
 
-        candidate = gen.generate(2)
-        assert len(candidate) == 2
+        #candidate = gen.generate(2)
+        #assert len(candidate) == 2
 
     def test_in_xopt(self):
         evaluator = Evaluator(xtest_callable)
