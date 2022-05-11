@@ -2,9 +2,9 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-
-from xopt.vocs import VOCS, ObjectiveEnum
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
+
+from xopt.vocs import ObjectiveEnum, VOCS
 
 
 class TestVOCS(object):

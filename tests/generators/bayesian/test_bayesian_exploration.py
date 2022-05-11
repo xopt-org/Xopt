@@ -58,5 +58,5 @@ class TestBayesianExplorationGenerator:
         xopt.step()
 
         # now use bayes opt
-        for _ in range(1):
+        for _ in range(5):
             xopt.step()
