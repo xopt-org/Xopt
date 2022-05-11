@@ -4,8 +4,10 @@ from typing import Dict, List
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
+from botorch.acquisition import ProximalAcquisitionFunction
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
+from botorch.models.transforms.outcome import ChainedOutcomeTransform
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
@@ -13,9 +15,9 @@ from gpytorch import Module
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from xopt.generator import Generator
+from xopt.generators.bayesian.custom_botorch.constraint_transform import Constraint
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
-from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 
 
 class BayesianGenerator(Generator, ABC):
@@ -38,8 +40,9 @@ class BayesianGenerator(Generator, ABC):
     def generate(self, n_candidates: int) -> List[Dict]:
 
         if n_candidates > 1:
-            raise NotImplementedError("Bayesian algorithms don't support parallel "
-                                      "candidate generation")
+            raise NotImplementedError(
+                "Bayesian algorithms don't support parallel " "candidate generation"
+            )
 
         # if no data exists use random generator to generate candidates
         if self.data.empty:
@@ -73,41 +76,53 @@ class BayesianGenerator(Generator, ABC):
 
     def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
         """
-        Returns a SingleTaskGP (or ModelList set of independent SingleTaskGPs
-        depending on the number of outputs, if data is None
+        Returns a ModelListGP containing independent models for the objectives and
+        constraints
 
         """
 
-        inputs, outputs = self.get_training_data(data)
-        input_transform = Normalize(
-            self.vocs.n_variables, bounds=torch.tensor(self.vocs.bounds)
-        )
-        outcome_transform = Standardize(self.vocs.n_outputs)
+        train_X = torch.tensor(data[self.vocs.variable_names].to_numpy())
+        bounds = torch.tensor(self.vocs.bounds)
+        normalize = Normalize(self.vocs.n_variables, bounds=bounds)
 
-        # create a batched single task GP model to represent independent outputs
-        train_X = inputs
-        train_Y = outputs
+        models = {}
+        for name in self.vocs.objective_names:
+            train_Y = torch.tensor(data[name].to_numpy()).unsqueeze(-1)
+            models[name] = SingleTaskGP(
+                train_X,
+                train_Y,
+                input_transform=normalize,
+                #outcome_transform=Standardize(1),
+            )
+            mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
+            fit_gpytorch_model(mll)
 
-        model = SingleTaskGP(
-            train_X,
-            train_Y,
-            input_transform=input_transform,
-            outcome_transform=outcome_transform,
-        )
+        # do constraint models
+        for name, val in self.vocs.constraints.items():
+            train_Y = torch.tensor(data[name].to_numpy()).unsqueeze(-1)
 
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_model(mll)
+            models[name] = SingleTaskGP(
+                train_X,
+                train_Y,
+                input_transform=normalize,
+                #outcome_transform=Standardize(1),
+            )
+
+            mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
+            fit_gpytorch_model(mll)
+
+        # create model list
+        _model = ModelListGP(*[models[name] for name in self.vocs.output_names])
 
         if update_internal:
-            self._model = model
-        return model
+            self._model = _model
+        return _model
 
     def get_training_data(self, data: pd.DataFrame) -> (torch.Tensor, torch.Tensor):
         """
         get training data from dataframe
         - transform constraint data into standard form where values < 0 imply
         feasibility
-
 
         """
         inputs, outputs = self.vocs.get_training_data(data)
