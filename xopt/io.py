@@ -39,7 +39,7 @@ def parse_config(config) -> dict:
     return xopt_kwargs_from_dict(d)
 
 
-def xopt_kwargs_from_dict(config: dict) -> Tuple[Generator, Evaluator, VOCS, XoptOptions]:
+def xopt_kwargs_from_dict(config: dict) -> dict:
     """
     Processes a config dictionary and returns the corresponding Xopt kwargs.
     """
@@ -58,7 +58,7 @@ def xopt_kwargs_from_dict(config: dict) -> Tuple[Generator, Evaluator, VOCS, Xop
     if "version" in config["generator"].keys():
         config["generator"].pop("version")
 
-    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]["options"]))
+    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]))
 
     # create evaluator
     func = get_function(config["evaluator"]["function"])
