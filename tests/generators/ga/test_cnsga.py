@@ -21,4 +21,4 @@ def test_cnsga_from_yaml():
     X.options.max_evaluations = 5
     X.run()
     assert len(X.data) == 5
-    assert all(X.data["xopt_error"] is False)
+    assert all(X.data["xopt_error"] == False)

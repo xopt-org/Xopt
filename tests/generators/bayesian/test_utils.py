@@ -29,15 +29,15 @@ class TestUtils:
 
         # test explicit points (posterior samples)
         # satisfies both constraints
-        ts1 = torch.tensor([-1.0, 10.0, -10.0]).unsqueeze(0).double()
+        ts1 = torch.tensor([-1.0, -10.0, -10.0]).unsqueeze(0).double()
         assert obj(ts1) == torch.tensor(1.0)
 
         # satisfies one constraint
-        ts2 = torch.tensor([-1.0, -10.0, -10.0]).unsqueeze(0).double()
+        ts2 = torch.tensor([-1.0, -10.0, 10.0]).unsqueeze(0).double()
         # satisfies one constraint
-        ts3 = torch.tensor([-1.0, 10.0, 10.0]).unsqueeze(0).double()
+        ts3 = torch.tensor([-1.0, 10.0, -10.0]).unsqueeze(0).double()
         # satisfies no constraints
-        ts4 = torch.tensor([-1.0, -10.0, 10.0]).unsqueeze(0).double()
+        ts4 = torch.tensor([-1.0, 10.0, 10.0]).unsqueeze(0).double()
 
         for ele in [ts2, ts3, ts4]:
             assert obj(ele) == torch.tensor(-100.0)
