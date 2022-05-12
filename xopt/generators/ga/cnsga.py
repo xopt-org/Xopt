@@ -1,14 +1,20 @@
 import array
 import logging
 import random
+import warnings
+import os
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
-from pydantic import Field
+from pydantic import confloat
 
 from xopt.generator import Generator, GeneratorOptions
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
+import xopt.utils 
+#xopt.utils.isotime() # works
+#from xopt.utils import isotime # circular import
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +23,45 @@ from typing import Dict, List
 
 
 class CNSGAOptions(GeneratorOptions):
-    crossover_probability: float = Field(
-        0.9, lt=1.0, gt=0.0, description="Crossover probability"
-    )
-    mutation_probabilitiy: float = Field(
-        1.0, lt=1.0, gt=0.0, description="Mutation probability"
-    )
 
+    population_size: int = 64
+    crossover_probability: confloat(ge=0, le=1) = 0.9
+    mutation_probability: confloat(ge=0, le=1) = 1.0
+    population_file: str = None
+    output_path: str = None
 
 class CNSGAGenerator(Generator):
-    def __init__(
+
+    alias = "cnsga"
+
+    @staticmethod
+    def default_options() -> CNSGAOptions:
+        return CNSGAOptions()
+
+    def __init__(self, vocs, options: CNSGAOptions = CNSGAOptions()):
+        super().__init__(vocs, options)
+
+        # Internal data structures
+        self.children = []  # unevaluated inputs. This should be a list of dicts.
+        self.population = None  # The latest population (fully evaluated)
+        self.offspring = None  # Newly evaluated data, but not yet added to population
+
+        # DEAP toolbox (internal)
+        self.toolbox = cnsga_toolbox(vocs, selection="auto")
+
+        if options.population_file is not None:
+            self.load_population_csv(options.population_file)
+            #n_here = len(self.population) 
+            #if n_here != self.n_pop:
+            #    warnings.warn(f"Population in {options.population_file} does not match n_pop: {n_here} != {self.n_pop}")
+
+        if options.output_path is not None:
+            assert os.path.isdir(options.output_path), "Output directory does not exist"
+
+        #if data is not None:
+        #    self.population = cnsga_select(data, n_pop, vocs, self.toolbox)        
+
+    def old__init__(
         self,
         vocs,
         *,
@@ -52,6 +87,10 @@ class CNSGAGenerator(Generator):
         if data is not None:
             self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
 
+
+
+
+
     def create_children(self):
 
         # No population, so create random children
@@ -63,8 +102,8 @@ class CNSGAGenerator(Generator):
             self.population,
             self.vocs,
             self.toolbox,
-            crossover_probability=self.crossover_probability,
-            mutation_probability=self.mutation_probability,
+            crossover_probability=self.options.crossover_probability,
+            mutation_probability=self.options.mutation_probability,
         )
         return inputs.to_dict(orient="records")
 
@@ -84,6 +123,9 @@ class CNSGAGenerator(Generator):
                 self.children = []  # reset children
                 self.offspring = None  # reset offspring
 
+            if self.options.output_path is not None:
+                self.write_population()
+
     def generate(self, n_candidates) -> List[Dict]:
         """
         generate `n_candidates` candidates
@@ -96,6 +138,34 @@ class CNSGAGenerator(Generator):
 
         return [self.children.pop() for _ in range(n_candidates)]
 
+
+    def write_population(self, filename=None):
+        """
+        Write the current population to a CSV file.
+        """
+
+        if filename is None:
+            filename = f"{self.alias}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
+            filename = os.path.join(self.options.output_path, filename)
+
+        self.population.to_csv(filename, index_label='xopt_index')
+
+    def load_population_csv(self, filename):
+        """
+        Read a population from a CSV file.
+        These will be reverted back to children for re-evaluation.
+        """
+        pop = pd.read_csv(filename, index_col='xopt_index')
+        # This is a list of dicts
+        self.children = self.vocs.convert_dataframe_to_inputs(pop).to_dict(orient="records")
+        logger.info(f"Loaded population of len {len(pop)} from file: {filename}")
+
+    @property
+    def n_pop(self):
+        """
+        Convenience alias for `options.population_size`
+        """
+        return self.options.population_size
 
 def uniform(low, up, size=None):
     """ """
