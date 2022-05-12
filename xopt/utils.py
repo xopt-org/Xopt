@@ -1,3 +1,5 @@
+import datetime
+
 import pandas as pd
 
 from xopt.generators import generator_default_options, generators
@@ -38,3 +40,18 @@ def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
     data["feas"] = data[[f"{ele}_feas" for ele in constraints]].all(axis=1)
 
     return data
+
+
+def isotime(include_microseconds=False):
+    """UTC to ISO 8601 with Local TimeZone information without microsecond"""
+    t = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).astimezone()
+    if not include_microseconds:
+        t = t.replace(microsecond=0)
+        
+    return t.isoformat()
+
+
+
+
+
+
