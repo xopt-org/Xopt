@@ -12,12 +12,15 @@ from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
+from gpytorch.kernels import ScaleKernel, MaternKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
+from gpytorch.priors import GammaPrior
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.custom_botorch.constraint_transform import Constraint
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
+from xopt.generators.bayesian.custom_botorch.bilog import Bilog
 
 
 class BayesianGenerator(Generator, ABC):
@@ -59,7 +62,7 @@ class BayesianGenerator(Generator, ABC):
             batch_initial_points = sample_truncated_normal_perturbations(
                 inputs[-1].unsqueeze(0),
                 n_discrete_points=self.options.optim.raw_samples,
-                sigma=0.1,
+                sigma=1.0,
                 bounds=bounds,
             )
 
@@ -92,7 +95,7 @@ class BayesianGenerator(Generator, ABC):
                 train_X,
                 train_Y,
                 input_transform=normalize,
-                #outcome_transform=Standardize(1),
+                outcome_transform=Standardize(1),
             )
             mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
             fit_gpytorch_model(mll)
@@ -101,11 +104,34 @@ class BayesianGenerator(Generator, ABC):
         for name, val in self.vocs.constraints.items():
             train_Y = torch.tensor(data[name].to_numpy()).unsqueeze(-1)
 
+            if self.options.model.use_bilog_transform:
+                outcome_transform = ChainedOutcomeTransform(
+                    constraint=Constraint({0: self.vocs.constraints[name]}),
+                    bilog=Bilog()
+                )
+            else:
+                outcome_transform = ChainedOutcomeTransform(
+                    constraint=Constraint({0: self.vocs.constraints[name]}),
+                )
+
+            # add in special covar module
+            if self.options.model.use_conservative_prior:
+                covar_module = ScaleKernel(
+                    MaternKernel(
+                        nu=2.5,
+                        ard_num_dims=self.vocs.n_variables,
+                        lengthscale_prior=GammaPrior(2.0, 20.0)
+                    )
+                )
+            else:
+                covar_module = None
+
             models[name] = SingleTaskGP(
                 train_X,
                 train_Y,
                 input_transform=normalize,
-                #outcome_transform=Standardize(1),
+                outcome_transform=outcome_transform,
+                covar_module=covar_module
             )
 
             mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])

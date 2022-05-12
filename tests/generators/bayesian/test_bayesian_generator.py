@@ -1,12 +1,17 @@
+from copy import deepcopy
+from unittest import TestCase
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 import torch
-from unittest.mock import patch
-from unittest import TestCase
 
 from botorch.models.gpytorch import GPyTorchModel
+from botorch.models.transforms import Normalize, Standardize
 
+from xopt import Evaluator, Xopt
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
@@ -23,14 +28,54 @@ class TestBayesianGenerator(TestCase):
 
         # test evaluating the model
         test_pts = torch.tensor(
-            pd.DataFrame(
-                TEST_VOCS_BASE.random_inputs(
-                    5, False, False
-                )).to_numpy()
+            pd.DataFrame(TEST_VOCS_BASE.random_inputs(5, False, False)).to_numpy()
         )
         with torch.no_grad():
             post = model(test_pts)
-            #assert post.mean.shape == torch.Size([2, 5])
+
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_transforms(self):
+        gen = BayesianGenerator(sinusoid_vocs)
+        gen.options.model.use_bilog_transform = True
+        evaluator = Evaluator(evaluate_sinusoid)
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
+
+        # generate some data samples
+        import numpy as np
+
+        test_samples = pd.DataFrame(np.linspace(0, 2 * 3.14, 10), columns=["x1"])
+        X.submit_data(test_samples)
+        X.process_futures()
+
+        print(X.data)
+
+        # create gp model with data
+        model = gen.train_model(X.data)
+
+        # test input normalization
+        input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds))
+        for inputs in model.train_inputs:
+            assert torch.allclose(
+                inputs[0], input_transform(torch.from_numpy(X.data["x1"].to_numpy())).T
+            )
+
+        # test outcome transform(s)
+        # objective transform
+        outcome_transform = Standardize(1)
+        assert torch.allclose(
+            model.train_targets[0],
+            torch.flatten(
+                outcome_transform(
+                    torch.from_numpy(X.data["y1"].to_numpy()).unsqueeze(-1)
+                )[0]
+            ),
+        )
+
+        # constraint transform
+        C = torch.from_numpy(X.data["c1"].to_numpy())
+        assert torch.allclose(
+            model.train_targets[1], torch.sign(-C) * torch.log(1 + torch.abs(-C))
+        )
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_training_data(self):

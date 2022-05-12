@@ -43,6 +43,8 @@ class ModelOptions(XoptBaseModel):
     #    None, description="transform applied to GP outcome model data", exclude=True
     # )
 
+    use_bilog_transform: bool = False
+    use_conservative_prior: bool = False
     # class Config:
     #    arbitrary_types_allowed = True
 

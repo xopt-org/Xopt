@@ -10,18 +10,7 @@ from torch import Tensor
 
 def constraint_function(Z, vocs=None, index=-1):
     n_objectives = len(vocs.objectives)
-    constraint_names = list(vocs.constraints.keys())
-
-    name = constraint_names[index]
-    if vocs.constraints[name][0] == "GREATER_THAN":
-        return vocs.constraints[name][1] - Z[..., n_objectives + index]
-    elif vocs.constraints[name][0] == "LESS_THAN":
-        return Z[..., n_objectives + index] - vocs.constraints[name][1]
-    else:
-        raise RuntimeError(
-            f"constraint type {vocs.constraints[name][0]} not "
-            "implemented for constrained bayes opt"
-        )
+    return Z[..., n_objectives + index]
 
 
 def create_constraint_callables(vocs):
