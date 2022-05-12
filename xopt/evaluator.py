@@ -23,7 +23,7 @@ class EvaluatorOptions(XoptBaseModel):
     Evaluator model.
     """
 
-    function: Callable[[...], dict]
+    function: Callable[..., dict]
     function_kwargs: dict = {}
     max_workers: int = 1
     executor: ExecutorEnum = ExecutorEnum.normal_executor
