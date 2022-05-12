@@ -10,7 +10,7 @@ def test_cnsga():
         evaluator=Evaluator(evaluate_TNK),
         vocs=tnk_vocs,
     )
-    X.options.max_evaluations = 100
+    X.options.max_evaluations = 5
     X.run()
 
 
@@ -19,7 +19,7 @@ def test_cnsga_from_yaml():
     X = Xopt(TEST_YAML)
     # Patch in generator
     X._generator = CNSGAGenerator(X.vocs)
-    X.options.max_evaluations = 100
+    X.options.max_evaluations = 5
     X.run()
-    assert len(X.data) == 100
+    assert len(X.data) == 5
     assert all(X.data["xopt_error"] == False)  
