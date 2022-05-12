@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+from xopt.pydantic import XoptBaseModel
 
-
-class XoptOptions(BaseModel):
+class XoptOptions(XoptBaseModel):
     asynch: bool = Field(
         False, description="flag to evaluate and submit evaluations asynchronously"
     )
