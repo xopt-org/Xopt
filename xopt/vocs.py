@@ -152,18 +152,19 @@ class VOCS(XoptBaseModel):
         # return pd.DataFrame(inputs, index=range(n))
         return inputs
 
-    def convert_dataframe_to_inputs(self, inputs: pd.DataFrame) -> pd.DataFrame:
+    def convert_dataframe_to_inputs(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Convert a dataframe candidate locations to a
-        list of dicts to pass to executors.
+        Extracts only inputs from a dataframe. 
+        This will add constants. 
         """
         # make sure that the df keys contain the vocs variables
-        if not set(self.variable_names).issubset(set(inputs.keys())):
+        if not set(self.variable_names).issubset(set(data.keys())):
             raise RuntimeError(
                 f"input dataframe must at least contain the vocs " f"variables"
             )
 
-        in_copy = inputs.copy()
+        # only keep the variables
+        in_copy = data[self.variable_names].copy()
 
         # append constants
         constants = self.constants
