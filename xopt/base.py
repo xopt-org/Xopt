@@ -57,6 +57,7 @@ class Xopt:
         # if config is provided, load it and re-init. Otherwise, init normally.
         if config is not None:
             self.__init__(**parse_config(config))
+            # TODO: Allow overrides
             return
 
         # initialize Xopt object
@@ -64,13 +65,13 @@ class Xopt:
         self._evaluator = evaluator
         self._vocs = vocs
 
-        logger.debug(f"Xopt generator: {self._generator}")
-        logger.debug(f"Xopt evaluator: {self._evaluator}")
+        logger.debug(f"Xopt initialized with generator: {self._generator}")
+        logger.debug(f"Xopt initialized with evaluator: {self._evaluator}")
 
         if not isinstance(options, XoptOptions):
             raise ValueError("options must of type `XoptOptions`")
         self.options = options
-        logger.debug(f"Xopt options: {self.options.dict()}")
+        logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
         self._data = pd.DataFrame(data)
         self._new_data = None
@@ -88,6 +89,14 @@ class Xopt:
     def run(self):
         """run until either xopt is done or the generator is done"""
         while not self._is_done:
+
+            # Stopping criteria
+            if self.options.max_evaluations:
+                if len(self.data) >= self.options.max_evaluations:
+                    self._is_done = True
+                    logger.info(f'Xopt is done. Max evaluations {self.options.max_evaluations} reached.')
+                    break
+
             self.step()
 
     def submit_data(self, input_data: pd.DataFrame):
@@ -172,7 +181,6 @@ class Xopt:
         self.update_data()
 
         # dump data to file if specified
-        logger.debug("Dumping data to file")
         self.dump_state()
 
         return len(unfinished_futures)
@@ -253,6 +261,7 @@ class Xopt:
             output = state_to_dict(self)
             with open(self.options.dump_file, "w") as f:
                 yaml.dump(output, f)
+            logger.debug(f"Dumping state to:{self.options.dump_file}")                
 
     @property
     def data(self):
@@ -286,9 +295,12 @@ class Xopt:
         return cls.from_dict(yaml.safe_load(yaml_str))
 
     def __repr__(self):
+        """
+        Returns a YAML representation of the Xopt object, without the data.
+        """
 
         config = state_to_dict(self)
-        data = config.pop("data")
+        data = config.pop("data") # Do not dump a giant dataframe to yaml
         n_data = len(data)
 
 
