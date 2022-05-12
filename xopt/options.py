@@ -16,3 +16,6 @@ class XoptOptions(BaseModel):
     dump_file: str = Field(
         None, description="file to dump the results of the evaluations"
     )
+    max_evaluations: int = Field(
+        None, description="maximum number of evaluations to perform"
+    )
