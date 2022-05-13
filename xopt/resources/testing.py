@@ -36,7 +36,6 @@ TEST_VOCS_DATA = pd.DataFrame(test_init_data)
 TEST_YAML = """
 xopt:
     asynch: True
-    timeout: 1.0
 generator:
     name: random
     
