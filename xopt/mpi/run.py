@@ -3,7 +3,7 @@
 
 
 """
-xopt MPI driver
+Xopt MPI driver
 
 Basic usage:
 
@@ -12,7 +12,7 @@ mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 
 """
 
-from xopt import XoptBase, xopt_logo
+from xopt import Xopt
 
 from mpi4py.futures import MPIPoolExecutor
 from mpi4py import MPI
@@ -29,7 +29,6 @@ from pprint import pprint
 
 
 from xopt.log import set_handler_with_logger
-
 
 if __name__ == "__main__":
 
@@ -69,8 +68,10 @@ if __name__ == "__main__":
     # logger.info('_________________________________')
     logger.info(f"Parallel execution with {mpi_size} workers")
 
-    X = XoptBase(infile)
-    # print(X)
+    X = Xopt(infile)
+    print(X)
     sys.stdout.flush()
     with MPIPoolExecutor() as executor:
-        X.run(executor=executor)
+        X.evaluator._executor = executor
+        X.evaluator.max_workers = mpi_size
+        X.run()

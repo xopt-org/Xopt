@@ -2,6 +2,7 @@ from typing import Dict
 
 import numpy as np
 import time
+from random import random
 
 from xopt.vocs import VOCS
 
@@ -29,13 +30,15 @@ def TNK(individual):
 
 
 # labeled version
-def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, **params):
+def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, random_sleep=0, **params):
     info = {"some": "info", "about": ["the", "run"]}
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = TNK(ind)
 
     # Sleep for a bit
     time.sleep(sleep)
+    time.sleep(random() * random_sleep * 2) # Average should be random_sleep
+
 
     outputs = {
         "y1": objectives[0],
