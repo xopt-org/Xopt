@@ -1,6 +1,7 @@
 from typing import Dict
 
 import numpy as np
+import time
 
 from xopt.vocs import VOCS
 
@@ -28,10 +29,14 @@ def TNK(individual):
 
 
 # labeled version
-def evaluate_TNK(inputs: Dict, extra_option="abc", **params):
+def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, **params):
     info = {"some": "info", "about": ["the", "run"]}
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = TNK(ind)
+
+    # Sleep for a bit
+    time.sleep(sleep)
+
     outputs = {
         "y1": objectives[0],
         "y2": objectives[1],
