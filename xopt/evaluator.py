@@ -8,6 +8,7 @@ from typing import Callable, Dict
 import pandas as pd
 
 from xopt.pydantic import XoptBaseModel
+from xopt.utils import get_function_defaults, get_function
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +41,23 @@ class Evaluator:
         function: Callable,
         max_workers: int = 1,
         executor: str = "NormalExecutor",
-        **kwargs,
+        function_kwargs: dict = {},
     ):
         """
         wrapper around the executor class, by default it uses a dummy
         executor with max_workers=1
 
         """
+
+        # Fill defaults
+        kw =  get_function_defaults(function)
+        kw.update(function_kwargs)
+
         self.options = EvaluatorOptions(
             function=function,
             max_workers=max_workers,
             executor=executor,
-            function_kwargs=kwargs,
+            function_kwargs=kw,
         )
         if self.options.executor == ExecutorEnum.normal_executor:
             logger.debug("using normal executor")
@@ -74,11 +80,7 @@ class Evaluator:
 
     @classmethod
     def from_options(cls, options: EvaluatorOptions):
-        return cls(
-            function=options.function,
-            max_workers=options.max_workers,
-            executor=options.executor,
-        )
+        return cls(**options.dict())
 
     def submit(self, input: Dict):
         """submit a single input to the executor"""
