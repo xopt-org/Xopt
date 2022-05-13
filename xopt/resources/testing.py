@@ -4,7 +4,7 @@ import pandas as pd
 from xopt.vocs import VOCS
 
 
-def xtest_callable(input_dict: dict) -> dict:
+def xtest_callable(input_dict: dict, a=0) -> dict:
     assert isinstance(input_dict, dict)
     x1 = input_dict["x1"]
     x2 = input_dict["x2"]
