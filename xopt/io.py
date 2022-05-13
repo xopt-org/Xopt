@@ -1,9 +1,9 @@
 from xopt.errors import XoptError
-from xopt.evaluator import Evaluator
+from xopt.evaluator import Evaluator, EvaluatorOptions
 from xopt.generator import Generator
 
 from xopt.options import XoptOptions
-from xopt.utils import get_generator_and_defaults
+from xopt.utils import get_generator_and_defaults, get_function
 from xopt.vocs import VOCS
 
 
@@ -11,7 +11,7 @@ import pandas as pd
 import yaml
 
 
-import importlib
+
 import json
 from copy import deepcopy
 from typing import Dict, Tuple, Union
@@ -60,9 +60,11 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
 
     generator = generator_type(vocs, generator_options.parse_obj(config["generator"]))
 
-    # create evaluator
-    func = get_function(config["evaluator"]["function"])
-    evaluator = Evaluator(func)
+    # Create evaluator
+    ev = config["evaluator"]
+    ev["function"] = get_function(ev["function"])
+    ev_options = EvaluatorOptions.parse_obj(ev)
+    evaluator = Evaluator(**ev_options.dict())
 
     if "data" in config.keys():
         data = config["data"]
@@ -77,10 +79,9 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
             "data": data}
 
 
-def state_to_dict(X):
+def state_to_dict(X, include_data=True):
     # dump data to dict with config metadata
     output = {
-        "data": json.loads(X.data.to_json()),
         "xopt": json.loads(X.options.json()),
         "generator": {
             "name": X.generator.alias,
@@ -89,33 +90,10 @@ def state_to_dict(X):
         "evaluator": json.loads(X.evaluator.options.json()),
         "vocs": json.loads(X.vocs.json()),
     }
+    if include_data:
+        output["data"] = json.loads(X.data.to_json())
+
     return output
 
 
-def get_function(name):
-    """
-    Returns a function from a fully qualified name or global name.
-    """
 
-    # Check if already a function
-    if callable(name):
-        return name
-
-    if not isinstance(name, str):
-        raise ValueError(f"{name} must be callable or a string.")
-
-    if name in globals():
-        if callable(globals()[name]):
-            f = globals()[name]
-        else:
-            raise ValueError(f"global {name} is not callable")
-    else:
-        if "." in name:
-            # try to import
-            m_name, f_name = name.rsplit(".", 1)
-            module = importlib.import_module(m_name)
-            f = getattr(module, f_name)
-        else:
-            raise Exception(f"function {name} does not exist")
-
-    return f

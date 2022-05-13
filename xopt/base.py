@@ -5,6 +5,7 @@ from xopt.vocs import VOCS
 from xopt.errors import XoptError
 from xopt.options import XoptOptions
 
+
 from xopt import _version
 
 __version__ = _version.get_versions()["version"]
@@ -167,7 +168,7 @@ class Xopt:
 
         # wait for futures to finish (depending on return_when)
         finished_futures, unfinished_futures = concurrent.futures.wait(
-            self._futures.values(), self.options.timeout, return_when
+            self._futures.values(), None, return_when
         )
 
         # if strict, raise exception if any future raises an exception
@@ -294,25 +295,31 @@ class Xopt:
             yaml_str = open(yaml_str)
         return cls.from_dict(yaml.safe_load(yaml_str))
 
+    def yaml(self, filename=None, *, include_data=False):
+        """
+        YAML representation of the Xopt object.
+        """
+        config = state_to_dict(self, include_data=include_data)
+        s = yaml.dump(config, default_flow_style=None, sort_keys=False)
+
+        if filename:
+            with open(filename, "w") as f:
+                f.write(s)
+
+        return s
+
     def __repr__(self):
         """
-        Returns a YAML representation of the Xopt object, without the data.
+        Returns infor about the Xopt object, including the YAML representation without data.
         """
-
-        config = state_to_dict(self)
-        data = config.pop("data") # Do not dump a giant dataframe to yaml
-        n_data = len(data)
-
-
-        s = f"""
+        return f"""
             Xopt 
 ________________________________           
 Version: {__version__}
-Data size: {n_data}
+Data size: {len(self.data)}
 Config as YAML:
+{self.yaml()}
 """
-        return s + yaml.dump(config, default_flow_style=None, sort_keys=False)
-
 
     def __str__(self):
         return self.__repr__()

@@ -1,4 +1,6 @@
 import datetime
+import importlib
+import inspect
 
 import pandas as pd
 
@@ -51,7 +53,60 @@ def isotime(include_microseconds=False):
     return t.isoformat()
 
 
+def get_function(name):
+    """
+    Returns a function from a fully qualified name or global name.
+    """
 
+    # Check if already a function
+    if callable(name):
+        return name
+
+    if not isinstance(name, str):
+        raise ValueError(f"{name} must be callable or a string.")
+
+    if name in globals():
+        if callable(globals()[name]):
+            f = globals()[name]
+        else:
+            raise ValueError(f"global {name} is not callable")
+    else:
+        if "." in name:
+            # try to import
+            m_name, f_name = name.rsplit(".", 1)
+            module = importlib.import_module(m_name)
+            f = getattr(module, f_name)
+        else:
+            raise Exception(f"function {name} does not exist")
+
+    return f
+
+
+def get_function_defaults(f):
+    """
+    Returns a dict of the non-empty POSITIONAL_OR_KEYWORD arguments.
+    
+    See the `inspect` documentation for defaults.
+    """
+    defaults = {}
+    for k, v in inspect.signature(f).parameters.items():
+        if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            # print(k, v.default, v.kind)
+            if v.default != inspect.Parameter.empty:
+                defaults[k] = v.default
+    return defaults
+
+
+def get_n_required_fuction_arguments(f):
+    """
+    Counts the number of required function arguments using the `inspect` module.
+    """
+    n = 0
+    for k, v in inspect.signature(f).parameters.items():
+        if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            if v.default == inspect.Parameter.empty:
+                n += 1
+    return n
 
 
 
