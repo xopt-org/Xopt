@@ -26,6 +26,7 @@ dependencies:
   - mkdocstrings
   - mkdocs-material
   - mkdocs-jupyter
+  - pre-commit
   - pip
 
 #  - pip:

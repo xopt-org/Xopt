@@ -167,3 +167,7 @@ conda activate xopt-dev
 pip install --no-dependencies -e .
 ```
 
+Install pre-commit hooks:
+```
+pre-commit install
+```
