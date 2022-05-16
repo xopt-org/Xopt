@@ -17,7 +17,7 @@ repos:
       language_version: python3
       types: [python]
       # only in lume_services
-      files: ^lume_services
+      files: ^xopt
       args: # arguments to configure flake8
         # making isort line length compatible with black
         - "--max-line-length=88"
