@@ -6,12 +6,9 @@ repos:
       entry: ufmt
       language: python
       repo: https://github.com/omnilib/ufmt
-      rev: v1.3.1
-      hooks:
-        - id: ufmt
-          additional_dependencies:
-            - black == 21.12b0
-            - usort == 1.0.1
+      additional_dependencies:
+        - black == 21.12b0
+        - usort == 1.0.1
 
     - id: flake8
       name: flake8
