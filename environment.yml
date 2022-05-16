@@ -28,6 +28,7 @@ dependencies:
   - mkdocs-jupyter
   - pre-commit
   - pip
+    - ufmt
 
 #  - pip:
 #    - git+git://github.com/some/repo
