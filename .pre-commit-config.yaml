@@ -5,7 +5,6 @@ repos:
       name: ufmt
       entry: ufmt
       language: python
-      repo: https://github.com/omnilib/ufmt
       additional_dependencies:
         - black == 21.12b0
         - usort == 1.0.1
@@ -16,7 +15,7 @@ repos:
       language: python
       language_version: python3
       types: [python]
-      # only in lume_services
+      # only in xopt
       files: ^xopt
       args: # arguments to configure flake8
         # making isort line length compatible with black
@@ -28,6 +27,7 @@ repos:
       language: system
       entry: pytest
       types: [python]
+      pass_filenames: false
 
     - id: pytest-cov
       name: pytest
