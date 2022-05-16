@@ -27,6 +27,7 @@ dependencies:
   - mkdocs-material
   - mkdocs-jupyter
   - pre-commit
+  - flake8
   - pip
     - ufmt
 
