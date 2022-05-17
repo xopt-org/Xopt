@@ -45,7 +45,8 @@ class Generator(ABC):
 
         self._is_done = False
         self._data = pd.DataFrame()
-        self.options = options
+        self._check_options(options)
+        self._options = options
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:
@@ -72,6 +73,12 @@ class Generator(ABC):
         """
         pass
 
+    def _check_options(self, options: XoptBaseModel):
+        """
+        Raise error if options are not compatable, overwrite in each generator if needed
+        """
+        pass
+
     @property
     def is_done(self):
         return self._is_done
@@ -87,3 +94,9 @@ class Generator(ABC):
     @property
     def vocs(self):
         return self._vocs
+
+    @property
+    def options(self):
+        return self._options
+
+
