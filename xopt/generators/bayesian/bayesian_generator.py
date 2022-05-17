@@ -12,15 +12,15 @@ from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
-from gpytorch.kernels import ScaleKernel, MaternKernel
+from gpytorch.kernels import MaternKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.priors import GammaPrior
 
 from xopt.generator import Generator
+from xopt.generators.bayesian.custom_botorch.bilog import Bilog
 from xopt.generators.bayesian.custom_botorch.constraint_transform import Constraint
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
-from xopt.generators.bayesian.custom_botorch.bilog import Bilog
 
 
 class BayesianGenerator(Generator, ABC):
@@ -107,7 +107,7 @@ class BayesianGenerator(Generator, ABC):
             if self.options.model.use_bilog_transform:
                 outcome_transform = ChainedOutcomeTransform(
                     constraint=Constraint({0: self.vocs.constraints[name]}),
-                    bilog=Bilog()
+                    bilog=Bilog(),
                 )
             else:
                 outcome_transform = ChainedOutcomeTransform(
@@ -120,7 +120,7 @@ class BayesianGenerator(Generator, ABC):
                     MaternKernel(
                         nu=2.5,
                         ard_num_dims=self.vocs.n_variables,
-                        lengthscale_prior=GammaPrior(2.0, 20.0)
+                        lengthscale_prior=GammaPrior(2.0, 20.0),
                     )
                 )
             else:
@@ -131,7 +131,7 @@ class BayesianGenerator(Generator, ABC):
                 train_Y,
                 input_transform=normalize,
                 outcome_transform=outcome_transform,
-                covar_module=covar_module
+                covar_module=covar_module,
             )
 
             mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
@@ -166,13 +166,6 @@ class BayesianGenerator(Generator, ABC):
 
         # add proximal biasing if requested
         if self.options.acq.proximal_lengthscales is not None:
-            n_lengthscales = len(self.options.acq.proximal_lengthscales)
-            if n_lengthscales != self.vocs.n_variables:
-                raise ValueError(
-                    f"Number of proximal lengthscales ({n_lengthscales}) must match "
-                    f"number of variables {self.vocs.n_variables}"
-                )
-
             acq = ProximalAcquisitionFunction(
                 self._get_acquisition(model),
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
@@ -193,3 +186,18 @@ class BayesianGenerator(Generator, ABC):
     @property
     def model(self):
         return self._model
+
+    def _check_options(self, options: BayesianOptions):
+        if options.acq.proximal_lengthscales is not None:
+            n_lengthscales = len(options.acq.proximal_lengthscales)
+
+            if n_lengthscales != self.vocs.n_variables:
+                raise ValueError(
+                    f"Number of proximal lengthscales ({n_lengthscales}) must match "
+                    f"number of variables {self.vocs.n_variables}"
+                )
+            if options.optim.num_restarts != 1:
+                raise ValueError(
+                    "`options.optim.num_restarts` must be 1 when proximal biasing is "
+                    "specified"
+                )
