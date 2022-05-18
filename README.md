@@ -172,6 +172,12 @@ Install pre-commit hooks:
 pre-commit install
 ```
 
+The pre-commit hooks perform autoformatting, report errors, and automatically execute tests. 
+* [ufmt](https://pypi.org/project/ufmt/) formats files w.r.t. [black](https://github.com/psf/black) a strict style enforcer, and [μsort](https://usort.readthedocs.io/en/stable/), which sorts imports in Python modules.
+* [flake8](https://flake8.pycqa.org/en/latest/) confirms compliance. Occasionally black misses long-line comments/docstrings and they require manual format.
+
+Pre-commit runs the hooks against your files. If the commit fails, correct the reported errors and then re-add the file with `git add my_file.py`.
+
 ### VSCode
 The source control integration packaged with VSCode requires additional configuration. Git commands are run in the integrated terminal, which does not inherit the Python interpreter configured with the VSCode project thus breaking the pre-commit hooks. The integration terminal can be configured to use the conda Python environment by including a `.env` file in your project repository:
 
