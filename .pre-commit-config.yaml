@@ -18,19 +18,3 @@ repos:
       args: # arguments to configure flake8
         # making isort line length compatible with black
         - "--max-line-length=88"
-
-    - id: pytest
-      name: pytest
-      stages: [commit]
-      language: system
-      entry: pytest
-      types: [python]
-      pass_filenames: false
-
-    - id: pytest-cov
-      name: pytest
-      stages: [push]
-      language: system
-      entry: pytest --cov --cov-fail-under=70
-      types: [python]
-      pass_filenames: false
