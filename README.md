@@ -172,7 +172,7 @@ Install pre-commit hooks:
 pre-commit install
 ```
 
-The pre-commit hooks perform autoformatting, report errors, and automatically execute tests. 
+The pre-commit hooks perform autoformatting and report style-compliance errors. 
 * [ufmt](https://pypi.org/project/ufmt/) formats files w.r.t. [black](https://github.com/psf/black) a strict style enforcer, and [μsort](https://usort.readthedocs.io/en/stable/), which sorts imports in Python modules.
 * [flake8](https://flake8.pycqa.org/en/latest/) confirms compliance. Occasionally black misses long-line comments/docstrings and they require manual format.
 
