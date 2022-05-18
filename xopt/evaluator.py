@@ -82,6 +82,24 @@ class Evaluator:
     def from_options(cls, options: EvaluatorOptions):
         return cls(**options.dict())
 
+
+    def evaluate(self, input: Dict, **kwargs):
+        """
+        Evaluate a single input dict using Evaluator.function with 
+        Evaluator.function_kwargs.
+        
+        Further kwargs are passed to the function.
+
+        Inputs:
+            inputs: dict of inputs to be evaluated
+            **kwargs: additional kwargs to pass to the function
+
+        Returns:
+            function(input, **function_kwargs_updated)
+
+        """
+        return self.function(input, **{**self.options.function_kwargs, **kwargs})
+
     def submit(self, input: Dict):
         """submit a single input to the executor"""
         if not isinstance(input, dict):
