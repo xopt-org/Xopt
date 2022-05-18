@@ -5,9 +5,7 @@ repos:
       name: ufmt
       entry: ufmt
       language: python
-      additional_dependencies:
-        - black == 21.12b0
-        - usort == 1.0.1
+      require_serial: true
 
     - id: flake8
       name: flake8
