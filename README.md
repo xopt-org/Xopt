@@ -177,5 +177,5 @@ The source control integration packaged with VSCode requires additional configur
 
 ```
 #!/usr/bin/bash 
-source ~/miniconda3/envs/xopt-dev/bin/activate
+source /path/to/xopt-dev/bin/activate
 ```
