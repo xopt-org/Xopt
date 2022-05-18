@@ -28,8 +28,9 @@ dependencies:
   - mkdocs-jupyter
   - pre-commit
   - flake8
-  - pip
+  - pip:
     - ufmt
+
 
 #  - pip:
 #    - git+git://github.com/some/repo
