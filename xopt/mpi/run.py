@@ -69,6 +69,9 @@ if __name__ == "__main__":
     logger.info(f"Parallel execution with {mpi_size} workers")
 
     X = Xopt(infile)
+    logger.info('Enabling async mode')
+    X.options.asynch = True # Force asynch
+
     print(X)
     sys.stdout.flush()
     with MPIPoolExecutor() as executor:
