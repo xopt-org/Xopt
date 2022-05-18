@@ -35,6 +35,10 @@ class ConstraintEnum(str, Enum):
 
 
 class VOCS(XoptBaseModel):
+    """
+    Variables, Objectives, Constraints, and other Settings (VOCS) data structure
+    to describe optimization problems. 
+    """
     variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {}
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
