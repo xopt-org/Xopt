@@ -173,7 +173,7 @@ pre-commit install
 ```
 
 ### VSCode
-The source control integration packaged with VSCode requires additional configuration. Git commands are run in the integrated terminal, which does not inherit the Python interpreter configured with the VSCode project. The integration terminal can be configured to use the conda Python environment by including a `.env` file in your project repository:
+The source control integration packaged with VSCode requires additional configuration. Git commands are run in the integrated terminal, which does not inherit the Python interpreter configured with the VSCode project thus breaking the pre-commit hooks. The integration terminal can be configured to use the conda Python environment by including a `.env` file in your project repository:
 
 ```
 #!/usr/bin/bash 
