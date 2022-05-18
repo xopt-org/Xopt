@@ -3,7 +3,7 @@ repos:
   hooks:
     - id: ufmt
       name: ufmt
-      entry: ufmt
+      entry: ufmt format
       language: python
       require_serial: true
 
