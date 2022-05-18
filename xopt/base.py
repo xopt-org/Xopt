@@ -15,6 +15,8 @@ import numpy as np
 import yaml
 import json
 
+
+from typing import Dict
 import concurrent
 import logging
 import traceback
@@ -144,6 +146,8 @@ class Xopt:
         # generate samples and submit to evaluator
         logger.debug(f"Generating {n_generate} candidates")
         new_samples = pd.DataFrame(self.generator.generate(n_generate))
+
+        
 
         # submit new samples to evaluator
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
@@ -323,3 +327,26 @@ Config as YAML:
 
     def __str__(self):
         return self.__repr__()
+
+
+    # Convenience methods
+
+    def random_inputs(self, *args, **kwargs):
+        """
+        Convenence method to call vocs.random_inputs
+        """
+        return self.vocs.random_inputs(*args, **kwargs)
+
+    def evaluate(self, inputs: Dict, **kwargs):
+        """
+        Convenience method to call evaluator.evaluate
+        """
+        return self.evaluator.evaluate(inputs, **kwargs)
+
+    def random_evaluate(self, *args, **kwargs):
+        """
+        Convenience method to generate random inputs using vocs
+        and evaluate them using evaluator.evaluate.
+        """
+        result = self.evaluate(self.random_inputs(*args, **kwargs))
+        return result
