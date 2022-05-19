@@ -3,11 +3,9 @@ repos:
   hooks:
     - id: ufmt
       name: ufmt
-      entry: ufmt
+      entry: ufmt format
       language: python
-      additional_dependencies:
-        - black == 21.12b0
-        - usort == 1.0.1
+      require_serial: true
 
     - id: flake8
       name: flake8
@@ -20,19 +18,3 @@ repos:
       args: # arguments to configure flake8
         # making isort line length compatible with black
         - "--max-line-length=88"
-
-    - id: pytest
-      name: pytest
-      stages: [commit]
-      language: system
-      entry: pytest
-      types: [python]
-      pass_filenames: false
-
-    - id: pytest-cov
-      name: pytest
-      stages: [push]
-      language: system
-      entry: pytest --cov --cov-fail-under=70
-      types: [python]
-      pass_filenames: false
