@@ -76,8 +76,6 @@ class Evaluator:
             self._executor = ProcessPoolExecutor(max_workers=self.options.max_workers)
         self.function = self.options.function
 
-        self._n_submitted = 0
-
     @classmethod
     def from_options(cls, options: EvaluatorOptions):
         return cls(**options.dict())
