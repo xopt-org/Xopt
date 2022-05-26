@@ -383,7 +383,6 @@ def test_function(x: int, y: int = 5):
 
 if __name__ == "__main__":
 
-    check = BaseExecutor[ThreadPoolExecutor]()
     print("ParameterizedCallable using TestClass, x=1, y=3")
     parameterized_fn = ParameterizedCallable(callable=TestClass, x=1, y=3)
     result = parameterized_fn.call()
