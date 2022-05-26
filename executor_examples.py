@@ -13,8 +13,6 @@ from pydantic.generics import GenericModel
 
 logger = logging.getLogger("__name__")
 
-
-ExecutorType = TypeVar("ExecutorType")
 ObjType = TypeVar("ObjType")
 
 JSON_ENCODERS = {
