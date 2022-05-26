@@ -222,8 +222,13 @@ class BaseExecutor(
     def validate_all(cls, values):
         executor_type = cls.__fields__["executor"].type_
 
+        # check if executor provided
+        executor = values.get("executor")
+        if executor is not None:
+            values.pop("executor")
+
         # VALIDATE SUBMIT CALLABLE AGAINST EXECUTOR TYPE
-        if not values.get("submit_callable"):
+        if "submit_callable" not in values:
             # use default
             submit_callable = cls.__fields__["submit_callable"].default
         else:
@@ -298,6 +303,7 @@ class BaseExecutor(
             "shutdown_callable": shutdown_callable,
             "map_callable": map_callable,
             "loader": loader,
+            "executor": executor,
         }
 
     def shutdown(self) -> None:
@@ -314,6 +320,7 @@ class NormalExecutor(
 ):
     @validator("executor", always=True)
     def validate_executor(cls, v, values):
+
         if v is None:
             v = values["loader"].load()
 
@@ -330,13 +337,11 @@ class NormalExecutor(
     def submit(self, fn, **kwargs) -> Future:
         # Create parameterized callable and sumbit
         submit_fn = getattr(self.executor, self.submit_callable)
-        parameterized_fn = ParameterizedCallable(callable=fn, **kwargs)
-        return submit_fn(parameterized_fn)
+        return submit_fn(fn, **kwargs)
 
     def map(self, fn, iter: Iterable) -> Iterable[Future]:
-        callable = UnparameterizedCallable(callable=fn)
         map_fn = getattr(self.executor, self.map_callable)
-        return map_fn(callable.call, iter)
+        return map_fn(fn, iter)
 
 
 # ContexExecutor with context handling on submission and no executor persistence
@@ -364,11 +369,10 @@ class ContextExecutor(
             return submit_fn(parameterized_fn.call)
 
     def map(self, fn, iter: Iterable) -> Iterable[Future]:
-        callable = UnparameterizedCallable(callable=fn)
 
         with self.context() as ctxt:
             map_fn = getattr(ctxt, self.map_callable)
-            return map_fn(callable.call, iter)
+            return map_fn(fn, iter)
 
 
 class TestClass:
@@ -450,8 +454,10 @@ if __name__ == "__main__":
 
     print("Run mapping function with threadpool normal executor")
     futures = norm_exec.map(test_function, ((1, 4), (3, 4)))
+    norm_exec.shutdown()
     print(f"Returns: {futures}")
-    # DASK
+
+    # DASK:
     from dask.distributed import Client
 
     client = Client(silence_logs=logging.ERROR)
@@ -459,7 +465,7 @@ if __name__ == "__main__":
     print("Creating dask normal executor w/ provided executor")
     dask_executor = NormalExecutor[type(executor)](executor=executor)
     print("Calling executor:")
-    future = norm_exec.submit(fn=test_function, x=1, y=8)
+    future = dask_executor.submit(fn=test_function, x=1, y=8)
     print(f"Returns: {future}")
 
     from dask.distributed.cfexecutor import ClientExecutor
@@ -467,9 +473,17 @@ if __name__ == "__main__":
     print("Creating dask normal executor w/ no provided executor")
     dask_executor = NormalExecutor[ClientExecutor](client=client)
     print("Calling executor:")
-    future = norm_exec.submit(fn=test_function, x=1, y=8)
+    future = dask_executor.submit(fn=test_function, x=1, y=8)
     print(f"Returns: {future}")
 
     norm_exec_json = norm_exec.json()
     print("Normal executor to json:")
     print(norm_exec_json)
+
+    # wait for future completion till shutdown
+    dask_executor.shutdown()
+
+    print("Creating contextual dask executor")
+    dask_executor = ContextExecutor[ClientExecutor](client=client)
+    futures = dask_executor.map(test_function, ((1, 4), (3, 4)))
+    print(f"Returns: {futures}")
