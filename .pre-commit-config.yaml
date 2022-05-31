@@ -6,6 +6,7 @@ repos:
       entry: ufmt format
       language: python
       require_serial: true
+      exclude: "\\.ipynb"
 
     - id: flake8
       name: flake8
