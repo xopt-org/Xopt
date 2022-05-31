@@ -30,10 +30,5 @@ dependencies:
   - flake8
   - pip:
     - ufmt
-<<<<<<< HEAD
-
-
-=======
->>>>>>> bba895a (Enforce latest pydantic)
 #  - pip:
 #    - git+git://github.com/some/repo
