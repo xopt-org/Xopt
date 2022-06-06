@@ -20,3 +20,6 @@ private_tests/*
 
 # local mkdocs
 site
+
+# vscode config
+.env
