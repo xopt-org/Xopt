@@ -20,10 +20,12 @@ from nbconvert import PythonExporter
 
 IGNORE = {
     "xopt_gpt_example.ipynb",
+    "xopt_parallel.ipynb",
+    "vocs.ipynb",
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
-SUB_DIRS = ["basic", "bayes_exp", "bayes_opt", "cnsga", "mobo"]
+SUB_DIRS = ["basic", "bayes_exp", "cnsga", "mobo"]
 
 
 def parse_ipynb(file: Path) -> str:
