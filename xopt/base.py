@@ -123,6 +123,9 @@ class Xopt:
         futures = self.evaluator.submit_data(input_data)
         self._futures.update(futures)
 
+        # wait for futures
+        self.wait_for_futures()
+
     def step(self):
         """
         run one optimization cycle
@@ -147,15 +150,20 @@ class Xopt:
         logger.debug(f"Generating {n_generate} candidates")
         new_samples = pd.DataFrame(self.generator.generate(n_generate))
 
-        
-
         # submit new samples to evaluator
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
         self.submit_data(new_samples)
 
+        self.wait_for_futures()
+
+    def wait_for_futures(self):
         # process futures after waiting for one or all to be completed
         # get number of uncompleted futures when done waiting
-        logger.debug("Waiting for futures to complete")
+        if self.options.asynch:
+            logger.debug("Waiting for at least one future to complete")
+        else:
+            logger.debug("Waiting for all futures to complete")
+
         self.n_unfinished_futures = self.process_futures()
         logger.debug(f"done. {self.n_unfinished_futures} futures remaining")
 

@@ -1,15 +1,30 @@
 import math
+from abc import ABC
 from copy import copy, deepcopy
 from time import sleep
 
+import pandas as pd
 import pytest
 import yaml
 
 from xopt import Evaluator, Xopt, VOCS
 from xopt.errors import XoptError
 from xopt.generators.random import RandomGenerator
+from xopt.generator import Generator
+
 from xopt.options import XoptOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
+
+
+class DummyGenerator(Generator, ABC):
+    def add_data(self, new_data: pd.DataFrame):
+        self.data = pd.concat([self.data, new_data], axis=0)
+
+    def generate(self, n_candidates) -> pd.DataFrame:
+        pass
+
+    def default_options(self):
+        pass
 
 
 class TestXopt:
@@ -69,6 +84,18 @@ class TestXopt:
         )
         with pytest.raises(XoptError):
             X2.step()
+
+    def test_update_data(self):
+        generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
+        evaluator = Evaluator(xtest_callable)
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
+        )
+        X.submit_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
+
+        assert len(X.generator.data) == 2
 
     def test_asynch(self):
         evaluator = Evaluator(xtest_callable)
