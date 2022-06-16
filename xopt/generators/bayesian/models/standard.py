@@ -17,7 +17,6 @@ from xopt.vocs import VOCS
 def create_standard_model(
     data: pd.DataFrame,
     vocs: VOCS,
-    bilog_multiplier: float = 1.0,
     use_conservative_prior_lengthscale: bool = False,
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
@@ -62,7 +61,7 @@ def create_standard_model(
 
         outcome_transform = ChainedOutcomeTransform(
             constraint=Constraint({0: vocs.constraints[name]}),
-            bilog=Bilog(m=1, multiplier=bilog_multiplier),
+            bilog=Bilog(m=1),
         )
 
         # use conservative priors if requested
