@@ -43,7 +43,6 @@ class ModelOptions(XoptBaseModel):
     #    None, description="transform applied to GP outcome model data", exclude=True
     # )
 
-    bilog_multiplier: float = 1.0
     use_conservative_prior_lengthscale: bool = False
     use_conservative_prior_mean: bool = False
     use_low_noise_prior: bool = False
