@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from copy import deepcopy
+
 from deap import base
 
 

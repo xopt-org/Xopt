@@ -2,7 +2,14 @@ from botorch.acquisition import qUpperConfidenceBound
 from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.objectives import create_constrained_mc_objective
+from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+    ConstrainedMCAcquisitionFunction,
+)
+from xopt.generators.bayesian.objectives import (
+    create_constrained_mc_objective,
+    create_constraint_callables,
+    create_mc_objective,
+)
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.vocs import VOCS
 
@@ -43,12 +50,18 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         return UCBOptions()
 
     def _get_objective(self):
-        return create_constrained_mc_objective(self.vocs)
+        return create_mc_objective(self.vocs)
 
     def _get_acquisition(self, model):
-        return qUpperConfidenceBound(
+        qUCB = qUpperConfidenceBound(
             model,
             sampler=self.sampler,
             objective=self.objective,
             beta=self.options.acq.beta,
         )
+
+        cqUCB = ConstrainedMCAcquisitionFunction(
+            model, qUCB, create_constraint_callables(self.vocs), infeasible_cost=0.0
+        )
+
+        return cqUCB

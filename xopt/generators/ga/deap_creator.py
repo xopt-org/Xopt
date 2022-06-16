@@ -33,8 +33,8 @@ programming, evolution strategies, particle swarm optimizers, and many more.
 
 import array
 import copy
-import warnings
 import copyreg
+import warnings
 
 class_replacers = {}
 """Some classes in Python's standard library as well as third party library

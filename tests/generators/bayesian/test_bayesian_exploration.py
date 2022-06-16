@@ -1,9 +1,9 @@
 import torch
 from botorch.sampling import SobolQMCNormalSampler
+from xopt import Evaluator, Xopt
 
 from xopt.generators.bayesian import BayesianExplorationGenerator
-from xopt.resources.testing import TEST_VOCS_DATA, TEST_VOCS_BASE, xtest_callable
-from xopt import Xopt, Evaluator
+from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
 class TestBayesianExplorationGenerator:
@@ -19,8 +19,8 @@ class TestBayesianExplorationGenerator:
         gen.options.acq.monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
 
-        #candidate = gen.generate(5)
-        #assert len(candidate) == 5
+        # candidate = gen.generate(5)
+        # assert len(candidate) == 5
 
     def test_in_xopt(self):
         evaluator = Evaluator(xtest_callable)
@@ -74,4 +74,3 @@ class TestBayesianExplorationGenerator:
         # initialize with single initial candidate
         X.step()
         X.step()
-

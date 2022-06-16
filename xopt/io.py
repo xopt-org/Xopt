@@ -1,21 +1,18 @@
+import json
+import os
+from copy import deepcopy
+from typing import Dict, Tuple, Union
+
+import pandas as pd
+import yaml
+
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, EvaluatorOptions
 from xopt.generator import Generator
 
 from xopt.options import XoptOptions
-from xopt.utils import get_generator_and_defaults, get_function
+from xopt.utils import get_function, get_generator_and_defaults
 from xopt.vocs import VOCS
-
-
-import pandas as pd
-import yaml
-
-
-
-import json
-from copy import deepcopy
-from typing import Dict, Tuple, Union
-import os
 
 
 def parse_config(config) -> dict:
@@ -71,12 +68,14 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     else:
         data = None
 
-    #return generator, evaluator, vocs, options, data
-    return {"generator": generator,
-            "evaluator": evaluator,
-            "vocs": vocs,
-            "options": options,
-            "data": data}
+    # return generator, evaluator, vocs, options, data
+    return {
+        "generator": generator,
+        "evaluator": evaluator,
+        "vocs": vocs,
+        "options": options,
+        "data": data,
+    }
 
 
 def state_to_dict(X, include_data=True):
@@ -94,6 +93,3 @@ def state_to_dict(X, include_data=True):
         output["data"] = json.loads(X.data.to_json())
 
     return output
-
-
-

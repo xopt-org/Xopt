@@ -2,6 +2,7 @@ from typing import List
 
 import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
+from pydantic import Field
 
 from xopt.generators.bayesian import BayesianGenerator
 from xopt.generators.bayesian.objectives import (
@@ -11,7 +12,6 @@ from xopt.generators.bayesian.objectives import (
 
 from xopt.vocs import VOCS
 from .options import AcqOptions, BayesianOptions
-from pydantic import Field
 
 
 class MOBOAcqOptions(AcqOptions):
@@ -46,9 +46,11 @@ class MOBOGenerator(BayesianGenerator):
 
     def _get_acquisition(self, model):
         # get reference point from data
-        inputs, outputs = self.get_training_data(self.data)
+        inputs = self.get_input_data(self.data)
+        outcomes = self.get_outcome_data(self.data)
+
         if self.options.acq.use_data_as_reference:
-            weighted_points = self.objective(outputs)
+            weighted_points = self.objective(outcomes)
             self.options.acq.ref_point = torch.min(
                 weighted_points, dim=0
             ).values.tolist()

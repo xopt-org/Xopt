@@ -3,22 +3,14 @@ from typing import Dict, List
 
 import pandas as pd
 import torch
-from botorch import fit_gpytorch_model
 from botorch.acquisition import ProximalAcquisitionFunction
-from botorch.models import ModelListGP, SingleTaskGP
-from botorch.models.transforms import Normalize, Standardize
-from botorch.models.transforms.outcome import ChainedOutcomeTransform
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
-from gpytorch.kernels import MaternKernel, ScaleKernel
-from gpytorch.mlls import ExactMarginalLogLikelihood
-from gpytorch.priors import GammaPrior
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.custom_botorch.bilog import Bilog
-from xopt.generators.bayesian.custom_botorch.constraint_transform import Constraint
+from xopt.generators.bayesian.models import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
@@ -58,11 +50,11 @@ class BayesianGenerator(Generator, ABC):
             self.train_model(self.data)
 
             # generate starting points for optimization
-            inputs, _ = self.get_training_data(self.data)
+            inputs = self.get_input_data(self.data)
             batch_initial_points = sample_truncated_normal_perturbations(
                 inputs[-1].unsqueeze(0),
                 n_discrete_points=self.options.optim.raw_samples,
-                sigma=1.0,
+                sigma=0.5,
                 bounds=bounds,
             )
 
@@ -84,77 +76,13 @@ class BayesianGenerator(Generator, ABC):
 
         """
 
-        train_X = torch.tensor(data[self.vocs.variable_names].to_numpy())
-        bounds = torch.tensor(self.vocs.bounds)
-        normalize = Normalize(self.vocs.n_variables, bounds=bounds)
-
-        models = {}
-        for name in self.vocs.objective_names:
-            train_Y = torch.tensor(data[name].to_numpy()).unsqueeze(-1)
-            models[name] = SingleTaskGP(
-                train_X,
-                train_Y,
-                input_transform=normalize,
-                outcome_transform=Standardize(1),
-            )
-            mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
-            fit_gpytorch_model(mll)
-
-        # do constraint models
-        for name, val in self.vocs.constraints.items():
-            train_Y = torch.tensor(data[name].to_numpy()).unsqueeze(-1)
-
-            if self.options.model.use_bilog_transform:
-                outcome_transform = ChainedOutcomeTransform(
-                    constraint=Constraint({0: self.vocs.constraints[name]}),
-                    bilog=Bilog(),
-                )
-            else:
-                outcome_transform = ChainedOutcomeTransform(
-                    constraint=Constraint({0: self.vocs.constraints[name]}),
-                )
-
-            # add in special covar module
-            if self.options.model.use_conservative_prior:
-                covar_module = ScaleKernel(
-                    MaternKernel(
-                        nu=2.5,
-                        ard_num_dims=self.vocs.n_variables,
-                        lengthscale_prior=GammaPrior(2.0, 20.0),
-                    )
-                )
-            else:
-                covar_module = None
-
-            models[name] = SingleTaskGP(
-                train_X,
-                train_Y,
-                input_transform=normalize,
-                outcome_transform=outcome_transform,
-                covar_module=covar_module,
-            )
-
-            mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
-            fit_gpytorch_model(mll)
-
-        # create model list
-        _model = ModelListGP(*[models[name] for name in self.vocs.output_names])
+        _model = create_standard_model(
+            data, self.vocs, tkwargs=self._tkwargs, **self.options.model.dict()
+        )
 
         if update_internal:
             self._model = _model
         return _model
-
-    def get_training_data(self, data: pd.DataFrame) -> (torch.Tensor, torch.Tensor):
-        """
-        get training data from dataframe
-        - transform constraint data into standard form where values < 0 imply
-        feasibility
-
-        """
-        inputs, outputs = self.vocs.get_training_data(data)
-        return torch.tensor(inputs, **self._tkwargs), torch.tensor(
-            outputs, **self._tkwargs
-        )
 
     def get_acquisition(self, model):
         """
@@ -174,6 +102,15 @@ class BayesianGenerator(Generator, ABC):
             acq = self._get_acquisition(model)
 
         return acq
+
+    def get_training_data(self, data: pd.DataFrame):
+        return self.get_input_data(data), self.get_outcome_data(data)
+
+    def get_input_data(self, data: pd.DataFrame):
+        return torch.tensor(data[self.vocs.variable_names].to_numpy(), **self._tkwargs)
+
+    def get_outcome_data(self, data: pd.DataFrame):
+        return torch.tensor(data[self.vocs.output_names].to_numpy(), **self._tkwargs)
 
     @abstractmethod
     def _get_acquisition(self, model):

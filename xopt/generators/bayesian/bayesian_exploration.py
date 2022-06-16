@@ -1,9 +1,6 @@
 from typing import Optional
 
-from botorch.acquisition import (
-    MCAcquisitionObjective,
-    MCAcquisitionFunction,
-)
+from botorch.acquisition import MCAcquisitionFunction, MCAcquisitionObjective
 from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
@@ -11,10 +8,17 @@ from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_tr
 from torch import Tensor
 
 from xopt.generator import GeneratorOptions
-from xopt.generators.bayesian.objectives import create_constrained_mc_objective
-from xopt.vocs import VOCS
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+    ConstrainedMCAcquisitionFunction,
+)
+from xopt.generators.bayesian.objectives import (
+    create_constrained_mc_objective,
+    create_constraint_callables,
+    create_mc_objective,
+)
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.vocs import VOCS
 
 
 class BayesianExplorationOptions(GeneratorOptions):
@@ -48,14 +52,20 @@ class BayesianExplorationGenerator(BayesianGenerator):
         return BayesianOptions()
 
     def _get_acquisition(self, model):
-        return qPosteriorVariance(
+        qPV = qPosteriorVariance(
             model,
             sampler=self.sampler,
             objective=self.objective,
         )
 
+        cqPV = ConstrainedMCAcquisitionFunction(
+            model, qPV, create_constraint_callables(self.vocs), infeasible_cost=0.0
+        )
+
+        return cqPV
+
     def _get_objective(self):
-        return create_constrained_mc_objective(self.vocs)
+        return create_mc_objective(self.vocs)
 
 
 class qPosteriorVariance(MCAcquisitionFunction):

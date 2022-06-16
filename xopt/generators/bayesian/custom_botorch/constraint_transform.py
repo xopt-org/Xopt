@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 from botorch.models.transforms.outcome import OutcomeTransform
@@ -21,7 +21,7 @@ class Constraint(OutcomeTransform):
         Args:
             outputs: Which of the outputs to Bilog-transform. If omitted, all
                 outputs will be transformed.
-            constraints: A dictionary of constraints to apply where keys are the 
+            constraints: A dictionary of constraints to apply where keys are the
             output indices and values are the constraints to apply (["LESS_THAN",1]).
         """
 
@@ -50,25 +50,23 @@ class Constraint(OutcomeTransform):
         if not self.training:
             new_tf.eval()
         return new_tf
-    
+
     def _constraint_transform(self, Y: Tensor, reverse=False) -> Tensor:
         Y_tf = Y.clone()
         for k, val in self._constraints.items():
             if val[0] == "LESS_THAN":
                 if reverse:
-                    Y_tf[..., k] = (Y_tf[..., k] + val[1])
+                    Y_tf[..., k] = Y_tf[..., k] + val[1]
                 else:
-                    Y_tf[..., k] = (Y_tf[..., k] - val[1])
+                    Y_tf[..., k] = Y_tf[..., k] - val[1]
             elif val[0] == "GREATER_THAN":
-                Y_tf[..., k] = (val[1] - Y_tf[..., k])
+                Y_tf[..., k] = val[1] - Y_tf[..., k]
             else:
-                raise NotImplementedError(
-                    f"{val[0]} is not a supported constraint."
-                )
+                raise NotImplementedError(f"{val[0]} is not a supported constraint.")
         return Y_tf
 
     def forward(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Bilog-transform outcomes.
 
@@ -102,7 +100,7 @@ class Constraint(OutcomeTransform):
         return Y_tf, Yvar
 
     def untransform(
-            self, Y: Tensor, Yvar: Optional[Tensor] = None
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Un-transform constraint-transformed outcomes
 

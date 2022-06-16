@@ -1,13 +1,13 @@
+import logging
+from abc import ABC, abstractmethod
+
+from typing import Dict, List, Type, TypeVar
+
 import numpy as np
 import pandas as pd
-from abc import ABC, abstractmethod
-from xopt.vocs import VOCS
-
-from typing import List, Dict, Type, TypeVar
 
 from xopt.pydantic import XoptBaseModel
-
-import logging
+from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class Generator(ABC):
     alias = None
 
     def __init__(
-            self, vocs: VOCS, options: Type[_GeneratorOptions] = GeneratorOptions()
+        self, vocs: VOCS, options: Type[_GeneratorOptions] = GeneratorOptions()
     ):
         """
         Initialize the generator.
@@ -98,5 +98,3 @@ class Generator(ABC):
     @property
     def options(self):
         return self._options
-
-
