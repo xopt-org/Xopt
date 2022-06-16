@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Optional, Callable, List
+from typing import Callable, List, Optional
 
 import torch
 from botorch.acquisition import ConstrainedMCObjective, GenericMCObjective
@@ -8,30 +8,48 @@ from botorch.utils import apply_constraints
 from torch import Tensor
 
 
-def constraint_function(Z, vocs=None, index=-1):
+def constraint_function(Z, vocs, index, quantile_cutoff=0.0):
+    """
+    create constraint function
+    - if a distribution of samples has a quantile level, given by `quantile_cutoff`,
+    that is infeasiable penalize the entire set of samples to make all infeasible
+    """
     n_objectives = len(vocs.objectives)
-    return Z[..., n_objectives + index]
+
+    # quantile test
+    output = Z[..., n_objectives + index] + 5.0 * (
+        torch.quantile(
+            Z[..., n_objectives + index], quantile_cutoff, dim=0, keepdim=True
+        )
+        > 0
+    )
+    return output
 
 
-def create_constraint_callables(vocs):
+def create_constraint_callables(vocs, quantile_cutoff=0.5):
     if vocs.constraints is not None:
         constraint_names = list(vocs.constraints.keys())
         n_constraints = len(constraint_names)
         constraint_callables = []
         for i in range(n_constraints):
-            constraint_callables += [partial(constraint_function, vocs=vocs, index=i)]
+            constraint_callables += [
+                partial(
+                    constraint_function,
+                    vocs=vocs,
+                    index=i,
+                    quantile_cutoff=quantile_cutoff,
+                )
+            ]
         return constraint_callables
 
     else:
         return None
 
 
-def create_constrained_mc_objective(vocs):
+def create_mc_objective(vocs):
     """
     create the objective object
 
-    NOTE: we assume that corresponding model outputs are ordered according to vocs
-    ordering
     """
     weights = torch.zeros(vocs.n_outputs).double()
     for idx, ele in enumerate(vocs.objective_names):
@@ -43,7 +61,25 @@ def create_constrained_mc_objective(vocs):
     def obj_callable(Z):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
-    constraint_callables = create_constraint_callables(vocs)
+    return GenericMCObjective(obj_callable)
+
+
+def create_constrained_mc_objective(vocs, quantile_cutoff=0.0):
+    """
+    create the objective object
+
+    """
+    weights = torch.zeros(vocs.n_outputs).double()
+    for idx, ele in enumerate(vocs.objective_names):
+        if vocs.objectives[ele] == "MINIMIZE":
+            weights[idx] = -1.0
+        else:
+            weights[idx] = 1.0
+
+    def obj_callable(Z):
+        return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
+
+    constraint_callables = create_constraint_callables(vocs, quantile_cutoff)
 
     constrained_obj = ConstrainedMCObjective(
         objective=obj_callable, constraints=constraint_callables, infeasible_cost=100.0
@@ -104,6 +140,6 @@ class FeasibilityObjective(GenericMCObjective):
             obj=obj,
             constraints=self.constraints,
             samples=samples,
-            infeasible_cost=self.infeasible_cost,
+            infeasible_cost=0.0,
             eta=self.eta,
         )

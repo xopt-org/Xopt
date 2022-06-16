@@ -1,5 +1,5 @@
 import logging
-from concurrent.futures import Executor, ThreadPoolExecutor, Future, ProcessPoolExecutor
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from enum import Enum
 from threading import Lock
 from types import FunctionType
@@ -8,7 +8,7 @@ from typing import Callable, Dict
 import pandas as pd
 
 from xopt.pydantic import XoptBaseModel
-from xopt.utils import get_function_defaults, get_function
+from xopt.utils import get_function, get_function_defaults
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class Evaluator:
         """
 
         # Fill defaults
-        kw =  get_function_defaults(function)
+        kw = get_function_defaults(function)
         kw.update(function_kwargs)
 
         self.options = EvaluatorOptions(
@@ -80,12 +80,11 @@ class Evaluator:
     def from_options(cls, options: EvaluatorOptions):
         return cls(**options.dict())
 
-
     def evaluate(self, input: Dict, **kwargs):
         """
-        Evaluate a single input dict using Evaluator.function with 
+        Evaluate a single input dict using Evaluator.function with
         Evaluator.function_kwargs.
-        
+
         Further kwargs are passed to the function.
 
         Inputs:

@@ -1,5 +1,7 @@
 from pydantic import Field
+
 from xopt.pydantic import XoptBaseModel
+
 
 class XoptOptions(XoptBaseModel):
     asynch: bool = Field(

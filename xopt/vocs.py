@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Union, Any
+from typing import Any, Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -37,8 +37,9 @@ class ConstraintEnum(str, Enum):
 class VOCS(XoptBaseModel):
     """
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
-    to describe optimization problems. 
+    to describe optimization problems.
     """
+
     variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {}
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
@@ -158,8 +159,8 @@ class VOCS(XoptBaseModel):
 
     def convert_dataframe_to_inputs(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Extracts only inputs from a dataframe. 
-        This will add constants. 
+        Extracts only inputs from a dataframe.
+        This will add constants.
         """
         # make sure that the df keys contain the vocs variables
         if not set(self.variable_names).issubset(set(data.keys())):

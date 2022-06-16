@@ -3,10 +3,10 @@ from copy import copy
 import yaml
 
 from xopt import Evaluator, Xopt
-from xopt.generators import RandomGenerator
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML
-from xopt.io import state_to_dict, parse_config
 from xopt.evaluator import EvaluatorOptions
+from xopt.generators import RandomGenerator
+from xopt.io import parse_config, state_to_dict
+from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML
 
 
 def dummy():
@@ -23,7 +23,7 @@ class Test_IO:
         assert state_dict["generator"]["name"] == generator.alias
 
         # read from dict
-        config =  parse_config(state_dict)
+        config = parse_config(state_dict)
         assert config["evaluator"].options.function == dummy
 
     def test_parse_config(self):

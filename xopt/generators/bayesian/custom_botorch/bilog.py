@@ -1,10 +1,15 @@
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
+
+import torch
 
 from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.posteriors import Posterior, TransformedPosterior
 from botorch.utils.transforms import normalize_indices
 from torch import Tensor
-import torch
+
+
+def rms(X, dim=0, keepdim=False):
+    return torch.sqrt(torch.sum(X**2, dim=dim, keepdim=keepdim) / X.shape[dim])
 
 
 class Bilog(OutcomeTransform):
@@ -13,14 +18,71 @@ class Bilog(OutcomeTransform):
     constraints as it magnifies values near zero and flattens extreme values.
     """
 
-    def __init__(self, outputs: Optional[List[int]] = None) -> None:
+    def __init__(
+        self,
+        m: int,
+        outputs: Optional[List[int]] = None,
+        batch_shape: torch.Size = torch.Size(),  # noqa: B008
+        min_scale: float = 1e-8,
+        multiplier: float = 1.0,
+    ) -> None:
         r"""Bilog-transform outcomes.
         Args:
             outputs: Which of the outputs to Bilog-transform. If omitted, all
                 outputs will be transformed.
         """
         super().__init__()
-        self._outputs = outputs
+
+        self._outputs = normalize_indices(outputs, d=m)
+        self.register_buffer("scales", torch.zeros(*batch_shape, 1, m))
+        self.register_buffer("multiplier", torch.tensor(multiplier))
+        self._batch_shape = batch_shape
+        self._min_scale = min_scale
+        self._m = m
+
+    def forward(
+        self, Y: Tensor, Yvar: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Optional[Tensor]]:
+        r"""Bilog-transform outcomes.
+        Args:
+            Y: A `batch_shape x n x m`-dim tensor of training targets.
+            Yvar: A `batch_shape x n x m`-dim tensor of observation noises
+                associated with the training targets (if applicable).
+        Returns:
+            A two-tuple with the transformed outcomes:
+            - The transformed outcome observations.
+            - The transformed observation noise (if applicable).
+        """
+        if self.training:
+            if Y.shape[:-2] != self._batch_shape:
+                raise RuntimeError("wrong batch shape")
+            if Y.size(-1) != self._m:
+                raise RuntimeError("wrong output dimension")
+            scales = rms(Y, dim=-2, keepdim=True) / self.multiplier
+            scales = scales.where(
+                scales >= self._min_scale, torch.full_like(scales, 1.0)
+            )
+            if self._outputs is not None:
+                unused = [i for i in range(self._m) if i not in self._outputs]
+                scales[..., unused] = 0.0
+
+            self.scales = scales
+
+        Y_tf = Y.sign() * (Y.abs() / self.scales + 1.0).log()
+        outputs = normalize_indices(self._outputs, d=Y.size(-1))
+        if outputs is not None:
+            Y_tf = torch.stack(
+                [
+                    Y_tf[..., i] if i in outputs else Y[..., i]
+                    for i in range(Y.size(-1))
+                ],
+                dim=-1,
+            )
+        if Yvar is not None:
+            raise NotImplementedError(
+                "Bilog does not yet support transforming observation noise"
+            )
+        return Y_tf, Yvar
 
     def subset_output(self, idcs: List[int]) -> OutcomeTransform:
         r"""Subset the transform along the output dimension.
@@ -42,35 +104,6 @@ class Bilog(OutcomeTransform):
             new_tf.eval()
         return new_tf
 
-    def forward(
-        self, Y: Tensor, Yvar: Optional[Tensor] = None
-    ) -> Tuple[Tensor, Optional[Tensor]]:
-        r"""Bilog-transform outcomes.
-        Args:
-            Y: A `batch_shape x n x m`-dim tensor of training targets.
-            Yvar: A `batch_shape x n x m`-dim tensor of observation noises
-                associated with the training targets (if applicable).
-        Returns:
-            A two-tuple with the transformed outcomes:
-            - The transformed outcome observations.
-            - The transformed observation noise (if applicable).
-        """
-        Y_tf = Y.sign() * (Y.abs() + 1.0).log()
-        outputs = normalize_indices(self._outputs, d=Y.size(-1))
-        if outputs is not None:
-            Y_tf = torch.stack(
-                [
-                    Y_tf[..., i] if i in outputs else Y[..., i]
-                    for i in range(Y.size(-1))
-                ],
-                dim=-1,
-            )
-        if Yvar is not None:
-            raise NotImplementedError(
-                "Bilog does not yet support transforming observation noise"
-            )
-        return Y_tf, Yvar
-
     def untransform(
         self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
@@ -85,7 +118,7 @@ class Bilog(OutcomeTransform):
             - The un-transformed outcome observations.
             - The un-transformed observation noise (if applicable).
         """
-        Y_utf = Y.sign() * (Y.abs().exp() - 1.0)
+        Y_utf = Y.sign() * (Y.abs().exp() - 1.0) * self.scales
         outputs = normalize_indices(self._outputs, d=Y.size(-1))
         if outputs is not None:
             Y_utf = torch.stack(
@@ -115,5 +148,5 @@ class Bilog(OutcomeTransform):
             )
         return TransformedPosterior(
             posterior=posterior,
-            sample_transform=lambda x: x.sign() * (x.abs().exp() - 1.0),
+            sample_transform=lambda x: x.sign() * (x.abs().exp() - 1.0) * self.scales,
         )

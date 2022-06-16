@@ -49,7 +49,7 @@ def isotime(include_microseconds=False):
     t = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).astimezone()
     if not include_microseconds:
         t = t.replace(microsecond=0)
-        
+
     return t.isoformat()
 
 
@@ -85,7 +85,7 @@ def get_function(name):
 def get_function_defaults(f):
     """
     Returns a dict of the non-empty POSITIONAL_OR_KEYWORD arguments.
-    
+
     See the `inspect` documentation for defaults.
     """
     defaults = {}
@@ -107,6 +107,3 @@ def get_n_required_fuction_arguments(f):
             if v.default == inspect.Parameter.empty:
                 n += 1
     return n
-
-
-

@@ -36,7 +36,6 @@ class TestBayesianGenerator(TestCase):
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
         gen = BayesianGenerator(sinusoid_vocs)
-        gen.options.model.use_bilog_transform = True
         evaluator = Evaluator(evaluate_sinusoid)
         X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
 
@@ -45,9 +44,6 @@ class TestBayesianGenerator(TestCase):
 
         test_samples = pd.DataFrame(np.linspace(0, 2 * 3.14, 10), columns=["x1"])
         X.submit_data(test_samples)
-        X.process_futures()
-
-        print(X.data)
 
         # create gp model with data
         model = gen.train_model(X.data)
@@ -60,7 +56,7 @@ class TestBayesianGenerator(TestCase):
             )
 
         # test outcome transform(s)
-        # objective transform
+        # objective transform - standardization
         outcome_transform = Standardize(1)
         assert torch.allclose(
             model.train_targets[0],
@@ -73,6 +69,7 @@ class TestBayesianGenerator(TestCase):
 
         # constraint transform
         C = torch.from_numpy(X.data["c1"].to_numpy())
+        C = C / torch.sqrt(torch.sum(C**2) / C.numel())  # standardization
         assert torch.allclose(
             model.train_targets[1], torch.sign(-C) * torch.log(1 + torch.abs(-C))
         )

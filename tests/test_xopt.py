@@ -7,10 +7,10 @@ import pandas as pd
 import pytest
 import yaml
 
-from xopt import Evaluator, Xopt, VOCS
+from xopt import Evaluator, VOCS, Xopt
 from xopt.errors import XoptError
-from xopt.generators.random import RandomGenerator
 from xopt.generator import Generator
+from xopt.generators.random import RandomGenerator
 
 from xopt.options import XoptOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable

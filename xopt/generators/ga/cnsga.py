@@ -1,19 +1,21 @@
 import array
 import logging
+import os
 import random
 import warnings
-import os
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
 from pydantic import confloat
 
+import xopt.utils
+
 from xopt.generator import Generator, GeneratorOptions
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
-import xopt.utils 
-#xopt.utils.isotime() # works
-#from xopt.utils import isotime # circular import
+
+# xopt.utils.isotime() # works
+# from xopt.utils import isotime # circular import
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ class CNSGAOptions(GeneratorOptions):
     mutation_probability: confloat(ge=0, le=1) = 1.0
     population_file: str = None
     output_path: str = None
+
 
 class CNSGAGenerator(Generator):
 
@@ -51,15 +54,15 @@ class CNSGAGenerator(Generator):
 
         if options.population_file is not None:
             self.load_population_csv(options.population_file)
-            #n_here = len(self.population) 
-            #if n_here != self.n_pop:
+            # n_here = len(self.population)
+            # if n_here != self.n_pop:
             #    warnings.warn(f"Population in {options.population_file} does not match n_pop: {n_here} != {self.n_pop}")
 
         if options.output_path is not None:
             assert os.path.isdir(options.output_path), "Output directory does not exist"
 
-        #if data is not None:
-        #    self.population = cnsga_select(data, n_pop, vocs, self.toolbox)        
+        # if data is not None:
+        #    self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
 
     def old__init__(
         self,
@@ -86,10 +89,6 @@ class CNSGAGenerator(Generator):
 
         if data is not None:
             self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
-
-
-
-
 
     def create_children(self):
 
@@ -138,7 +137,6 @@ class CNSGAGenerator(Generator):
 
         return [self.children.pop() for _ in range(n_candidates)]
 
-
     def write_population(self, filename=None):
         """
         Write the current population to a CSV file.
@@ -148,16 +146,18 @@ class CNSGAGenerator(Generator):
             filename = f"{self.alias}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
             filename = os.path.join(self.options.output_path, filename)
 
-        self.population.to_csv(filename, index_label='xopt_index')
+        self.population.to_csv(filename, index_label="xopt_index")
 
     def load_population_csv(self, filename):
         """
         Read a population from a CSV file.
         These will be reverted back to children for re-evaluation.
         """
-        pop = pd.read_csv(filename, index_col='xopt_index')
+        pop = pd.read_csv(filename, index_col="xopt_index")
         # This is a list of dicts
-        self.children = self.vocs.convert_dataframe_to_inputs(pop).to_dict(orient="records")
+        self.children = self.vocs.convert_dataframe_to_inputs(pop).to_dict(
+            orient="records"
+        )
         logger.info(f"Loaded population of len {len(pop)} from file: {filename}")
 
     @property
@@ -166,6 +166,7 @@ class CNSGAGenerator(Generator):
         Convenience alias for `options.population_size`
         """
         return self.options.population_size
+
 
 def uniform(low, up, size=None):
     """ """

@@ -1,26 +1,24 @@
-from xopt.generator import Generator
-from xopt.evaluator import Evaluator
-from xopt.io import state_to_dict, parse_config
-from xopt.vocs import VOCS
-from xopt.errors import XoptError
-from xopt.options import XoptOptions
-
-
 from xopt import _version
+from xopt.errors import XoptError
+from xopt.evaluator import Evaluator
+from xopt.generator import Generator
+from xopt.io import parse_config, state_to_dict
+from xopt.options import XoptOptions
+from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
 
-import pandas as pd
-import numpy as np
-import yaml
+import concurrent
 import json
-
+import logging
+import os
+import traceback
 
 from typing import Dict
-import concurrent
-import logging
-import traceback
-import os
+
+import numpy as np
+import pandas as pd
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +95,9 @@ class Xopt:
             if self.options.max_evaluations:
                 if len(self.data) >= self.options.max_evaluations:
                     self._is_done = True
-                    logger.info(f'Xopt is done. Max evaluations {self.options.max_evaluations} reached.')
+                    logger.info(
+                        f"Xopt is done. Max evaluations {self.options.max_evaluations} reached."
+                    )
                     break
 
             self.step()
@@ -227,8 +227,10 @@ class Xopt:
 
                 # check to make sure the output is a dict - if so raise XoptError
                 if not isinstance(outputs, dict):
-                    raise XoptError(f"Evaluator function must return a dict, got type "
-                                    f"{type(future.result())} instead")
+                    raise XoptError(
+                        f"Evaluator function must return a dict, got type "
+                        f"{type(future.result())} instead"
+                    )
 
                 outputs["xopt_error"] = False
                 outputs["xopt_error_str"] = ""
@@ -274,7 +276,7 @@ class Xopt:
             output = state_to_dict(self)
             with open(self.options.dump_file, "w") as f:
                 yaml.dump(output, f)
-            logger.debug(f"Dumping state to:{self.options.dump_file}")                
+            logger.debug(f"Dumping state to:{self.options.dump_file}")
 
     @property
     def data(self):
@@ -299,7 +301,7 @@ class Xopt:
     @classmethod
     def from_dict(cls, config_dict):
         pass
-        #return cls(**xopt_kwargs_from_dict(config_dict))
+        # return cls(**xopt_kwargs_from_dict(config_dict))
 
     @classmethod
     def from_yaml(cls, yaml_str):
@@ -335,7 +337,6 @@ Config as YAML:
 
     def __str__(self):
         return self.__repr__()
-
 
     # Convenience methods
 

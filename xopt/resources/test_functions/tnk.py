@@ -1,8 +1,8 @@
+import time
+from random import random
 from typing import Dict
 
 import numpy as np
-import time
-from random import random
 
 from xopt.vocs import VOCS
 
@@ -23,7 +23,7 @@ def TNK(individual):
     x2 = individual[1]
     objectives = (x1, x2)
     constraints = (
-        x1 ** 2 + x2 ** 2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
+        x1**2 + x2**2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
         (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2,
     )
     return objectives, constraints
@@ -37,8 +37,7 @@ def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, random_sleep=0, **pa
 
     # Sleep for a bit
     time.sleep(sleep)
-    time.sleep(random() * random_sleep * 2) # Average should be random_sleep
-
+    time.sleep(random() * random_sleep * 2)  # Average should be random_sleep
 
     outputs = {
         "y1": objectives[0],

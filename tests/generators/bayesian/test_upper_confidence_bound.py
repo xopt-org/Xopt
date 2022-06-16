@@ -1,11 +1,11 @@
 import torch
 from botorch.sampling import SobolQMCNormalSampler
-
-from xopt.resources.testing import TEST_VOCS_DATA, TEST_VOCS_BASE, xtest_callable
-from xopt import Xopt, Evaluator
+from xopt import Evaluator, Xopt
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
+
+from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
 class TestUpperConfidenceBoundGenerator:
@@ -26,8 +26,8 @@ class TestUpperConfidenceBoundGenerator:
         candidate = gen.generate(1)
         assert len(candidate) == 1
 
-        #candidate = gen.generate(2)
-        #assert len(candidate) == 2
+        # candidate = gen.generate(2)
+        # assert len(candidate) == 2
 
     def test_in_xopt(self):
         evaluator = Evaluator(xtest_callable)

@@ -12,21 +12,21 @@ mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 
 """
 
-from xopt import Xopt
+from mpi4py import MPI
 
 from mpi4py.futures import MPIPoolExecutor
-from mpi4py import MPI
+
+from xopt import Xopt
 
 comm = MPI.COMM_WORLD
 mpi_rank = comm.Get_rank()
 mpi_size = comm.Get_size()
 
 import argparse
+import logging
 import os
 import sys
-import logging
 from pprint import pprint
-
 
 from xopt.log import set_handler_with_logger
 
@@ -69,8 +69,8 @@ if __name__ == "__main__":
     logger.info(f"Parallel execution with {mpi_size} workers")
 
     X = Xopt(infile)
-    logger.info('Enabling async mode')
-    X.options.asynch = True # Force asynch
+    logger.info("Enabling async mode")
+    X.options.asynch = True  # Force asynch
 
     print(X)
     sys.stdout.flush()
