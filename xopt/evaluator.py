@@ -8,7 +8,7 @@ from typing import Callable, Dict
 import pandas as pd
 
 from xopt.pydantic import XoptBaseModel
-from xopt.utils import get_function, get_function_defaults
+from xopt.utils import get_function_defaults
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
+from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.vocs import ObjectiveEnum, VOCS
 
 

@@ -13,7 +13,6 @@ mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 """
 
 from mpi4py import MPI
-
 from mpi4py.futures import MPIPoolExecutor
 
 from xopt import Xopt
@@ -26,7 +25,6 @@ import argparse
 import logging
 import os
 import sys
-from pprint import pprint
 
 from xopt.log import set_handler_with_logger
 

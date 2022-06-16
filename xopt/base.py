@@ -9,7 +9,6 @@ from xopt.vocs import VOCS
 __version__ = _version.get_versions()["version"]
 
 import concurrent
-import json
 import logging
 import os
 import traceback

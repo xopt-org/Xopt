@@ -1,5 +1,3 @@
-import torch
-from botorch.sampling import SobolQMCNormalSampler
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
