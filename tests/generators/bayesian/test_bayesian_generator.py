@@ -1,11 +1,8 @@
-from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import patch
 
 import pandas as pd
-import pytest
 import torch
-
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 

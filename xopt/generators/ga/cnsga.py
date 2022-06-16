@@ -2,14 +2,12 @@ import array
 import logging
 import os
 import random
-import warnings
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
 from pydantic import confloat
 
 import xopt.utils
-
 from xopt.generator import Generator, GeneratorOptions
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints

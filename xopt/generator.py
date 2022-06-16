@@ -1,9 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import Type, TypeVar
 
-from typing import Dict, List, Type, TypeVar
-
-import numpy as np
 import pandas as pd
 
 from xopt.pydantic import XoptBaseModel

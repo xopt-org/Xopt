@@ -13,7 +13,6 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.objectives import (
-    create_constrained_mc_objective,
     create_constraint_callables,
     create_mc_objective,
 )

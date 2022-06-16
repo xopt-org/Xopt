@@ -9,7 +9,7 @@ class HalfCauchyPrior(Prior, HalfCauchy):
     """
 
     def __init__(self, scale, validate_args=None, transform=None):
-        TModule.__init__(self)
+        TModule.__init__()
         HalfCauchy.__init__(self, scale=scale, validate_args=validate_args)
         self._transform = transform
 

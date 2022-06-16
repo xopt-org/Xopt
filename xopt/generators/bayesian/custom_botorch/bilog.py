@@ -24,7 +24,6 @@ class Bilog(OutcomeTransform):
         outputs: Optional[List[int]] = None,
         batch_shape: torch.Size = torch.Size(),  # noqa: B008
         min_scale: float = 1e-8,
-        multiplier: float = 1.0,
     ) -> None:
         r"""Bilog-transform outcomes.
         Args:
@@ -35,7 +34,6 @@ class Bilog(OutcomeTransform):
 
         self._outputs = normalize_indices(outputs, d=m)
         self.register_buffer("scales", torch.zeros(*batch_shape, 1, m))
-        self.register_buffer("multiplier", torch.tensor(multiplier))
         self._batch_shape = batch_shape
         self._min_scale = min_scale
         self._m = m
@@ -58,7 +56,7 @@ class Bilog(OutcomeTransform):
                 raise RuntimeError("wrong batch shape")
             if Y.size(-1) != self._m:
                 raise RuntimeError("wrong output dimension")
-            scales = rms(Y, dim=-2, keepdim=True) / self.multiplier
+            scales = rms(Y, dim=-2, keepdim=True)
             scales = scales.where(
                 scales >= self._min_scale, torch.full_like(scales, 1.0)
             )
@@ -99,7 +97,10 @@ class Bilog(OutcomeTransform):
                     "when subsetting outputs and only transforming some outputs."
                 )
             new_outputs = [i for i in self._outputs if i in idcs]
-        new_tf = self.__class__(outputs=new_outputs)
+        new_tf = self.__class__(self._m, outputs=new_outputs,
+                                batch_shape = self._batch_shape,
+                                min_scale=self._min_scale
+                                )
         if not self.training:
             new_tf.eval()
         return new_tf

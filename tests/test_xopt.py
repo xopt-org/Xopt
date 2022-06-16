@@ -1,7 +1,6 @@
 import math
 from abc import ABC
 from copy import copy, deepcopy
-from time import sleep
 
 import pandas as pd
 import pytest
@@ -11,7 +10,6 @@ from xopt import Evaluator, VOCS, Xopt
 from xopt.errors import XoptError
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
-
 from xopt.options import XoptOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
 
