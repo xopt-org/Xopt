@@ -30,14 +30,21 @@ def TNK(individual):
 
 
 # labeled version
-def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, random_sleep=0, **params):
+def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, random_sleep=0, raise_probability = 0,
+    **params):
     info = {"some": "info", "about": ["the", "run"]}
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = TNK(ind)
 
+
+    r = random()
     # Sleep for a bit
     time.sleep(sleep)
-    time.sleep(random() * random_sleep * 2)  # Average should be random_sleep
+    time.sleep(r * random_sleep * 2)  # Average should be random_sleep
+
+    if r < raise_probability:
+        raise ValueError(f'intentioal TNK crash ')
+
 
     outputs = {
         "y1": objectives[0],
