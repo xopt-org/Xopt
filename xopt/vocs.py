@@ -244,20 +244,29 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
 
     Returns a dataframe with the objective data intented to be minimized.
 
+    Missing or nan values will be filled with: np.inf 
+
     """
     if not objectives:
         return None
 
     data = pd.DataFrame(data)
 
-    odata = pd.DataFrame()
+    odata = pd.DataFrame(index=data.index)
+    
     for k in sorted(list(objectives)):
+        
+        # Protect against missing data
+        if k not in data:
+            odata[prefix + k] = np.inf
+            continue
+
         operator = objectives[k].upper()
         if operator not in OBJECTIVE_WEIGHT:
             raise ValueError(f"Unknown objective operator: {operator}")
 
         weight = OBJECTIVE_WEIGHT[operator]
-        odata[prefix + k] = weight * data[k]
+        odata[prefix + k] = (weight * data[k]).fillna(np.inf) # Protect against nans
 
     return odata
 
@@ -273,14 +282,24 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
         prefix: Prefix to use for the transformed data in the dataframe
 
     Returns a dataframe with the constraint data.
+
+    Missing or nan values will be filled with: np.inf 
+
     """
     if not constraints:
         return None
 
     data = pd.DataFrame(data)  # cast to dataframe
 
-    cdata = pd.DataFrame()
+    cdata = pd.DataFrame(index=data.index)
+
     for k in sorted(list(constraints)):
+
+        # Protect against missing data
+        if k not in data:
+            cdata[prefix + k] = np.inf
+            continue
+
         x = data[k]
         op, d = constraints[k]
         op = op.upper()  # Allow any case
@@ -292,7 +311,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
         else:
             raise ValueError(f"Unknown constraint operator: {op}")
 
-        cdata[prefix + k] = cvalues
+        cdata[prefix + k] = cvalues.fillna(np.inf) # Protect against nans
     return cdata
 
 
