@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import yaml
 
-from xopt.evaluator import Evaluator, EvaluatorOptions
+from xopt.evaluator import Evaluator
 from xopt.options import XoptOptions
 from xopt.utils import get_function, get_generator_and_defaults
 from xopt.vocs import VOCS
