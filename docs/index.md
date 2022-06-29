@@ -40,14 +40,19 @@ Xopt runs are specified via a dictionary that can be directly imported from a YA
 file.
 
 ```yaml
-xopt: {}
+xopt:
+    max_evaluations: 6400
+
 generator:
-    name: random
+    name: cnsga
+    population_size: 64
+    population_file: test.csv
+    output_path: .
 
 evaluator:
     function: xopt.resources.test_functions.tnk.evaluate_TNK
     function_kwargs:
-        a: 999
+      raise_probability: 0.1
 
 vocs:
     variables:

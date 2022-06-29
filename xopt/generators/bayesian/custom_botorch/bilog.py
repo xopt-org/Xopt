@@ -9,7 +9,7 @@ from torch import Tensor
 
 
 def rms(X, dim=0, keepdim=False):
-    return torch.sqrt(torch.sum(X**2, dim=dim, keepdim=keepdim) / X.shape[dim])
+    return torch.sqrt(torch.sum(X ** 2, dim=dim, keepdim=keepdim) / X.shape[dim])
 
 
 class Bilog(OutcomeTransform):
@@ -19,11 +19,11 @@ class Bilog(OutcomeTransform):
     """
 
     def __init__(
-        self,
-        m: int,
-        outputs: Optional[List[int]] = None,
-        batch_shape: torch.Size = torch.Size(),  # noqa: B008
-        min_scale: float = 1e-8,
+            self,
+            m: int,
+            outputs: Optional[List[int]] = None,
+            batch_shape: torch.Size = torch.Size(),  # noqa: B008
+            min_scale: float = 1e-8,
     ) -> None:
         r"""Bilog-transform outcomes.
         Args:
@@ -39,7 +39,7 @@ class Bilog(OutcomeTransform):
         self._m = m
 
     def forward(
-        self, Y: Tensor, Yvar: Optional[Tensor] = None
+            self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Bilog-transform outcomes.
         Args:
@@ -98,7 +98,7 @@ class Bilog(OutcomeTransform):
                 )
             new_outputs = [i for i in self._outputs if i in idcs]
         new_tf = self.__class__(self._m, outputs=new_outputs,
-                                batch_shape = self._batch_shape,
+                                batch_shape=self._batch_shape,
                                 min_scale=self._min_scale
                                 )
         if not self.training:
@@ -106,7 +106,7 @@ class Bilog(OutcomeTransform):
         return new_tf
 
     def untransform(
-        self, Y: Tensor, Yvar: Optional[Tensor] = None
+            self, Y: Tensor, Yvar: Optional[Tensor] = None
     ) -> Tuple[Tensor, Optional[Tensor]]:
         r"""Un-transform bilog-transformed outcomes
         Args:

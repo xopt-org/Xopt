@@ -11,8 +11,6 @@ class TestVOCS(object):
     def test_init(self):
         from xopt.vocs import VOCS
 
-        vocs = VOCS()
-
         # test various configurations
         vocs = VOCS(
             variables={"x": [0, 1]},
@@ -25,11 +23,11 @@ class TestVOCS(object):
     def test_from_yaml(self):
         Y = """
         variables:
-          a: [0, 1e3] # Note that 1e3 usually parses as a str with YAML. 
+          a: [0, 1e3] # Note that 1e3 usually parses as a str with YAML.
           b: [-1, 1]
         objectives:
           c: maximize
-          d: minimize 
+          d: minimize
         constraints:
           e: ['Less_than', 2]
           f: ['greater_than', 0]

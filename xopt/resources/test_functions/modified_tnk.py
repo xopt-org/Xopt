@@ -29,7 +29,6 @@ def modified_TNK(individual):
 
 # labeled version
 def evaluate_modified_TNK(inputs: Dict, extra_option="abc", **params):
-    info = {"some": "info", "about": ["the", "run"]}
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = modified_TNK(ind)
     outputs = {
