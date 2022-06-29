@@ -1,12 +1,13 @@
-from xopt import Evaluator, Xopt
+from xopt.evaluator import Evaluator
+from xopt.base import Xopt
 
-from xopt.generators.bayesian import BayesianExplorationGenerator
+from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
 class TestBayesianExplorationGenerator:
     def test_init(self):
-        gen = BayesianExplorationGenerator(TEST_VOCS_BASE)
+        BayesianExplorationGenerator(TEST_VOCS_BASE)
 
     def test_generate(self):
         gen = BayesianExplorationGenerator(

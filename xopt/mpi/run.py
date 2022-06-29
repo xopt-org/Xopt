@@ -1,6 +1,18 @@
-#!/usr/bin/env python
-# coding: utf-8
+import argparse
+import logging
+import os
+import sys
 
+from mpi4py import MPI
+from mpi4py.futures import MPIPoolExecutor
+
+from xopt.base import Xopt
+
+from xopt.log import set_handler_with_logger
+
+comm = MPI.COMM_WORLD
+mpi_rank = comm.Get_rank()
+mpi_size = comm.Get_size()
 
 """
 Xopt MPI driver
@@ -12,21 +24,6 @@ mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 
 """
 
-from mpi4py import MPI
-from mpi4py.futures import MPIPoolExecutor
-
-from xopt import Xopt
-
-comm = MPI.COMM_WORLD
-mpi_rank = comm.Get_rank()
-mpi_size = comm.Get_size()
-
-import argparse
-import logging
-import os
-import sys
-
-from xopt.log import set_handler_with_logger
 
 if __name__ == "__main__":
 

@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 
+<<<<<<< HEAD
 from xopt import Evaluator
+=======
+from xopt.evaluator import Evaluator, EvaluatorOptions
+>>>>>>> da376980f51ebef5012358b46b7a880fabfe4c1e
 
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 

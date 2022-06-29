@@ -9,7 +9,7 @@ dependencies:
   - pydantic>=1.9.0
   - pyyaml
   - pytorch
-  - botorch
+  - botorch>=0.6.1
   - gpytorch
   - pandas
   - ipywidgets

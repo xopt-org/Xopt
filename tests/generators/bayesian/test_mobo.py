@@ -4,8 +4,9 @@ import numpy as np
 import pytest
 import yaml
 
-from xopt import Evaluator, Xopt
-from xopt.generators.bayesian import MOBOGenerator
+from xopt.evaluator import Evaluator
+from xopt.base import Xopt
+from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.testing import TEST_VOCS_BASE
 
@@ -32,7 +33,7 @@ class TestBayesianExplorationGenerator:
 
         for ele in [bad_options, bad_options2]:
             with pytest.raises(ValueError):
-                bad_generator = MOBOGenerator(tnk_vocs, ele)
+                MOBOGenerator(tnk_vocs, ele)
 
         base_options = deepcopy(MOBOGenerator.default_options())
         base_options.optim.raw_samples = 2

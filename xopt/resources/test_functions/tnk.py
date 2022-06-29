@@ -23,19 +23,22 @@ def TNK(individual):
     x2 = individual[1]
     objectives = (x1, x2)
     constraints = (
-        x1**2 + x2**2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
+        x1 ** 2 + x2 ** 2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
         (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2,
     )
     return objectives, constraints
 
 
 # labeled version
-def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, random_sleep=0, raise_probability = 0,
-    **params):
-    info = {"some": "info", "about": ["the", "run"]}
+def evaluate_TNK(
+    inputs: Dict,
+    sleep=0,
+    random_sleep=0,
+    raise_probability=0,
+    **params
+):
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = TNK(ind)
-
 
     r = random()
     # Sleep for a bit
@@ -43,8 +46,7 @@ def evaluate_TNK(inputs: Dict, extra_option="abc", sleep=0, random_sleep=0, rais
     time.sleep(r * random_sleep * 2)  # Average should be random_sleep
 
     if r < raise_probability:
-        raise ValueError(f'intentioal TNK crash ')
-
+        raise ValueError("intentioal TNK crash")
 
     outputs = {
         "y1": objectives[0],

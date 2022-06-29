@@ -1,4 +1,13 @@
-from .bayesian_exploration import BayesianExplorationGenerator
-from .bayesian_generator import BayesianGenerator
-from .mobo import MOBOGenerator
-from .upper_confidence_bound import UpperConfidenceBoundGenerator
+from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.mobo import MOBOGenerator
+from xopt.generators.bayesian.upper_confidence_bound import (
+    UpperConfidenceBoundGenerator,
+)
+
+__all__ = [
+    "BayesianGenerator",
+    "BayesianExplorationGenerator",
+    "MOBOGenerator",
+    "UpperConfidenceBoundGenerator",
+]
