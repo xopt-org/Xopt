@@ -38,7 +38,7 @@ xopt:
     asynch: True
 generator:
     name: random
-    
+
 evaluator:
     function: xopt.resources.testing.xtest_callable
     function_kwargs:

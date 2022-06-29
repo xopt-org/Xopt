@@ -326,8 +326,8 @@ class Xopt:
         Returns infor about the Xopt object, including the YAML representation without data.
         """
         return f"""
-            Xopt 
-________________________________           
+            Xopt
+________________________________
 Version: {__version__}
 Data size: {len(self.data)}
 Config as YAML:

@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from xopt import Evaluator
-from xopt.evaluator import EvaluatorOptions
+from xopt.evaluator import Evaluator, EvaluatorOptions
 
 
 class TestEvaluator:
