@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, List
 
 import numpy as np
 import pandas as pd
@@ -207,7 +207,7 @@ class VOCS(XoptBaseModel):
     # Extract optimization data (in correct column order)
     def variable_data(
         self,
-        data: Union[pd.DataFrame, list[dict], dict[list]],
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
         prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
@@ -225,7 +225,7 @@ class VOCS(XoptBaseModel):
 
     def objective_data(
         self,
-        data: Union[pd.DataFrame, list[dict], dict[list]],
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
         prefix: str = "objective_",
     ) -> pd.DataFrame:
         """
@@ -243,7 +243,7 @@ class VOCS(XoptBaseModel):
 
     def constraint_data(
         self,
-        data: Union[pd.DataFrame, list[dict], dict[list]],
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
         prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
@@ -261,7 +261,7 @@ class VOCS(XoptBaseModel):
 
     def feasibility_data(
         self,
-        data: Union[pd.DataFrame, list[dict], dict[list]],
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
         prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """

@@ -11,8 +11,6 @@ class TestVOCS(object):
     def test_init(self):
         from xopt.vocs import VOCS
 
-        vocs = VOCS()
-
         # test various configurations
         vocs = VOCS(
             variables={"x": [0, 1]},
