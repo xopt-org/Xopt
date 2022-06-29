@@ -28,7 +28,7 @@ class TestUpperConfidenceBoundGenerator:
         # assert len(candidate) == 2
 
     def test_in_xopt(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         ucb_gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
         )
@@ -45,7 +45,7 @@ class TestUpperConfidenceBoundGenerator:
             xopt.step()
 
     def test_in_xopt_w_proximal(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         ucb_gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
         )

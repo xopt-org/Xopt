@@ -7,7 +7,7 @@ from xopt.resources.testing import TEST_YAML
 def test_cnsga():
     X = Xopt(
         generator=CNSGAGenerator(tnk_vocs),
-        evaluator=Evaluator(evaluate_TNK),
+        evaluator=Evaluator(function=evaluate_TNK),
         vocs=tnk_vocs,
     )
     X.options.max_evaluations = 5

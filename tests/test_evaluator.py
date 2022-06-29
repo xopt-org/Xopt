@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 
 from xopt import Evaluator
-from xopt.evaluator import EvaluatorOptions
 
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 class TestEvaluator:
     @staticmethod
@@ -18,13 +18,13 @@ class TestEvaluator:
         return False
 
     def test_submit(self):
-        evaluator = Evaluator(self.f)
+        evaluator = Evaluator(function=self.f)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 
         # try with a bad function
-        evaluator = Evaluator(self.g)
+        evaluator = Evaluator(function=self.g)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
@@ -39,7 +39,7 @@ class TestEvaluator:
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
 
-        evaluator = Evaluator.from_options(EvaluatorOptions(**test_dict))
+        evaluator = Evaluator(**test_dict)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
@@ -57,7 +57,7 @@ class TestEvaluator:
             "max_workers": 1,
         }
 
-        for ele in ["ThreadPoolExecutor", "ProcessPoolExecutor"]:
-            test_dict["executor"] = ele
-            options = EvaluatorOptions(**test_dict)
-            options.json()
+        for Executor in [ThreadPoolExecutor, ProcessPoolExecutor]:
+            test_dict["executor"] = Executor()
+            ev = Evaluator(**test_dict)
+            ev.json()
