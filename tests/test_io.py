@@ -4,7 +4,6 @@ import yaml
 
 from xopt.evaluator import Evaluator
 from xopt.base import Xopt
-from xopt.evaluator import EvaluatorOptions
 from xopt.generators import RandomGenerator
 from xopt.io import parse_config, state_to_dict
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML

@@ -60,9 +60,10 @@ def run_script(script: str, env: Dict[str, str] = None) -> None:
 
 
 def run_tutorial(tutorial: Path, smoke_test: bool = False) -> Optional[str]:
+    print(f"Running tutorial {tutorial.name}.")
     script = parse_ipynb(tutorial)
     tic = time.time()
-    print(f"Running tutorial {tutorial.name}.")
+
     run_out = run_script(script, env={"SMOKE_TEST": "true"})
     try:
         run_out.check_returncode()
