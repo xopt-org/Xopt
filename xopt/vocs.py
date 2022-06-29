@@ -70,30 +70,39 @@ class VOCS(XoptBaseModel):
 
     @property
     def variable_names(self):
+        """Returns a sorted list of variable names"""
         return list(sorted(self.variables.keys()))
 
     @property
     def objective_names(self):
+        """Returns a sorted list of objective names"""
         return list(sorted(self.objectives.keys()))
 
     @property
     def constraint_names(self):
+        """Returns a sorted list of constraint names"""
         if self.constraints is None:
             return []
         return list(sorted(self.constraints.keys()))
 
     @property
     def output_names(self):
+        """
+        Returns a sorted list of objective and constraint names (objectives first
+        then constraints)
+        """
         return self.objective_names + self.constraint_names
 
     @property
     def constant_names(self):
+        """Returns a sorted list of constraint names"""
         if self.constants is None:
             return []
         return list(sorted(self.constants.keys()))
 
     @property
     def all_names(self):
+        """Returns all vocs names (variables, constants, objectives, constraints"""
         return (
             self.variable_names
             + self.constant_names
@@ -103,26 +112,32 @@ class VOCS(XoptBaseModel):
 
     @property
     def n_variables(self):
+        """Returns the number of variables"""
         return len(self.variables)
 
     @property
     def n_constants(self):
+        """Returns the number of constants"""
         return len(self.constants)
 
     @property
     def n_inputs(self):
+        """Returns the number of inputs (variables and constants)"""
         return self.n_variables + self.n_constants
 
     @property
     def n_objectives(self):
+        """Returns the number of objectives"""
         return len(self.objectives)
 
     @property
     def n_constraints(self):
+        """Returns the number of constraints"""
         return len(self.constraints)
 
     @property
     def n_outputs(self):
+        """Returns the number of outputs (objectives and constraints)"""
         return self.n_objectives + self.n_constraints
 
     def random_inputs(
@@ -189,29 +204,78 @@ class VOCS(XoptBaseModel):
         df = pd.DataFrame(inputs, columns=self.variable_names)
         return self.convert_dataframe_to_inputs(df)
 
-    def get_training_data(self, data: pd.DataFrame):
-        """
-        get training data from dataframe (usually supplied by xopt base)
-
-        """
-        inputs = data[self.variable_names].to_numpy(np.float64)
-        outputs = data[self.objective_names + self.constraint_names].to_numpy(
-            np.float64
-        )
-
-        return inputs, outputs
-
     # Extract optimization data (in correct column order)
-    def variable_data(self, data, prefix="variable_"):
+    def variable_data(
+        self,
+        data: Union[pd.DataFrame, list[dict], dict[list]],
+        prefix: str = "variable_",
+    ) -> pd.DataFrame:
+        """
+        Returns a dataframe containing variables according to `vocs.variables` in sorted
+        order
+
+        Args:
+            data: Data to be processed.
+            prefix: Prefix added to column names.
+
+        Returns:
+            result: processed Dataframe
+        """
         return form_variable_data(self.variables, data, prefix=prefix)
 
-    def objective_data(self, data, prefix="objective_"):
+    def objective_data(
+        self,
+        data: Union[pd.DataFrame, list[dict], dict[list]],
+        prefix: str = "objective_",
+    ) -> pd.DataFrame:
+        """
+        Returns a dataframe containing objective data transformed according to
+        `vocs.objectives` such that we always assume minimization.
+
+        Args:
+            data: data to be processed.
+            prefix: prefix added to column names.
+
+        Returns:
+            result: processed Dataframe
+        """
         return form_objective_data(self.objectives, data, prefix)
 
-    def constraint_data(self, data, prefix="constraint_"):
+    def constraint_data(
+        self,
+        data: Union[pd.DataFrame, list[dict], dict[list]],
+        prefix: str = "constraint_",
+    ) -> pd.DataFrame:
+        """
+        Returns a dataframe containing constraint data transformed according to
+        `vocs.constraints` such that values that satisfy each constraint are negative.
+
+        Args:
+            data: data to be processed.
+            prefix: prefix added to column names.
+
+        Returns:
+            result: processed Dataframe
+        """
         return form_constraint_data(self.constraints, data, prefix)
 
-    def feasibility_data(self, data, prefix="feasible_"):
+    def feasibility_data(
+        self,
+        data: Union[pd.DataFrame, list[dict], dict[list]],
+        prefix: str = "feasible_",
+    ) -> pd.DataFrame:
+        """
+        Returns a dataframe containing booleans denoting if a constraint is satisfied or
+        not. Returned dataframe also contains a column `feasibility` which denotes if
+        all constraints are satisfied.
+
+        Args:
+            data: data to be processed.
+            prefix: prefix added to column names.
+
+        Returns:
+            result: processed Dataframe
+        """
         return form_feasibility_data(self.constraints, data, prefix)
 
 
@@ -244,7 +308,7 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
 
     Returns a dataframe with the objective data intented to be minimized.
 
-    Missing or nan values will be filled with: np.inf 
+    Missing or nan values will be filled with: np.inf
 
     """
     if not objectives:
@@ -253,9 +317,9 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
     data = pd.DataFrame(data)
 
     odata = pd.DataFrame(index=data.index)
-    
+
     for k in sorted(list(objectives)):
-        
+
         # Protect against missing data
         if k not in data:
             odata[prefix + k] = np.inf
@@ -266,15 +330,15 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
             raise ValueError(f"Unknown objective operator: {operator}")
 
         weight = OBJECTIVE_WEIGHT[operator]
-        odata[prefix + k] = (weight * data[k]).fillna(np.inf) # Protect against nans
+        odata[prefix + k] = (weight * data[k]).fillna(np.inf)  # Protect against nans
 
     return odata
 
 
 def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constraint_"):
     """
-    Use constraint dict and data (dataframe) to generate constraint data (dataframe)
-    A constraint is satisfied if the evaluation is < 0.
+    Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
+    constraint is satisfied if the evaluation is < 0.
 
     Args:
         constraints: Dictonary of constraints
@@ -283,7 +347,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
 
     Returns a dataframe with the constraint data.
 
-    Missing or nan values will be filled with: np.inf 
+    Missing or nan values will be filled with: np.inf
 
     """
     if not constraints:
@@ -311,7 +375,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
         else:
             raise ValueError(f"Unknown constraint operator: {op}")
 
-        cdata[prefix + k] = cvalues.fillna(np.inf) # Protect against nans
+        cdata[prefix + k] = cvalues.fillna(np.inf)  # Protect against nans
     return cdata
 
 
