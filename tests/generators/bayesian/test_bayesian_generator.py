@@ -33,7 +33,7 @@ class TestBayesianGenerator(TestCase):
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
         gen = BayesianGenerator(sinusoid_vocs)
-        evaluator = Evaluator(evaluate_sinusoid)
+        evaluator = Evaluator(function=evaluate_sinusoid)
         X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
 
         # generate some data samples

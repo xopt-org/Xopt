@@ -1,6 +1,8 @@
 import math
 from abc import ABC
 from copy import copy, deepcopy
+from concurrent.futures import ThreadPoolExecutor
+
 
 import pandas as pd
 import pytest
@@ -40,7 +42,7 @@ class TestXopt:
         def dummy(x):
             pass
 
-        evaluator = Evaluator(dummy)
+        evaluator = Evaluator(function=dummy)
         gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
         X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
@@ -60,7 +62,7 @@ class TestXopt:
         )
 
         # init with generator and evaluator
-        evaluator = Evaluator(f)
+        evaluator = Evaluator(function=f)
         generator = RandomGenerator(vocs)
         X = Xopt(
             generator=generator,
@@ -72,7 +74,7 @@ class TestXopt:
             X.step()
 
         # init with generator and evaluator
-        evaluator = Evaluator(g)
+        evaluator = Evaluator(function=g)
         generator = RandomGenerator(vocs)
         X2 = Xopt(
             generator=generator,
@@ -85,7 +87,7 @@ class TestXopt:
 
     def test_update_data(self):
         generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
@@ -96,7 +98,7 @@ class TestXopt:
         assert len(X.generator.data) == 2
 
     def test_asynch(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
         X = Xopt(
             generator=generator,
@@ -112,7 +114,7 @@ class TestXopt:
         # now use a threadpool evaluator with different number of max workers
         for mw in [2]:
             evaluator = Evaluator(
-                xtest_callable, executor="ThreadPoolExecutor", max_workers=mw
+                function=xtest_callable, executor=ThreadPoolExecutor(), max_workers=mw
             )
             X2 = Xopt(
                 generator=generator,
@@ -132,7 +134,7 @@ class TestXopt:
         def bad_function(inval):
             raise ValueError
 
-        evaluator = Evaluator(bad_function)
+        evaluator = Evaluator(function=bad_function)
         gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
         X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
@@ -146,7 +148,7 @@ class TestXopt:
             X2.step()
 
     def test_random(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
@@ -160,7 +162,7 @@ class TestXopt:
         assert len(data) == 11
 
     def test_checkpointing(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(

@@ -19,7 +19,7 @@ class TestBayesianExplorationGenerator:
         print(f"\n{gen.options.dict()}")
 
     def test_script(self):
-        evaluator = Evaluator(evaluate_TNK)
+        evaluator = Evaluator(function=evaluate_TNK)
 
         # test check options
         bad_options = deepcopy(MOBOGenerator.default_options())

@@ -73,6 +73,6 @@ if __name__ == "__main__":
     print(X)
     sys.stdout.flush()
     with MPIPoolExecutor() as executor:
-        X.evaluator._executor = executor
+        X.evaluator.executor = executor
         X.evaluator.max_workers = mpi_size
         X.run()

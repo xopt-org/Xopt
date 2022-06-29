@@ -21,7 +21,7 @@ class TestBayesianExplorationGenerator:
         # assert len(candidate) == 5
 
     def test_in_xopt(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         gen = BayesianExplorationGenerator(
             TEST_VOCS_BASE,
         )
@@ -39,7 +39,7 @@ class TestBayesianExplorationGenerator:
         xopt.step()
 
     def test_in_xopt_w_proximal(self):
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         gen = BayesianExplorationGenerator(
             TEST_VOCS_BASE,
         )
@@ -57,7 +57,7 @@ class TestBayesianExplorationGenerator:
         # now use bayes opt
         X.step()
 
-        evaluator = Evaluator(xtest_callable)
+        evaluator = Evaluator(function=xtest_callable)
         gen = BayesianExplorationGenerator(
             TEST_VOCS_BASE,
         )
