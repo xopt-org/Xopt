@@ -10,7 +10,7 @@ from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.models import create_standard_model
+from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 

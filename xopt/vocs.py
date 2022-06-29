@@ -180,7 +180,7 @@ class VOCS(XoptBaseModel):
         # make sure that the df keys contain the vocs variables
         if not set(self.variable_names).issubset(set(data.keys())):
             raise RuntimeError(
-                f"input dataframe must at least contain the vocs " f"variables"
+                "input dataframe must at least contain the vocs variables"
             )
 
         # only keep the variables

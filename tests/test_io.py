@@ -2,7 +2,8 @@ from copy import copy
 
 import yaml
 
-from xopt import Evaluator, Xopt
+from xopt.evaluator import Evaluator
+from xopt.base import Xopt
 from xopt.evaluator import EvaluatorOptions
 from xopt.generators import RandomGenerator
 from xopt.io import parse_config, state_to_dict

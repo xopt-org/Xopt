@@ -1,8 +1,7 @@
-from xopt.generators.bayesian import (
-    BayesianExplorationGenerator,
-    MOBOGenerator,
-    UpperConfidenceBoundGenerator,
-)
+from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
+from xopt.generators.bayesian.mobo import MOBOGenerator
+from xopt.generators.bayesian.upper_confidence_bound import \
+    UpperConfidenceBoundGenerator
 
 from xopt.generators.ga import CNSGAGenerator
 from xopt.generators.random import RandomGenerator

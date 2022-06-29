@@ -4,13 +4,13 @@ import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
 from pydantic import Field
 
-from xopt.generators.bayesian import BayesianGenerator
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mobo_objective,
 )
 
 from xopt.vocs import VOCS
+from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
 
 

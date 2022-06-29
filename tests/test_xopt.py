@@ -6,7 +6,9 @@ import pandas as pd
 import pytest
 import yaml
 
-from xopt import Evaluator, VOCS, Xopt
+from xopt.evaluator import Evaluator
+from xopt.base import Xopt
+from xopt.vocs import VOCS
 from xopt.errors import XoptError
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
@@ -125,8 +127,8 @@ class TestXopt:
             for i in range(n_steps):
                 X2.step()
 
-            ## TODO: better async test. This is unpredictable:
-            ## assert len(X2.data) == n_steps
+            # TODO: better async test. This is unpredictable:
+            # assert len(X2.data) == n_steps
 
     def test_strict(self):
         def bad_function(inval):

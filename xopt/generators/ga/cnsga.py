@@ -2,6 +2,7 @@ import array
 import logging
 import os
 import random
+from typing import Dict, List
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
@@ -17,9 +18,6 @@ from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstrai
 
 
 logger = logging.getLogger(__name__)
-
-
-from typing import Dict, List
 
 
 class CNSGAOptions(GeneratorOptions):
@@ -54,7 +52,8 @@ class CNSGAGenerator(Generator):
             self.load_population_csv(options.population_file)
             # n_here = len(self.population)
             # if n_here != self.n_pop:
-            #    warnings.warn(f"Population in {options.population_file} does not match n_pop: {n_here} != {self.n_pop}")
+            #    warnings.warn(f"Population in {options.population_file}"
+            #    f"does not match n_pop: {n_here} != {self.n_pop}")
 
         if options.output_path is not None:
             assert os.path.isdir(options.output_path), "Output directory does not exist"
@@ -111,7 +110,7 @@ class CNSGAGenerator(Generator):
         if len(self.offspring) >= self.n_pop:
             if self.population is None:
                 self.population = self.offspring.iloc[: self.n_pop]
-                self.offspring = self.offspring.iloc[self.n_pop :]
+                self.offspring = self.offspring.iloc[self.n_pop:]
             else:
                 candidates = pd.concat([self.population, self.offspring])
                 self.population = cnsga_select(

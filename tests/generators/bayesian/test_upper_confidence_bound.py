@@ -1,4 +1,5 @@
-from xopt import Evaluator, Xopt
+from xopt.evaluator import Evaluator
+from xopt.base import Xopt
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
