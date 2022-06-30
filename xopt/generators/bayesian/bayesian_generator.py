@@ -49,7 +49,7 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
-            # generate starting points for optimization
+            # generate starting points for optimization (note in real domain)
             inputs = self.get_input_data(self.data)
             batch_initial_points = sample_truncated_normal_perturbations(
                 inputs[-1].unsqueeze(0),
@@ -58,6 +58,7 @@ class BayesianGenerator(Generator, ABC):
                 bounds=bounds,
             )
 
+            # get candidates in real domain
             candidates, out = optimize_acqf(
                 acq_function=self.get_acquisition(self._model),
                 bounds=bounds,
