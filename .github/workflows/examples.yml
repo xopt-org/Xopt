@@ -25,7 +25,7 @@ jobs:
       - name: Create environment
         shell: bash -l {0}
         run: |
-          mamba install nbformat, nbconvert, ipython, matplotlib
+          mamba install nbformat nbconvert ipython matplotlib
 
       - name: Install Xopt
         shell: bash -l {0}
