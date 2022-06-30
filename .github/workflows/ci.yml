@@ -14,8 +14,16 @@ jobs:
         python-version: [3.7]
     steps:
       - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-activate-base: true
+          activate-environment: true
+          python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          channels: conda-forge
 
-      - name: Install Python Dependencies
+      - name: Create environment
+        shell: bash -l {0}
         run: |
           pip install -r requirements.txt
           pip install -r test-requirements.txt
@@ -25,9 +33,11 @@ jobs:
           flake8 .
 
       - name: Install Xopt
+        shell: bash -l {0}
         run: |
-          pip install .
+          pip install --no-dependencies .
 
       - name: Run Tests
+        shell: bash -l {0}
         run: |
           python run_tests.py

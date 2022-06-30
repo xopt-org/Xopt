@@ -13,30 +13,32 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.7]
+        python-version: [3.9]
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-activate-base: true
           activate-environment: true
           python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
           channels: conda-forge
-          channel-priority: strict
-      - name: Install Dependencies
+
+      - name: Create environment
         shell: bash -l {0}
         run: |
-          conda config --set always_yes yes --set changeps1 no
-          pip install -r docs-requirements.txt
+          mamba config --set always_yes yes --set changeps1 no
+          mamba install --yes --file requirements.txt
+          mamba install --yes --file docs-requirements.txt
           pip install .
+
       - name: Build Docs
         shell: bash -l {0}
         run: |
           mkdocs build
           zip -r xopt-examples.zip examples/
           mv xopt-examples.zip ./site/assets/.
+          
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags')
