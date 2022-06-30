@@ -1,22 +1,20 @@
-# globally modify pydantic base model to not allow extra keys and handle np arrays
-
-
 import copy
 import inspect
+import logging
 from concurrent.futures import Future
 from importlib import import_module
+from types import FunctionType, MethodType
+from typing import Any, Callable, Generic, Iterable, Optional, TypeVar
 
 import numpy as np
-from pydantic import BaseModel, Field, root_validator, validate_arguments, validator, ValidationError, Extra
-from pydantic import create_model, Field
-from types import FunctionType, MethodType
-from typing import Any, Callable, Dict, Generic, Iterable, Optional, TypeVar, Tuple
-
+from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
 
-
 ObjType = TypeVar("ObjType")
+logger = logging.getLogger(__name__)
 
+
+# globally modify pydantic base model to not allow extra keys and handle np arrays
 class XoptBaseModel(BaseModel):
     class Config:
         extra = "forbid"
@@ -26,8 +24,10 @@ class XoptBaseModel(BaseModel):
             np.float64: lambda x: float(x),
         }
 
+
 JSON_ENCODERS = {
-    # function/method type distinguished for class members and not recognized as callables
+    # function/method type distinguished for class members
+    # and not recognized as callables
     FunctionType: lambda x: f"{x.__module__}.{x.__qualname__}",
     MethodType: lambda x: f"{x.__module__}.{x.__qualname__}",
     Callable: lambda x: f"{x.__module__}.{type(x).__qualname__}",
@@ -35,12 +35,6 @@ JSON_ENCODERS = {
     # for encoding instances of the ObjType}
     ObjType: lambda x: f"{x.__module__}.{x.__class__.__qualname__}",
 }
-
-
-
-
-from pydantic import create_model, Field
-
 
 
 class CallableModel(BaseModel):
@@ -76,7 +70,7 @@ class CallableModel(BaseModel):
 
             else:
                 callable = get_callable_from_string(callable)
-        
+
         values["callable"] = callable
 
         # for reloading:
@@ -84,51 +78,48 @@ class CallableModel(BaseModel):
         args = ()
         if "args" in values:
             args = values.pop("args")
-            
+
         if "kwargs" in values:
             kwargs = values["kwargs"]
 
         # ignore kwarg-only and arg-only args for now
         sig_kwargs, _, _ = validate_and_compose_signature(callable, *args, **kwargs)
-        
+
         # fix for pydantic handling...
         kwargs = {}
         for key, value in sig_kwargs.items():
             if isinstance(value, (tuple,)):
-                kwargs[key] =(tuple, Field(None))
-                
+                kwargs[key] = (tuple, Field(None))
+
             elif value is None:
-                kwargs[key] =(Any, Field(None))
-                
+                kwargs[key] = (Any, Field(None))
+
             else:
-                kwargs[key] = value  
-        
+                kwargs[key] = value
+
         values["kwargs"] = create_model(f"Kwargs_{callable.__qualname__}", **kwargs)()
-        
+
         return values
-    
 
     def __call__(self, *args, **kwargs):
         if kwargs is None:
             kwargs = {}
-            
+
         # create self.kwarg copy
         fn_kwargs = self.kwargs.dict()
-        
+
         # update pos/kw kwargs with args
         if len(args):
 
             stored_kwargs = list(fn_kwargs.keys())
 
-            for i, arg in enumerate(args[:len(fn_kwargs)]):
+            for i, arg in enumerate(args[: len(fn_kwargs)]):
                 fn_kwargs[stored_kwargs[i]] = arg
-                
+
         # update stored kwargs
         fn_kwargs.update(kwargs)
-        
+
         return self.callable(**fn_kwargs)
-
-
 
 
 class ObjLoader(
@@ -145,7 +136,7 @@ class ObjLoader(
     def validate_all(cls, values):
         # inspect class init signature
         obj_type = cls.__fields__["object"].type_
-        
+
         # adjust for re init from json
         if "loader" not in values:
             loader = CallableModel(callable=obj_type, **values)
@@ -154,11 +145,9 @@ class ObjLoader(
             # validate loader callable is same as obj type
             if values["loader"].get("callable") is not None:
                 # unparameterized callable will handle parsing
-                callable = CallableModel(
-                    callable=values["loader"]["callable"]
-                )
-                
-                if not callable.callable is obj_type:
+                callable = CallableModel(callable=values["loader"]["callable"])
+
+                if callable.callable is not obj_type:
                     raise ValueError(
                         "Provided loader of type %s. ObjLoader parameterized for %s",
                         callable.callable.__name__,
@@ -189,21 +178,22 @@ class ObjLoader(
             return self.loader()
 
 
-
 # COMMON BASE FOR EXECUTORS
 class BaseExecutor(
     GenericModel,
     Generic[ObjType],
     arbitrary_types_allowed=True,
     json_encoders=JSON_ENCODERS,
-    copy_on_model_validation = False, # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
+    copy_on_model_validation=False,
+    # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
 ):
     # executor_type must comply with https://peps.python.org/pep-3148/ standard
-    loader: Optional[ObjLoader[ObjType]] # loader of executor type
+    loader: Optional[ObjLoader[ObjType]]  # loader of executor type
 
-    # This is a utility field not included in reps. The typing lib has opened issues on access of generic type within class.
+    # This is a utility field not included in reps. The typing lib has opened
+    # issues on access of generic type within class.
     # This tracks for if-necessary future use.
-    executor_type: type = Field(None, exclude=True) 
+    executor_type: type = Field(None, exclude=True)
     submit_callable: str = "submit"
     map_callable: str = "map"
     shutdown_callable: str = "shutdown"
@@ -214,13 +204,15 @@ class BaseExecutor(
 
     @root_validator(pre=True)
     def validate_all(cls, values):
-        executor_type = cls.__fields__["executor"].type_ # introspect fields to get type
+        executor_type = cls.__fields__[
+            "executor"
+        ].type_  # introspect fields to get type
 
         # check if executor provided
         executor = values.get("executor")
         if executor is not None:
             values.pop("executor")
-        
+
         # VALIDATE SUBMIT CALLABLE AGAINST EXECUTOR TYPE
         if "submit_callable" not in values:
             # use default
@@ -305,9 +297,6 @@ class BaseExecutor(
         shutdown_fn()
 
 
-
-
-
 # NormalExecutor with no context handling on submission and executor persistence
 class NormalExecutor(
     BaseExecutor[ObjType],
@@ -315,7 +304,6 @@ class NormalExecutor(
     arbitrary_types_allowed=True,
     json_encoders=JSON_ENCODERS,
 ):
-
     @validator("executor", always=True)
     def validate_executor(cls, v, values):
 
@@ -339,8 +327,6 @@ class NormalExecutor(
     def map(self, fn, *iter: Iterable, **kwargs) -> Iterable[Future]:
         map_fn = getattr(self.executor, self.map_callable)
         return map_fn(fn, *iter, **kwargs)
-
-
 
 
 def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
@@ -420,26 +406,24 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
 
 
 def validate_and_compose_signature(callable: Callable, *args, **kwargs):
-    
     # try partial bind to validate
     signature = inspect.signature(callable)
     bound_args = signature.bind_partial(*args, **kwargs)
-    
+
     sig_pos_or_kw = {}
     sig_kw_only = bound_args.arguments.get("kwargs")
     sig_args_only = bound_args.arguments.get("args")
-    
-    n_args = len(args)
-    
+
     # Now go parameter by parameter and assemble kwargs
     for i, param in enumerate(signature.parameters.values()):
 
         if param.kind == param.POSITIONAL_OR_KEYWORD:
-            sig_pos_or_kw[param.name] = param.default if not param.default == param.empty else None
-            
+            sig_pos_or_kw[param.name] = (
+                param.default if not param.default == param.empty else None
+            )
+
             # assign via binding
             if param.name in bound_args.arguments:
                 sig_pos_or_kw[param.name] = bound_args.arguments[param.name]
-                
-    
-    return sig_pos_or_kw, sig_kw_only, sig_args_only        
+
+    return sig_pos_or_kw, sig_kw_only, sig_args_only
