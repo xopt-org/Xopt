@@ -7,14 +7,7 @@ from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, Optional, TypeVar
 
 import numpy as np
-from pydantic import (
-    BaseModel,
-    create_model,
-    Extra,
-    Field,
-    root_validator,
-    validator,
-)
+from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
 
 ObjType = TypeVar("ObjType")
@@ -158,7 +151,7 @@ class ObjLoader(
                     # unparameterized callable will handle parsing
                     callable = CallableModel(callable=values["loader"]["callable"])
 
-                    if not callable.callable is obj_type:
+                    if callable.callable is not obj_type:
                         raise ValueError(
                             "Provided loader of type %s. ObjLoader parameterized for %s",
                             callable.callable.__name__,
