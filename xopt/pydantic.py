@@ -7,14 +7,20 @@ from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, Optional, TypeVar
 
 import numpy as np
-from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
+from pydantic import (
+    BaseModel,
+    create_model,
+    Extra,
+    Field,
+    root_validator,
+    validator,
+)
 from pydantic.generics import GenericModel
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
 
 
-# globally modify pydantic base model to not allow extra keys and handle np arrays
 class XoptBaseModel(BaseModel):
     class Config:
         extra = "forbid"
@@ -142,23 +148,28 @@ class ObjLoader(
             loader = CallableModel(callable=obj_type, **values)
 
         else:
-            # validate loader callable is same as obj type
-            if values["loader"].get("callable") is not None:
-                # unparameterized callable will handle parsing
-                callable = CallableModel(callable=values["loader"]["callable"])
+            # if already-initialized callable, do nothing
+            if isinstance(values["loader"], (CallableModel,)):
+                loader = values["loader"]
 
-                if callable.callable is not obj_type:
-                    raise ValueError(
-                        "Provided loader of type %s. ObjLoader parameterized for %s",
-                        callable.callable.__name__,
-                        obj_type,
-                    )
+            else:
+                # validate loader callable is same as obj type
+                if values["loader"].get("callable") is not None:
+                    # unparameterized callable will handle parsing
+                    callable = CallableModel(callable=values["loader"]["callable"])
 
-                # opt for obj type
-                values["loader"].pop("callable")
+                    if not callable.callable is obj_type:
+                        raise ValueError(
+                            "Provided loader of type %s. ObjLoader parameterized for %s",
+                            callable.callable.__name__,
+                            obj_type,
+                        )
 
-            # re-init drop callable from loader vals to use new instance
-            loader = CallableModel(callable=obj_type, **values["loader"])
+                    # opt for obj type
+                    values["loader"].pop("callable")
+
+                # re-init drop callable from loader vals to use new instance
+                loader = CallableModel(callable=obj_type, **values["loader"])
 
         # update the class json encoders. Will only execute on initial type construction
         if obj_type not in cls.__config__.json_encoders:
