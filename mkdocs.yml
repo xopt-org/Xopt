@@ -6,15 +6,19 @@ nav:
     - Home: index.md
     - Installation: installation.md
     - Examples:
-      - examples/xopt_basic.ipynb
-      - examples/xopt_parallel.ipynb
-      - Bayesian:
-          - Bayesian Exploration:
-              - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
-              - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
-          - Bayesian Optimization:
-              - Upper confidence bound: examples/bayes_opt/bayesian_optimization.ipynb
-              - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
+        - Basics:
+            - examples/basic/xopt_basic.ipynb
+            - examples/basic/xopt_parallel.ipynb
+        - Bayesian:
+            - Bayesian Exploration:
+                - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
+                - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
+            - Bayesian Optimization:
+                - Upper confidence bound: examples/bayes_opt/bayesian_optimization.ipynb
+                - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
+        - Evolutionary:
+            - CNSGA: examples/cnsga/cnsga_tnk.ipynb
+
     - API:
       - Xopt: api/xopt.md
       - Vocs: api/vocs.md
