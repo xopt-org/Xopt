@@ -1,10 +1,10 @@
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
 import numpy as np
 import pandas as pd
 
-
 from xopt import Evaluator
 
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 class TestEvaluator:
     @staticmethod

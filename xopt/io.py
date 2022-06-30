@@ -6,7 +6,7 @@ import yaml
 
 from xopt.evaluator import Evaluator
 from xopt.options import XoptOptions
-from xopt.utils import get_function, get_generator_and_defaults
+from xopt.utils import get_generator_and_defaults
 from xopt.vocs import VOCS
 
 
@@ -56,10 +56,10 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     evaluator = Evaluator(**config["evaluator"])
 
     # OldEvaluator
-    #ev = config["evaluator"]
-    #ev["function"] = get_function(ev["function"])
-    #ev_options = EvaluatorOptions.parse_obj(ev)
-    #evaluator = Evaluator(**ev_options.dict())
+    # ev = config["evaluator"]
+    # ev["function"] = get_function(ev["function"])
+    # ev_options = EvaluatorOptions.parse_obj(ev)
+    # evaluator = Evaluator(**ev_options.dict())
 
     if "data" in config.keys():
         data = config["data"]

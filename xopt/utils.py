@@ -107,6 +107,3 @@ def get_n_required_fuction_arguments(f):
             if v.default == inspect.Parameter.empty:
                 n += 1
     return n
-
-
-
