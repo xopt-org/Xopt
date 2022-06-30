@@ -33,12 +33,11 @@ jobs:
           flake8 .
 
       - name: Install Xopt
+        shell: bash -l {0}
         run: |
           pip install --no-dependencies .
-          echo $(which python)
 
       - name: Run Tests
         shell: bash -l {0}
         run: |
-          echo $(which python)
           python run_tests.py

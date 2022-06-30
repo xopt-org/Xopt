@@ -16,18 +16,15 @@ jobs:
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-activate-base: true
-          activate-environment: true
           python-version: ${{ matrix.python-version }}
           mamba-version: "*"
           channels: conda-forge
-          channel-priority: strict
+          activate-environment: xopt-dev
+          environment-file: environment.yml
 
       - name: Create environment
         shell: bash -l {0}
         run: |
-          mamba config --set always_yes yes --set changeps1 no
-          mamba install --yes --file requirements.txt
           mamba install nbformat, nbconvert, ipython, matplotlib
 
       - name: Install Xopt
