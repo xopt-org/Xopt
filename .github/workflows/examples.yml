@@ -31,4 +31,4 @@ jobs:
 
       - name: Run Examples
         run: |
-          python run_examples.py -p "$(pwd)" -s
+          python run_examples.py -p "$(pwd)/docs" -s

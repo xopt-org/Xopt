@@ -4,11 +4,17 @@ repo_name: ChristopherMayes/Xopt
 
 nav:
     - Home: index.md
-    - Installation: installation.md    
+    - Installation: installation.md
     - Examples:
       - examples/xopt_basic.ipynb
-      - examples/xopt_parallel.ipynb      
-      - examples/bayesian_exploration.ipynb
+      - examples/xopt_parallel.ipynb
+      - Bayesian:
+          - Bayesian Exploration:
+              - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
+              - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
+          - Bayesian Optimization:
+              - Upper confidence bound: examples/bayes_opt/bayesian_optimization.ipynb
+              - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
     - API:
       - Xopt: api/xopt.md
       - Vocs: api/vocs.md

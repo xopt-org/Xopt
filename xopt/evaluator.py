@@ -25,16 +25,14 @@ class Evaluator(BaseModel):
 
     Parameters
     ----------
-    function: Callable
-
-        Function to evaluate
-
-    function_kwargs: dict = {}
-        Any kwargs to pass on to this function
-
-    max_workers: int = 1
-
-    executor: NormalExecutor or any instantiated Executor object
+    function : Callable
+        Function to evaluate.
+    function_kwargs : dict, default={}
+        Any kwargs to pass on to this function.
+    max_workers : int, default=1
+        Maximum number of workers.
+    executor : NormalExecutor
+        NormalExecutor or any instantiated Executor object
     """
 
     function: Callable
@@ -43,6 +41,7 @@ class Evaluator(BaseModel):
     function_kwargs: dict = {}
 
     class Config:
+        """config"""
         arbitrary_types_allowed = True
         # validate_assignment = True # Broken in 1.9.0.
         # Trying to fix in https://github.com/samuelcolvin/pydantic/pull/4194

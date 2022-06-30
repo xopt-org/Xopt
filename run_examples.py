@@ -25,7 +25,7 @@ IGNORE = {
     "cnsga2_tnk.ipynb",  # requires pymoo, not in package dependencies or conda
 }
 
-SUB_DIRS = ["basic", "bayes_exp", "cnsga", "mobo"]
+SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt"]
 
 
 def parse_ipynb(file: Path) -> str:
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the tutorials.")
     parser.add_argument(
-        "-p", "--path", metavar="path", required=True, help="botorch repo directory."
+        "-p", "--path", metavar="path", required=True, help="repo directory."
     )
     parser.add_argument(
         "-s", "--smoke", action="store_true", help="Run in smoke test mode."
