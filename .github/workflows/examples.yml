@@ -35,4 +35,4 @@ jobs:
       - name: Run Examples
         shell: bash -l {0}
         run: |
-          python run_examples.py -p "$(pwd)/docs" -s
+          python run_examples.py -p "$(pwd)/docs/examples" -s
