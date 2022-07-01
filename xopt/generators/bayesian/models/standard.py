@@ -32,7 +32,7 @@ def create_standard_model(
             see (https://arxiv.org/abs/2002.08526) for details
     """
     tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
-    data = data.dropna()
+    data = data[vocs.variable_names + vocs.output_names].dropna()
 
     train_X = torch.tensor(data[vocs.variable_names].to_numpy(), **tkwargs)
     bounds = torch.tensor(vocs.bounds, **tkwargs)
