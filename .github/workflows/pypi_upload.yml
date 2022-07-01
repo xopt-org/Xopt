@@ -4,6 +4,7 @@ on: push
 
 jobs:
   build-n-publish:
+    if: ${{ github.repository == 'ChristopherMayes/Xopt' }}
     name: Build and publish Python distributions to PyPI
     runs-on: ubuntu-latest
 
