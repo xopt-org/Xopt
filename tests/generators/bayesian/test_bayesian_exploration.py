@@ -31,13 +31,13 @@ class TestBayesianExplorationGenerator:
         gen.options.acq.monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # initialize with single initial candidate
-        xopt.step()
+        X.step()
 
         # now use bayes opt
-        xopt.step()
+        X.step()
 
     def test_in_xopt_w_proximal(self):
         evaluator = Evaluator(function=xtest_callable)
