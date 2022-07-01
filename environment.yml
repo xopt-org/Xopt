@@ -27,6 +27,7 @@ dependencies:
   - mkdocstrings
   - mkdocs-material
   - mkdocs-jupyter
+  - mkdocstrings-python
   - pre-commit
   - flake8
   - pip:
