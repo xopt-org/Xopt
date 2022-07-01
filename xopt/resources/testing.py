@@ -28,7 +28,11 @@ cnames = (
     + list(TEST_VOCS_BASE.objectives.keys())
     + list(TEST_VOCS_BASE.constraints.keys())
 )
-test_init_data = {"x1": np.random.rand(10), "x2": np.random.rand(10) * 10.0}
+test_init_data = {
+    "x1": np.random.rand(10),
+    "x2": np.random.rand(10) * 10.0,
+    "cnt1": 1.0,
+}
 test_init_data.update(xtest_callable(test_init_data))
 
 TEST_VOCS_DATA = pd.DataFrame(test_init_data)

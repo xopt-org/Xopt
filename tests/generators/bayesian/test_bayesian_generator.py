@@ -36,7 +36,7 @@ class TestBayesianGenerator(TestCase):
 
         # try with input data that contains Nans due to xopt raising an error
         # currently we drop all rows containing Nans
-        test_data["y1"][5] = np.NaN
+        test_data["y1"].iloc[5] = np.NaN
         model = gen.train_model(test_data)
         assert len(model.models[0].train_inputs[0]) == len(test_data) - 1
 
