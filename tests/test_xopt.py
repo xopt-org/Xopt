@@ -9,12 +9,11 @@ import pytest
 import yaml
 
 from xopt.evaluator import Evaluator
-from xopt.base import Xopt
+from xopt.base import Xopt, XoptOptions
 from xopt.vocs import VOCS
 from xopt.errors import XoptError
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
-from xopt.options import XoptOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
 
 
