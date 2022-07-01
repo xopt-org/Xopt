@@ -1,6 +1,8 @@
+from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 import torch
 from botorch.models.gpytorch import GPyTorchModel
@@ -20,8 +22,9 @@ class TestBayesianGenerator(TestCase):
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
         gen = BayesianGenerator(TEST_VOCS_BASE)
-        model = gen.train_model(TEST_VOCS_DATA)
+        model = gen.train_model(test_data)
         assert isinstance(model, GPyTorchModel)
 
         # test evaluating the model
@@ -30,6 +33,12 @@ class TestBayesianGenerator(TestCase):
         )
         with torch.no_grad():
             model(test_pts)
+
+        # try with input data that contains Nans due to xopt raising an error
+        # currently we drop all rows containing Nans
+        test_data["y1"][5] = np.NaN
+        model = gen.train_model(test_data)
+        assert len(model.models[0].train_inputs[0]) == len(test_data) - 1
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
