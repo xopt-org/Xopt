@@ -30,7 +30,6 @@ Currenty **Xopt** provides:
   - `bayesian_optimization` Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
   - `mobo` Multi-objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
   - `bayesian_exploration` Bayesian exploration.
-  - `multi_fidelity` Multi-fidelity Single objective Bayesian optimization.
 - sampling algorithms:
   - `random sampler`
 - Convenient YAML/JSON based input format.
