@@ -1,9 +1,14 @@
+import json
+from copy import deepcopy
+
+from pydantic import Field
+
 from xopt import _version
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
-from xopt.io import parse_config, state_to_dict
-from xopt.options import XoptOptions
+from xopt.pydantic import XoptBaseModel
+from xopt.utils import get_generator_and_defaults
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
@@ -20,6 +25,23 @@ import pandas as pd
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+class XoptOptions(XoptBaseModel):
+    asynch: bool = Field(
+        False, description="flag to evaluate and submit evaluations asynchronously"
+    )
+    strict: bool = Field(
+        False,
+        description="flag to indicate if exceptions raised during evaluation "
+        "should stop Xopt",
+    )
+    dump_file: str = Field(
+        None, description="file to dump the results of the evaluations"
+    )
+    max_evaluations: int = Field(
+        None, description="maximum number of evaluations to perform"
+    )
 
 
 class Xopt:
@@ -358,3 +380,86 @@ Config as YAML:
         """
         result = self.evaluate(self.random_inputs(*args, **kwargs))
         return result
+
+
+def parse_config(config) -> dict:
+    """
+    Parse a config, which can be:
+        YAML file
+        JSON file
+        dict-like object
+
+    Returns a dict of kwargs for Xopt constructor.
+    """
+    if isinstance(config, str):
+        if os.path.exists(config):
+            yaml_str = open(config)
+        else:
+            yaml_str = config
+        d = yaml.safe_load(yaml_str)
+    else:
+        d = config
+
+    return xopt_kwargs_from_dict(d)
+
+
+def xopt_kwargs_from_dict(config: dict) -> dict:
+    """
+    Processes a config dictionary and returns the corresponding Xopt kwargs.
+    """
+
+    # get copy of config
+    config = deepcopy(config)
+
+    options = XoptOptions(**config["xopt"])
+    vocs = VOCS(**config["vocs"])
+
+    # create generator
+    generator_type, generator_options = get_generator_and_defaults(
+        config["generator"].pop("name")
+    )
+    # TODO: use version number in some way
+    if "version" in config["generator"].keys():
+        config["generator"].pop("version")
+
+    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]))
+
+    # Create evaluator
+    evaluator = Evaluator(**config["evaluator"])
+
+    # OldEvaluator
+    # ev = config["evaluator"]
+    # ev["function"] = get_function(ev["function"])
+    # ev_options = EvaluatorOptions.parse_obj(ev)
+    # evaluator = Evaluator(**ev_options.dict())
+
+    if "data" in config.keys():
+        data = config["data"]
+    else:
+        data = None
+
+    # return generator, evaluator, vocs, options, data
+    return {
+        "generator": generator,
+        "evaluator": evaluator,
+        "vocs": vocs,
+        "options": options,
+        "data": data,
+    }
+
+
+def state_to_dict(X, include_data=True):
+    # dump data to dict with config metadata
+    output = {
+        "xopt": json.loads(X.options.json()),
+        "generator": {
+            "name": X.generator.alias,
+            **json.loads(X.generator.options.json()),
+        },
+        "evaluator": json.loads(X.evaluator.json()),
+        "vocs": json.loads(X.vocs.json()),
+    }
+    if include_data:
+        output["data"] = json.loads(X.data.to_json())
+
+    return output
