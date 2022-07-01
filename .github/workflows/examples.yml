@@ -1,8 +1,6 @@
 name: Examples
 
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   build:
@@ -13,22 +11,28 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.7]
+        python-version: [3.9]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          channels: conda-forge
+          activate-environment: xopt-dev
+          environment-file: environment.yml
 
-      - name: Install Python Dependencies
+      - name: Create environment
+        shell: bash -l {0}
         run: |
-          pip install -r requirements.txt
-          pip install nbformat
-          pip install nbconvert
-          pip install ipython
-          pip install matplotlib
+          mamba install nbformat nbconvert ipython matplotlib
 
       - name: Install Xopt
+        shell: bash -l {0}
         run: |
-          pip install .
+          pip install --no-dependencies .
 
       - name: Run Examples
+        shell: bash -l {0}
         run: |
           python run_examples.py -p "$(pwd)/docs" -s

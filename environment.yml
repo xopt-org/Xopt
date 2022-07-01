@@ -19,6 +19,7 @@ dependencies:
   - dask
 # Developer
   - pytest
+  - pytest-cov
   - jupyterlab>=3
   - matplotlib
   - pygments
@@ -26,6 +27,7 @@ dependencies:
   - mkdocstrings
   - mkdocs-material
   - mkdocs-jupyter
+  - mkdocstrings-python
   - pre-commit
   - flake8
   - pip:

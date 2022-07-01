@@ -153,7 +153,8 @@ class ObjLoader(
 
                     if callable.callable is not obj_type:
                         raise ValueError(
-                            "Provided loader of type %s. ObjLoader parameterized for %s",
+                            "Provided loader of type %s. ObjLoader parameterized for \
+                                %s",
                             callable.callable.__name__,
                             obj_type,
                         )
