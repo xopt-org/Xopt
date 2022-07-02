@@ -23,6 +23,11 @@ jobs:
           activate-environment: xopt-dev
           environment-file: environment.yml
 
+      - name: Execute notebooks
+        shell: bash -l {0}
+        run: |
+          scripts/execute_notebooks.bash 
+
       - name: Build Docs
         shell: bash -l {0}
         run: |

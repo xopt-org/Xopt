@@ -1,4 +1,7 @@
+#!/bin/bash
+
 NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
+
 echo $NOTEBOOKS
 
 for file in $NOTEBOOKS
