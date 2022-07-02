@@ -83,10 +83,17 @@ class CallableModel(BaseModel):
 
         if "signature" in values:
             if "args" in values["signature"]:
-                args = values["signature"]["args"]
+                args = values["signature"].pop("args")
+
+            # not needed during reserialization
+            if "kwarg_order" in values["signature"]:
+                values["signature"].pop("kwarg_order")
 
             if "kwargs" in values:
                 kwargs = values["signature"]["kwargs"]
+
+            else:
+                kwargs = values["signature"]
 
         values["signature"] = validate_and_compose_signature(callable, *args, **kwargs)
 
@@ -419,15 +426,16 @@ class SignatureModel(BaseModel):
         if "args" in stored_kwargs:
             stored_args = stored_kwargs.pop("args")
 
-        positional_kwargs = []
-
         # adjust for positional
         args = list(args)
-        if len(args) < len(stored_args):
-            stored_args[: len(args)] = args
+        n_pos_only = len(stored_args)
+        positional_kwargs = []
+        if len(args) < n_pos_only:
+            stored_args[:n_pos_only] = args
 
         else:
-            stored_args = args
+            stored_args = args[:n_pos_only]
+            positional_kwargs = args[n_pos_only:]
 
         stored_kwargs.update(kwargs)
 
@@ -435,22 +443,16 @@ class SignatureModel(BaseModel):
         stored_kwargs = {
             key: value
             for key, value in stored_kwargs.items()
-            if not isinstance(
-                value,
-                (
-                    type(
-                        inspect.Parameter.empty,
-                    )
-                ),
-            )
+            if not value == inspect.Parameter.empty
         }
-
+        print(positional_kwargs)
         if len(positional_kwargs):
-            kwarg_keys = list(kwargs.keys())
             for i, positional_kwarg in enumerate(positional_kwargs):
 
-                kwargs[kwarg_keys[i]] = positional_kwarg
+                stored_kwargs[self.kwarg_order[i]] = positional_kwarg
 
+        print(stored_args)
+        print(stored_kwargs)
         return stored_args, stored_kwargs
 
 
@@ -485,7 +487,10 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
                 sig_kwargs[param.name] = bound_args.arguments[param.name]
 
     # create pydantic model
-    pydantic_fields = {"args": (List[Any], Field(list(sig_args)))}
+    pydantic_fields = {
+        "args": (List[Any], Field(list(sig_args))),
+        "kwarg_order": Field(list(sig_kwargs.keys()), exclude=True),
+    }
     for key, value in sig_kwargs.items():
         if isinstance(value, (tuple,)):
             pydantic_fields[key] = (tuple, Field(None))
