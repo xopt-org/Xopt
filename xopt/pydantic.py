@@ -445,14 +445,11 @@ class SignatureModel(BaseModel):
             for key, value in stored_kwargs.items()
             if not value == inspect.Parameter.empty
         }
-        print(positional_kwargs)
         if len(positional_kwargs):
             for i, positional_kwarg in enumerate(positional_kwargs):
 
                 stored_kwargs[self.kwarg_order[i]] = positional_kwarg
 
-        print(stored_args)
-        print(stored_kwargs)
         return stored_args, stored_kwargs
 
 
