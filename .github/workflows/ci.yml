@@ -35,13 +35,4 @@ jobs:
       - name: Run Tests
         shell: bash -l {0}
         run: |
-          python run_tests.py
-
-      - name: Build a source tarball
-        shell: bash -l {0}
-        run: >-
-          python -m
-          build
-          --sdist
-          --outdir dist/
-          .
+          python scripts/run_tests.py
