@@ -23,11 +23,17 @@ jobs:
           activate-environment: xopt-dev
           environment-file: environment.yml
 
+      - name: Execute notebooks
+        shell: bash -l {0}
+        run: |
+          pip install --no-dependencies . 
+          scripts/execute_notebooks.bash 
+
       - name: Build Docs
         shell: bash -l {0}
         run: |
           mkdocs build
-          zip -r xopt-examples.zip examples/
+          zip -r xopt-examples.zip docs/examples/
           mv xopt-examples.zip ./site/assets/.
           
       - name: Deploy to gh-pages

@@ -4,7 +4,7 @@ import logging
 from concurrent.futures import Future
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
 from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
@@ -38,7 +38,7 @@ JSON_ENCODERS = {
 
 class CallableModel(BaseModel):
     callable: Callable
-    kwargs: BaseModel
+    signature: BaseModel
 
     class Config:
         arbitrary_types_allowed = True
@@ -74,29 +74,28 @@ class CallableModel(BaseModel):
 
         # for reloading:
         kwargs = {}
-        args = ()
+        args = []
         if "args" in values:
             args = values.pop("args")
 
         if "kwargs" in values:
-            kwargs = values["kwargs"]
+            kwargs = values.pop("kwargs")
 
-        # ignore kwarg-only and arg-only args for now
-        sig_kwargs, _, _ = validate_and_compose_signature(callable, *args, **kwargs)
+        if "signature" in values:
+            if "args" in values["signature"]:
+                args = values["signature"].pop("args")
 
-        # fix for pydantic handling...
-        kwargs = {}
-        for key, value in sig_kwargs.items():
-            if isinstance(value, (tuple,)):
-                kwargs[key] = (tuple, Field(None))
+            # not needed during reserialization
+            if "kwarg_order" in values["signature"]:
+                values["signature"].pop("kwarg_order")
 
-            elif value is None:
-                kwargs[key] = (Any, Field(None))
+            if "kwargs" in values:
+                kwargs = values["signature"]["kwargs"]
 
             else:
-                kwargs[key] = value
+                kwargs = values["signature"]
 
-        values["kwargs"] = create_model(f"Kwargs_{callable.__qualname__}", **kwargs)()
+        values["signature"] = validate_and_compose_signature(callable, *args, **kwargs)
 
         return values
 
@@ -104,21 +103,9 @@ class CallableModel(BaseModel):
         if kwargs is None:
             kwargs = {}
 
-        # create self.kwarg copy
-        fn_kwargs = self.kwargs.dict()
+        fn_args, fn_kwargs = self.signature.build(*args, **kwargs)
 
-        # update pos/kw kwargs with args
-        if len(args):
-
-            stored_kwargs = list(fn_kwargs.keys())
-
-            for i, arg in enumerate(args[: len(fn_kwargs)]):
-                fn_kwargs[stored_kwargs[i]] = arg
-
-        # update stored kwargs
-        fn_kwargs.update(kwargs)
-
-        return self.callable(**fn_kwargs)
+        return self.callable(*fn_args, **fn_kwargs)
 
 
 class ObjLoader(
@@ -355,9 +342,27 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
 
     try:
         module = import_module(module_name)
-    except ModuleNotFoundError as err:
-        logger.error("Unable to import module %s", module_name)
-        raise err
+
+    except ModuleNotFoundError:
+
+        try:
+            module_split = module_name.rsplit(".", 1)
+
+            if len(module_split) != 2:
+                raise ValueError(f"Unable to access: {callable}")
+
+            module_name, class_name = module_split
+
+            module = import_module(module_name)
+            callable_name = f"{class_name}.{callable_name}"
+
+        except ModuleNotFoundError as err:
+            logger.error("Unable to import module %s", module_name)
+            raise err
+
+        except ValueError as err:
+            logger.error(err)
+            raise err
 
     # construct partial in case of bound method
     if "." in callable_name:
@@ -410,25 +415,96 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
     return callable
 
 
+class SignatureModel(BaseModel):
+    class Config:
+        arbitrary_types_allowed = True
+
+    def build(self, *args, **kwargs):
+        stored_kwargs = self.dict()
+
+        stored_args = []
+        if "args" in stored_kwargs:
+            stored_args = stored_kwargs.pop("args")
+
+        # adjust for positional
+        args = list(args)
+        n_pos_only = len(stored_args)
+        positional_kwargs = []
+        if len(args) < n_pos_only:
+            stored_args[:n_pos_only] = args
+
+        else:
+            stored_args = args[:n_pos_only]
+            positional_kwargs = args[n_pos_only:]
+
+        stored_kwargs.update(kwargs)
+
+        # exclude empty parameters
+        stored_kwargs = {
+            key: value
+            for key, value in stored_kwargs.items()
+            if not value == inspect.Parameter.empty
+        }
+        if len(positional_kwargs):
+            for i, positional_kwarg in enumerate(positional_kwargs):
+
+                stored_kwargs[self.kwarg_order[i]] = positional_kwarg
+
+        return stored_args, stored_kwargs
+
+
 def validate_and_compose_signature(callable: Callable, *args, **kwargs):
     # try partial bind to validate
     signature = inspect.signature(callable)
     bound_args = signature.bind_partial(*args, **kwargs)
 
-    sig_pos_or_kw = {}
-    sig_kw_only = bound_args.arguments.get("kwargs")
-    sig_args_only = bound_args.arguments.get("args")
+    sig_kw = bound_args.arguments.get("kwargs", {})
+    sig_args = bound_args.arguments.get("args", [])
 
+    sig_kwargs = {}
     # Now go parameter by parameter and assemble kwargs
     for i, param in enumerate(signature.parameters.values()):
 
-        if param.kind == param.POSITIONAL_OR_KEYWORD:
-            sig_pos_or_kw[param.name] = (
-                param.default if not param.default == param.empty else None
-            )
+        if param.kind in [param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY]:
+            # if param not bound use default/ compose field rep
+            if not sig_kw.get(param.name):
+
+                # create a field representation
+                if param.default == param.empty:
+                    sig_kwargs[param.name] = param.empty
+
+                else:
+                    sig_kwargs[param.name] = param.default
+
+            else:
+                sig_kwargs[param.name] = sig_kw.get(param.name)
 
             # assign via binding
             if param.name in bound_args.arguments:
-                sig_pos_or_kw[param.name] = bound_args.arguments[param.name]
+                sig_kwargs[param.name] = bound_args.arguments[param.name]
 
-    return sig_pos_or_kw, sig_kw_only, sig_args_only
+    # create pydantic model
+    pydantic_fields = {
+        "args": (List[Any], Field(list(sig_args))),
+        "kwarg_order": Field(list(sig_kwargs.keys()), exclude=True),
+    }
+    for key, value in sig_kwargs.items():
+        if isinstance(value, (tuple,)):
+            pydantic_fields[key] = (tuple, Field(None))
+
+        elif value == inspect.Parameter.empty:
+            pydantic_fields[key] = (inspect.Parameter.empty, Field(value))
+
+        else:
+            # assigning empty default
+            if value is None:
+                pydantic_fields[key] = (inspect.Parameter.empty, Field(None))
+
+            else:
+                pydantic_fields[key] = value
+
+    model = create_model(
+        f"Kwargs_{callable.__qualname__}", __base__=SignatureModel, **pydantic_fields
+    )
+
+    return model()
