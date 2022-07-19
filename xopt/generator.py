@@ -44,7 +44,6 @@ class Generator(ABC):
         self._is_done = False
         self._data = pd.DataFrame()
         self._check_options(self._options)
-        
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:

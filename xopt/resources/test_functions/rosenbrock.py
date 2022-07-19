@@ -1,6 +1,7 @@
 from typing import Dict
 from xopt import VOCS
 
+
 def rosenbrock(x):
     """
     Rosenbrock function
@@ -21,9 +22,12 @@ def rosenbrock(x):
     """
     n = len(x)
 
-    return sum( (100*(x[i+1] - x[i]**2)**2 + (1-x[i])**2 for i in range(n-1) ))
+    return sum(
+        (100 * (x[i + 1] - x[i] ** 2) ** 2 + (1 - x[i]) ** 2 for i in range(n - 1))
+    )
 
-def evaluate_rosenbrock(inputs: Dict, label='y') -> Dict[str, float]:
+
+def evaluate_rosenbrock(inputs: Dict, label="y") -> Dict[str, float]:
     """
     Evaluate the Rosenbrock function with labeled inputs and outputs.
 
@@ -32,10 +36,10 @@ def evaluate_rosenbrock(inputs: Dict, label='y') -> Dict[str, float]:
     inputs: Dict[str, float]
         labeled vector of inputs. The labels can be arbitrary.
         labels will be sorted to construct the call to rosenbrock.
-        
+
 
     label: str
-        Label for the returned function value. 
+        Label for the returned function value.
         Default: 'y'
 
     Returns
@@ -53,8 +57,10 @@ def evaluate_rosenbrock(inputs: Dict, label='y') -> Dict[str, float]:
     return {"y": rosenbrock([inputs[k] for k in sorted(inputs)])}
 
 
-
 def make_rosenbrock_vocs(n):
-    return VOCS(variables = { f"x{i}": [-2, 2] for i in range(n)}, objectives={"y": "MINIMIZE"})    
+    return VOCS(
+        variables={f"x{i}": [-2, 2] for i in range(n)}, objectives={"y": "MINIMIZE"}
+    )
+
 
 rosenbrock2_vocs = make_rosenbrock_vocs(2)

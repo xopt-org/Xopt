@@ -162,7 +162,7 @@ class Xopt:
         logger.info("Running Xopt step")
         if self.is_done:
             logger.debug('Xopt is done, will not step.')
-            return 
+            return
 
         # get number of candidates to generate
         if self.options.asynch:
@@ -178,12 +178,11 @@ class Xopt:
         if len(new_samples) == 0:
             logger.debug('Generator returned 0 samples => optimization is done.')
             assert self.generator.is_done
-            return 
+            return
 
         # submit new samples to evaluator
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
         self.submit_data(new_samples)
-
 
     def wait_for_futures(self):
         # process futures after waiting for one or all to be completed
@@ -311,10 +310,9 @@ class Xopt:
     def data(self):
         return self._data
 
-
     @property
     def is_done(self):
-        return self._is_done or self.generator.is_done      
+        return self._is_done or self.generator.is_done
 
     @property
     def new_data(self):
