@@ -110,7 +110,7 @@ class Xopt:
 
     def run(self):
         """run until either xopt is done or the generator is done"""
-        while not self._is_done:
+        while not self.is_done:
 
             # Stopping criteria
             if self.options.max_evaluations:
@@ -160,6 +160,9 @@ class Xopt:
 
         """
         logger.info("Running Xopt step")
+        if self.is_done:
+            logger.debug('Xopt is done, will not step.')
+            return 
 
         # get number of candidates to generate
         if self.options.asynch:
@@ -171,11 +174,16 @@ class Xopt:
         logger.debug(f"Generating {n_generate} candidates")
         new_samples = pd.DataFrame(self.generator.generate(n_generate))
 
+        # generator is done when it returns no new samples
+        if len(new_samples) == 0:
+            logger.debug('Generator returned 0 samples => optimization is done.')
+            assert self.generator.is_done
+            return 
+
         # submit new samples to evaluator
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
         self.submit_data(new_samples)
 
-        self.wait_for_futures()
 
     def wait_for_futures(self):
         # process futures after waiting for one or all to be completed
@@ -302,6 +310,11 @@ class Xopt:
     @property
     def data(self):
         return self._data
+
+
+    @property
+    def is_done(self):
+        return self._is_done or self.generator.is_done      
 
     @property
     def new_data(self):
