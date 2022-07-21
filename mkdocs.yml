@@ -9,6 +9,7 @@ nav:
         - Basics:
             - examples/basic/xopt_basic.ipynb
             - examples/basic/xopt_parallel.ipynb
+            - examples/basic/xopt_vocs.ipynb
         - Bayesian:
             - Bayesian Exploration:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
@@ -18,6 +19,9 @@ nav:
                 - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
         - Evolutionary:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
+        - SciPy:
+            - Nelder-Mead: examples/scipy/neldermead.ipynb
+
 
     - API:
       - Xopt: api/xopt.md
@@ -27,6 +31,7 @@ nav:
           - Base generator class: api/generators.md
           - Bayesian generators: api/generators/bayesian.md
           - Genetic generators: api/generators/genetic.md
+          - SciPy generators: api/generators/scipy.md
 
 theme:
   icon:
