@@ -2,6 +2,7 @@ from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGen
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.generators.bayesian.upper_confidence_bound import \
     UpperConfidenceBoundGenerator
+from xopt.generators.scipy.neldermead import NelderMeadGenerator
 
 from xopt.generators.ga import CNSGAGenerator
 from xopt.generators.random import RandomGenerator
@@ -13,6 +14,7 @@ registered_generators = [
     BayesianExplorationGenerator,
     CNSGAGenerator,
     RandomGenerator,
+    NelderMeadGenerator,
 ]
 
 generators = {gen.alias: gen for gen in registered_generators}
