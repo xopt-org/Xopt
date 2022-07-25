@@ -39,12 +39,11 @@ class Generator(ABC):
         if not isinstance(options, GeneratorOptions):
             raise TypeError("options must be of type GeneratorOptions")
 
-        self._vocs = vocs
-
+        self._vocs = vocs.copy()
+        self._options = options.copy()
         self._is_done = False
         self._data = pd.DataFrame()
-        self._check_options(options)
-        self._options = options
+        self._check_options(self._options)
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:
