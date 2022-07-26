@@ -53,10 +53,7 @@ def create_mc_objective(vocs):
     """
     weights = torch.zeros(vocs.n_outputs).double()
     for idx, ele in enumerate(vocs.objective_names):
-        if vocs.objectives[ele] == "MINIMIZE":
-            weights[idx] = -1.0
-        else:
-            weights[idx] = 1.0
+        weights[idx] = 1.0
 
     def obj_callable(Z):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)

@@ -33,10 +33,10 @@ class BayesianGenerator(Generator, ABC):
         self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> List[Dict]:
-
         if n_candidates > 1:
             raise NotImplementedError(
-                "Bayesian algorithms don't support parallel " "candidate generation"
+                "Bayesian algorithms don't currently support parallel candidate "
+                "generation"
             )
 
         # if no data exists use random generator to generate candidates
@@ -66,6 +66,7 @@ class BayesianGenerator(Generator, ABC):
                 batch_initial_conditions=batch_initial_points,
                 num_restarts=self.options.optim.num_restarts,
             )
+
             return self.vocs.convert_numpy_to_inputs(
                 candidates.unsqueeze(0).detach().numpy()
             )
@@ -76,9 +77,21 @@ class BayesianGenerator(Generator, ABC):
         constraints
 
         """
+        # drop nans
+        vailid_data = data[self.vocs.variable_names + self.vocs.output_names].dropna()
+
+        # create dataframes for processed data
+        variable_data = self.vocs.variable_data(vailid_data, "")
+        objective_data = self.vocs.objective_data(vailid_data, "")
+        constraint_data = self.vocs.constraint_data(vailid_data, "")
 
         _model = create_standard_model(
-            data, self.vocs, tkwargs=self._tkwargs, **self.options.model.dict()
+            variable_data,
+            objective_data,
+            constraint_data,
+            bounds=self.vocs.bounds,
+            tkwargs=self._tkwargs,
+            **self.options.model.dict(),
         )
 
         if update_internal:
@@ -93,14 +106,15 @@ class BayesianGenerator(Generator, ABC):
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
         self.objective = self._get_objective()
 
+        # get base acquisition function
+        acq = self._get_acquisition(model)
+
         # add proximal biasing if requested
         if self.options.acq.proximal_lengthscales is not None:
             acq = ProximalAcquisitionFunction(
-                self._get_acquisition(model),
+                acq,
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
             )
-        else:
-            acq = self._get_acquisition(model)
 
         return acq
 
