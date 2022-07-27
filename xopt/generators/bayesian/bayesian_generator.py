@@ -78,12 +78,12 @@ class BayesianGenerator(Generator, ABC):
 
         """
         # drop nans
-        vailid_data = data[self.vocs.variable_names + self.vocs.output_names].dropna()
+        valid_data = data[self.vocs.variable_names + self.vocs.output_names].dropna()
 
         # create dataframes for processed data
-        variable_data = self.vocs.variable_data(vailid_data, "")
-        objective_data = self.vocs.objective_data(vailid_data, "")
-        constraint_data = self.vocs.constraint_data(vailid_data, "")
+        variable_data = self.vocs.variable_data(valid_data, "")
+        objective_data = self.vocs.objective_data(valid_data, "")
+        constraint_data = self.vocs.constraint_data(valid_data, "")
 
         _model = create_standard_model(
             variable_data,
