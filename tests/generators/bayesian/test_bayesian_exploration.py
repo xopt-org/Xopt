@@ -1,8 +1,5 @@
-from copy import deepcopy
-
-from xopt.evaluator import Evaluator
 from xopt.base import Xopt
-
+from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 

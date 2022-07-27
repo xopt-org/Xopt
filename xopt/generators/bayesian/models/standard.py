@@ -2,16 +2,13 @@ import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
 from botorch.models import ModelListGP, SingleTaskGP
-from botorch.models.transforms import ChainedOutcomeTransform, Normalize, Standardize
+from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 
 from xopt.generators.bayesian.custom_botorch.bilog import Bilog
-from xopt.generators.bayesian.custom_botorch.constraint_transform import Constraint
-
-from xopt.vocs import VOCS
 
 
 def create_standard_model(

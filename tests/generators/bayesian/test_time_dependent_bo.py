@@ -4,12 +4,9 @@ from unittest.mock import patch
 
 import numpy as np
 
-from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.upper_confidence_bound import (
     TDUpperConfidenceBoundGenerator,
-    UCBOptions,
-    UpperConfidenceBoundGenerator,
 )
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
