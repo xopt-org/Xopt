@@ -290,7 +290,7 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
     Use variables dict to form a dataframe.
     """
     if not variables:
-        return None
+        return pd.DataFrame([])
 
     data = pd.DataFrame(data)
     vdata = pd.DataFrame()
@@ -312,7 +312,7 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
 
     """
     if not objectives:
-        return None
+        return pd.DataFrame([])
 
     data = pd.DataFrame(data)
 
@@ -351,7 +351,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
 
     """
     if not constraints:
-        return None
+        return pd.DataFrame([])
 
     data = pd.DataFrame(data)  # cast to dataframe
 
