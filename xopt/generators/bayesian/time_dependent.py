@@ -2,6 +2,7 @@ import time
 from abc import ABC
 from typing import Dict, List
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -34,13 +35,15 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
     def generate(self, n_candidates: int) -> List[Dict]:
         self.target_prediction_time = time.time() + self.options.acq.added_time
-
         output = super().generate(n_candidates)
 
-        if self.target_prediction_time is not None:
-            # if the current time is < target_prediction_time wait until it is not
-            while time.time() < self.target_prediction_time:
-                time.sleep(0.1)
+        if time.time() > self.target_prediction_time:
+            raise RuntimeWarning(
+                "target prediction time is in the past! Increase "
+                "added time for accurate results"
+            )
+        while time.time() < self.target_prediction_time:
+            time.sleep(0.001)
 
         return output
 
@@ -95,7 +98,8 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         # identify which column has the `time` attribute
         column = [-1]
         value = torch.tensor(self.target_prediction_time, **self._tkwargs).unsqueeze(0)
-        acq = FixedFeatureAcquisitionFunction(
+        fixed_acq = FixedFeatureAcquisitionFunction(
             acq, self.vocs.n_variables + 1, column, value
         )
-        return acq
+
+        return fixed_acq

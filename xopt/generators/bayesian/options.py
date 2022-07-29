@@ -31,6 +31,10 @@ class OptimOptions(XoptBaseModel):
         description="flag to use sequential optimization for q-batch point "
         "selection",
     )
+    use_nearby_initial_points: bool = Field(
+        True,
+        description="flag to use local samples to start acqf optimization"
+    )
 
 
 class ModelOptions(XoptBaseModel):
