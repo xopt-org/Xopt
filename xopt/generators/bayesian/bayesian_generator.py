@@ -8,11 +8,15 @@ from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
+from matplotlib import pyplot as plt
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
+
+import logging
+logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
@@ -49,26 +53,34 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
-            # generate starting points for optimization (note in real domain)
-            inputs = self.get_input_data(self.data)
-            batch_initial_points = sample_truncated_normal_perturbations(
-                inputs[-1].unsqueeze(0),
-                n_discrete_points=self.options.optim.raw_samples,
-                sigma=0.5,
-                bounds=bounds,
-            )
+            if self.options.optim.use_nearby_initial_points:
+                # generate starting points for optimization (note in real domain)
+                inputs = self.get_input_data(self.data)
+                batch_initial_points = sample_truncated_normal_perturbations(
+                    inputs[-1].unsqueeze(0),
+                    n_discrete_points=self.options.optim.raw_samples,
+                    sigma=0.5,
+                    bounds=bounds,
+                ).unsqueeze(-2)
+                raw_samples = None
+            else:
+                batch_initial_points = None
+                raw_samples = self.options.optim.raw_samples
+
+            acq_funct = self.get_acquisition(self._model)
 
             # get candidates in real domain
             candidates, out = optimize_acqf(
-                acq_function=self.get_acquisition(self._model),
+                acq_function=acq_funct,
                 bounds=bounds,
                 q=n_candidates,
+                raw_samples=raw_samples,
                 batch_initial_conditions=batch_initial_points,
                 num_restarts=self.options.optim.num_restarts,
             )
-
+            logger.debug("Best candidate from optimize", candidates, out)
             return self.vocs.convert_numpy_to_inputs(
-                candidates.unsqueeze(0).detach().numpy()
+                candidates.detach().numpy()
             )
 
     def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
