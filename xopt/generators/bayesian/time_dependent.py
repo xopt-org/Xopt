@@ -2,7 +2,6 @@ import time
 from abc import ABC
 from typing import Dict, List
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -13,7 +12,6 @@ from pydantic import Field
 from xopt.generators.bayesian import BayesianGenerator
 from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
-
 from xopt.vocs import VOCS
 
 
