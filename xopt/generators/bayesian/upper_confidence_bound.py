@@ -81,7 +81,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
 class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
-    alias = "td_upper_confidence_bound"
+    alias = "time_dependent_upper_confidence_bound"
 
     def __init__(self, vocs: VOCS, options: TDUCBOptions = TDUCBOptions()):
         super(TDUpperConfidenceBoundGenerator, self).__init__(vocs, options)
