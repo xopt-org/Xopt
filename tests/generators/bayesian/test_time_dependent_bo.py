@@ -40,7 +40,7 @@ class TestTimeDependentBO:
 
     def test_td_ucb(self):
         options = TDUpperConfidenceBoundGenerator.default_options()
-        options.acq.added_time = 1.0
+        options.acq.added_time = 2.0
         options.acq.monte_carlo_samples = 1
         test_vocs = deepcopy(TEST_VOCS_BASE)
 

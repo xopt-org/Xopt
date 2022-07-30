@@ -10,7 +10,7 @@ class AcqOptions(XoptBaseModel):
     """Options for defining the acquisition function in BO"""
 
     # monte carlo options
-    monte_carlo_samples = Field(512, description="number of monte carlo samples to use")
+    monte_carlo_samples = Field(128, description="number of monte carlo samples to use")
 
     proximal_lengthscales: List[float] = Field(
         None, description="lengthscales for proximal biasing"
