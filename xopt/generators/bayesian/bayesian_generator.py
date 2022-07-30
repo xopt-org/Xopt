@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
@@ -8,14 +9,12 @@ from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
-from matplotlib import pyplot as plt
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
-import logging
 logger = logging.getLogger()
 
 
