@@ -2,21 +2,20 @@ import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
 from botorch.models import ModelListGP, SingleTaskGP
-from botorch.models.transforms import ChainedOutcomeTransform, Normalize, Standardize
+from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 
 from xopt.generators.bayesian.custom_botorch.bilog import Bilog
-from xopt.generators.bayesian.custom_botorch.constraint_transform import Constraint
-
-from xopt.vocs import VOCS
 
 
 def create_standard_model(
-    data: pd.DataFrame,
-    vocs: VOCS,
+    input_data: pd.DataFrame,
+    objective_data: pd.DataFrame,
+    constraint_data: pd.DataFrame,
+    bounds,
     use_conservative_prior_lengthscale: bool = False,
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
@@ -32,38 +31,40 @@ def create_standard_model(
             see (https://arxiv.org/abs/2002.08526) for details
     """
     tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
-    data = data[vocs.variable_names + vocs.output_names].dropna()
 
-    train_X = torch.tensor(data[vocs.variable_names].to_numpy(), **tkwargs)
-    bounds = torch.tensor(vocs.bounds, **tkwargs)
-    normalize = Normalize(vocs.n_variables, bounds=bounds)
+    train_X = torch.tensor(input_data.to_numpy(), **tkwargs)
+    bounds = torch.tensor(bounds, **tkwargs)
+    normalize = Normalize(train_X.shape[-1], bounds=bounds)
 
-    models = {}
-    for name in vocs.objective_names:
-        train_Y = torch.tensor(data[name].to_numpy(), **tkwargs).unsqueeze(-1)
+    models = []
+
+    # create models for objectives
+    for name in objective_data.keys():
+        train_Y = torch.tensor(objective_data[name].to_numpy(), **tkwargs).unsqueeze(-1)
 
         likelihood = None
         if use_low_noise_prior:
             likelihood = GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
 
-        models[name] = SingleTaskGP(
-            train_X,
-            train_Y,
-            input_transform=normalize,
-            outcome_transform=Standardize(1),
-            likelihood=likelihood,
+        models.append(
+            SingleTaskGP(
+                train_X,
+                train_Y,
+                input_transform=normalize,
+                outcome_transform=Standardize(1),
+                likelihood=likelihood,
+            )
         )
-        mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
+        mll = ExactMarginalLogLikelihood(models[-1].likelihood, models[-1])
         fit_gpytorch_model(mll)
 
     # do constraint models
-    for name, val in vocs.constraints.items():
-        train_Y = torch.tensor(data[name].to_numpy(), **tkwargs).unsqueeze(-1)
-
-        outcome_transform = ChainedOutcomeTransform(
-            constraint=Constraint({0: vocs.constraints[name]}),
-            bilog=Bilog(m=1),
+    for name in constraint_data.keys():
+        train_Y = torch.tensor(constraint_data[name].to_numpy(), **tkwargs).unsqueeze(
+            -1
         )
+
+        outcome_transform = Bilog(m=1)
 
         # use conservative priors if requested
         covar_module = None
@@ -71,7 +72,7 @@ def create_standard_model(
             covar_module = ScaleKernel(
                 MaternKernel(
                     nu=1.5,
-                    ard_num_dims=vocs.n_variables,
+                    ard_num_dims=train_X.shape[-1],
                     lengthscale_prior=GammaPrior(10.0, 100.0),
                 ),
                 outputscale_prior=GammaPrior(5.0, 1.0),
@@ -81,22 +82,24 @@ def create_standard_model(
         if use_low_noise_prior:
             likelihood = GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
 
-        models[name] = SingleTaskGP(
-            train_X,
-            train_Y,
-            input_transform=normalize,
-            outcome_transform=outcome_transform,
-            covar_module=covar_module,
-            likelihood=likelihood,
+        models.append(
+            SingleTaskGP(
+                train_X,
+                train_Y,
+                input_transform=normalize,
+                outcome_transform=outcome_transform,
+                covar_module=covar_module,
+                likelihood=likelihood,
+            )
         )
 
         if use_conservative_prior_mean:
-            models[name].mean_module.constant = torch.nn.Parameter(
+            models[-1].mean_module.constant = torch.nn.Parameter(
                 torch.tensor(5.0, **tkwargs), requires_grad=False
             )
 
-        mll = ExactMarginalLogLikelihood(models[name].likelihood, models[name])
+        mll = ExactMarginalLogLikelihood(models[-1].likelihood, models[-1])
         fit_gpytorch_model(mll)
 
     # create model list
-    return ModelListGP(*[models[name] for name in vocs.output_names])
+    return ModelListGP(*models)

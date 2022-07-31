@@ -1,6 +1,5 @@
-from xopt.evaluator import Evaluator
 from xopt.base import Xopt
-
+from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
@@ -33,10 +32,8 @@ class TestBayesianExplorationGenerator:
 
         X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
-        # initialize with single initial candidate
-        X.step()
-
         # now use bayes opt
+        X.step()
         X.step()
 
     def test_in_xopt_w_proximal(self):

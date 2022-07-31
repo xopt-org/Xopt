@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
@@ -13,6 +14,8 @@ from xopt.generator import Generator
 from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
+
+logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
@@ -33,10 +36,10 @@ class BayesianGenerator(Generator, ABC):
         self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> List[Dict]:
-
         if n_candidates > 1:
             raise NotImplementedError(
-                "Bayesian algorithms don't support parallel " "candidate generation"
+                "Bayesian algorithms don't currently support parallel candidate "
+                "generation"
             )
 
         # if no data exists use random generator to generate candidates
@@ -49,25 +52,34 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
-            # generate starting points for optimization (note in real domain)
-            inputs = self.get_input_data(self.data)
-            batch_initial_points = sample_truncated_normal_perturbations(
-                inputs[-1].unsqueeze(0),
-                n_discrete_points=self.options.optim.raw_samples,
-                sigma=0.5,
-                bounds=bounds,
-            )
+            if self.options.optim.use_nearby_initial_points:
+                # generate starting points for optimization (note in real domain)
+                inputs = self.get_input_data(self.data)
+                batch_initial_points = sample_truncated_normal_perturbations(
+                    inputs[-1].unsqueeze(0),
+                    n_discrete_points=self.options.optim.raw_samples,
+                    sigma=0.5,
+                    bounds=bounds,
+                ).unsqueeze(-2)
+                raw_samples = None
+            else:
+                batch_initial_points = None
+                raw_samples = self.options.optim.raw_samples
+
+            acq_funct = self.get_acquisition(self._model)
 
             # get candidates in real domain
             candidates, out = optimize_acqf(
-                acq_function=self.get_acquisition(self._model),
+                acq_function=acq_funct,
                 bounds=bounds,
                 q=n_candidates,
+                raw_samples=raw_samples,
                 batch_initial_conditions=batch_initial_points,
                 num_restarts=self.options.optim.num_restarts,
             )
+            logger.debug("Best candidate from optimize", candidates, out)
             return self.vocs.convert_numpy_to_inputs(
-                candidates.unsqueeze(0).detach().numpy()
+                candidates.detach().numpy()
             )
 
     def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
@@ -76,9 +88,21 @@ class BayesianGenerator(Generator, ABC):
         constraints
 
         """
+        # drop nans
+        valid_data = data[self.vocs.variable_names + self.vocs.output_names].dropna()
+
+        # create dataframes for processed data
+        variable_data = self.vocs.variable_data(valid_data, "")
+        objective_data = self.vocs.objective_data(valid_data, "")
+        constraint_data = self.vocs.constraint_data(valid_data, "")
 
         _model = create_standard_model(
-            data, self.vocs, tkwargs=self._tkwargs, **self.options.model.dict()
+            variable_data,
+            objective_data,
+            constraint_data,
+            bounds=self.vocs.bounds,
+            tkwargs=self._tkwargs,
+            **self.options.model.dict(),
         )
 
         if update_internal:
@@ -93,14 +117,15 @@ class BayesianGenerator(Generator, ABC):
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
         self.objective = self._get_objective()
 
+        # get base acquisition function
+        acq = self._get_acquisition(model)
+
         # add proximal biasing if requested
         if self.options.acq.proximal_lengthscales is not None:
             acq = ProximalAcquisitionFunction(
-                self._get_acquisition(model),
+                acq,
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
             )
-        else:
-            acq = self._get_acquisition(model)
 
         return acq
 

@@ -10,7 +10,7 @@ class AcqOptions(XoptBaseModel):
     """Options for defining the acquisition function in BO"""
 
     # monte carlo options
-    monte_carlo_samples = Field(512, description="number of monte carlo samples to use")
+    monte_carlo_samples = Field(128, description="number of monte carlo samples to use")
 
     proximal_lengthscales: List[float] = Field(
         None, description="lengthscales for proximal biasing"
@@ -30,6 +30,10 @@ class OptimOptions(XoptBaseModel):
         True,
         description="flag to use sequential optimization for q-batch point "
         "selection",
+    )
+    use_nearby_initial_points: bool = Field(
+        True,
+        description="flag to use local samples to start acqf optimization"
     )
 
 
