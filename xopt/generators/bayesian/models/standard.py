@@ -32,11 +32,16 @@ def create_standard_model(
     """
     tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
 
+    # validate data
+    if len(input_data) == 0:
+        raise ValueError("input_data is empty/all Nans, cannot create model")
+
     train_X = torch.tensor(input_data.to_numpy(), **tkwargs)
     bounds = torch.tensor(bounds, **tkwargs)
     normalize = Normalize(train_X.shape[-1], bounds=bounds)
 
     models = []
+
 
     # create models for objectives
     for name in objective_data.keys():
