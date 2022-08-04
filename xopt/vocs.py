@@ -424,4 +424,4 @@ def validate_input_data(vocs, data):
 
         d = data[name].to_numpy()
         if np.any(d > upper) or np.any(d < lower):
-            raise ValueError(f"input points are not valid for VOCS!")
+            raise ValueError("input points are not valid for VOCS!")
