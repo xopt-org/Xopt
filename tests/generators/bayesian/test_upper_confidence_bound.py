@@ -1,7 +1,11 @@
 from copy import deepcopy
 
-from xopt.evaluator import Evaluator
+import pytest
+
 from xopt.base import Xopt
+
+from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationOptions
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
@@ -14,6 +18,11 @@ class TestUpperConfidenceBoundGenerator:
         ucb_gen = UpperConfidenceBoundGenerator(TEST_VOCS_BASE)
         ucb_gen.options.dict()
         ucb_gen.options.schema()
+
+        with pytest.raises(ValueError):
+            UpperConfidenceBoundGenerator(
+                TEST_VOCS_BASE, BayesianExplorationOptions()
+            )
 
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(
