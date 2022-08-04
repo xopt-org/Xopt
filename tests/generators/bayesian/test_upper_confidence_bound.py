@@ -1,5 +1,11 @@
-from xopt.evaluator import Evaluator
+from copy import deepcopy
+
+import pytest
+
 from xopt.base import Xopt
+
+from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationOptions
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
@@ -12,6 +18,11 @@ class TestUpperConfidenceBoundGenerator:
         ucb_gen = UpperConfidenceBoundGenerator(TEST_VOCS_BASE)
         ucb_gen.options.dict()
         ucb_gen.options.schema()
+
+        with pytest.raises(ValueError):
+            UpperConfidenceBoundGenerator(
+                TEST_VOCS_BASE, BayesianExplorationOptions()
+            )
 
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(
@@ -27,6 +38,20 @@ class TestUpperConfidenceBoundGenerator:
 
         # candidate = gen.generate(2)
         # assert len(candidate) == 2
+
+    def test_generate_w_overlapping_objectives_constraints(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {"y1": ["GREATER_THAN", 0.0]}
+        gen = UpperConfidenceBoundGenerator(
+            test_vocs,
+        )
+        gen.options.optim.raw_samples = 1
+        gen.options.optim.num_restarts = 1
+        gen.options.acq.monte_carlo_samples = 1
+        gen.data = TEST_VOCS_DATA
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)

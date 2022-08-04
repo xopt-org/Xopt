@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
@@ -36,9 +37,23 @@ class TestBayesianGenerator(TestCase):
 
         # try with input data that contains Nans due to xopt raising an error
         # currently we drop all rows containing Nans
+        test_data = deepcopy(TEST_VOCS_DATA)
         test_data["y1"].iloc[5] = np.NaN
         model = gen.train_model(test_data)
         assert len(model.models[0].train_inputs[0]) == len(test_data) - 1
+
+        # test with input data that is only Nans
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_data["y1"].iloc[:] = np.NaN
+        with pytest.raises(ValueError):
+            gen.train_model(test_data)
+
+        # test with the same objective and constraint keys
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
+        gen2 = BayesianGenerator(test_vocs)
+        test_data = deepcopy(TEST_VOCS_DATA)
+        gen2.train_model(test_data)
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
@@ -49,7 +64,7 @@ class TestBayesianGenerator(TestCase):
         # generate some data samples
         import numpy as np
 
-        test_samples = pd.DataFrame(np.linspace(0, 2 * 3.14, 10), columns=["x1"])
+        test_samples = pd.DataFrame(np.linspace(0, 3.14, 10), columns=["x1"])
         X.submit_data(test_samples)
 
         # create gp model with data
@@ -94,3 +109,5 @@ class TestBayesianGenerator(TestCase):
         true_outputs = torch.from_numpy(TEST_VOCS_DATA[onames].to_numpy())
         assert torch.allclose(inputs, true_inputs)
         assert torch.allclose(outputs, true_outputs)
+
+    # TODO: test passing UCB options to bayesian exploration

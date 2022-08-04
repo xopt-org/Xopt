@@ -95,11 +95,15 @@ class Xopt:
         self.options = options
         logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
+        # add data to xopt object and generator
         self._data = pd.DataFrame(data)
+        if self.generator is not None:
+            self.generator.add_data(self.data)
+
         self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
-        self._ix_last = len(self._data)  # index of last sample generated
+        self._ix_last = len(self.data)  # index of last sample generated
         self._is_done = False
         self.n_unfinished_futures = 0
 
@@ -133,12 +137,18 @@ class Xopt:
         """
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
+        # TODO: Append VOCS constants to submitted data by user or define separate
+        #  method to handle custom user input
+
         # Reindex input dataframe
         input_data.index = np.arange(
             self._ix_last + 1, self._ix_last + 1 + len(input_data)
         )
         self._ix_last += len(input_data)
         self._input_data = pd.concat([self._input_data, input_data])
+
+        # validate data before submission
+        self.vocs.validate_input_data(self._input_data)
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)
@@ -161,7 +171,7 @@ class Xopt:
         """
         logger.info("Running Xopt step")
         if self.is_done:
-            logger.debug('Xopt is done, will not step.')
+            logger.debug("Xopt is done, will not step.")
             return
 
         # get number of candidates to generate
@@ -176,7 +186,7 @@ class Xopt:
 
         # generator is done when it returns no new samples
         if len(new_samples) == 0:
-            logger.debug('Generator returned 0 samples => optimization is done.')
+            logger.debug("Generator returned 0 samples => optimization is done.")
             assert self.generator.is_done
             return
 
