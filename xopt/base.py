@@ -97,13 +97,13 @@ class Xopt:
 
         # add data to xopt object and generator
         self._data = pd.DataFrame(data)
-        if self._generator is not None:
-            self._generator.add_data(self._data)
+        if self.generator is not None:
+            self.generator.add_data(self.data)
 
         self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
-        self._ix_last = len(self._data)  # index of last sample generated
+        self._ix_last = len(self.data)  # index of last sample generated
         self._is_done = False
         self.n_unfinished_futures = 0
 
