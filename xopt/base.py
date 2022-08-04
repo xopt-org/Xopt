@@ -97,7 +97,8 @@ class Xopt:
 
         # add data to xopt object and generator
         self._data = pd.DataFrame(data)
-        self._generator.add_data(self._data)
+        if self._generator is not None:
+            self._generator.add_data(self._data)
 
         self._new_data = None
         self._futures = {}  # unfinished futures
@@ -138,12 +139,16 @@ class Xopt:
 
         # TODO: Append VOCS constants to submitted data by user or define separate
         #  method to handle custom user input
+
         # Reindex input dataframe
         input_data.index = np.arange(
             self._ix_last + 1, self._ix_last + 1 + len(input_data)
         )
         self._ix_last += len(input_data)
         self._input_data = pd.concat([self._input_data, input_data])
+
+        # validate data before submission
+        self.vocs.validate_input_data(self._input_data)
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)

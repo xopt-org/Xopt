@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Union, List
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -278,6 +278,22 @@ class VOCS(XoptBaseModel):
         """
         return form_feasibility_data(self.constraints, data, prefix)
 
+    def validate_input_data(self, input_points: pd.DataFrame) -> None:
+        """
+        Validates input data. Raises an error if the input data does not satisfy
+        requirements given by vocs.
+
+        Args:
+            input_points: input data to be validated.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: if input data does not satisfy requirements.
+        """
+        validate_input_data(self, input_points)
+
 
 # --------------------------------
 # dataframe utilities
@@ -399,3 +415,13 @@ def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     # if all row values are true, then the row is feasible
     fdata["feasible"] = fdata.all(axis=1)
     return fdata
+
+
+def validate_input_data(vocs, data):
+    for name in vocs.variable_names:
+        lower = vocs.variables[name][0]
+        upper = vocs.variables[name][1]
+
+        d = data[name].to_numpy()
+        if np.any(d > upper) or np.any(d < lower):
+            raise ValueError(f"input points are not valid for VOCS!")
