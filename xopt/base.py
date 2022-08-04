@@ -166,7 +166,7 @@ class Xopt:
         """
         logger.info("Running Xopt step")
         if self.is_done:
-            logger.debug('Xopt is done, will not step.')
+            logger.debug("Xopt is done, will not step.")
             return
 
         # get number of candidates to generate
@@ -181,7 +181,7 @@ class Xopt:
 
         # generator is done when it returns no new samples
         if len(new_samples) == 0:
-            logger.debug('Generator returned 0 samples => optimization is done.')
+            logger.debug("Generator returned 0 samples => optimization is done.")
             assert self.generator.is_done
             return
 

@@ -42,7 +42,6 @@ def create_standard_model(
 
     models = []
 
-
     # create models for objectives
     for name in objective_data.keys():
         train_Y = torch.tensor(objective_data[name].to_numpy(), **tkwargs).unsqueeze(-1)
