@@ -45,7 +45,7 @@ class TestXopt:
 
         evaluator = Evaluator(function=dummy)
         gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+        Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -85,6 +85,17 @@ class TestXopt:
         )
         with pytest.raises(XoptError):
             X2.step()
+
+    def test_submit_bad_data(self):
+        generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
+        evaluator = Evaluator(function=xtest_callable)
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
+        )
+        with pytest.raises(ValueError):
+            X.submit_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
 
     def test_update_data(self):
         generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))

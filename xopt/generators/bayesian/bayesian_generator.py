@@ -89,7 +89,7 @@ class BayesianGenerator(Generator, ABC):
 
         """
         # drop nans
-        valid_data = data[self.vocs.variable_names + self.vocs.output_names].dropna()
+        valid_data = data[pd.unique(self.vocs.variable_names + self.vocs.output_names)].dropna()
 
         # create dataframes for processed data
         variable_data = self.vocs.variable_data(valid_data, "")
