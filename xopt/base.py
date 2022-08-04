@@ -95,7 +95,10 @@ class Xopt:
         self.options = options
         logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
+        # add data to xopt object and generator
         self._data = pd.DataFrame(data)
+        self._generator.add_data(self._data)
+
         self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
@@ -133,6 +136,8 @@ class Xopt:
         """
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
+        # TODO: Append VOCS constants to submitted data by user or define separate
+        #  method to handle custom user input
         # Reindex input dataframe
         input_data.index = np.arange(
             self._ix_last + 1, self._ix_last + 1 + len(input_data)
