@@ -125,6 +125,7 @@ class BayesianGenerator(Generator, ABC):
             acq = ProximalAcquisitionFunction(
                 acq,
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
+                transformed_weighting=self.options.acq.use_transformed_proximal_weights,
             )
 
         return acq
