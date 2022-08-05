@@ -2,7 +2,7 @@ deap
 numpy
 pyyaml
 torch
-botorch>=0.6.1
+botorch>=0.6.5
 gpytorch
 pandas
 pydantic>=1.9.0
