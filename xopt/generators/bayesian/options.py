@@ -15,6 +15,9 @@ class AcqOptions(XoptBaseModel):
     proximal_lengthscales: List[float] = Field(
         None, description="lengthscales for proximal biasing"
     )
+    use_transformed_proximal_weights: bool = Field(
+        True, description="use transformed proximal weights"
+    )
 
 
 class OptimOptions(XoptBaseModel):
@@ -32,8 +35,7 @@ class OptimOptions(XoptBaseModel):
         "selection",
     )
     use_nearby_initial_points: bool = Field(
-        True,
-        description="flag to use local samples to start acqf optimization"
+        True, description="flag to use local samples to start acqf optimization"
     )
 
 
