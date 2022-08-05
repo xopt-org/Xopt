@@ -2,13 +2,11 @@ import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
 from botorch.models import ModelListGP, SingleTaskGP
-from botorch.models.transforms import Normalize, Standardize
+from botorch.models.transforms import Bilog, Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-
-from xopt.generators.bayesian.custom_botorch.bilog import Bilog
 
 
 def create_standard_model(
@@ -68,7 +66,7 @@ def create_standard_model(
             -1
         )
 
-        outcome_transform = Bilog(m=1)
+        outcome_transform = Bilog()
 
         # use conservative priors if requested
         covar_module = None

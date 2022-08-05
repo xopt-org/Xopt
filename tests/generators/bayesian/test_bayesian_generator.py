@@ -8,9 +8,9 @@ import pytest
 import torch
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
+from xopt.base import Xopt
 
 from xopt.evaluator import Evaluator
-from xopt.base import Xopt
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
@@ -89,9 +89,8 @@ class TestBayesianGenerator(TestCase):
             ),
         )
 
-        # constraint transform
+        # constraint transform - bilog
         C = torch.from_numpy(X.data["c1"].to_numpy())
-        C = C / torch.sqrt(torch.sum(C**2) / C.numel())  # standardization
         assert torch.allclose(
             model.train_targets[1], torch.sign(-C) * torch.log(1 + torch.abs(-C))
         )
