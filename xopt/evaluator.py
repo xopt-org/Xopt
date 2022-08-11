@@ -42,6 +42,7 @@ class Evaluator(BaseModel):
 
     class Config:
         """config"""
+
         arbitrary_types_allowed = True
         # validate_assignment = True # Broken in 1.9.0.
         # Trying to fix in https://github.com/samuelcolvin/pydantic/pull/4194
@@ -100,7 +101,7 @@ class Evaluator(BaseModel):
         """submit dataframe of inputs to executor"""
         input_data = pd.DataFrame(input_data)  # cast to dataframe
         futures = {}
-        #for index, row in input_data.iterrows(): # Bad, does not preserve dtype
+        # for index, row in input_data.iterrows(): # Bad, does not preserve dtype
         for index, row in zip(input_data.index, input_data.to_dict(orient="records")):
             future = self.submit(dict(row))
             futures[index] = future
