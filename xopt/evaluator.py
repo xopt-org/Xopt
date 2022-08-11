@@ -100,7 +100,8 @@ class Evaluator(BaseModel):
         """submit dataframe of inputs to executor"""
         input_data = pd.DataFrame(input_data)  # cast to dataframe
         futures = {}
-        for index, row in input_data.iterrows():
+        #for index, row in input_data.iterrows(): # Bad, does not preserve dtype
+        for index, row in zip(input_data.index, input_data.to_dict(orient="records")):
             future = self.submit(dict(row))
             futures[index] = future
 
