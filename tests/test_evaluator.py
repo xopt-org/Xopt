@@ -18,6 +18,10 @@ class TestEvaluator:
     def g(x, a=True):
         return False
 
+    @staticmethod
+    def identity(x, a=True):
+        return {k + "_out": v for k, v in x.items()}
+
     def test_submit(self):
         evaluator = Evaluator(function=self.f)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
@@ -29,6 +33,37 @@ class TestEvaluator:
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         futures = evaluator.submit_data(candidates)
         assert len(futures) == 10
+
+    def test_type_preservation(self):
+        """
+        iterrows does not necessarily preserve types:
+        https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iterrows.html
+        """
+        evaluator = Evaluator(function=self.identity)
+
+        #  Test with ints and floats ONLY. A
+        candidates = pd.DataFrame(
+            {
+                "ints": [1, 2, 3],
+                "floats": [2.0, 3.0, 4.0],
+                #  Do not add these.
+                # 'strings': ['a','b','c'],
+                # 'booleans': [True, False, True],
+                # 'lists': [[1,2,3],[4,5,6],[7,8,9]],
+                # 'dicts': [{'a':1,'b':2},{'c':3,'d':4},{'e':5,'f':6}],
+                # 'tuples': [(1,2,3),(4,5,6),(7,8,9)]
+            },
+            index=[7, 8, 9],
+        )
+        futures = evaluator.submit_data(candidates)
+        index = []
+        data = []
+        for ix, future in futures.items():
+            index.append(ix)
+            data.append(future.result())
+        df2 = pd.DataFrame(data, index=index)
+        df2.columns = df2.columns.str.replace("_out", "")
+        assert df2.equals(candidates), "DataFrame types were not preserved"
 
     def test_init(self):
         test_dict = {
