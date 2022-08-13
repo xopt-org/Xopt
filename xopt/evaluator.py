@@ -101,15 +101,11 @@ class Evaluator(BaseModel):
         """submit dataframe of inputs to executor"""
         input_data = pd.DataFrame(input_data)  # cast to dataframe for consistency
         futures = {}
-        # for index, row in input_data.iterrows(): # Bad, does not preserve dtype
-        # for index, row in zip(input_data.index, input_data.to_dict(orient="records")):
-        # This should be more efficient:
+        # Do not use iterrows, it doesn't preserve dtype
         for row in input_data.itertuples():
             inputs = row._asdict()
             index = inputs.pop("Index")
-            future = self.submit(inputs)
-            futures[index] = future
-
+            futures[index] = self.submit(inputs)
         return futures
 
 
