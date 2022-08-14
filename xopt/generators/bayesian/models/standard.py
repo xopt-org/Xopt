@@ -96,9 +96,8 @@ def create_standard_model(
         )
 
         if use_conservative_prior_mean:
-            models[-1].mean_module.constant = torch.nn.Parameter(
-                torch.tensor(5.0, **tkwargs), requires_grad=False
-            )
+            models[-1].mean_module.constant.data = torch.tensor(5.0, **tkwargs)
+            models[-1].mean_module.constant.requires_grad = False
 
         mll = ExactMarginalLogLikelihood(models[-1].likelihood, models[-1])
         fit_gpytorch_model(mll)
