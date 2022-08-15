@@ -37,6 +37,10 @@ class OptimOptions(XoptBaseModel):
     use_nearby_initial_points: bool = Field(
         True, description="flag to use local samples to start acqf optimization"
     )
+    max_travel_distances: List[float] = Field(
+        None,
+        description="limits for travel distance between points in normalized space",
+    )
 
 
 class ModelOptions(XoptBaseModel):
