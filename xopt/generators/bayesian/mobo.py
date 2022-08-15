@@ -35,7 +35,7 @@ class MOBOGenerator(BayesianGenerator):
         if not isinstance(options, MOBOOptions):
             raise ValueError("options must be a MOBOOptions object")
 
-        super(MOBOGenerator, self).__init__(vocs, options)
+        super().__init__(vocs, options)
 
     @staticmethod
     def default_options() -> MOBOOptions:

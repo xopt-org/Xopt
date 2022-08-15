@@ -23,7 +23,7 @@ class BayesianGenerator(Generator, ABC):
         if not isinstance(options, BayesianOptions):
             raise ValueError("options must be of type BayesianOptions")
 
-        super(BayesianGenerator, self).__init__(vocs, options)
+        super().__init__(vocs, options)
 
         self._model = None
         self._acquisition = None
@@ -31,6 +31,10 @@ class BayesianGenerator(Generator, ABC):
         self.objective = self._get_objective()
 
         self._tkwargs = {"dtype": torch.double, "device": "cpu"}
+
+    @staticmethod
+    def default_options() -> BayesianOptions:
+        return BayesianOptions()
 
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
@@ -47,7 +51,7 @@ class BayesianGenerator(Generator, ABC):
             return self.vocs.random_inputs(self.options.n_initial)
 
         else:
-            bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
+            bounds = self._get_bounds()
 
             # update internal model with internal data
             self.train_model(self.data)
@@ -78,18 +82,21 @@ class BayesianGenerator(Generator, ABC):
                 num_restarts=self.options.optim.num_restarts,
             )
             logger.debug("Best candidate from optimize", candidates, out)
-            return self.vocs.convert_numpy_to_inputs(
-                candidates.detach().numpy()
-            )
+            return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
 
-    def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
+    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
         Returns a ModelListGP containing independent models for the objectives and
         constraints
 
         """
+        if data is None:
+            data = self.data
+
         # drop nans
-        valid_data = data[pd.unique(self.vocs.variable_names + self.vocs.output_names)].dropna()
+        valid_data = data[
+            pd.unique(self.vocs.variable_names + self.vocs.output_names)
+        ].dropna()
 
         # create dataframes for processed data
         variable_data = self.vocs.variable_data(valid_data, "")
@@ -150,6 +157,43 @@ class BayesianGenerator(Generator, ABC):
     @property
     def model(self):
         return self._model
+
+    def _get_bounds(self):
+        bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
+        # if specified modify bounds to limit maximum travel distances
+        if self.options.optim.max_travel_distances is not None:
+            if len(self.options.optim.max_travel_distances) != len(bounds):
+                raise ValueError(
+                    "max_travel_distances must be of length {}".format(len(bounds))
+                )
+
+            # get last point
+            if self.data.empty:
+                raise ValueError(
+                    "No data exists to specify max_travel_distances "
+                    "from, add data first to use during BO"
+                )
+            last_point = torch.tensor(
+                self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self._tkwargs
+            )
+
+            # bound lengths for normalization
+            lengths = bounds[1, :] - bounds[0, :]
+
+            # get maximum travel distances
+            max_travel_distances = (
+                torch.tensor(self.options.optim.max_travel_distances, **self._tkwargs)
+                * lengths
+            )
+            bounds[0, :] = torch.max(
+                bounds[0, :],
+                last_point - max_travel_distances,
+            )
+            bounds[1, :] = torch.min(
+                bounds[1, :],
+                last_point + max_travel_distances,
+            )
+        return bounds
 
     def _check_options(self, options: BayesianOptions):
         if options.acq.proximal_lengthscales is not None:
