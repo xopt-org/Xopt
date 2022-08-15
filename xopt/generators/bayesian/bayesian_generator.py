@@ -23,7 +23,7 @@ class BayesianGenerator(Generator, ABC):
         if not isinstance(options, BayesianOptions):
             raise ValueError("options must be of type BayesianOptions")
 
-        super(BayesianGenerator, self).__init__(vocs, options)
+        super().__init__(vocs, options)
 
         self._model = None
         self._acquisition = None

@@ -8,7 +8,7 @@ class RandomGenerator(Generator):
     alias = "random"
 
     def __init__(self, vocs, options: GeneratorOptions = GeneratorOptions()):
-        super(RandomGenerator, self).__init__(vocs, options)
+        super().__init__(vocs, options)
 
     @staticmethod
     def default_options() -> GeneratorOptions:
