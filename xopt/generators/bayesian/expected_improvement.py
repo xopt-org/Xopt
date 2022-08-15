@@ -35,7 +35,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for optimization")
 
-        super(ExpectedImprovementGenerator, self).__init__(vocs, options)
+        super().__init__(vocs, options)
 
     @staticmethod
     def default_options() -> BayesianOptions:

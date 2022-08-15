@@ -28,7 +28,7 @@ class TDOptions(BayesianOptions):
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     def __init__(self, vocs: VOCS, options: TDOptions = TDOptions()):
-        super(TimeDependentBayesianGenerator, self).__init__(vocs, options)
+        super().__init__(vocs, options)
         self.target_prediction_time = None
 
     def generate(self, n_candidates: int) -> List[Dict]:
@@ -45,12 +45,15 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
         return output
 
-    def train_model(self, data: pd.DataFrame, update_internal=True) -> Module:
+    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
         Returns a ModelListGP containing independent models for the objectives and
         constraints
 
         """
+        if data is None:
+            data = self.data
+
         # drop nans
         valid_data = data[
             self.vocs.variable_names + self.vocs.output_names + ["time"]
