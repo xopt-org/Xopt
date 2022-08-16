@@ -36,8 +36,10 @@ class TestEvaluator:
 
     def test_type_preservation(self):
         """
+        Tests for these problems:
         iterrows does not necessarily preserve types:
         https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iterrows.html
+        itertuples does not preserve column names with understores or colons.
         """
         evaluator = Evaluator(function=self.identity)
 
@@ -46,6 +48,9 @@ class TestEvaluator:
             {
                 "ints": [1, 2, 3],
                 "floats": [2.0, 3.0, 4.0],
+                "_leading": [2.0, 3.0, 4.0],
+                "has:colon": [1, 2.0, 3],
+                ":colon:leading": [2.0, 3.0, 4.0],
                 #  Do not add these.
                 # 'strings': ['a','b','c'],
                 # 'booleans': [True, False, True],
