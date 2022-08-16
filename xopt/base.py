@@ -96,11 +96,11 @@ class Xopt:
         logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
         # add data to xopt object and generator
-        self._data = pd.DataFrame(data)
-        if self.generator is not None:
-            self.generator.add_data(self.data)
+        self._new_data = pd.DataFrame()
+        self._data = pd.DataFrame()
+        if data is not None:
+            self.set_data(pd.DataFrame(data))
 
-        self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
         self._ix_last = len(self.data)  # index of last sample generated
@@ -227,27 +227,6 @@ class Xopt:
                 if f.exception() is not None:
                     raise f.exception()
 
-        # update dataframe with results from finished futures + generator data
-        logger.debug("Updating dataframes with results")
-        self.update_data()
-
-        # dump data to file if specified
-        self.dump_state()
-
-        return len(unfinished_futures)
-
-    def update_data(self):
-        """
-        process finished futures and update dataframes
-
-        Dataframes are updated in the following order:
-        - xopt._data
-        - xopt._new_data
-
-        Data is added to the dataframe in the following order:
-        - generator._data
-
-        """
         # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
@@ -288,14 +267,35 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # Add to internal dataframes
-        self._data = pd.concat([self._data, new_data], axis=0)
+        _data = pd.concat([self._data, new_data], axis=0)
         self._new_data = new_data
 
-        # The generator can optionally use new data
-        self.generator.add_data(self._new_data)
+        # update dataframe with results from finished futures + generator data
+        logger.debug("Updating dataframes with results")
+        self.set_data(_data)
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
+
+        # dump data to file if specified
+        self.dump_state()
+
+        return len(unfinished_futures)
+
+    def set_data(self, data: pd.DataFrame):
+        """
+        set dataframes for xopt and generator
+
+        """
+        # make sure index is int
+        data.index = data.index.astype(int)
+
+        # update xopt dataframe
+        self._data = data
+
+        # The generator can optionally use new data
+        if self.generator is not None:
+            self.generator.data = data
 
     def check_components(self):
         """check to make sure everything is in place to step"""
@@ -318,7 +318,7 @@ class Xopt:
 
     @property
     def data(self):
-        return self._data
+        return self._data.sort_index(axis=0)
 
     @property
     def is_done(self):
