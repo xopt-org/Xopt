@@ -25,7 +25,7 @@ class MGGPOAcqOptions(AcqOptions):
         description="flag to determine if the dataset determines the reference point",
     )
     n_ga_samples: int = Field(
-        128, description="number of genetic algorithm samples to use"
+        32, description="number of genetic algorithm samples to use"
     )
 
 
@@ -56,7 +56,6 @@ class MGGPOGenerator(BayesianGenerator):
         if self.data.empty:
             return self.vocs.random_inputs(self.options.n_initial)
         else:
-
             if n_candidates > self.options.acq.n_ga_samples:
                 raise ValueError(
                     "n_candidates must be less than or equal to n_ga_samples"
@@ -79,6 +78,10 @@ class MGGPOGenerator(BayesianGenerator):
             return self.vocs.convert_numpy_to_inputs(
                 candidates.reshape(n_candidates, self.vocs.n_variables).numpy()
             )
+
+    def add_data(self, new_data: pd.DataFrame):
+        super().add_data(new_data)
+        self.ga_generator.add_data(self.data)
 
     def _get_objective(self):
         return create_mobo_objective(self.vocs)
