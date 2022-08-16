@@ -101,7 +101,6 @@ class Evaluator(BaseModel):
         """submit dataframe of inputs to executor"""
         input_data = pd.DataFrame(input_data)  # cast to dataframe for consistency
         futures = {}
-        input_data.to_dict(orient="records")
         # Do not use iterrows or itertuples.
         for index, inputs in zip(input_data.index, input_data.to_dict("records")):
             futures[index] = self.submit(inputs)
