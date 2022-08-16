@@ -97,7 +97,7 @@ class TestXopt:
         with pytest.raises(ValueError):
             X.submit_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
 
-    def test_update_data(self):
+    def test_add_data(self):
         generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
@@ -105,9 +105,12 @@ class TestXopt:
             evaluator=evaluator,
             vocs=deepcopy(TEST_VOCS_BASE),
         )
-        X.submit_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
+        assert len(X.generator.data) == 0
+        X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
-        assert len(X.generator.data) == 2
+        assert (
+            len(X.generator.data) == 2
+        ), f"len(X.generator.data) = {len(X.generator.data)}"
 
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)

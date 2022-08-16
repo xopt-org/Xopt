@@ -99,7 +99,7 @@ class Xopt:
         self._new_data = pd.DataFrame()
         self._data = pd.DataFrame()
         if data is not None:
-            self.set_data(pd.DataFrame(data))
+            self.data = data
 
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
@@ -267,7 +267,7 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # Add to internal dataframes
-        self.data = pd.concat([self._data, new_data], axis=0)
+        self.add_data(new_data)
         self._new_data = new_data
 
         # update dataframe with results from finished futures + generator data
@@ -302,16 +302,28 @@ class Xopt:
 
     @property
     def data(self):
-        return self._data.sort_index(axis=0)
+        return self._data
 
     @data.setter
     def data(self, data: pd.DataFrame):
-        # update xopt dataframe
-        self._data = data
+        # Replace xopt dataframe
+        self._data = pd.DataFrame(data)
 
-        # The generator can optionally use new data
+        # Update generator's data
         if self.generator is not None:
             self.generator.data = data
+
+    def add_data(self, new_data: pd.DataFrame):
+        """
+        Concatenate new data to internal dataframe,
+        and also adds this data to the generator if it exists.
+        """
+        # Set internal dataframe. Don't use self.data =
+        new_data = pd.DataFrame(new_data)
+        self._data = pd.concat([self._data, new_data], axis=0)
+
+        if self.generator is not None:
+            self.generator.add_data(new_data)
 
     @property
     def is_done(self):
