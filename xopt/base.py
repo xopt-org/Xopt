@@ -267,12 +267,11 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # Add to internal dataframes
-        _data = pd.concat([self._data, new_data], axis=0)
+        self.data = pd.concat([self._data, new_data], axis=0)
         self._new_data = new_data
 
         # update dataframe with results from finished futures + generator data
         logger.debug("Updating dataframes with results")
-        self.set_data(_data)
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
@@ -281,21 +280,6 @@ class Xopt:
         self.dump_state()
 
         return len(unfinished_futures)
-
-    def set_data(self, data: pd.DataFrame):
-        """
-        set dataframes for xopt and generator
-
-        """
-        # make sure index is int
-        data.index = data.index.astype(int)
-
-        # update xopt dataframe
-        self._data = data
-
-        # The generator can optionally use new data
-        if self.generator is not None:
-            self.generator.data = data
 
     def check_components(self):
         """check to make sure everything is in place to step"""
@@ -319,6 +303,15 @@ class Xopt:
     @property
     def data(self):
         return self._data.sort_index(axis=0)
+
+    @data.setter
+    def data(self, data: pd.DataFrame):
+        # update xopt dataframe
+        self._data = data
+
+        # The generator can optionally use new data
+        if self.generator is not None:
+            self.generator.data = data
 
     @property
     def is_done(self):
