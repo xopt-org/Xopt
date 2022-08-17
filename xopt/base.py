@@ -154,9 +154,6 @@ class Xopt:
         futures = self.evaluator.submit_data(input_data)
         self._futures.update(futures)
 
-        # wait for futures
-        self.wait_for_futures()
-
     def step(self):
         """
         run one optimization cycle
@@ -193,6 +190,9 @@ class Xopt:
         # submit new samples to evaluator
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
         self.submit_data(new_samples)
+
+        # wait for futures
+        self.wait_for_futures()        
 
     def wait_for_futures(self):
         # process futures after waiting for one or all to be completed
@@ -309,9 +309,8 @@ class Xopt:
         # Replace xopt dataframe
         self._data = pd.DataFrame(data)
 
-        # Update generator's data
-        if self.generator is not None:
-            self.generator.data = data
+        # do not do anything with generator.
+        # Generator data should be handled with add_data. 
 
     def add_data(self, new_data: pd.DataFrame):
         """
