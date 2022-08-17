@@ -4,7 +4,7 @@ import os
 import sys
 
 from mpi4py import MPI
-from mpi4py.futures import MPIPoolExecutor
+from mpi4py.futures import MPICommExecutor, MPIPoolExecutor
 
 from xopt.base import Xopt
 
@@ -69,7 +69,9 @@ if __name__ == "__main__":
 
     print(X)
     sys.stdout.flush()
-    with MPIPoolExecutor() as executor:
+    with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
+    #with MPIPoolExecutor() as executor:
+
         X.evaluator.executor = executor
         X.evaluator.max_workers = mpi_size
         X.run()
