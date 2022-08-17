@@ -108,8 +108,6 @@ class Xopt:
         self.n_unfinished_futures = 0
 
         # check internals
-        self.check_components()
-
         logger.info("Xopt object initialized")
 
     def run(self):
@@ -121,24 +119,40 @@ class Xopt:
                 if len(self.data) >= self.options.max_evaluations:
                     self._is_done = True
                     logger.info(
-                        f"Xopt is done. Max evaluations {self.options.max_evaluations} reached."
+                        "Xopt is done. "
+                        f"Max evaluations {self.options.max_evaluations} reached."
                     )
                     break
 
             self.step()
 
+    def evaluate_data(self, input_data: pd.DataFrame):
+        """
+        Submit data to evaluator, wait for futures to finish and add data to internal
+        dataframe(s).
+
+        Args:
+            input_data: dataframe containing input data
+
+        """
+        # submit input data and get future objects
+        futures = self.submit_data(input_data)
+
+        # update internal list of future objects
+        self._futures.update(futures)
+
+        # wait for futures to finish
+        self.wait_for_futures()
+
     def submit_data(self, input_data: pd.DataFrame):
         """
-        Submit data to evaluator and append results to internal dataframe.
+        Submit data to evaluator and return futures indexed to internal futures list.
 
         Args:
             input_data: dataframe containing input data
 
         """
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
-
-        # TODO: Append VOCS constants to submitted data by user or define separate
-        #  method to handle custom user input
 
         # Reindex input dataframe
         input_data.index = np.arange(
@@ -152,7 +166,7 @@ class Xopt:
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)
-        self._futures.update(futures)
+        return futures
 
     def step(self):
         """
@@ -167,6 +181,10 @@ class Xopt:
 
         """
         logger.info("Running Xopt step")
+
+        #check if Xopt is set up to step
+        self.check_components()
+
         if self.is_done:
             logger.debug("Xopt is done, will not step.")
             return
@@ -187,12 +205,9 @@ class Xopt:
             assert self.generator.is_done
             return
 
-        # submit new samples to evaluator
+        # submit new samples to evaluator and wait for futures to finish
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
-        self.submit_data(new_samples)
-
-        # wait for futures
-        self.wait_for_futures()
+        self.evaluate_data(new_samples)
 
     def wait_for_futures(self):
         # process futures after waiting for one or all to be completed
