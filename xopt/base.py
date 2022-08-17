@@ -267,11 +267,9 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # Add to internal dataframes
+        logger.debug("Adding new data to internal dataframes")
         self.add_data(new_data)
         self._new_data = new_data
-
-        # update dataframe with results from finished futures + generator data
-        logger.debug("Updating dataframes with results")
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
