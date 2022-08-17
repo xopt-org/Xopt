@@ -4,8 +4,9 @@ import os
 import sys
 
 from mpi4py import MPI
-from mpi4py.futures import MPICommExecutor, MPIPoolExecutor
+from mpi4py.futures import MPICommExecutor
 
+# from mpi4py.futures import MPIPoolExecutor
 from xopt.base import Xopt
 
 from xopt.log import set_handler_with_logger
