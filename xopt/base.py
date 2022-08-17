@@ -105,6 +105,7 @@ class Xopt:
         self._input_data = None  # dataframe for unfinished futures inputs
         self._ix_last = len(self.data)  # index of last sample generated
         self._is_done = False
+        self._i_step = 0  # step counter
         self.n_unfinished_futures = 0
 
         # check internals
@@ -169,7 +170,8 @@ class Xopt:
         - update data storage and generator data storage (if applicable)
 
         """
-        logger.info("Running Xopt step")
+        self._i_step += 1
+        logger.info(f"Running Xopt step {self._i_step}")
         if self.is_done:
             logger.debug("Xopt is done, will not step.")
             return
