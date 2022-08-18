@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, root_validator
 
 import numpy as np
 
+from xopt.errors import XoptError
 from xopt.pydantic import JSON_ENCODERS, NormalExecutor
 from xopt.utils import (
     get_function,
@@ -23,10 +24,6 @@ class ExecutorEnum(str, Enum):
     thread_pool_executor = "ThreadPoolExecutor"
     process_pool_executor = "ProcessPoolExecutor"
     normal_executor = "NormalExecutor"
-
-
-class EvaluatorError(Exception):
-    pass
 
 
 class Evaluator(BaseModel):
@@ -111,16 +108,17 @@ class Evaluator(BaseModel):
         if self.vectorized:
             output_data = self.safe_function(input_data, **self.function_kwargs)
         else:
-
             # This construction is needed to avoid a pickle error
             inputs = input_data.to_dict("records")
+            
             funcs = [self.function] * len(inputs)
+            kwargs = [self.function_kwargs] * len(inputs)
 
             output_data = self.executor.map(
-                safe_function,
+                safe_function1_for_map,
                 funcs,
                 inputs,
-                **self.function_kwargs,
+                kwargs,
             )
 
         return pd.DataFrame(output_data, index=input_data.index)
@@ -170,6 +168,11 @@ class Evaluator(BaseModel):
                 futures[index] = self.submit(inputs)
         return futures
 
+def safe_function1_for_map(function, inputs, kwargs):
+    """
+    Safely call the function, handling exceptions.
+    """
+    return safe_function(function, inputs, **kwargs)
 
 def safe_function(function, *args, **kwargs):
     safe_outputs = safe_call(function, *args, **kwargs)
@@ -201,6 +204,29 @@ def process_safe_outputs(outputs: Dict):
     if error:
         o["xopt_error_str"] = error_str
     return o
+
+def validate_outputs(outputs):
+    """
+    Looks for Xopt errors in the outputs and raises XoptError if found.
+    """
+
+    # Handles dicts or dataframes
+    if not np.any(outputs["xopt_error"]):
+        return
+
+    if "xopt_non_dict_result" in outputs:
+        result = outputs["xopt_non_dict_result"]
+        raise XoptError(
+            "Xopt evaluator returned a non-dict result, type is: "
+            f"{type(result)}, result is: {result}"
+        )
+    else:
+        raise XoptError(
+            "Xopt evaluator caught an exception: "
+            f"{outputs['xopt_error_str']}"
+        )
+
+
 
 
 class DummyExecutor(Executor):
