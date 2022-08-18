@@ -1,6 +1,10 @@
 import datetime
 import importlib
 import inspect
+import time
+import traceback
+import sys
+from typing import Dict
 
 import pandas as pd
 
@@ -107,3 +111,45 @@ def get_n_required_fuction_arguments(f):
             if v.default == inspect.Parameter.empty:
                 n += 1
     return n
+
+
+def safe_call(func, *args, **kwargs):
+    """
+    Safely call the function, catching all exceptions.
+    Returns a dict
+
+    Parameters
+    ----------
+    func : Callable
+        Function to call.
+    args : tuple
+        Arguments to pass to the function.
+    kwargs : dict
+        Keyword arguments to pass to the function.
+
+    Returns
+    -------
+    outputs : dict
+        result: result of the function call
+        exception: exception raised by the function call
+        traceback: traceback of the exception
+        runtime: runtime of the function call in seconds
+    """
+
+    t = time.perf_counter()
+    outputs = {}
+    try:
+        result = func(*args, **kwargs)
+        outputs["exception"] = None
+        outputs["traceback"] = ""
+    except Exception as e:
+        exc_tuple = sys.exc_info()
+        error_str = traceback.format_exc()
+        outputs = {}
+        result = None
+        outputs["exception"] = exc_tuple[1]
+        outputs["traceback"] = error_str
+    finally:
+        outputs["result"] = result
+        outputs["runtime"] = time.perf_counter() - t
+    return outputs

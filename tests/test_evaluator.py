@@ -67,6 +67,11 @@ class TestEvaluator:
             index.append(ix)
             data.append(future.result())
         df2 = pd.DataFrame(data, index=index)
+        # Strip additional Xopt columns
+        for key in df2.columns:
+            if key.startswith("xopt_"):
+                df2.pop(key)
+
         df2.columns = df2.columns.str.replace("_out", "")
         assert df2.equals(candidates), "DataFrame types were not preserved"
 
