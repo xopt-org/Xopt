@@ -264,7 +264,7 @@ class Xopt:
             future = self._futures.pop(ix)  # remove from futures
             outputs = future.result()  # Exceptions are already handled by the evaluator
             if self.options.strict:
-                if f.exception() is not None:
+                if future.exception() is not None:
                     raise f.exception()
                 validate_outputs(outputs)
             output_data.append(outputs)
