@@ -98,7 +98,7 @@ class Xopt:
         self._new_data = pd.DataFrame()
         self._data = pd.DataFrame()
         if data is not None:
-            self.data = data
+            self.add_data(data)
 
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
