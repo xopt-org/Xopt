@@ -155,7 +155,9 @@ class Xopt:
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)
-        self._futures.update(futures)
+        index = input_data.index
+        new_futures = dict(zip(index, futures)) 
+        self._futures.update(new_futures)
         return futures
 
     def prepare_input_data(self, input_data: pd.DataFrame):
