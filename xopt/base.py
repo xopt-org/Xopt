@@ -131,6 +131,7 @@ class Xopt:
         Evaluate data using the evaluator.
         Adds to the internal dataframe.
         """
+        input_data = self.prepare_input_data(input_data)
         new_data = self.evaluator.evaluate_data(input_data)
         self.add_data(new_data)
         return new_data
@@ -142,6 +143,18 @@ class Xopt:
         Args:
             input_data: dataframe containing input data
 
+        """
+
+        input_data = self.prepare_input_data(input_data)
+
+        # submit data to evaluator. Futures are keyed on the index of the input data.
+        futures = self.evaluator.submit_data(input_data)
+        self._futures.update(futures)
+        return futures
+
+    def prepare_input_data(self, input_data: pd.DataFrame):
+        """
+        re-index and validate input data.
         """
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
@@ -155,10 +168,7 @@ class Xopt:
         # validate data before submission
         self.vocs.validate_input_data(self._input_data)
 
-        # submit data to evaluator. Futures are keyed on the index of the input data.
-        futures = self.evaluator.submit_data(input_data)
-        self._futures.update(futures)
-        return futures
+        return input_data
 
     def step(self):
         """
@@ -195,6 +205,12 @@ class Xopt:
         if len(new_samples) == 0:
             logger.debug("Generator returned 0 samples => optimization is done.")
             assert self.generator.is_done
+            return
+
+        #  Vectorized evaluation can happen immediately
+        if self.evaluator.vectorized:
+            logger.info(f"Vectorized evaluate of {len(new_samples)} candidates")
+            self.evaluate_data(new_samples)
             return
 
         # submit new samples to evaluator and wait for futures to finish
@@ -239,8 +255,9 @@ class Xopt:
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
             outputs = future.result()  # Exceptions are already handled by the evaluator
+            error = outputs["xopt_error"]
             if self.options.strict:
-                if outputs["xopt_error"]:
+                if error:
                     if "xopt_non_dict_result" in outputs:
                         result = outputs["xopt_non_dict_result"]
                         raise XoptError(
@@ -252,7 +269,6 @@ class Xopt:
                             "Xopt evaluator caught an exception: "
                             f"{outputs['xopt_error_str']}"
                         )
-
             output_data.append(outputs)
 
         output_data = pd.DataFrame(output_data, index=ix_done)
