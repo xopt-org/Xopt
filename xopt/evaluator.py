@@ -168,20 +168,13 @@ def safe_function(function, *args, **kwargs):
 def process_safe_outputs(outputs: Dict):
     """
     Process the outputs of of safe_call, flattening the output.
-    This assumes
     """
-    o = {"xopt_error": False}  # Put this first
-
+    o = {}
     error = False
-    for k in outputs:
-        if k == "result":
-            continue
-        else:
-            o[f"xopt_{k}"] = outputs[k]
-
-    if outputs["traceback"]:
+    error_str = ""
+    if outputs["exception"]:
         error = True
-        o["xopt_error_str"] = outputs["traceback"]
+        error_str = outputs["traceback"]
 
     result = outputs["result"]
     if isinstance(result, dict):
@@ -189,9 +182,13 @@ def process_safe_outputs(outputs: Dict):
     elif not error:
         o[f"xopt_non_dict_result"] = result  # result is not a dict, but preserve anyway
         error = True
+        error_str = "Non-dict result"
 
     # Add in error bool
-    o[f"xopt_error"] = error
+    o["xopt_runtime"] = outputs["runtime"]
+    o["xopt_error"] = error
+    if error:
+        o["xopt_error_str"] = error_str
     return o
 
 

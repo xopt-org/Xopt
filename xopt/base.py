@@ -241,15 +241,18 @@ class Xopt:
             future = self._futures.pop(ix)  # remove from futures
             outputs = future.result()  # Exceptions are already handled by the evaluator
             if self.options.strict:
-                if outputs["xopt_exception"]:
-                    # Re-raise. Note that the traceback is not included in the exception.
-                    raise outputs["xopt_exception"]
-                if "xopt_non_dict_result" in outputs:
-                    result = outputs["xopt_non_dict_result"]
-                    raise XoptError(
-                        "Xopt evaluator returned a non-dict result, type is: "
-                        f"{type(result)}, result is: {result}"
-                    )
+                if outputs["xopt_error"]:
+                    if "xopt_non_dict_result" in outputs:
+                        result = outputs["xopt_non_dict_result"]
+                        raise XoptError(
+                            "Xopt evaluator returned a non-dict result, type is: "
+                            f"{type(result)}, result is: {result}"
+                        )
+                    else:
+                        raise XoptError(
+                            "Xopt evaluator caught an exception: "
+                            f"{outputs['xopt_error_str']}"
+                        )
 
             output_data.append(outputs)
 
