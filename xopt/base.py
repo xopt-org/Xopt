@@ -136,7 +136,6 @@ class Xopt:
         if self.options.strict:
             print(input_data, output_data)
             validate_outputs(output_data)
-            print("here")
         new_data = pd.concat([input_data, output_data], axis=1)
 
         self.add_data(new_data)
@@ -156,8 +155,18 @@ class Xopt:
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)
         index = input_data.index
-        new_futures = dict(zip(index, futures)) 
-        self._futures.update(new_futures)
+        # Special handling for vectorized evaluations
+        if self.evaluator.vectorized:
+            assert len(futures) == 1
+            new_futures = {tuple(index): futures[0]}
+        else:
+            new_futures = dict(zip(index, futures))
+
+        # add futures to internal list
+        for key, future in new_futures.items():
+            assert key not in self._futures
+            self._futures[key] = future
+        # self._futures.update(new_futures)
         return futures
 
     def prepare_input_data(self, input_data: pd.DataFrame):
@@ -257,19 +266,27 @@ class Xopt:
         # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
-        # Collect done inputs
-        input_data_done = self._input_data.loc[ix_done]
-
         output_data = []
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
             outputs = future.result()  # Exceptions are already handled by the evaluator
             if self.options.strict:
                 validate_outputs(outputs)
-
             output_data.append(outputs)
 
-        output_data = pd.DataFrame(output_data, index=ix_done)
+        # Special handling of a vectorized futures.
+        # Dict keys have all indexes of the input data.
+        if self.evaluator.vectorized:
+            output_data = pd.concat([pd.DataFrame([output]) for output in output_data])
+            index = []
+            for ix in ix_done:
+                index.extend(list(ix))
+        else:
+            index = ix_done
+
+        # Collect done inputs and outputs
+        input_data_done = self._input_data.loc[index]
+        output_data = pd.DataFrame(output_data, index=index)
 
         # Form completed evaluation
         new_data = pd.concat([input_data_done, output_data], axis=1)
@@ -278,7 +295,7 @@ class Xopt:
         self.add_data(new_data)
 
         # Cleanup
-        self._input_data.drop(ix_done, inplace=True)
+        self._input_data.drop(index, inplace=True)
 
         return len(unfinished_futures)
 
