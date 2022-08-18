@@ -71,7 +71,7 @@ class TestXopt:
             vocs=vocs,
             options=XoptOptions(strict=True),
         )
-        with pytest.raises(KeyError):
+        with pytest.raises(XoptError):
             X.step()
 
         # init with generator and evaluator
@@ -159,7 +159,7 @@ class TestXopt:
         X2 = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
         X2.options.strict = True
 
-        with pytest.raises(ValueError):
+        with pytest.raises(XoptError):
             X2.step()
 
     def test_random(self):
