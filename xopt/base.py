@@ -16,7 +16,6 @@ __version__ = _version.get_versions()["version"]
 import concurrent
 import logging
 import os
-import traceback
 
 from typing import Dict
 

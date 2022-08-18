@@ -4,7 +4,6 @@ import inspect
 import time
 import traceback
 import sys
-from typing import Dict
 
 import pandas as pd
 
@@ -142,12 +141,12 @@ def safe_call(func, *args, **kwargs):
         result = func(*args, **kwargs)
         outputs["exception"] = None
         outputs["traceback"] = ""
-    except Exception as e:
+    except Exception:
         exc_tuple = sys.exc_info()
         error_str = traceback.format_exc()
         outputs = {}
         result = None
-        outputs["exception"] = exc_tuple[1]
+        outputs["exception"] = exc_tuple
         outputs["traceback"] = error_str
     finally:
         outputs["result"] = result
