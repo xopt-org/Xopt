@@ -5,7 +5,7 @@ from pydantic import Field
 
 from xopt import _version
 from xopt.errors import XoptError
-from xopt.evaluator import Evaluator
+from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import get_generator_and_defaults
@@ -16,7 +16,6 @@ __version__ = _version.get_versions()["version"]
 import concurrent
 import logging
 import os
-import traceback
 
 from typing import Dict
 
@@ -58,7 +57,7 @@ class Xopt:
         generator: Generator = None,
         evaluator: Evaluator = None,
         vocs: VOCS = None,
-        options: XoptOptions = XoptOptions(),
+        options: XoptOptions = None,
         data: pd.DataFrame = None,
     ):
         """
@@ -90,27 +89,23 @@ class Xopt:
         logger.debug(f"Xopt initialized with generator: {self._generator}")
         logger.debug(f"Xopt initialized with evaluator: {self._evaluator}")
 
-        if not isinstance(options, XoptOptions):
-            raise ValueError("options must of type `XoptOptions`")
-        self.options = options
+        self.options = options or XoptOptions()
         logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
         # add data to xopt object and generator
-        self._data = pd.DataFrame(data)
-        if self.generator is not None:
-            self.generator.add_data(self.data)
+        self._new_data = pd.DataFrame()
+        self._data = pd.DataFrame()
+        if data is not None:
+            self.add_data(data)
 
-        self._new_data = None
         self._futures = {}  # unfinished futures
         self._input_data = None  # dataframe for unfinished futures inputs
         self._ix_last = len(self.data)  # index of last sample generated
         self._is_done = False
-        self._i_step = 0  # step counter
         self.n_unfinished_futures = 0
 
         # check internals
         self.check_components()
-
         logger.info("Xopt object initialized")
 
     def run(self):
@@ -122,24 +117,62 @@ class Xopt:
                 if len(self.data) >= self.options.max_evaluations:
                     self._is_done = True
                     logger.info(
-                        f"Xopt is done. Max evaluations {self.options.max_evaluations} reached."
+                        "Xopt is done. "
+                        f"Max evaluations {self.options.max_evaluations} reached."
                     )
                     break
 
             self.step()
 
+    def evaluate_data(self, input_data: pd.DataFrame):
+        """
+        Evaluate data using the evaluator.
+        Adds to the internal dataframe.
+        """
+        logger.debug(f"Evaluating {len(input_data)} inputs")
+        input_data = self.prepare_input_data(input_data)
+        output_data = self.evaluator.evaluate_data(input_data)
+
+        if self.options.strict:
+            validate_outputs(output_data)
+        new_data = pd.concat([input_data, output_data], axis=1)
+
+        self.add_data(new_data)
+        return new_data
+
     def submit_data(self, input_data: pd.DataFrame):
         """
-        Submit data to evaluator and append results to internal dataframe.
+        Submit data to evaluator and return futures indexed to internal futures list.
 
         Args:
             input_data: dataframe containing input data
 
         """
-        input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
+        logger.debug(f"Submitting {len(input_data)} inputs")
+        input_data = self.prepare_input_data(input_data)
 
-        # TODO: Append VOCS constants to submitted data by user or define separate
-        #  method to handle custom user input
+        # submit data to evaluator. Futures are keyed on the index of the input data.
+        futures = self.evaluator.submit_data(input_data)
+        index = input_data.index
+        # Special handling for vectorized evaluations
+        if self.evaluator.vectorized:
+            assert len(futures) == 1
+            new_futures = {tuple(index): futures[0]}
+        else:
+            new_futures = dict(zip(index, futures))
+
+        # add futures to internal list
+        for key, future in new_futures.items():
+            assert key not in self._futures
+            self._futures[key] = future
+        # self._futures.update(new_futures)
+        return futures
+
+    def prepare_input_data(self, input_data: pd.DataFrame):
+        """
+        re-index and validate input data.
+        """
+        input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
         # Reindex input dataframe
         input_data.index = np.arange(
@@ -151,12 +184,7 @@ class Xopt:
         # validate data before submission
         self.vocs.validate_input_data(self._input_data)
 
-        # submit data to evaluator. Futures are keyed on the index of the input data.
-        futures = self.evaluator.submit_data(input_data)
-        self._futures.update(futures)
-
-        # wait for futures
-        self.wait_for_futures()
+        return input_data
 
     def step(self):
         """
@@ -170,8 +198,11 @@ class Xopt:
         - update data storage and generator data storage (if applicable)
 
         """
-        self._i_step += 1
-        logger.info(f"Running Xopt step {self._i_step}")
+        logger.info("Running Xopt step")
+
+        # check if Xopt is set up to step
+        self.check_components()
+
         if self.is_done:
             logger.debug("Xopt is done, will not step.")
             return
@@ -192,115 +223,82 @@ class Xopt:
             assert self.generator.is_done
             return
 
-        # submit new samples to evaluator
-        logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
-        self.submit_data(new_samples)
-
-    def wait_for_futures(self):
-        # process futures after waiting for one or all to be completed
-        # get number of uncompleted futures when done waiting
+        #  Blocking submission/evaluation
         if self.options.asynch:
-            logger.debug("Waiting for at least one future to complete")
+            # Submit data
+            self.submit_data(new_samples)
+            # Process futures
+            self.n_unfinished_futures = self.process_futures()
         else:
-            logger.debug("Waiting for all futures to complete")
+            # Evaluate data
+            self.evaluate_data(new_samples)
 
-        self.n_unfinished_futures = self.process_futures()
-        logger.debug(f"done. {self.n_unfinished_futures} futures remaining")
+        # dump data to file if specified
+        self.dump_state()
 
     def process_futures(self):
         """
         wait for futures to finish (specified by asynch) and then internal dataframes
-        of xopt and generator, finally return the number of unfinished futures
+        of Xopt and generator, finally return the number of unfinished futures
 
         """
         if self.options.asynch:
+            logger.debug("Waiting for at least one future to complete")
             return_when = concurrent.futures.FIRST_COMPLETED
         else:
+            logger.debug("Waiting for all futures to complete")
             return_when = concurrent.futures.ALL_COMPLETED
+        logger.debug(f"done. {self.n_unfinished_futures} futures remaining")
 
         # wait for futures to finish (depending on return_when)
         finished_futures, unfinished_futures = concurrent.futures.wait(
             self._futures.values(), None, return_when
         )
 
-        # if strict, raise exception if any future raises an exception
-        if self.options.strict:
-            for f in finished_futures:
-                if f.exception() is not None:
-                    raise f.exception()
-
-        # update dataframe with results from finished futures + generator data
-        logger.debug("Updating dataframes with results")
-        self.update_data()
-
-        # dump data to file if specified
-        self.dump_state()
-
-        return len(unfinished_futures)
-
-    def update_data(self):
-        """
-        process finished futures and update dataframes
-
-        Dataframes are updated in the following order:
-        - xopt._data
-        - xopt._new_data
-
-        Data is added to the dataframe in the following order:
-        - generator._data
-
-        """
         # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
-        # Collect done inputs
-        input_data_done = self._input_data.loc[ix_done]
-
+        # Get results from futures
         output_data = []
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
-
-            # Handle exceptions inside the future result
-            try:
-                # if the future raised an exception, it gets raised here
-                outputs = future.result()
-
-                # check to make sure the output is a dict - if so raise XoptError
-                if not isinstance(outputs, dict):
-                    raise XoptError(
-                        f"Evaluator function must return a dict, got type "
-                        f"{type(future.result())} instead"
-                    )
-
-                outputs["xopt_error"] = False
-                outputs["xopt_error_str"] = ""
-            except Exception as e:
-
-                # if the exception is an XoptError, re-raise it
-                if isinstance(e, XoptError):
-                    raise e
-
-                error_str = traceback.format_exc()
-                outputs = {"xopt_error": True, "xopt_error_str": error_str}
-
+            outputs = future.result()  # Exceptions are already handled by the evaluator
+            if self.options.strict:
+                if future.exception() is not None:
+                    raise future.exception()
+                validate_outputs(outputs)
             output_data.append(outputs)
-        output_data = pd.DataFrame(output_data, index=ix_done)
+
+        # Special handling of a vectorized futures.
+        # Dict keys have all indexes of the input data.
+        if self.evaluator.vectorized:
+            output_data = pd.concat([pd.DataFrame([output]) for output in output_data])
+            index = []
+            for ix in ix_done:
+                index.extend(list(ix))
+        else:
+            index = ix_done
+
+        # Collect done inputs and outputs
+        input_data_done = self._input_data.loc[index]
+        output_data = pd.DataFrame(output_data, index=index)
 
         # Form completed evaluation
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # Add to internal dataframes
-        self._data = pd.concat([self._data, new_data], axis=0)
-        self._new_data = new_data
-
-        # The generator can optionally use new data
-        self.generator.add_data(self._new_data)
+        self.add_data(new_data)
 
         # Cleanup
-        self._input_data.drop(ix_done, inplace=True)
+        self._input_data.drop(index, inplace=True)
+
+        return len(unfinished_futures)
 
     def check_components(self):
         """check to make sure everything is in place to step"""
+        if not isinstance(self.options, XoptOptions):
+            raise ValueError("options must of type `XoptOptions`")
+
         if self.generator is None:
             raise XoptError("Xopt generator not specified")
 
@@ -321,6 +319,29 @@ class Xopt:
     @property
     def data(self):
         return self._data
+
+    @data.setter
+    def data(self, data: pd.DataFrame):
+        # Replace xopt dataframe
+        self._data = pd.DataFrame(data)
+
+        # do not do anything with generator.
+        # Generator data should be handled with add_data.
+
+    def add_data(self, new_data: pd.DataFrame):
+        """
+        Concatenate new data to internal dataframe,
+        and also adds this data to the generator if it exists.
+        """
+        logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
+
+        # Set internal dataframe. Don't use self.data =
+        new_data = pd.DataFrame(new_data)
+        self._data = pd.concat([self._data, new_data], axis=0)
+        self._new_data = new_data
+
+        if self.generator is not None:
+            self.generator.add_data(new_data)
 
     @property
     def is_done(self):
