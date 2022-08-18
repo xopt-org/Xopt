@@ -3,12 +3,17 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
 from typing import Callable, Dict
+from zlib import DEF_BUF_SIZE
 
 import pandas as pd
 from pydantic import BaseModel, Field, root_validator
 
 from xopt.pydantic import JSON_ENCODERS, NormalExecutor
-from xopt.utils import get_function, get_function_defaults
+from xopt.utils import (
+    get_function,
+    get_function_defaults,
+    safe_call,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +22,10 @@ class ExecutorEnum(str, Enum):
     thread_pool_executor = "ThreadPoolExecutor"
     process_pool_executor = "ProcessPoolExecutor"
     normal_executor = "NormalExecutor"
+
+
+class EvaluatorError(Exception):
+    pass
 
 
 class Evaluator(BaseModel):
@@ -39,6 +48,7 @@ class Evaluator(BaseModel):
     max_workers: int = 1
     executor: NormalExecutor = Field(exclude=True)  # Do not serialize
     function_kwargs: dict = {}
+    vectorized: bool = False
 
     class Config:
         """config"""
@@ -89,13 +99,56 @@ class Evaluator(BaseModel):
             function(input, **function_kwargs_updated)
 
         """
-        return self.function(input, **{**self.function_kwargs, **kwargs})
+        return self.safe_function(input, **{**self.function_kwargs, **kwargs})
+
+    def evaluate_data(self, input_data: pd.DataFrame):
+        """evaluate dataframe of inputs"""
+        input_data = pd.DataFrame(input_data)
+
+        if self.vectorized:
+            output_data = self.safe_function(input_data, **self.function_kwargs)
+        else:
+
+            # This construction is needed to avoid a pickle error
+            inputs = input_data.to_dict("records")
+            funcs = [self.function] * len(inputs)
+
+            output_data = self.executor.map(
+                safe_function,
+                funcs,
+                inputs,
+                **self.function_kwargs,
+            )
+
+        return pd.DataFrame(output_data, index=input_data.index)
+
+    def safe_function(self, *args, **kwargs):
+        """
+        Safely call the function, handling exceptions.
+
+        Note that this should not be submitted to fuu
+        """
+        return safe_function(self.function, *args, **kwargs)
 
     def submit(self, input: Dict):
-        """submit a single input to the executor"""
+        """submit a single input to the executor
+
+        Parameters
+        ----------
+        input : dict
+
+        Returns
+        -------
+        Future  : Future object
+        """
         if not isinstance(input, dict):
             raise ValueError("input must be a dictionary")
-        return self.executor.submit(self.function, input, **self.function_kwargs)
+        # return self.executor.submit(self.function, input, **self.function_kwargs)
+        # Must call a function outside of the classs
+        # See: https://stackoverflow.com/questions/44144584/typeerror-cant-pickle-thread-lock-objects
+        return self.executor.submit(
+            safe_function, self.function, input, **self.function_kwargs
+        )
 
     def submit_data(self, input_data: pd.DataFrame):
         """submit dataframe of inputs to executor"""
@@ -105,6 +158,41 @@ class Evaluator(BaseModel):
         for index, inputs in zip(input_data.index, input_data.to_dict("records")):
             futures[index] = self.submit(inputs)
         return futures
+
+
+def safe_function(function, *args, **kwargs):
+    safe_outputs = safe_call(function, *args, **kwargs)
+    return process_safe_outputs(safe_outputs)
+
+
+def process_safe_outputs(outputs: Dict):
+    """
+    Process the outputs of of safe_call, flattening the output.
+    This assumes
+    """
+    o = {"xopt_error": False}  # Put this first
+
+    error = False
+    for k in outputs:
+        if k == "result":
+            continue
+        else:
+            o[f"xopt_{k}"] = outputs[k]
+
+    if outputs["traceback"]:
+        error = True
+        o["xopt_error_str"] = outputs["traceback"]
+
+    result = outputs["result"]
+    if isinstance(result, dict):
+        o.update(result)
+    elif not error:
+        o[f"xopt_non_dict_result"] = result  # result is not a dict, but preserve anyway
+        error = True
+
+    # Add in error bool
+    o[f"xopt_error"] = error
+    return o
 
 
 class DummyExecutor(Executor):
@@ -118,6 +206,9 @@ class DummyExecutor(Executor):
     def __init__(self):
         self._shutdown = False
         self._shutdownLock = Lock()
+
+    def map(self, fn, *iterables, timeout=None, chunksize=1):
+        return map(fn, *iterables)
 
     def submit(self, fn, *args, **kwargs):
         with self._shutdownLock:

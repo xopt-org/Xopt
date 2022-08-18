@@ -75,7 +75,7 @@ class TestXopt:
             X.step()
 
         # init with generator and evaluator
-        evaluator = Evaluator(function=g)
+        evaluator = Evaluator(function=g)  # Has non-dict return type
         generator = RandomGenerator(vocs)
         X2 = Xopt(
             generator=generator,

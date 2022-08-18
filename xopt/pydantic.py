@@ -176,7 +176,7 @@ class BaseExecutor(
     Generic[ObjType],
     arbitrary_types_allowed=True,
     json_encoders=JSON_ENCODERS,
-    copy_on_model_validation='none',
+    copy_on_model_validation="none",
     # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
 ):
     # executor_type must comply with https://peps.python.org/pep-3148/ standard

@@ -108,6 +108,7 @@ class Xopt:
         self.n_unfinished_futures = 0
 
         # check internals
+        self.check_components()
         logger.info("Xopt object initialized")
 
     def run(self):
@@ -128,21 +129,12 @@ class Xopt:
 
     def evaluate_data(self, input_data: pd.DataFrame):
         """
-        Submit data to evaluator, wait for futures to finish and add data to internal
-        dataframe(s).
-
-        Args:
-            input_data: dataframe containing input data
-
+        Evaluate data using the evaluator.
+        Adds to the internal dataframe.
         """
-        # submit input data and get future objects
-        futures = self.submit_data(input_data)
-
-        # update internal list of future objects
-        self._futures.update(futures)
-
-        # wait for futures to finish
-        self.wait_for_futures()
+        new_data = self.evaluator.evaluate_data(input_data)
+        self.add_data(new_data)
+        return new_data
 
     def submit_data(self, input_data: pd.DataFrame):
         """
@@ -166,6 +158,7 @@ class Xopt:
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)
+        self._futures.update(futures)
         return futures
 
     def step(self):
@@ -182,7 +175,7 @@ class Xopt:
         """
         logger.info("Running Xopt step")
 
-        #check if Xopt is set up to step
+        # check if Xopt is set up to step
         self.check_components()
 
         if self.is_done:
@@ -207,29 +200,24 @@ class Xopt:
 
         # submit new samples to evaluator and wait for futures to finish
         logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
-        self.evaluate_data(new_samples)
+        self.submit_data(new_samples)
 
-    def wait_for_futures(self):
-        # process futures after waiting for one or all to be completed
-        # get number of uncompleted futures when done waiting
-        if self.options.asynch:
-            logger.debug("Waiting for at least one future to complete")
-        else:
-            logger.debug("Waiting for all futures to complete")
-
+        # Process futures
         self.n_unfinished_futures = self.process_futures()
-        logger.debug(f"done. {self.n_unfinished_futures} futures remaining")
 
     def process_futures(self):
         """
         wait for futures to finish (specified by asynch) and then internal dataframes
-        of xopt and generator, finally return the number of unfinished futures
+        of Xopt and generator, finally return the number of unfinished futures
 
         """
         if self.options.asynch:
+            logger.debug("Waiting for at least one future to complete")
             return_when = concurrent.futures.FIRST_COMPLETED
         else:
+            logger.debug("Waiting for all futures to complete")
             return_when = concurrent.futures.ALL_COMPLETED
+        logger.debug(f"done. {self.n_unfinished_futures} futures remaining")
 
         # wait for futures to finish (depending on return_when)
         finished_futures, unfinished_futures = concurrent.futures.wait(
@@ -251,31 +239,20 @@ class Xopt:
         output_data = []
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
-
-            # Handle exceptions inside the future result
-            try:
-                # if the future raised an exception, it gets raised here
-                outputs = future.result()
-
-                # check to make sure the output is a dict - if so raise XoptError
-                if not isinstance(outputs, dict):
+            outputs = future.result()  # Exceptions are already handled by the evaluator
+            if self.options.strict:
+                if outputs["xopt_exception"]:
+                    # Re-raise. Note that the traceback is not included in the exception.
+                    raise outputs["xopt_exception"]
+                if "xopt_non_dict_result" in outputs:
+                    result = outputs["xopt_non_dict_result"]
                     raise XoptError(
-                        f"Evaluator function must return a dict, got type "
-                        f"{type(future.result())} instead"
+                        "Xopt evaluator returned a non-dict result, type is: "
+                        f"{type(result)}, result is: {result}"
                     )
 
-                outputs["xopt_error"] = False
-                outputs["xopt_error_str"] = ""
-            except Exception as e:
-
-                # if the exception is an XoptError, re-raise it
-                if isinstance(e, XoptError):
-                    raise e
-
-                error_str = traceback.format_exc()
-                outputs = {"xopt_error": True, "xopt_error_str": error_str}
-
             output_data.append(outputs)
+
         output_data = pd.DataFrame(output_data, index=ix_done)
 
         # Form completed evaluation
@@ -284,7 +261,6 @@ class Xopt:
         # Add to internal dataframes
         logger.debug("Adding new data to internal dataframes")
         self.add_data(new_data)
-        self._new_data = new_data
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
@@ -333,6 +309,7 @@ class Xopt:
         # Set internal dataframe. Don't use self.data =
         new_data = pd.DataFrame(new_data)
         self._data = pd.concat([self._data, new_data], axis=0)
+        self._new_data = new_data
 
         if self.generator is not None:
             self.generator.add_data(new_data)
