@@ -154,18 +154,17 @@ class Evaluator(BaseModel):
     def submit_data(self, input_data: pd.DataFrame):
         """submit dataframe of inputs to executor"""
         input_data = pd.DataFrame(input_data)  # cast to dataframe for consistency
-        futures = {}
 
         if self.vectorized:
             # Single submission, cast to numpy array
             inputs = input_data.to_dict(orient="list")
             for key, value in inputs.items():
                 inputs[key] = np.array(value)
-            futures[tuple(input_data.index)] = self.submit(inputs)
+            futures = [self.submit(inputs)]  # Single item
         else:
             # Do not use iterrows or itertuples.
-            for index, inputs in zip(input_data.index, input_data.to_dict("records")):
-                futures[index] = self.submit(inputs)
+            futures = [self.submit(inputs) for inputs in input_data.to_dict("records")]
+
         return futures
 
 
