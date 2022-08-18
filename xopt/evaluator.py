@@ -110,7 +110,7 @@ class Evaluator(BaseModel):
         else:
             # This construction is needed to avoid a pickle error
             inputs = input_data.to_dict("records")
-            
+
             funcs = [self.function] * len(inputs)
             kwargs = [self.function_kwargs] * len(inputs)
 
@@ -168,11 +168,13 @@ class Evaluator(BaseModel):
                 futures[index] = self.submit(inputs)
         return futures
 
+
 def safe_function1_for_map(function, inputs, kwargs):
     """
     Safely call the function, handling exceptions.
     """
     return safe_function(function, inputs, **kwargs)
+
 
 def safe_function(function, *args, **kwargs):
     safe_outputs = safe_call(function, *args, **kwargs)
@@ -205,6 +207,7 @@ def process_safe_outputs(outputs: Dict):
         o["xopt_error_str"] = error_str
     return o
 
+
 def validate_outputs(outputs):
     """
     Looks for Xopt errors in the outputs and raises XoptError if found.
@@ -222,11 +225,8 @@ def validate_outputs(outputs):
         )
     else:
         raise XoptError(
-            "Xopt evaluator caught an exception: "
-            f"{outputs['xopt_error_str']}"
+            "Xopt evaluator caught an exception: " f"{outputs['xopt_error_str']}"
         )
-
-
 
 
 class DummyExecutor(Executor):

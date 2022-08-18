@@ -89,7 +89,7 @@ class Xopt:
         logger.debug(f"Xopt initialized with generator: {self._generator}")
         logger.debug(f"Xopt initialized with evaluator: {self._evaluator}")
 
-        self.options = options or XoptOptions()   
+        self.options = options or XoptOptions()
         logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
         # add data to xopt object and generator
@@ -129,14 +129,14 @@ class Xopt:
         Evaluate data using the evaluator.
         Adds to the internal dataframe.
         """
-        logger.debug(f"Evaluating {len(input_data)} inputs")        
+        logger.debug(f"Evaluating {len(input_data)} inputs")
         input_data = self.prepare_input_data(input_data)
         output_data = self.evaluator.evaluate_data(input_data)
-        
+
         if self.options.strict:
             print(input_data, output_data)
             validate_outputs(output_data)
-            print('here')
+            print("here")
         new_data = pd.concat([input_data, output_data], axis=1)
 
         self.add_data(new_data)
@@ -225,8 +225,7 @@ class Xopt:
             self.evaluate_data(new_samples)
 
         # dump data to file if specified
-        self.dump_state()            
-            
+        self.dump_state()
 
     def process_futures(self):
         """
