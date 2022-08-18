@@ -7,6 +7,8 @@ from typing import Callable, Dict
 import pandas as pd
 from pydantic import BaseModel, Field, root_validator
 
+import numpy as np
+
 from xopt.pydantic import JSON_ENCODERS, NormalExecutor
 from xopt.utils import (
     get_function,
@@ -41,6 +43,8 @@ class Evaluator(BaseModel):
         Maximum number of workers.
     executor : NormalExecutor
         NormalExecutor or any instantiated Executor object
+    vectorized : bool, default=False
+        If true,
     """
 
     function: Callable
@@ -153,9 +157,17 @@ class Evaluator(BaseModel):
         """submit dataframe of inputs to executor"""
         input_data = pd.DataFrame(input_data)  # cast to dataframe for consistency
         futures = {}
-        # Do not use iterrows or itertuples.
-        for index, inputs in zip(input_data.index, input_data.to_dict("records")):
-            futures[index] = self.submit(inputs)
+
+        if self.vectorized:
+            # Single submission, cast to numpy array
+            inputs = input_data.to_dict(orient="list")
+            for key, value in inputs.items():
+                inputs[key] = np.array(value)
+            futures[tuple(input_data.index)] = self.submit(inputs)
+        else:
+            # Do not use iterrows or itertuples.
+            for index, inputs in zip(input_data.index, input_data.to_dict("records")):
+                futures[index] = self.submit(inputs)
         return futures
 
 
