@@ -32,6 +32,7 @@ class ScipyOptimizeGenerator(Generator):
         self.y = None  # Used to coordinate with func
         self._lock = False  # mechanism to lock function calls
         self._algorithm = None  # Will initialize on first generate
+        self.objective_name = self.vocs.objective_names[0] # Takes one objective only
 
         self.initial_point = options.initial_point  # Handles None also.
 
@@ -89,8 +90,8 @@ class ScipyOptimizeGenerator(Generator):
             self.y = y  # generator_function accesses this
         
         if shape(new_data) == (1,): # if calling Generator.evaluate method on inputs
-            assert "y" in new_data[0].keys()
-            self.data["y"] = new_data[0]["y"]
+            assert self.objective_name in new_data[0].keys()
+            self.data[self.objective_name] = new_data[0][self.objective_name]
             self._lock = False  # unlock
             return
         
