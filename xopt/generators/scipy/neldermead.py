@@ -75,18 +75,26 @@ class ScipyOptimizeGenerator(Generator):
         self.options.initial_point = value
 
     def add_data(self, new_data: pd.DataFrame):
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
-        res = self.vocs.objective_data(new_data).to_numpy()
-        assert shape(res) == (1, 1)
-        y = res[0, 0]
-        if np.isinf(y) or np.isnan(y):
-            self._is_done = True
-            return
+        if len(new_data) != 0: # if not init point
+            assert (
+                len(new_data) == 1
+            ), f"length of new_data must be 1, found: {len(new_data)}"
+            res = self.vocs.objective_data(new_data).to_numpy()
+            assert shape(res) == (1, 1)
+            y = res[0, 0]
+            if np.isinf(y) or np.isnan(y):
+                self._is_done = True
+                return
 
-        self.y = y  # generator_function accesses this
-        self.data = new_data
+            self.y = y  # generator_function accesses this
+        
+        if shape(new_data) == (1,): # if calling Generator.evaluate method on inputs
+            assert "y" in new_data[0].keys()
+            self.data["y"] = new_data[0]["y"]
+            self._lock = False  # unlock
+            return
+        
+        self.data = pd.concat([self.data, new_data], axis=0)
         self._lock = False  # unlock
 
     def generate(self, n_candidates) -> List[Dict]:
