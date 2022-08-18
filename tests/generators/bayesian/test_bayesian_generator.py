@@ -65,8 +65,7 @@ class TestBayesianGenerator(TestCase):
         import numpy as np
 
         test_samples = pd.DataFrame(np.linspace(0, 3.14, 10), columns=["x1"])
-        X.submit_data(test_samples)
-        X.process_futures()
+        X.evaluate_data(test_samples)
 
         # create gp model with data
         model = gen.train_model(X.data)
