@@ -5,7 +5,7 @@ from pydantic import Field
 
 from xopt import _version
 from xopt.errors import XoptError
-from xopt.evaluator import Evaluator
+from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import get_generator_and_defaults
@@ -57,7 +57,7 @@ class Xopt:
         generator: Generator = None,
         evaluator: Evaluator = None,
         vocs: VOCS = None,
-        options: XoptOptions = XoptOptions(),
+        options: XoptOptions = None,
         data: pd.DataFrame = None,
     ):
         """
@@ -89,9 +89,7 @@ class Xopt:
         logger.debug(f"Xopt initialized with generator: {self._generator}")
         logger.debug(f"Xopt initialized with evaluator: {self._evaluator}")
 
-        if not isinstance(options, XoptOptions):
-            raise ValueError("options must of type `XoptOptions`")
-        self.options = options
+        self.options = options or XoptOptions()   
         logger.debug(f"Xopt initialized with options: {self.options.dict()}")
 
         # add data to xopt object and generator
@@ -131,8 +129,14 @@ class Xopt:
         Evaluate data using the evaluator.
         Adds to the internal dataframe.
         """
+        logger.debug(f"Evaluating {len(input_data)} inputs")        
         input_data = self.prepare_input_data(input_data)
         output_data = self.evaluator.evaluate_data(input_data)
+        
+        if self.options.strict:
+            print(input_data, output_data)
+            validate_outputs(output_data)
+            print('here')
         new_data = pd.concat([input_data, output_data], axis=1)
 
         self.add_data(new_data)
@@ -146,7 +150,7 @@ class Xopt:
             input_data: dataframe containing input data
 
         """
-
+        logger.debug(f"Submitting {len(input_data)} inputs")
         input_data = self.prepare_input_data(input_data)
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
@@ -209,18 +213,20 @@ class Xopt:
             assert self.generator.is_done
             return
 
-        #  Vectorized evaluation can happen immediately
-        if self.evaluator.vectorized:
-            logger.info(f"Vectorized evaluate of {len(new_samples)} candidates")
+        #  Blocking submission/evaluation
+        if self.options.asynch:
+            # Submit data
+            self.submit_data(new_samples)
+            # Process futures
+            self.n_unfinished_futures = self.process_futures()
+
+        else:
+            # Evaluate data
             self.evaluate_data(new_samples)
-            return
 
-        # submit new samples to evaluator and wait for futures to finish
-        logger.debug(f"Submitting {len(new_samples)} candidates to evaluator")
-        self.submit_data(new_samples)
-
-        # Process futures
-        self.n_unfinished_futures = self.process_futures()
+        # dump data to file if specified
+        self.dump_state()            
+            
 
     def process_futures(self):
         """
@@ -257,20 +263,9 @@ class Xopt:
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
             outputs = future.result()  # Exceptions are already handled by the evaluator
-            error = outputs["xopt_error"]
             if self.options.strict:
-                if error:
-                    if "xopt_non_dict_result" in outputs:
-                        result = outputs["xopt_non_dict_result"]
-                        raise XoptError(
-                            "Xopt evaluator returned a non-dict result, type is: "
-                            f"{type(result)}, result is: {result}"
-                        )
-                    else:
-                        raise XoptError(
-                            "Xopt evaluator caught an exception: "
-                            f"{outputs['xopt_error_str']}"
-                        )
+                validate_outputs(outputs)
+
             output_data.append(outputs)
 
         output_data = pd.DataFrame(output_data, index=ix_done)
@@ -279,19 +274,18 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # Add to internal dataframes
-        logger.debug("Adding new data to internal dataframes")
         self.add_data(new_data)
 
         # Cleanup
         self._input_data.drop(ix_done, inplace=True)
 
-        # dump data to file if specified
-        self.dump_state()
-
         return len(unfinished_futures)
 
     def check_components(self):
         """check to make sure everything is in place to step"""
+        if not isinstance(self.options, XoptOptions):
+            raise ValueError("options must of type `XoptOptions`")
+
         if self.generator is None:
             raise XoptError("Xopt generator not specified")
 
@@ -326,6 +320,8 @@ class Xopt:
         Concatenate new data to internal dataframe,
         and also adds this data to the generator if it exists.
         """
+        logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
+
         # Set internal dataframe. Don't use self.data =
         new_data = pd.DataFrame(new_data)
         self._data = pd.concat([self._data, new_data], axis=0)
