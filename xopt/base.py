@@ -134,7 +134,6 @@ class Xopt:
         output_data = self.evaluator.evaluate_data(input_data)
 
         if self.options.strict:
-            print(input_data, output_data)
             validate_outputs(output_data)
         new_data = pd.concat([input_data, output_data], axis=1)
 
@@ -230,7 +229,6 @@ class Xopt:
             self.submit_data(new_samples)
             # Process futures
             self.n_unfinished_futures = self.process_futures()
-
         else:
             # Evaluate data
             self.evaluate_data(new_samples)
@@ -257,20 +255,17 @@ class Xopt:
             self._futures.values(), None, return_when
         )
 
-        # if strict, raise exception if any future raises an exception
-        if self.options.strict:
-            for f in finished_futures:
-                if f.exception() is not None:
-                    raise f.exception()
-
         # Get done indexes.
         ix_done = [ix for ix, future in self._futures.items() if future.done()]
 
+        # Get results from futures
         output_data = []
         for ix in ix_done:
             future = self._futures.pop(ix)  # remove from futures
             outputs = future.result()  # Exceptions are already handled by the evaluator
             if self.options.strict:
+                if f.exception() is not None:
+                    raise f.exception()
                 validate_outputs(outputs)
             output_data.append(outputs)
 
