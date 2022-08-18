@@ -3,7 +3,6 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
 from typing import Callable, Dict
-from zlib import DEF_BUF_SIZE
 
 import pandas as pd
 from pydantic import BaseModel, Field, root_validator
@@ -180,7 +179,7 @@ def process_safe_outputs(outputs: Dict):
     if isinstance(result, dict):
         o.update(result)
     elif not error:
-        o[f"xopt_non_dict_result"] = result  # result is not a dict, but preserve anyway
+        o["xopt_non_dict_result"] = result  # result is not a dict, but preserve anyway
         error = True
         error_str = "Non-dict result"
 
