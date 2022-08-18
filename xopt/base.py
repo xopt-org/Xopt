@@ -132,7 +132,9 @@ class Xopt:
         Adds to the internal dataframe.
         """
         input_data = self.prepare_input_data(input_data)
-        new_data = self.evaluator.evaluate_data(input_data)
+        output_data = self.evaluator.evaluate_data(input_data)
+        new_data = pd.concat([input_data, output_data], axis=1)
+
         self.add_data(new_data)
         return new_data
 
