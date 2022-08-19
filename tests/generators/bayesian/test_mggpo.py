@@ -1,12 +1,9 @@
 from copy import deepcopy
 
-import numpy as np
 import pandas as pd
-import pytest
-import yaml
 
-from xopt.evaluator import Evaluator
 from xopt.base import Xopt
+from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.testing import TEST_VOCS_BASE
@@ -44,4 +41,3 @@ class TestMGPO:
         for _ in [0, 1]:
             X.step()
         print(X.data)
-
