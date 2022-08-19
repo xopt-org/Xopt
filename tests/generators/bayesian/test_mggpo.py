@@ -21,7 +21,7 @@ class TestMGPO:
         # test check options
         vocs = deepcopy(tnk_vocs)
         gen = MGGPOGenerator(vocs)
-        gen.options.acq.reference_point = {"y1":3.14, "y2":3.14}
+        gen.options.acq.reference_point = {"y1": 3.14, "y2": 3.14}
         X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
         samples = X.generator.generate(10)
@@ -36,7 +36,7 @@ class TestMGPO:
         # test check options
         vocs = deepcopy(tnk_vocs)
         gen = MGGPOGenerator(vocs)
-        gen.options.acq.reference_point = {"y1":3.14, "y2":3.14}
+        gen.options.acq.reference_point = {"y1": 3.14, "y2": 3.14}
 
         X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
