@@ -37,7 +37,10 @@ class CNSGAGenerator(Generator):
     def default_options() -> CNSGAOptions:
         return CNSGAOptions()
 
-    def __init__(self, vocs, options: CNSGAOptions = CNSGAOptions()):
+    def __init__(self, vocs, options: CNSGAOptions = None):
+        options = options or CNSGAOptions()
+        if not isinstance(options, CNSGAOptions):
+            raise TypeError("options must be of type CNSGAOptions")
         super().__init__(vocs, options)
 
         # Internal data structures
