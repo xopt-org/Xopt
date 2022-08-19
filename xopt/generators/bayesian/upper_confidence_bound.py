@@ -36,7 +36,7 @@ class TDUCBOptions(UCBOptions):
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
 
-    def __init__(self, vocs: VOCS, options: UCBOptions = UCBOptions()):
+    def __init__(self, vocs: VOCS, options: UCBOptions = None):
         """
         Generator using UpperConfidenceBound acquisition function
 
@@ -48,6 +48,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         options: UpperConfidenceBoundOptions
             Specific options for this generator
         """
+        options = options or UCBOptions()
         if not isinstance(options, UCBOptions):
             raise ValueError("options must be a UCBOptions object")
 
@@ -83,7 +84,11 @@ class TDUpperConfidenceBoundGenerator(
 ):
     alias = "time_dependent_upper_confidence_bound"
 
-    def __init__(self, vocs: VOCS, options: TDUCBOptions = TDUCBOptions()):
+    def __init__(self, vocs: VOCS, options: TDUCBOptions = None):
+        options = options or TDUCBOptions()
+        if not isinstance(options, UCBOptions):
+            raise ValueError("options must be a TDUCBOptions object")
+
         super(TDUpperConfidenceBoundGenerator, self).__init__(vocs, options)
 
     @staticmethod
