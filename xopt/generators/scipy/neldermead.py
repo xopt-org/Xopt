@@ -149,7 +149,10 @@ class NelderMeadGenerator(ScipyOptimizeGenerator):
     def default_options() -> NelderMeadOptions:
         return NelderMeadOptions()
 
-    def __init__(self, vocs, options: NelderMeadOptions = NelderMeadOptions()):
+    def __init__(self, vocs, options: NelderMeadOptions = None):
+        options = options or NelderMeadOptions()
+        if not isinstance(options, NelderMeadOptions):
+            raise TypeError("options must be of type NedlerMeadOptions")
         super().__init__(vocs, options)
 
     def _init_algorithm(self):
