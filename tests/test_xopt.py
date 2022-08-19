@@ -71,11 +71,11 @@ class TestXopt:
             vocs=vocs,
             options=XoptOptions(strict=True),
         )
-        with pytest.raises(KeyError):
+        with pytest.raises(XoptError):
             X.step()
 
         # init with generator and evaluator
-        evaluator = Evaluator(function=g)
+        evaluator = Evaluator(function=g)  # Has non-dict return type
         generator = RandomGenerator(vocs)
         X2 = Xopt(
             generator=generator,
@@ -97,7 +97,7 @@ class TestXopt:
         with pytest.raises(ValueError):
             X.submit_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
 
-    def test_update_data(self):
+    def test_add_data(self):
         generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
@@ -105,9 +105,12 @@ class TestXopt:
             evaluator=evaluator,
             vocs=deepcopy(TEST_VOCS_BASE),
         )
-        X.submit_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
+        assert len(X.generator.data) == 0
+        X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
-        assert len(X.generator.data) == 2
+        assert (
+            len(X.generator.data) == 2
+        ), f"len(X.generator.data) = {len(X.generator.data)}"
 
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -156,7 +159,7 @@ class TestXopt:
         X2 = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
         X2.options.strict = True
 
-        with pytest.raises(ValueError):
+        with pytest.raises(XoptError):
             X2.step()
 
     def test_random(self):
