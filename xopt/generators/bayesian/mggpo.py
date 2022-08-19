@@ -17,16 +17,10 @@ from .options import AcqOptions, BayesianOptions
 
 
 class MGGPOAcqOptions(AcqOptions):
-    ref_point: List[float] = Field(
-        None, description="reference point for multi-objective optimization"
+    reference_point: Dict[str, float] = Field(
+        None, description="dict of reference points for multi-objective optimization"
     )
-    use_data_as_reference: bool = Field(
-        True,
-        description="flag to determine if the dataset determines the reference point",
-    )
-    n_ga_samples: int = Field(
-        32, description="number of genetic algorithm samples to use"
-    )
+    population_size: int = Field(64, description="population size for ga")
 
 
 class MGGPOOptions(BayesianOptions):
@@ -45,7 +39,7 @@ class MGGPOGenerator(BayesianGenerator):
         # create GA generator
         self.ga_generator = CNSGAGenerator(
             vocs,
-            options=CNSGAOptions(population_size=self.options.acq.n_ga_samples),
+            options=CNSGAOptions(population_size=self.options.acq.population_size),
         )
 
     @staticmethod
@@ -56,11 +50,7 @@ class MGGPOGenerator(BayesianGenerator):
         if self.data.empty:
             return self.vocs.random_inputs(self.options.n_initial)
         else:
-            if n_candidates > self.options.acq.n_ga_samples:
-                raise ValueError(
-                    "n_candidates must be less than or equal to n_ga_samples"
-                )
-            ga_candidates = self.ga_generator.generate(self.options.acq.n_ga_samples)
+            ga_candidates = self.ga_generator.generate(n_candidates * 10)
             ga_candidates = pd.DataFrame(ga_candidates)[
                 self.vocs.variable_names
             ].to_numpy()
@@ -86,16 +76,17 @@ class MGGPOGenerator(BayesianGenerator):
     def _get_objective(self):
         return create_mobo_objective(self.vocs)
 
+    @property
+    def reference_point(self):
+        return torch.tensor(
+            [-self.options.acq.reference_point[ele] for ele in
+             self.vocs.objective_names],
+            **self._tkwargs
+        )
+
     def _get_acquisition(self, model):
         # get reference point from data
         inputs = self.get_input_data(self.data)
-        outcomes = self.get_outcome_data(self.data)
-
-        if self.options.acq.use_data_as_reference:
-            weighted_points = self.objective(outcomes)
-            self.options.acq.ref_point = torch.min(
-                weighted_points, dim=0
-            ).values.tolist()
 
         # get list of constraining functions
         constraint_callables = create_constraint_callables(self.vocs)
@@ -105,7 +96,7 @@ class MGGPOGenerator(BayesianGenerator):
             X_baseline=inputs,
             prune_baseline=True,
             constraints=constraint_callables,
-            ref_point=self.options.acq.ref_point,
+            ref_point=self.reference_point,
             sampler=self.sampler,
             objective=self.objective,
         )
