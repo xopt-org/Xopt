@@ -18,6 +18,7 @@ class MOBOAcqOptions(AcqOptions):
     ref_point: List[float] = Field(
         None, description="reference point for multi-objective optimization"
     )
+    # TODO: rewrite above as a dict, get rid of use data as reference
     use_data_as_reference: bool = Field(
         True,
         description="flag to determine if the dataset determines the reference point",
