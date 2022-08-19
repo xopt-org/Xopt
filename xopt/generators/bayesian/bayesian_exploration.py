@@ -27,7 +27,7 @@ class BayesianExplorationOptions(GeneratorOptions):
 class BayesianExplorationGenerator(BayesianGenerator):
     alias = "bayesian_exploration"
 
-    def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
+    def __init__(self, vocs: VOCS, options: BayesianOptions = None):
         """
         Generator using UpperConfidenceBound acquisition function
 
@@ -39,6 +39,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
         options: BayesianOptions
             Options for the generator
         """
+        options = options or BayesianOptions()
         if not isinstance(options, BayesianOptions):
             raise ValueError("options must be a BayesianOptions object")
 

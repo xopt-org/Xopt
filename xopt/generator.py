@@ -25,7 +25,7 @@ class Generator(ABC):
     alias = None
 
     def __init__(
-        self, vocs: VOCS, options: Type[_GeneratorOptions] = GeneratorOptions()
+        self, vocs: VOCS, options: GeneratorOptions = None
     ):
         """
         Initialize the generator.
@@ -35,7 +35,7 @@ class Generator(ABC):
             options: The options to use.
         """
         logger.info(f"Initializing generator {self.alias},")
-
+        options = options or GeneratorOptions()
         if not isinstance(options, GeneratorOptions):
             raise TypeError("options must be of type GeneratorOptions")
 

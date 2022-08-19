@@ -32,7 +32,8 @@ class MOBOOptions(BayesianOptions):
 class MOBOGenerator(BayesianGenerator):
     alias = "mobo"
 
-    def __init__(self, vocs: VOCS, options: MOBOOptions = MOBOOptions()):
+    def __init__(self, vocs: VOCS, options: MOBOOptions = None):
+        options = options or MOBOOptions()
         if not isinstance(options, MOBOOptions):
             raise ValueError("options must be a MOBOOptions object")
 

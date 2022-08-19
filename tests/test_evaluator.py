@@ -36,8 +36,10 @@ class TestEvaluator:
 
     def test_type_preservation(self):
         """
+        Tests for these problems:
         iterrows does not necessarily preserve types:
         https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iterrows.html
+        itertuples does not preserve column names with understores or colons.
         """
         evaluator = Evaluator(function=self.identity)
 
@@ -46,6 +48,9 @@ class TestEvaluator:
             {
                 "ints": [1, 2, 3],
                 "floats": [2.0, 3.0, 4.0],
+                "_leading": [2.0, 3.0, 4.0],
+                "has:colon": [1, 2.0, 3],
+                ":colon:leading": [2.0, 3.0, 4.0],
                 #  Do not add these.
                 # 'strings': ['a','b','c'],
                 # 'booleans': [True, False, True],
@@ -56,12 +61,13 @@ class TestEvaluator:
             index=[7, 8, 9],
         )
         futures = evaluator.submit_data(candidates)
-        index = []
-        data = []
-        for ix, future in futures.items():
-            index.append(ix)
-            data.append(future.result())
-        df2 = pd.DataFrame(data, index=index)
+        data = [fut.result() for fut in futures]
+        df2 = pd.DataFrame(data, index=candidates.index)
+        # Strip additional Xopt columns
+        for key in df2.columns:
+            if key.startswith("xopt_"):
+                df2.pop(key)
+
         df2.columns = df2.columns.str.replace("_out", "")
         assert df2.equals(candidates), "DataFrame types were not preserved"
 
