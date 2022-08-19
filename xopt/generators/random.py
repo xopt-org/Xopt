@@ -7,7 +7,10 @@ class RandomGenerator(Generator):
 
     alias = "random"
 
-    def __init__(self, vocs, options: GeneratorOptions = GeneratorOptions()):
+    def __init__(self, vocs, options: GeneratorOptions = None):
+        options = options or GeneratorOptions()
+        if not isinstance(options, GeneratorOptions):
+            raise ValueError("options must be of type GeneratorOptions")
         super().__init__(vocs, options)
 
     @staticmethod

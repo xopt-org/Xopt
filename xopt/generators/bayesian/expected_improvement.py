@@ -17,7 +17,7 @@ from xopt.vocs import VOCS
 class ExpectedImprovementGenerator(BayesianGenerator):
     alias = "expected_improvement"
 
-    def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
+    def __init__(self, vocs: VOCS, options: BayesianOptions = None):
         """
         Generator using Expected improvement acquisition function
 
@@ -29,6 +29,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         options: BayesianOptions
             Specific options for this generator
         """
+        options = options or BayesianOptions()
         if not isinstance(options, BayesianOptions):
             raise ValueError("options must be a `BayesianOptions` object")
 

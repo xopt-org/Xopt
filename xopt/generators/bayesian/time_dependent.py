@@ -27,7 +27,11 @@ class TDOptions(BayesianOptions):
 
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
-    def __init__(self, vocs: VOCS, options: TDOptions = TDOptions()):
+    def __init__(self, vocs: VOCS, options: TDOptions = None):
+        options = options or TDOptions()
+        if not isinstance(options, BayesianOptions):
+            raise ValueError("options must be a TDOptions object")
+
         super().__init__(vocs, options)
         self.target_prediction_time = None
 

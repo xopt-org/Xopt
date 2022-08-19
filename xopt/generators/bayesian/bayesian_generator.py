@@ -19,7 +19,8 @@ logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
-    def __init__(self, vocs: VOCS, options: BayesianOptions = BayesianOptions()):
+    def __init__(self, vocs: VOCS, options: BayesianOptions = None):
+        options = options or BayesianOptions()
         if not isinstance(options, BayesianOptions):
             raise ValueError("options must be of type BayesianOptions")
 
