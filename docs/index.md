@@ -34,6 +34,12 @@ Currenty **Xopt** provides:
 
 Rather, **Xopt** asks you to define this function.
 
+Overview
+===============
+[Xopt Overview PDF](assets/xopt_overview.pdf) gives an overview of Xopt's design and usage.
+
+
+
 Configuring an Xopt run
 ===============
 Xopt runs are specified via a dictionary that can be directly imported from a YAML 
