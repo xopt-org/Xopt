@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict
 
 import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
