@@ -1,8 +1,9 @@
-from typing import List
+from typing import Callable, List
 
 from pydantic import Field
 
 from xopt.generator import GeneratorOptions
+from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.pydantic import XoptBaseModel
 
 
@@ -46,18 +47,12 @@ class OptimOptions(XoptBaseModel):
 class ModelOptions(XoptBaseModel):
     """Options for defining the GP model in BO"""
 
-    # input_transform: InputTransform = Field(
-    #    None, description="transform applied to GP input model data", exclude=True
-    # )
-    # outcome_transform: OutcomeTransform = Field(
-    #    None, description="transform applied to GP outcome model data", exclude=True
-    # )
-
-    use_conservative_prior_lengthscale: bool = False
-    use_conservative_prior_mean: bool = False
-    use_low_noise_prior: bool = False
-    # class Config:
-    #    arbitrary_types_allowed = True
+    model_function: Callable = Field(
+        create_standard_model, description="callable used to generate GP model"
+    )
+    model_function_kwargs: dict = Field(
+        {}, description="keyword args passed to model function"
+    )
 
 
 class BayesianOptions(GeneratorOptions):
