@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
@@ -15,13 +15,8 @@ from .options import AcqOptions, BayesianOptions
 
 
 class MOBOAcqOptions(AcqOptions):
-    ref_point: List[float] = Field(
-        None, description="reference point for multi-objective optimization"
-    )
-    # TODO: rewrite above as a dict, get rid of use data as reference
-    use_data_as_reference: bool = Field(
-        True,
-        description="flag to determine if the dataset determines the reference point",
+    reference_point: Dict[str, float] = Field(
+        None, description="dict of reference points for multi-objective optimization"
     )
 
 
@@ -43,19 +38,24 @@ class MOBOGenerator(BayesianGenerator):
     def default_options() -> MOBOOptions:
         return MOBOOptions()
 
+    @property
+    def reference_point(self):
+        pt = []
+        for name, val in self.vocs.objectives.items():
+            ref_val = self.options.acq.reference_point[name]
+            if val == "MINIMIZE":
+                pt += [-ref_val]
+            elif val == "MAXIMIZE":
+                pt += [ref_val]
+
+        return torch.tensor(pt, **self._tkwargs)
+
     def _get_objective(self):
         return create_mobo_objective(self.vocs)
 
     def _get_acquisition(self, model):
-        # get reference point from data
         inputs = self.get_input_data(self.data)
         outcomes = self.get_outcome_data(self.data)
-
-        if self.options.acq.use_data_as_reference:
-            weighted_points = self.objective(outcomes)
-            self.options.acq.ref_point = torch.min(
-                weighted_points, dim=0
-            ).values.tolist()
 
         # get list of constraining functions
         constraint_callables = create_constraint_callables(self.vocs)
@@ -65,7 +65,7 @@ class MOBOGenerator(BayesianGenerator):
             X_baseline=inputs,
             prune_baseline=True,
             constraints=constraint_callables,
-            ref_point=self.options.acq.ref_point,
+            ref_point=self.reference_point,
             sampler=self.sampler,
             objective=self.objective,
         )
