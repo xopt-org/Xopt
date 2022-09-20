@@ -11,8 +11,8 @@ from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.utils import get_function
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -99,18 +99,10 @@ class BayesianGenerator(Generator, ABC):
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
         ].dropna()
 
-        # create dataframes for processed data
-        variable_data = self.vocs.variable_data(valid_data, "")
-        objective_data = self.vocs.objective_data(valid_data, "")
-        constraint_data = self.vocs.constraint_data(valid_data, "")
-
-        _model = create_standard_model(
-            variable_data,
-            objective_data,
-            constraint_data,
-            bounds=self.vocs.bounds,
-            tkwargs=self._tkwargs,
-            **self.options.model.dict(),
+        _model = get_function(self.options.model.model_function)(
+            valid_data,
+            self.vocs,
+            **self.options.model.model_function_kwargs
         )
 
         if update_internal:
