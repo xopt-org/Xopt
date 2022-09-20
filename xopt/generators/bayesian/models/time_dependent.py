@@ -6,12 +6,7 @@ from xopt.generators.bayesian.models.standard import create_split_model
 from xopt.generators.bayesian.models.utils import split_data
 
 
-def create_time_dependent_model(
-    data,
-    vocs,
-    added_time=0,
-    **kwargs
-) -> ModelListGP:
+def create_time_dependent_model(data, vocs, added_time=0, **kwargs) -> ModelListGP:
 
     # create dataframes for processed data
     input_data, objective_data, constraint_data = split_data(data, vocs)
@@ -24,18 +19,12 @@ def create_time_dependent_model(
             np.array(
                 (
                     data["time"].to_numpy().min(),
-                    data["time"].to_numpy().max()
-                    + 2 * added_time,
+                    data["time"].to_numpy().max() + 2 * added_time,
                 )
             ).reshape(2, 1),
         ]
     )
 
     return create_split_model(
-        input_data,
-        objective_data,
-        constraint_data,
-        bounds,
-        **kwargs
+        input_data, objective_data, constraint_data, bounds, **kwargs
     )
-
