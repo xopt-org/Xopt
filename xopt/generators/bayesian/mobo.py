@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, List
 
 import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
@@ -55,7 +55,6 @@ class MOBOGenerator(BayesianGenerator):
 
     def _get_acquisition(self, model):
         inputs = self.get_input_data(self.data)
-        outcomes = self.get_outcome_data(self.data)
 
         # get list of constraining functions
         constraint_callables = create_constraint_callables(self.vocs)
