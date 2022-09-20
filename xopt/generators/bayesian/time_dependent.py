@@ -1,8 +1,7 @@
 import time
 from abc import ABC
-from typing import Dict, List
+from typing import Callable, Dict, List
 
-import numpy as np
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
@@ -10,8 +9,8 @@ from gpytorch import Module
 from pydantic import Field
 
 from xopt.generators.bayesian import BayesianGenerator
-from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
+from xopt.generators.bayesian.models.time_dependent import create_time_dependent_model
+from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
 from xopt.vocs import VOCS
 
 
@@ -22,8 +21,15 @@ class TDAcqOptions(AcqOptions):
     )
 
 
+class TDModelOptions(ModelOptions):
+    model_function: Callable = Field(
+        create_time_dependent_model, description="callable to create model"
+    )
+
+
 class TDOptions(BayesianOptions):
     acq = TDAcqOptions()
+    model = TDModelOptions()
 
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
@@ -34,6 +40,10 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
         super().__init__(vocs, options)
         self.target_prediction_time = None
+
+        self.options.model.model_function_kwargs[
+            "added_time"
+        ] = self.options.acq.added_time
 
     def generate(self, n_candidates: int) -> List[Dict]:
         self.target_prediction_time = time.time() + self.options.acq.added_time
@@ -63,34 +73,8 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
             self.vocs.variable_names + self.vocs.output_names + ["time"]
         ].dropna()
 
-        # create dataframes for processed data
-        variable_data = self.vocs.variable_data(valid_data, "")
-        # add time column to variable data
-        variable_data = pd.concat([variable_data, valid_data["time"]], axis=1)
-        # add bounds for input transformation
-        bounds = np.hstack(
-            [
-                self.vocs.bounds,
-                np.array(
-                    (
-                        valid_data["time"].to_numpy().min(),
-                        valid_data["time"].to_numpy().max()
-                        + 2 * self.options.acq.added_time,
-                    )
-                ).reshape(2, 1),
-            ]
-        )
-
-        objective_data = self.vocs.objective_data(valid_data, "")
-        constraint_data = self.vocs.constraint_data(valid_data, "")
-
-        _model = create_standard_model(
-            variable_data,
-            objective_data,
-            constraint_data,
-            bounds=bounds,
-            tkwargs=self._tkwargs,
-            **self.options.model.dict(),
+        _model = create_time_dependent_model(
+            valid_data, self.vocs, **self.options.model.model_function_kwargs
         )
 
         if update_internal:

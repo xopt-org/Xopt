@@ -1,4 +1,3 @@
-import pandas as pd
 import torch
 from botorch import fit_gpytorch_model
 from botorch.models import ModelListGP, SingleTaskGP
@@ -8,11 +7,21 @@ from gpytorch.kernels import MaternKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 
+from .utils import split_data
 
-def create_standard_model(
-    input_data: pd.DataFrame,
-    objective_data: pd.DataFrame,
-    constraint_data: pd.DataFrame,
+
+def create_standard_model(data, vocs, **kwargs):
+    input_data, objective_data, constraint_data = split_data(data, vocs)
+    bounds = vocs.bounds
+    return create_split_model(
+        input_data, objective_data, constraint_data, bounds, **kwargs
+    )
+
+
+def create_split_model(
+    input_data,
+    objective_data,
+    constraint_data,
     bounds,
     use_conservative_prior_lengthscale: bool = False,
     use_conservative_prior_mean: bool = False,
@@ -28,6 +37,7 @@ def create_standard_model(
             imply feasibility and extreme values are damped using a Bilog transform (
             see (https://arxiv.org/abs/2002.08526) for details
     """
+
     tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
 
     # validate data
