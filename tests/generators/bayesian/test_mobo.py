@@ -36,14 +36,17 @@ class TestBayesianExplorationGenerator:
                 MOBOGenerator(tnk_vocs, ele)
 
         base_options = deepcopy(MOBOGenerator.default_options())
+        base_options.acq.reference_point = {"y1": 1.5, "y2": 1.5}
         base_options.optim.raw_samples = 2
         base_options.acq.monte_carlo_samples = 2
 
         proximal_biasing = deepcopy(base_options)
+        proximal_biasing.acq.reference_point = {"y1": 1.5, "y2": 1.5}
         proximal_biasing.optim.num_restarts = 1  # required
         proximal_biasing.acq.proximal_lengthscales = [1.0, 1.0]
 
         proximal_biasing2 = deepcopy(base_options)
+        proximal_biasing2.acq.reference_point = {"y1": 1.5, "y2": 1.5}
         proximal_biasing2.optim.num_restarts = 1  # required
         proximal_biasing2.acq.proximal_lengthscales = np.array([1.0, 1.0])
 
@@ -63,6 +66,7 @@ class TestBayesianExplorationGenerator:
                 num_restarts: 1
                 raw_samples: 2
             acq:
+                reference_point: {y1: 1.5, y2: 1.5}
                 proximal_lengthscales: [1.5, 1.5]
 
         evaluator:
