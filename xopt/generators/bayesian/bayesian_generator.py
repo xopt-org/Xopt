@@ -12,7 +12,6 @@ from gpytorch import Module
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.options import BayesianOptions
-from xopt.utils import get_function
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -99,10 +98,12 @@ class BayesianGenerator(Generator, ABC):
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
         ].dropna()
 
-        _model = get_function(self.options.model.model_function)(
+        kwargs = self.options.model.model_kwargs.dict()
+
+        _model = self.options.model.model_function(
             valid_data,
             self.vocs,
-            **self.options.model.model_function_kwargs
+            **kwargs
         )
 
         if update_internal:
