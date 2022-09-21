@@ -25,23 +25,23 @@ class TDAcqOptions(AcqOptions):
 class TDModelOptions(ModelOptions):
     """Options for defining the GP model in BO"""
 
-    model_function: Callable
-    model_kwargs: BaseModel
+    function: Callable
+    kwargs: BaseModel
 
     @root_validator(pre=True)
     def validate_all(cls, values):
-        if "model_function" in values.keys():
-            f = get_function(values["model_function"])
+        if "function" in values.keys():
+            f = get_function(values["function"])
         else:
             f = create_time_dependent_model
 
-        kwargs = values.get("model_kwargs", {})
+        kwargs = values.get("kwargs", {})
         kwargs = {**get_function_defaults(f), **kwargs}
         # remove add time
         kwargs.pop("added_time")
 
-        values["model_function"] = f
-        values["model_kwargs"] = create_model("model_kwargs", **kwargs)()
+        values["function"] = f
+        values["kwargs"] = create_model("kwargs", **kwargs)()
 
         return values
 
@@ -92,9 +92,9 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
             self.vocs.variable_names + self.vocs.output_names + ["time"]
         ].dropna()
 
-        kwargs = self.options.model.model_kwargs.dict()
+        kwargs = self.options.model.kwargs.dict()
 
-        _model = self.options.model.model_function(
+        _model = self.options.model.function(
             valid_data, self.vocs, added_time=self.options.acq.added_time, **kwargs
         )
 

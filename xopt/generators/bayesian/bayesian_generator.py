@@ -5,6 +5,7 @@ from typing import Dict, List
 import pandas as pd
 import torch
 from botorch.acquisition import ProximalAcquisitionFunction
+from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
@@ -98,13 +99,12 @@ class BayesianGenerator(Generator, ABC):
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
         ].dropna()
 
-        kwargs = self.options.model.model_kwargs.dict()
+        kwargs = self.options.model.kwargs.dict()
 
-        _model = self.options.model.model_function(
-            valid_data,
-            self.vocs,
-            **kwargs
-        )
+        _model = self.options.model.function(valid_data, self.vocs, **kwargs)
+
+        # validate returned model
+        self._validate_model(_model)
 
         if update_internal:
             self._model = _model
@@ -203,3 +203,7 @@ class BayesianGenerator(Generator, ABC):
                     "`options.optim.num_restarts` must be 1 when proximal biasing is "
                     "specified"
                 )
+
+    def _validate_model(self, model):
+        if not isinstance(model, ModelListGP):
+            raise ValueError("model must be ModelListGP object")

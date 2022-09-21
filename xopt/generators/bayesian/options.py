@@ -50,8 +50,8 @@ class ModelOptions(BaseModel):
 
     # TODO: fix this? see https://github.com/pydantic/pydantic/issues/3693 need to
     #  wait for pydantic v2
-    model_function: Callable
-    model_kwargs: BaseModel
+    function: Callable
+    kwargs: BaseModel
 
     class Config:
         arbitrary_types_allowed = True
@@ -60,15 +60,15 @@ class ModelOptions(BaseModel):
 
     @root_validator(pre=True)
     def validate_all(cls, values):
-        if "model_function" in values.keys():
-            f = get_function(values["model_function"])
+        if "function" in values.keys():
+            f = get_function(values["function"])
         else:
             f = create_standard_model
 
-        kwargs = values.get("model_kwargs", {})
+        kwargs = values.get("kwargs", {})
         kwargs = {**get_function_defaults(f), **kwargs}
-        values["model_function"] = f
-        values["model_kwargs"] = create_model("model_kwargs", **kwargs)()
+        values["function"] = f
+        values["kwargs"] = create_model("kwargs", **kwargs)()
 
         return values
 
