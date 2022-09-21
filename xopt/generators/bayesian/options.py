@@ -1,9 +1,11 @@
-from typing import List
+from typing import Callable, List
 
-from pydantic import Field
+from pydantic import Field, root_validator, create_model, BaseModel
 
 from xopt.generator import GeneratorOptions
-from xopt.pydantic import XoptBaseModel
+from xopt.generators.bayesian.models.standard import create_standard_model
+from xopt.pydantic import XoptBaseModel, JSON_ENCODERS
+from xopt.utils import get_function, get_function_defaults
 
 
 class AcqOptions(XoptBaseModel):
@@ -32,7 +34,7 @@ class OptimOptions(XoptBaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-        "selection",
+                    "selection",
     )
     use_nearby_initial_points: bool = Field(
         True, description="flag to use local samples to start acqf optimization"
@@ -43,21 +45,32 @@ class OptimOptions(XoptBaseModel):
     )
 
 
-class ModelOptions(XoptBaseModel):
+class ModelOptions(BaseModel):
     """Options for defining the GP model in BO"""
 
-    # input_transform: InputTransform = Field(
-    #    None, description="transform applied to GP input model data", exclude=True
-    # )
-    # outcome_transform: OutcomeTransform = Field(
-    #    None, description="transform applied to GP outcome model data", exclude=True
-    # )
+    # TODO: fix this? see https://github.com/pydantic/pydantic/issues/3693 need to
+    #  wait for pydantic v2
+    function: Callable
+    kwargs: BaseModel
 
-    use_conservative_prior_lengthscale: bool = False
-    use_conservative_prior_mean: bool = False
-    use_low_noise_prior: bool = False
-    # class Config:
-    #    arbitrary_types_allowed = True
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = JSON_ENCODERS
+        extra = "forbid"
+
+    @root_validator(pre=True)
+    def validate_all(cls, values):
+        if "function" in values.keys():
+            f = get_function(values["function"])
+        else:
+            f = create_standard_model
+
+        kwargs = values.get("kwargs", {})
+        kwargs = {**get_function_defaults(f), **kwargs}
+        values["function"] = f
+        values["kwargs"] = create_model("kwargs", **kwargs)()
+
+        return values
 
 
 class BayesianOptions(GeneratorOptions):
