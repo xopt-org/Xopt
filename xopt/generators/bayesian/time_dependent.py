@@ -6,11 +6,12 @@ import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
 from gpytorch import Module
-from pydantic import Field
+from pydantic import BaseModel, create_model, Field, root_validator
 
 from xopt.generators.bayesian import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import create_time_dependent_model
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
+from xopt.utils import get_function, get_function_defaults
 from xopt.vocs import VOCS
 
 
@@ -22,9 +23,27 @@ class TDAcqOptions(AcqOptions):
 
 
 class TDModelOptions(ModelOptions):
-    model_function: Callable = Field(
-        create_time_dependent_model, description="callable to create model"
-    )
+    """Options for defining the GP model in BO"""
+
+    model_function: Callable
+    model_kwargs: BaseModel
+
+    @root_validator(pre=True)
+    def validate_all(cls, values):
+        if "model_function" in values.keys():
+            f = get_function(values["model_function"])
+        else:
+            f = create_time_dependent_model
+
+        kwargs = values.get("model_kwargs", {})
+        kwargs = {**get_function_defaults(f), **kwargs}
+        # remove add time
+        kwargs.pop("added_time")
+
+        values["model_function"] = f
+        values["model_kwargs"] = create_model("model_kwargs", **kwargs)()
+
+        return values
 
 
 class TDOptions(BayesianOptions):
@@ -41,9 +60,9 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         super().__init__(vocs, options)
         self.target_prediction_time = None
 
-        self.options.model.model_function_kwargs[
-            "added_time"
-        ] = self.options.acq.added_time
+    @staticmethod
+    def default_options() -> TDOptions:
+        return TDOptions()
 
     def generate(self, n_candidates: int) -> List[Dict]:
         self.target_prediction_time = time.time() + self.options.acq.added_time
@@ -73,8 +92,10 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
             self.vocs.variable_names + self.vocs.output_names + ["time"]
         ].dropna()
 
-        _model = create_time_dependent_model(
-            valid_data, self.vocs, **self.options.model.model_function_kwargs
+        kwargs = self.options.model.model_kwargs.dict()
+
+        _model = self.options.model.model_function(
+            valid_data, self.vocs, added_time=self.options.acq.added_time, **kwargs
         )
 
         if update_internal:

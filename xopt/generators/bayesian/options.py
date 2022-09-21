@@ -1,10 +1,11 @@
 from typing import Callable, List
 
-from pydantic import Field
+from pydantic import Field, root_validator, create_model, BaseModel
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.pydantic import XoptBaseModel
+from xopt.pydantic import XoptBaseModel, JSON_ENCODERS
+from xopt.utils import get_function, get_function_defaults
 
 
 class AcqOptions(XoptBaseModel):
@@ -33,7 +34,7 @@ class OptimOptions(XoptBaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-        "selection",
+                    "selection",
     )
     use_nearby_initial_points: bool = Field(
         True, description="flag to use local samples to start acqf optimization"
@@ -44,15 +45,32 @@ class OptimOptions(XoptBaseModel):
     )
 
 
-class ModelOptions(XoptBaseModel):
+class ModelOptions(BaseModel):
     """Options for defining the GP model in BO"""
 
-    model_function: Callable = Field(
-        create_standard_model, description="callable used to generate GP model"
-    )
-    model_function_kwargs: dict = Field(
-        {}, description="keyword args passed to model function"
-    )
+    # TODO: fix this? see https://github.com/pydantic/pydantic/issues/3693 need to
+    #  wait for pydantic v2
+    model_function: Callable
+    model_kwargs: BaseModel
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = JSON_ENCODERS
+        extra = "forbid"
+
+    @root_validator(pre=True)
+    def validate_all(cls, values):
+        if "model_function" in values.keys():
+            f = get_function(values["model_function"])
+        else:
+            f = create_standard_model
+
+        kwargs = values.get("model_kwargs", {})
+        kwargs = {**get_function_defaults(f), **kwargs}
+        values["model_function"] = f
+        values["model_kwargs"] = create_model("model_kwargs", **kwargs)()
+
+        return values
 
 
 class BayesianOptions(GeneratorOptions):
