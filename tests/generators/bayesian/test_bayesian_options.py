@@ -11,7 +11,7 @@ class TestBayesianOptions:
         model_options = ModelOptions()
         BayesianOptions()
 
-        assert model_options.model_kwargs == get_function_defaults(
+        assert model_options.kwargs == get_function_defaults(
             create_standard_model
         )
 
