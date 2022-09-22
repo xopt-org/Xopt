@@ -15,7 +15,7 @@ def create_standard_model(
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
 ):
-    input_data, objective_data, constraint_data = vocs.split_data(data)
+    input_data, objective_data, constraint_data = vocs.extract_data(data)
     tkwargs = {"dtype": torch.double, "device": "cpu"}
 
     input_transform = Normalize(

@@ -1,9 +1,12 @@
 import pytest
-from pydantic import create_model
 
 from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.generators.bayesian.options import AcqOptions, ModelOptions, OptimOptions, \
-    BayesianOptions
+from xopt.generators.bayesian.options import (
+    AcqOptions,
+    BayesianOptions,
+    ModelOptions,
+    OptimOptions,
+)
 from xopt.utils import get_function_defaults
 
 
@@ -14,9 +17,7 @@ class TestBayesianOptions:
         model_options = ModelOptions()
         BayesianOptions()
 
-        assert model_options.kwargs == get_function_defaults(
-            create_standard_model
-        )
+        assert model_options.kwargs == get_function_defaults(create_standard_model)
 
         model_options.json()
 
@@ -29,4 +30,3 @@ class TestBayesianOptions:
         my_options = {"t": 5}
         with pytest.raises(TypeError):
             options.kwargs = my_options
-
