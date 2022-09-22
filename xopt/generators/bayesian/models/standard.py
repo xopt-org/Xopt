@@ -7,8 +7,6 @@ from gpytorch.kernels import MaternKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 
-from .utils import split_data
-
 
 def create_standard_model(
     data,
@@ -17,7 +15,7 @@ def create_standard_model(
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
 ):
-    input_data, objective_data, constraint_data = split_data(data, vocs)
+    input_data, objective_data, constraint_data = vocs.extract_data(data)
     tkwargs = {"dtype": torch.double, "device": "cpu"}
 
     input_transform = Normalize(

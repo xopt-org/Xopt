@@ -15,7 +15,7 @@ nav:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
             - Bayesian Optimization:
-                - Upper confidence bound: examples/bayes_opt/upper_confidence_bound_tnk.ipynb
+                - Upper confidence bound: examples/bayes_opt/upper_confidence_bound.ipynb
                 - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
         - Evolutionary:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
