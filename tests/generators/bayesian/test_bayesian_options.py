@@ -1,3 +1,6 @@
+import pytest
+from pydantic import create_model
+
 from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import AcqOptions, ModelOptions, OptimOptions, \
     BayesianOptions
@@ -20,3 +23,10 @@ class TestBayesianOptions:
     def test_json_serialization(self):
         options = BayesianOptions()
         options.json()
+
+    def test_assignment(self):
+        options = ModelOptions()
+        my_options = {"t": 5}
+        with pytest.raises(TypeError):
+            options.kwargs = my_options
+

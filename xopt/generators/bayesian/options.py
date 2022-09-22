@@ -1,10 +1,10 @@
-from typing import Callable, List
+from typing import Callable, List, Union
 
-from pydantic import Field, root_validator, create_model, BaseModel
+from pydantic import BaseModel, create_model, Field, root_validator, validator
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.pydantic import XoptBaseModel, JSON_ENCODERS
+from xopt.pydantic import JSON_ENCODERS, XoptBaseModel
 from xopt.utils import get_function, get_function_defaults
 
 
@@ -34,7 +34,7 @@ class OptimOptions(XoptBaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-                    "selection",
+        "selection",
     )
     use_nearby_initial_points: bool = Field(
         True, description="flag to use local samples to start acqf optimization"
@@ -48,8 +48,6 @@ class OptimOptions(XoptBaseModel):
 class ModelOptions(BaseModel):
     """Options for defining the GP model in BO"""
 
-    # TODO: fix this? see https://github.com/pydantic/pydantic/issues/3693 need to
-    #  wait for pydantic v2
     function: Callable
     kwargs: BaseModel
 
@@ -57,6 +55,7 @@ class ModelOptions(BaseModel):
         arbitrary_types_allowed = True
         json_encoders = JSON_ENCODERS
         extra = "forbid"
+        allow_mutation = False
 
     @root_validator(pre=True)
     def validate_all(cls, values):
