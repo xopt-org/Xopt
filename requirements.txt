@@ -5,6 +5,6 @@ torch
 botorch>=0.6.5
 gpytorch
 pandas
-pydantic>=1.9.0
+pydantic>=1.10.0
 ipywidgets
 tqdm
