@@ -2,10 +2,9 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-import yaml
+from xopt.base import Xopt
 
 from xopt.evaluator import Evaluator
-from xopt.base import Xopt
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.testing import TEST_VOCS_BASE
@@ -52,4 +51,3 @@ class TestBayesianExplorationGenerator:
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.step()
             X.step()
-
