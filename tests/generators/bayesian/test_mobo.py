@@ -53,30 +53,3 @@ class TestBayesianExplorationGenerator:
             X.step()
             X.step()
 
-    def test_yaml(self):
-        YAML = """
-        xopt: {}
-        generator:
-            name: mobo
-            n_initial: 5
-            optim:
-                num_restarts: 1
-                raw_samples: 2
-            acq:
-                proximal_lengthscales: [1.5, 1.5]
-
-        evaluator:
-            function: xopt.resources.test_functions.tnk.evaluate_TNK
-
-        vocs:
-            variables:
-                x1: [0, 3.14159]
-                x2: [0, 3.14159]
-            objectives: {y1: MINIMIZE, y2: MINIMIZE}
-            constraints:
-                c1: [GREATER_THAN, 0]
-                c2: [LESS_THAN, 0.5]
-        """
-        X = Xopt(config=yaml.safe_load(YAML))
-        X.step()
-        X.step()

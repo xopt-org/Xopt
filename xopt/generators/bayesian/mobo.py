@@ -58,6 +58,8 @@ class MOBOGenerator(BayesianGenerator):
 
         # get list of constraining functions
         constraint_callables = create_constraint_callables(self.vocs)
+        if len(constraint_callables) == 0:
+            constraint_callables = None
 
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
