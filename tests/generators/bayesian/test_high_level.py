@@ -43,6 +43,7 @@ class TestHighLevel:
                 num_restarts: 1
                 raw_samples: 2
             acq:
+                reference_point: {y1: 1.5, y2: 1.5}
                 proximal_lengthscales: [1.5, 1.5]
 
         evaluator:
@@ -70,6 +71,7 @@ class TestHighLevel:
                     num_restarts: 1
                     raw_samples: 2
                 acq:
+                    reference_point: {y1: 1.5, y2: 1.5}
                     proximal_lengthscales: [1.5, 1.5]
 
             evaluator:
