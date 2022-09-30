@@ -294,6 +294,24 @@ class VOCS(XoptBaseModel):
         """
         validate_input_data(self, input_points)
 
+    def extract_data(self, data: pd.DataFrame):
+        """
+        split dataframe into seperate dataframes for variables, objectives and
+        constraints based on vocs
+
+        Args:
+            data: dataframe to be split
+
+        Returns:
+            variable_data: dataframe containing variable data
+            objective_data: dataframe containing objective data
+            constraint_data: dataframe containing constraint data
+        """
+        variable_data = self.variable_data(data, "")
+        objective_data = self.objective_data(data, "")
+        constraint_data = self.constraint_data(data, "")
+        return variable_data, objective_data, constraint_data
+
 
 # --------------------------------
 # dataframe utilities

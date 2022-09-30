@@ -1,6 +1,6 @@
-from xopt.generators import generators
+from xopt.generators import generators, get_generator_and_defaults
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.utils import add_constraint_information, get_generator_and_defaults
+from xopt.utils import add_constraint_information
 
 
 class TestUtils:
