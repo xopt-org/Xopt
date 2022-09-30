@@ -2,7 +2,6 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-import yaml
 from xopt.base import Xopt
 
 from xopt.evaluator import Evaluator
@@ -55,7 +54,7 @@ class TestBayesianExplorationGenerator:
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.step()
             X.step()
-
+            
     def test_yaml(self):
         YAML = """
         xopt: {}
@@ -84,3 +83,4 @@ class TestBayesianExplorationGenerator:
         X = Xopt(config=yaml.safe_load(YAML))
         X.step()
         X.step()
+

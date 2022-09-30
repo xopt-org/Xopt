@@ -1,9 +1,11 @@
-from typing import List
+from typing import Callable, List
 
-from pydantic import Field
+from pydantic import BaseModel, create_model, Field, root_validator
 
 from xopt.generator import GeneratorOptions
-from xopt.pydantic import XoptBaseModel
+from xopt.generators.bayesian.models.standard import create_standard_model
+from xopt.pydantic import JSON_ENCODERS, XoptBaseModel
+from xopt.utils import get_function, get_function_defaults
 
 
 class AcqOptions(XoptBaseModel):
@@ -43,21 +45,31 @@ class OptimOptions(XoptBaseModel):
     )
 
 
-class ModelOptions(XoptBaseModel):
+class ModelOptions(BaseModel):
     """Options for defining the GP model in BO"""
 
-    # input_transform: InputTransform = Field(
-    #    None, description="transform applied to GP input model data", exclude=True
-    # )
-    # outcome_transform: OutcomeTransform = Field(
-    #    None, description="transform applied to GP outcome model data", exclude=True
-    # )
+    function: Callable
+    kwargs: BaseModel
 
-    use_conservative_prior_lengthscale: bool = False
-    use_conservative_prior_mean: bool = False
-    use_low_noise_prior: bool = False
-    # class Config:
-    #    arbitrary_types_allowed = True
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = JSON_ENCODERS
+        extra = "forbid"
+        allow_mutation = False
+
+    @root_validator(pre=True)
+    def validate_all(cls, values):
+        if "function" in values.keys():
+            f = get_function(values["function"])
+        else:
+            f = create_standard_model
+
+        kwargs = values.get("kwargs", {})
+        kwargs = {**get_function_defaults(f), **kwargs}
+        values["function"] = f
+        values["kwargs"] = create_model("kwargs", **kwargs)()
+
+        return values
 
 
 class BayesianOptions(GeneratorOptions):

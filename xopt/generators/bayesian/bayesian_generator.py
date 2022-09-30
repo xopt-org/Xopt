@@ -5,13 +5,13 @@ from typing import Dict, List
 import pandas as pd
 import torch
 from botorch.acquisition import ProximalAcquisitionFunction
+from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.models.standard import create_standard_model
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
@@ -99,19 +99,12 @@ class BayesianGenerator(Generator, ABC):
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
         ].dropna()
 
-        # create dataframes for processed data
-        variable_data = self.vocs.variable_data(valid_data, "")
-        objective_data = self.vocs.objective_data(valid_data, "")
-        constraint_data = self.vocs.constraint_data(valid_data, "")
+        kwargs = self.options.model.kwargs.dict()
 
-        _model = create_standard_model(
-            variable_data,
-            objective_data,
-            constraint_data,
-            bounds=self.vocs.bounds,
-            tkwargs=self._tkwargs,
-            **self.options.model.dict(),
-        )
+        _model = self.options.model.function(valid_data, self.vocs, **kwargs)
+
+        # validate returned model
+        self._validate_model(_model)
 
         if update_internal:
             self._model = _model
@@ -210,3 +203,7 @@ class BayesianGenerator(Generator, ABC):
                     "`options.optim.num_restarts` must be 1 when proximal biasing is "
                     "specified"
                 )
+
+    def _validate_model(self, model):
+        if not isinstance(model, ModelListGP):
+            raise ValueError("model must be ModelListGP object")
