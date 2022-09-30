@@ -15,6 +15,12 @@ class ExtremumSeekingGenerator(Generator):
     """
     Extremum seeking algorithm.
 
+    Reference:
+    Extremum Seeking-Based Control System for Particle Accelerator
+    Beam Loss Minimization
+    A. Scheinker, E. -C. Huang and C. Taylor
+    doi: 10.1109/TCST.2021.3136133
+
     This algorithm must be stepped serially.
     """
 
