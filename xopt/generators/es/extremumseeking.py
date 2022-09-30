@@ -43,9 +43,19 @@ class ExtremumSeekingGenerator(Generator):
         bound_low, bound_up = vocs.bounds
         self.p_ave = (bound_up + bound_low) / 2
         self.p_diff = bound_up - bound_low
+        self.amplitude = 1
+
+        # Evaluation counter, note that the first point counts as zero in ES
+        self.i = -1
+        # Track the last variables and objectives
+        self.last_input = None  # 1d numpy array
+        self.last_outcome = None  # float
 
     def add_data(self, new_data: pd.DataFrame):
-        self.data = pd.concat([self.data, new_data], axis=0)
+        self.data = new_data.iloc[-1:]
+        self.last_input = self.data[self.vocs.variable_names].to_numpy()[0]
+        self.last_outcome = self.data[self.vocs.output_names].to_numpy()[0]
+        self.i += 1
 
     # Function that normalizes paramters
     def p_normalize(self, p):
@@ -57,12 +67,6 @@ class ExtremumSeekingGenerator(Generator):
         p_un_norm = p * self.p_diff/2.0 + self.p_ave
         return p_un_norm
 
-    def get_last_input_data(self):
-        return self.data[self.vocs.variable_names].to_numpy()[-1]
-
-    def get_last_outcome_data(self):
-        return self.data[self.vocs.output_names].to_numpy()[-1]
-
     def generate(self, n_candidates) -> pd.DataFrame:
         if n_candidates != 1:
             raise NotImplementedError(
@@ -73,10 +77,7 @@ class ExtremumSeekingGenerator(Generator):
         if self.data.empty:
             return pd.DataFrame(dict(zip(self.vocs.variable_names, self.p_ave.reshape(-1, 1))))
 
-        p_n = self.p_normalize(self.get_last_input_data())
-        cES_now = self.get_last_outcome_data()[0]
-        i = len(self.data) - 1
-        amplitude = self.options.decay_rate ** i
+        p_n = self.p_normalize(self.last_input)
 
         # ES step for each parameter
         p_next_n = np.zeros(self.nES)
@@ -86,14 +87,14 @@ class ExtremumSeekingGenerator(Generator):
             # Use the same frequency for each two parameters
             # Alternating Sine and Cosine
             jw = int(np.floor(j/2))
-            if (-1)**j > 0:
-                p_next_n[j] = p_n[j] + amplitude * self.dtES * \
-                    np.cos(self.dtES * i * self.wES[jw] + self.options.k * cES_now) * \
-                        (self.aES[j] * self.wES[jw]) ** 0.5
+            if not j % 2:
+                p_next_n[j] = p_n[j] + self.amplitude * self.dtES * \
+                    np.cos(self.dtES * self.i * self.wES[jw] + self.options.k * self.last_outcome) * \
+                        np.sqrt(self.aES[j] * self.wES[jw])
             else:
-                p_next_n[j] = p_n[j] + amplitude * self.dtES * \
-                    np.sin(self.dtES * i * self.wES[jw] + self.options.k * cES_now) * \
-                        (self.aES[j] * self.wES[jw]) ** 0.5
+                p_next_n[j] = p_n[j] + self.amplitude * self.dtES * \
+                    np.sin(self.dtES * self.i * self.wES[jw] + self.options.k * self.last_outcome) * \
+                        np.sqrt(self.aES[j] * self.wES[jw])
 
             # For each new ES value, check that we stay within min/max constraints
             if p_next_n[j] < -1.0:
@@ -102,6 +103,8 @@ class ExtremumSeekingGenerator(Generator):
                 p_next_n[j] = 1.0
 
         p_next = self.p_un_normalize(p_next_n)
+
+        self.amplitude *= self.options.decay_rate  # decay the osc amplitude
 
         # Return the next value
         return pd.DataFrame(dict(zip(self.vocs.variable_names, p_next.reshape(-1, 1))))
