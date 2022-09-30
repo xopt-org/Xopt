@@ -4,6 +4,7 @@ from xopt.generators.bayesian.upper_confidence_bound import \
     UpperConfidenceBoundGenerator, TDUpperConfidenceBoundGenerator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.scipy.neldermead import NelderMeadGenerator
+from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
 
 from xopt.generators.ga import CNSGAGenerator
 from xopt.generators.random import RandomGenerator
@@ -18,6 +19,7 @@ registered_generators = [
     NelderMeadGenerator,
     TDUpperConfidenceBoundGenerator,
     ExpectedImprovementGenerator,
+    ExtremumSeekingGenerator,
 ]
 
 generators = {gen.alias: gen for gen in registered_generators}
