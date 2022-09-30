@@ -2,6 +2,7 @@ import logging
 import numpy as np
 import pandas as pd
 from xopt.generator import Generator, GeneratorOptions
+from pydantic import validator
 logger = logging.getLogger(__name__)
 
 
@@ -9,6 +10,15 @@ class ExtremumSeekingOptions(GeneratorOptions):
     k: float = 2.0
     oscillation_size: float = 0.1
     decay_rate: float = 1.0
+
+    @validator('oscillation_size', 'decay_rate', pre=True)
+    def must_positive(cls, v):
+        if v <= 0:
+            raise ValueError('must larger than 0')
+        return v
+
+    class Config:
+        validate_assignment = True
 
 
 class ExtremumSeekingGenerator(Generator):
