@@ -12,6 +12,7 @@ from xopt.generators.bayesian.objectives import (
 from xopt.generators.ga.cnsga import CNSGAGenerator, CNSGAOptions
 
 from xopt.vocs import VOCS
+from ...errors import XoptError
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
 
@@ -80,13 +81,23 @@ class MGGPOGenerator(BayesianGenerator):
 
     @property
     def reference_point(self):
+        if self.options.acq.reference_point is None:
+            raise XoptError(
+                "referenece point must be specified for multi-objective " "algorithm"
+            )
+
         pt = []
-        for name, val in self.vocs.objectives.items():
+        for name in self.vocs.objective_names:
             ref_val = self.options.acq.reference_point[name]
-            if val == "MINIMIZE":
+            if self.vocs.objectives[name] == "MINIMIZE":
                 pt += [-ref_val]
-            elif val == "MAXIMIZE":
+            elif self.vocs.objectives[name] == "MAXIMIZE":
                 pt += [ref_val]
+            else:
+                raise RuntimeError(
+                    f"objective type {self.vocs.objectives[name]} not\
+                    supported"
+                )
 
         return torch.tensor(pt, **self._tkwargs)
 

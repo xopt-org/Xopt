@@ -42,8 +42,9 @@ class MOBOGenerator(BayesianGenerator):
     @property
     def reference_point(self):
         if self.options.acq.reference_point is None:
-            raise XoptError("referenece point must be specified for multi-objective "
-                            "algorithm")
+            raise XoptError(
+                "referenece point must be specified for multi-objective " "algorithm"
+            )
 
         pt = []
         for name in self.vocs.objective_names:
@@ -52,6 +53,11 @@ class MOBOGenerator(BayesianGenerator):
                 pt += [-ref_val]
             elif self.vocs.objectives[name] == "MAXIMIZE":
                 pt += [ref_val]
+            else:
+                raise RuntimeError(
+                    f"objective type {self.vocs.objectives[name]} not\
+                        supported"
+                )
 
         return torch.tensor(pt, **self._tkwargs)
 
