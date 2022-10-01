@@ -46,11 +46,11 @@ class MOBOGenerator(BayesianGenerator):
                             "algorithm")
 
         pt = []
-        for name, val in self.vocs.objectives.items():
+        for name in self.vocs.objective_names:
             ref_val = self.options.acq.reference_point[name]
-            if val == "MINIMIZE":
+            if self.vocs.objectives[name] == "MINIMIZE":
                 pt += [-ref_val]
-            elif val == "MAXIMIZE":
+            elif self.vocs.objectives[name] == "MAXIMIZE":
                 pt += [ref_val]
 
         return torch.tensor(pt, **self._tkwargs)
