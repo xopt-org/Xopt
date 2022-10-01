@@ -12,6 +12,7 @@ from xopt.generators.bayesian.objectives import (
 from xopt.vocs import VOCS
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
+from ...errors import XoptError
 
 
 class MOBOAcqOptions(AcqOptions):
@@ -40,6 +41,10 @@ class MOBOGenerator(BayesianGenerator):
 
     @property
     def reference_point(self):
+        if self.options.acq.reference_point is None:
+            raise XoptError("referenece point must be specified for multi-objective "
+                            "algorithm")
+
         pt = []
         for name, val in self.vocs.objectives.items():
             ref_val = self.options.acq.reference_point[name]
