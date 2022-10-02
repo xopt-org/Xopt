@@ -95,7 +95,7 @@ class TestXopt:
             vocs=deepcopy(TEST_VOCS_BASE),
         )
         with pytest.raises(ValueError):
-            X.submit_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
+            X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
 
     def test_add_data(self):
         generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
