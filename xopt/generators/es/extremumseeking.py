@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from xopt.generator import Generator, GeneratorOptions
 from pydantic import validator
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,10 +12,10 @@ class ExtremumSeekingOptions(GeneratorOptions):
     oscillation_size: float = 0.1
     decay_rate: float = 1.0
 
-    @validator('oscillation_size', 'decay_rate', pre=True)
+    @validator("oscillation_size", "decay_rate", pre=True)
     def must_positive(cls, v):
         if v <= 0:
-            raise ValueError('must larger than 0')
+            raise ValueError("must larger than 0")
         return v
 
     class Config:
@@ -80,7 +81,7 @@ class ExtremumSeekingGenerator(Generator):
 
     # Function that un-normalizes parameters
     def p_un_normalize(self, p):
-        p_un_norm = p * self.p_diff/2.0 + self.p_ave
+        p_un_norm = p * self.p_diff / 2.0 + self.p_ave
         return p_un_norm
 
     def generate(self, n_candidates) -> pd.DataFrame:
@@ -91,7 +92,9 @@ class ExtremumSeekingGenerator(Generator):
 
         # Initial data point
         if self.data.empty:
-            return pd.DataFrame(dict(zip(self.vocs.variable_names, self.p_ave.reshape(-1, 1))))
+            return pd.DataFrame(
+                dict(zip(self.vocs.variable_names, self.p_ave.reshape(-1, 1)))
+            )
 
         p_n = self.p_normalize(self.last_input)
 
@@ -102,15 +105,17 @@ class ExtremumSeekingGenerator(Generator):
         for j in np.arange(self.nES):
             # Use the same frequency for each two parameters
             # Alternating Sine and Cosine
-            jw = int(np.floor(j/2))
+            jw = int(np.floor(j / 2))
             if not j % 2:
-                p_next_n[j] = p_n[j] + self.amplitude * self.dtES * \
-                    np.cos(self.dtES * self.i * self.wES[jw] + self.options.k * self.last_outcome) * \
-                    np.sqrt(self.aES[j] * self.wES[jw])
+                p_next_n[j] = p_n[j] + self.amplitude * self.dtES * np.cos(
+                    self.dtES * self.i * self.wES[jw]
+                    + self.options.k * self.last_outcome
+                ) * np.sqrt(self.aES[j] * self.wES[jw])
             else:
-                p_next_n[j] = p_n[j] + self.amplitude * self.dtES * \
-                    np.sin(self.dtES * self.i * self.wES[jw] + self.options.k * self.last_outcome) * \
-                    np.sqrt(self.aES[j] * self.wES[jw])
+                p_next_n[j] = p_n[j] + self.amplitude * self.dtES * np.sin(
+                    self.dtES * self.i * self.wES[jw]
+                    + self.options.k * self.last_outcome
+                ) * np.sqrt(self.aES[j] * self.wES[jw])
 
             # For each new ES value, check that we stay within min/max constraints
             if p_next_n[j] < -1.0:
