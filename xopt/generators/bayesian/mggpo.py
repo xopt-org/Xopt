@@ -94,7 +94,7 @@ class MGGPOGenerator(BayesianGenerator):
             elif self.vocs.objectives[name] == "MAXIMIZE":
                 pt += [ref_val]
             else:
-                raise RuntimeError(
+                raise ValueError(
                     f"objective type {self.vocs.objectives[name]} not\
                     supported"
                 )
