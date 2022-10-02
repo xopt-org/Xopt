@@ -10,9 +10,9 @@ from xopt.generators.bayesian.objectives import (
 )
 
 from xopt.vocs import VOCS
+from ...errors import XoptError
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
-from ...errors import XoptError
 
 
 class MOBOAcqOptions(AcqOptions):
@@ -54,7 +54,7 @@ class MOBOGenerator(BayesianGenerator):
             elif self.vocs.objectives[name] == "MAXIMIZE":
                 pt += [ref_val]
             else:
-                raise RuntimeError(
+                raise ValueError(
                     f"objective type {self.vocs.objectives[name]} not\
                         supported"
                 )
