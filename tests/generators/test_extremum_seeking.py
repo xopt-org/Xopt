@@ -86,14 +86,14 @@ class TestExtremumSeekingGenerator:
         # Now we define some ES parameters
 
         # This keeps track of the history of all of the parameters being tuned
-        pES = np.zeros([ES_steps,nES])
+        pES = np.zeros([ES_steps, nES])
 
         # Start with initial conditions inside of the max/min bounds
         # In this case I will start them near the center of the range
         pES[0] = p_ave
 
         # This keeps track of the history of all of the normalized parameters being tuned
-        pES_n = np.zeros([ES_steps,nES])
+        pES_n = np.zeros([ES_steps, nES])
 
         # Calculate the mean value of the initial condtions
         pES_n[0] = p_normalize(pES[0])
@@ -109,7 +109,8 @@ class TestExtremumSeekingGenerator:
         p_opt = 1.5*(2*np.random.rand(nES)-1)
         # Various frequencies for unknown points
         w_opt = 0.25+2*np.random.rand(nES)
-        def f_ES_minimize(p,i):
+
+        def f_ES_minimize(p, i):
             # Vary the optimal point with time
             p_opt_i = np.zeros(nES)
             for n in np.arange(nES):
@@ -119,17 +120,17 @@ class TestExtremumSeekingGenerator:
             return f_val
 
         # Calculate the initial cost function value based on initial conditions
-        cES[0] = f_ES_minimize(pES[0],0) + noise[0]
+        cES[0] = f_ES_minimize(pES[0], 0) + noise[0]
 
         # These are the unknown optimal values (just for plotting)
-        p_opt_t = np.zeros([ES_steps,nES])
+        p_opt_t = np.zeros([ES_steps, nES])
         for n in np.arange(nES):
-            p_opt_t[:,n] = p_opt[n]*(1+np.sin(2*np.pi*w_opt[n]*np.arange(ES_steps)/2000))
+            p_opt_t[:, n] = p_opt[n]*(1+np.sin(2*np.pi*w_opt[n]*np.arange(ES_steps)/2000))
 
         # ES dithering frequencies, for iterative applications the dithering frequencies
         # are simply uniformly spread out between 1.0 and 1.75 so that no two
         # frequencies are integer multiples of each other
-        wES = np.linspace(1.0,1.75,int(np.ceil(nES/2)))
+        wES = np.linspace(1.0, 1.75, int(np.ceil(nES/2)))
 
         # ES dt step size, this particular choice of dtES ensures that the parameter
         # oscillations are smooth with at least 10 steps required to complete
@@ -162,7 +163,6 @@ class TestExtremumSeekingGenerator:
         # the feedback gain kES until the system starts to respond. Making kES too big
         # can destabilize the system
 
-
         # Decay rate. This value is optional, it causes the oscillation sizes to naturally decay.
         # If you want the parameters to persistently oscillate without decay, set decay_rate = 1.0
         decay_rate = 1.0
@@ -171,7 +171,7 @@ class TestExtremumSeekingGenerator:
         amplitude = 1.0
 
         # This function defines one step of the ES algorithm at iteration i
-        def ES_step(p_n,i,cES_now,amplitude):
+        def ES_step(p_n, i, cES_now, amplitude):
 
             # ES step for each parameter
             p_next = np.zeros(nES)
@@ -202,13 +202,13 @@ class TestExtremumSeekingGenerator:
             pES_n[i] = p_normalize(pES[i])
 
             # Take one ES step based on previous cost value
-            pES_n[i+1] = ES_step(pES_n[i],i,cES[i],amplitude)
+            pES_n[i+1] = ES_step(pES_n[i], i, cES[i], amplitude)
 
             # Un-normalize to physical parameter values
             pES[i+1] = p_un_normalize(pES_n[i+1])
 
             # Calculate new cost function values based on new settings
-            cES[i+1] = f_ES_minimize(pES[i+1],i+1) + noise[i+1]
+            cES[i+1] = f_ES_minimize(pES[i+1], i+1) + noise[i+1]
 
             # Decay the amplitude
             amplitude = amplitude*decay_rate
