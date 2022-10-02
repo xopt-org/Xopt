@@ -47,10 +47,12 @@ theme:
   custom_dir: overrides
   features:
     - navigation.top
+    - navigation.tabs
+    - navigation.indexes
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: white
+      primary: black
       toggle:
         icon: material/toggle-switch-off-outline
         name: Switch to dark mode
