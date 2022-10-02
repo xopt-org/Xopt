@@ -12,7 +12,7 @@ from xopt.generators.bayesian.objectives import (
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
     TDAcqOptions,
-    TimeDependentBayesianGenerator,
+    TimeDependentBayesianGenerator, TDModelOptions,
 )
 from xopt.vocs import VOCS
 
@@ -31,6 +31,7 @@ class UCBOptions(BayesianOptions):
 
 class TDUCBOptions(UCBOptions):
     acq = TDUpperConfidenceBoundOptions()
+    model = TDModelOptions()
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):

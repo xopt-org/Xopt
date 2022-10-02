@@ -4,11 +4,11 @@ from copy import deepcopy
 from pydantic import Field
 
 from xopt import _version
+from xopt.generators import get_generator_and_defaults
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.pydantic import XoptBaseModel
-from xopt.utils import get_generator_and_defaults
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]

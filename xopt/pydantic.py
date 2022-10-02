@@ -13,17 +13,6 @@ from pydantic.generics import GenericModel
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
 
-
-class XoptBaseModel(BaseModel):
-    class Config:
-        extra = "forbid"
-        json_encoders = {
-            np.ndarray: lambda x: x.tolist(),
-            np.int64: lambda x: int(x),
-            np.float64: lambda x: float(x),
-        }
-
-
 JSON_ENCODERS = {
     # function/method type distinguished for class members
     # and not recognized as callables
@@ -33,7 +22,16 @@ JSON_ENCODERS = {
     type: lambda x: f"{x.__module__}.{x.__name__}",
     # for encoding instances of the ObjType}
     ObjType: lambda x: f"{x.__module__}.{x.__class__.__qualname__}",
+    np.ndarray: lambda x: x.tolist(),
+    np.int64: lambda x: int(x),
+    np.float64: lambda x: float(x),
 }
+
+
+class XoptBaseModel(BaseModel):
+    class Config:
+        extra = "forbid"
+        json_encoders = JSON_ENCODERS
 
 
 class CallableModel(BaseModel):
@@ -50,11 +48,11 @@ class CallableModel(BaseModel):
         callable = values.pop("callable")
 
         if not isinstance(
-            callable,
-            (
-                str,
-                Callable,
-            ),
+                callable,
+                (
+                        str,
+                        Callable,
+                ),
         ):
             raise ValueError(
                 "Callable must be object or a string. Provided %s", type(callable)
@@ -447,7 +445,6 @@ class SignatureModel(BaseModel):
         }
         if len(positional_kwargs):
             for i, positional_kwarg in enumerate(positional_kwargs):
-
                 stored_kwargs[self.kwarg_order[i]] = positional_kwarg
 
         return stored_args, stored_kwargs
