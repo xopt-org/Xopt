@@ -25,6 +25,8 @@ nav:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
         - SciPy:
             - Nelder-Mead: examples/scipy/neldermead.ipynb
+        - Other:
+            - Extremum seeking: examples/es/extremum_seeking.ipynb
 
 
     - API:
@@ -41,8 +43,8 @@ theme:
   icon:
     repo: fontawesome/brands/github
   name: material
-  
-  custom_dir: overrides   
+
+  custom_dir: overrides
   features:
     - navigation.top
   palette:
@@ -72,10 +74,10 @@ extra:
 
 plugins:
     - search
-      
+
     - mkdocs-jupyter:
         include_source: True
-          
+
     - mkdocstrings:
         default_handler: python
         handlers:
