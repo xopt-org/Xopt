@@ -4,7 +4,6 @@ from typing import Dict, List
 
 import pandas as pd
 import torch
-from botorch.acquisition import ProximalAcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
@@ -13,6 +12,7 @@ from gpytorch import Module
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -127,6 +127,7 @@ class BayesianGenerator(Generator, ABC):
                 acq,
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
                 transformed_weighting=self.options.acq.use_transformed_proximal_weights,
+                beta=10.0
             )
 
         return acq
