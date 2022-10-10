@@ -55,7 +55,6 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         model: Model,
         base_acqusition: MCAcquisitionFunction,
         constraints: List[Callable],
-        infeasible_cost=0.0,
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
     ) -> None:
@@ -66,7 +65,6 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             posterior_transform=posterior_transform,
             X_pending=X_pending,
         )
-        self.infeasible_cost = infeasible_cost
         self.base_acqusition = base_acqusition
 
     @concatenate_pending_points
@@ -79,6 +77,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         obj = self.objective(samples, X=X)
 
         # multiply the output of the base acquisition function by the feasibility
-        return (self.base_acqusition(X) + self.infeasible_cost) * obj.max(dim=-1)[
+        base_val = torch.nn.functional.softplus(self.base_acqusition(X), beta=10)
+        return base_val * obj.max(dim=-1)[
             0
         ].mean(dim=0)

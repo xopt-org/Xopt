@@ -1,6 +1,8 @@
 from copy import deepcopy
 
+import pandas as pd
 import pytest
+import torch
 
 from xopt.base import Xopt
 
@@ -87,3 +89,17 @@ class TestUpperConfidenceBoundGenerator:
         # now use bayes opt
         for _ in range(1):
             xopt.step()
+
+    def test_positivity(self):
+        # for UCB to work properly with constraints, it must always be positive.
+        # to acheive this we set infeasible cost
+        ucb_gen = UpperConfidenceBoundGenerator(
+            TEST_VOCS_BASE,
+        )
+        ucb_gen.add_data(pd.DataFrame({"x1": -1., "x2": -1., "y1": 100., "c1": -100},
+                                      index=[0]))
+        ucb_gen.train_model()
+        # evaluate acqf
+        acqf = ucb_gen.get_acquisition(ucb_gen.model)
+        with torch.no_grad():
+            assert acqf(torch.tensor((-1., -1.)).reshape(1, 1, 2)) >= 0.0

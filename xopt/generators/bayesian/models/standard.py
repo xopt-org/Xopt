@@ -125,7 +125,7 @@ def create_constraint_models(
         )
 
         if use_conservative_prior_mean:
-            models[-1].mean_module.constant.data = torch.tensor(5.0, **tkwargs)
+            models[-1].mean_module.constant.data = torch.tensor(1.0, **tkwargs)
             models[-1].mean_module.constant.requires_grad = False
 
         mll = ExactMarginalLogLikelihood(models[-1].likelihood, models[-1])

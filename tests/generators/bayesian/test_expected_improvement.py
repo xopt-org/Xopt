@@ -13,7 +13,7 @@ from xopt.generators.bayesian.expected_improvement import (
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
-class TestUpperConfidenceBoundGenerator:
+class TestExpectedImprovement:
     def test_init(self):
         ucb_gen = ExpectedImprovementGenerator(TEST_VOCS_BASE)
         ucb_gen.options.dict()
