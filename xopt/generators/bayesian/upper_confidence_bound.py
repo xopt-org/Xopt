@@ -12,7 +12,8 @@ from xopt.generators.bayesian.objectives import (
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
     TDAcqOptions,
-    TimeDependentBayesianGenerator, TDModelOptions,
+    TDModelOptions,
+    TimeDependentBayesianGenerator,
 )
 from xopt.vocs import VOCS
 
@@ -74,7 +75,9 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
-            model, qUCB, create_constraint_callables(self.vocs), infeasible_cost=0.0
+            model,
+            qUCB,
+            create_constraint_callables(self.vocs),
         )
 
         return cqUCB
