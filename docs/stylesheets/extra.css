@@ -1,0 +1,32 @@
+/*
+Hide In and Out prefix
+https://oceanumeric.github.io/blog/2022/jupyter-style/
+*/
+.jp-CodeCell > .jp-Cell-inputWrapper {
+    direction: rtl;
+    width:113%;
+}
+
+.jp-InputArea-prompt {
+    visibility: hidden;
+} 
+
+.jp-OutputArea-prompt {
+    visibility: hidden;  /* disable this to tune the position */
+    background-color:red; 
+    position:absolute;
+    right: 0;
+    
+}
+
+.jp-CodeCell > .jp-Cell-outputWrapper {
+    margin-top: -10px;
+    padding-top:0;
+    display: table-cell;
+    text-align: left;
+}
+.jp-Cell-outputWrapper > .jp-Cell-outputCollapser {
+    /* background-color:red; */
+    margin-top: -17px;
+}
+

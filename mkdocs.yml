@@ -74,6 +74,9 @@ extra:
       link: https://github.com/ChristopherMayes/Xopt
       name: Xopt
 
+extra_css:
+  - stylesheets/extra.css      
+
 plugins:
     - search
 
