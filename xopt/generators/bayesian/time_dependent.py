@@ -66,6 +66,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
     def generate(self, n_candidates: int) -> List[Dict]:
         self.target_prediction_time = time.time() + self.options.acq.added_time
+        #print(f'{self.options.acq.added_time=}')
         output = super().generate(n_candidates)
 
         if time.time() > self.target_prediction_time:

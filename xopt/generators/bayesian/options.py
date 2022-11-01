@@ -122,6 +122,9 @@ class BayesianOptions(GeneratorOptions):
         return self
 
     def check_and_set(self, new_dict=None):
+        """
+        Validates a dictionary against the options model, and if so, sets new values
+        """
         # https://github.com/pydantic/pydantic/issues/1864
         new_dict = new_dict or self.__dict__
         values, fields_set, validation_error = validate_model(
