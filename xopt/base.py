@@ -343,6 +343,12 @@ class Xopt:
         if self.generator is not None:
             self.generator.add_data(new_data)
 
+    def update_data(self, new_data):
+        """ Force update data in Xopt and in the generator """
+        self._data = pd.DataFrame(new_data)
+        if self.generator is not None:
+            self.generator.update_data(new_data)
+
     @property
     def is_done(self):
         return self._is_done or self.generator.is_done

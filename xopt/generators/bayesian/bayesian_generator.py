@@ -40,6 +40,9 @@ class BayesianGenerator(Generator, ABC):
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
+    def update_data(self, new_data: pd.DataFrame):
+        self.data = pd.DataFrame(new_data)
+
     def generate(self, n_candidates: int) -> List[Dict]:
         if n_candidates > 1:
             raise NotImplementedError(
