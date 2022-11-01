@@ -1,7 +1,8 @@
+import copy
 import json
 from copy import deepcopy
 
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 from xopt import _version
 from xopt.generators import get_generator_and_defaults
@@ -17,7 +18,7 @@ import concurrent
 import logging
 import os
 
-from typing import Dict
+from typing import Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -33,7 +34,7 @@ class XoptOptions(XoptBaseModel):
     strict: bool = Field(
         False,
         description="flag to indicate if exceptions raised during evaluation "
-        "should stop Xopt",
+                    "should stop Xopt",
     )
     dump_file: str = Field(
         None, description="file to dump the results of the evaluations"
@@ -51,14 +52,14 @@ class Xopt:
     """
 
     def __init__(
-        self,
-        config: dict = None,
-        *,
-        generator: Generator = None,
-        evaluator: Evaluator = None,
-        vocs: VOCS = None,
-        options: XoptOptions = None,
-        data: pd.DataFrame = None,
+            self,
+            config: dict = None,
+            *,
+            generator: Generator = None,
+            evaluator: Evaluator = None,
+            vocs: VOCS = None,
+            options: XoptOptions = None,
+            data: pd.DataFrame = None,
     ):
         """
         Initialize Xopt object using either a config dictionary or explicitly
@@ -83,6 +84,7 @@ class Xopt:
 
         # initialize Xopt object
         self._generator = generator
+        self._generator_options_history: list[dict] = []
         self._evaluator = evaluator
         self._vocs = vocs
 
@@ -186,7 +188,7 @@ class Xopt:
 
         return input_data
 
-    def step(self):
+    def step(self, generator_opts: dict[str, Any] = None, is_permanent: bool = False):
         """
         run one optimization cycle
 
@@ -196,6 +198,8 @@ class Xopt:
         - wait until all (asynch == False) or at least one (asynch == True) evaluation
             is finished
         - update data storage and generator data storage (if applicable)
+
+        if any parameters are provided, they will be passed to generator
 
         """
         logger.info("Running Xopt step")
@@ -215,7 +219,21 @@ class Xopt:
 
         # generate samples and submit to evaluator
         logger.debug(f"Generating {n_generate} candidates")
-        new_samples = pd.DataFrame(self.generator.generate(n_generate))
+        if generator_opts is not None:
+            assert isinstance(generator_opts, dict), f'Generator options must be a dictionary'
+            new_samples, effective_config = self.generator.generate_custom(n_generate,
+                                                                           config_changes=generator_opts,
+                                                                           is_permanent=is_permanent
+                                                                           )
+            new_samples = pd.DataFrame(new_samples)
+            savepoint = {'is_permanent': is_permanent, 'config_change': generator_opts,
+                         'n': n_generate, 'effective_config': effective_config}
+            self._generator_options_history.append(savepoint)
+        else:
+            new_samples = pd.DataFrame(self.generator.generate(n_generate))
+            savepoint = {'is_permanent': is_permanent, 'config_change': None,
+                         'n': n_generate, 'effective_config': self.generator.options.dict().copy()}
+            self._generator_options_history.append(savepoint)
 
         # generator is done when it returns no new samples
         if len(new_samples) == 0:
@@ -498,7 +516,7 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     }
 
 
-def state_to_dict(X, include_data=True):
+def state_to_dict(X, include_data=True, include_options_history=True):
     # dump data to dict with config metadata
     output = {
         "xopt": json.loads(X.options.json()),
@@ -511,5 +529,7 @@ def state_to_dict(X, include_data=True):
     }
     if include_data:
         output["data"] = json.loads(X.data.to_json())
+    if include_options_history:
+        output["generator"]['history'] = json.loads(json.dumps([opt for opt in X.generator._options_history.json()]))
 
     return output
