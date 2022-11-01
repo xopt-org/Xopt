@@ -334,6 +334,36 @@ class Xopt:
                 yaml.dump(output, f)
             logger.debug(f"Dumping state to:{self.options.dump_file}")
 
+    def rollback(self, step: int = None, candidate: int = None):
+        """Set state to a particular point in history"""
+        assert step is not None or candidate is not None
+        if step is not None:
+            # rollback to specific step
+            logger.debug(f"Rolling back to step {step}")
+            assert 0 <= step < len(self._generator_options_history)
+            history = self._generator_options_history[:step]
+            n_candidates_to_keep = sum(h['n'] for h in history)
+            self.generator._options = history[-1]['effective_config']
+            self.update_data(self.data.iloc[:n_candidates_to_keep, :])
+            self._generator_options_history = self._generator_options_history[:step]
+        else:
+            # rollback to specific candidate
+            logger.debug(f"Rolling back to candidate {candidate}")
+            assert 0 <= candidate < self.data.shape[0]
+            n_found = 0
+            for i in range(len(self._generator_options_history)):
+                n_found += self._generator_options_history[i]['n']
+                if n_found > candidate:
+                    self.generator._options = self._generator_options_history[i]['effective_config']
+                    self._generator_options_history = self._generator_options_history[:i + 1]
+                    break
+            self.update_data(self.data.iloc[:candidate, :])
+
+    def rollback_copy(self, step: int = None, candidate: int = None):
+        """ Creates a copy of optimizer at a particular point in history """
+        X = copy.copy(self)
+        return X.rollback(step, candidate)
+
     @property
     def data(self):
         return self._data
