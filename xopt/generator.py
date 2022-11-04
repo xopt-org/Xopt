@@ -72,9 +72,6 @@ class Generator(ABC):
 
         # Shallow copy will be affected by some changes, but deepcopy costly
         previous_options = self._options
-        #old_options = self._options_ext.copy()
-        # self._options_history.append(previous_options)
-        # self._options_changes_history.append(config_changes)
         self._options = new_options.copy()
         r = self.generate(n_candidates)
         if not is_permanent:

@@ -97,26 +97,6 @@ class BayesianOptions(GeneratorOptions):
         This method merges new dictionary into current model,
         replacing values in-place but not making any copies.
         """
-        # def biased_merge(a, b, path=None):
-        #     if path is None:
-        #         path = []
-        #     for key in b:
-        #         if key in a:
-        #             is_a_dict = isinstance(a[key], dict)
-        #             is_b_dict = isinstance(b[key], dict)
-        #             if is_a_dict and is_b_dict:
-        #                 biased_merge(a[key], b[key], path + [str(key)])
-        #             elif is_a_dict != is_b_dict:
-        #                 # Dicts should be paired since pydantic generates defaults
-        #                 raise AttributeError(f'Structure mismatch at {path}:{key}')
-        #             else:
-        #                 # Leave validation to pydantic
-        #                 a[key] = b[key]
-        #         else:
-        #             a[key] = b[key]
-        #     return a
-        #updated_dict = biased_merge(self.dict(), new_kwargs)
-
         updated_dict = deep_update(self.dict(), new_kwargs)
         self.check_and_set(updated_dict)
         return self
@@ -124,8 +104,14 @@ class BayesianOptions(GeneratorOptions):
     def check_and_set(self, new_dict=None):
         """
         Validates a dictionary against the options model, and if so, sets new values
+
+        Parameters
+        ----------
+        new_dict: dict
+            New settings dictionary. If None, use current one as source.
+
+        See https://github.com/pydantic/pydantic/issues/1864
         """
-        # https://github.com/pydantic/pydantic/issues/1864
         new_dict = new_dict or self.__dict__
         values, fields_set, validation_error = validate_model(
             self.__class__, new_dict

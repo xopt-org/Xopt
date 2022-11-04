@@ -560,6 +560,8 @@ def state_to_dict(X, include_data=True, include_options_history=True):
     if include_data:
         output["data"] = json.loads(X.data.to_json())
     if include_options_history:
-        output["generator"]['history'] = json.loads(json.dumps([opt for opt in X.generator._options_history.json()]))
-
+        if not hasattr(X.generator, '_options_history'):
+            raise XoptError(f'Generator {X} does not store options history')
+        output["generator"]['options_history'] = json.loads(
+            json.dumps([opt for opt in X.generator._options_history.json()]))
     return output
