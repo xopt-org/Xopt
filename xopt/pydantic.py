@@ -7,7 +7,7 @@ from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
-from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
+from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator, validate_model
 from pydantic.generics import GenericModel
 
 ObjType = TypeVar("ObjType")
@@ -505,3 +505,32 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
     )
 
     return model()
+
+
+def check_and_set_options(model: XoptBaseModel, new_dict: dict):
+    """
+    Validates a dictionary against the model, and if so, sets new values
+
+    Parameters
+    ----------
+    model: XoptBaseModel
+        The object to change
+    new_dict: dict
+        Dictionary of options
+
+    See https://github.com/pydantic/pydantic/issues/1864
+    """
+
+    values, fields_set, validation_error = validate_model(
+        model.__class__, new_dict
+    )
+    if validation_error:
+        raise validation_error
+    try:
+        object.__setattr__(model, "__dict__", values)
+    except TypeError as e:
+        raise TypeError(
+            "Model values must be a dict; you may not have returned "
+            + "a dictionary from a root validator"
+        ) from e
+    object.__setattr__(model, "__fields_set__", fields_set)
