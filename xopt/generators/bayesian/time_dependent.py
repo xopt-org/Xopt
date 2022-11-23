@@ -1,4 +1,5 @@
 import time
+import warnings
 from abc import ABC
 from typing import Callable, Dict, List
 
@@ -69,9 +70,9 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         output = super().generate(n_candidates)
 
         if time.time() > self.target_prediction_time:
-            raise RuntimeWarning(
+            warnings.warn(
                 "target prediction time is in the past! Increase "
-                "added time for accurate results"
+                "added time for accurate results", RuntimeWarning
             )
         while time.time() < self.target_prediction_time:
             time.sleep(0.001)
