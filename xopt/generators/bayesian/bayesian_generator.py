@@ -11,8 +11,8 @@ from botorch.sampling import SobolQMCNormalSampler
 from gpytorch import Module
 
 from xopt.generator import Generator
-from xopt.generators.bayesian.options import BayesianOptions
 from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
+from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -127,7 +127,7 @@ class BayesianGenerator(Generator, ABC):
                 acq,
                 torch.tensor(self.options.acq.proximal_lengthscales, **self._tkwargs),
                 transformed_weighting=self.options.acq.use_transformed_proximal_weights,
-                beta=10.0
+                beta=10.0,
             )
 
         return acq
@@ -157,9 +157,10 @@ class BayesianGenerator(Generator, ABC):
         bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
         # if specified modify bounds to limit maximum travel distances
         if self.options.optim.max_travel_distances is not None:
-            if len(self.options.optim.max_travel_distances) != len(bounds):
+            if len(self.options.optim.max_travel_distances) != bounds.shape[-1]:
                 raise ValueError(
-                    "max_travel_distances must be of length {}".format(len(bounds))
+                    f"length of max_travel_distances must match the number of "
+                    f"variables {bounds.shape[-1]}"
                 )
 
             # get last point
