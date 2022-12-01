@@ -17,7 +17,6 @@ class RCDS:
         step=1e-2,
         tol=1e-5,
         max_it=10,
-        # max_eval=1000,
     ):
         """
         Input:
@@ -33,7 +32,6 @@ class RCDS:
         self.step = step
         self.tol = tol
         self.maxIt = max_it
-        # self.maxEval = max_eval
 
         # Internal vars
         self.cnt = 0
@@ -52,7 +50,6 @@ class RCDS:
         step = self.step
         tol = self.tol
         maxIt = self.maxIt
-        # maxEval = self.maxEval
         self.Nvar = len(x0)
         yield x0
         f0, _ = self.func_obj(x0)
@@ -151,15 +148,7 @@ class RCDS:
                         % (k, max(dotp))
                     )
 
-            # logger.debug("g count is ", self.cnt, "and maxEval is ", maxEval)
             logger.debug("g count is ", self.cnt)
-            # termination
-            # if self.cnt > maxEval:
-            #     logger.debug(
-            #         "terminated, reaching self.func_objtion evaluation limit: %d > %d\n"
-            #         % (self.cnt, maxEval)
-            #     )
-            #     break
 
             if 2.0 * abs(f0 - fm) < tol * (abs(f0) + abs(fm)) and tol > 0:
                 logger.debug(
