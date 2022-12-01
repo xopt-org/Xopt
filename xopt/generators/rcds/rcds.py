@@ -484,7 +484,9 @@ class RCDSGenerator(Generator):
 
         # Verify the candidate here
         while np.any(x_next > self.ub) or np.any(x_next < self.lb):
-            self.rcds.update_obj(np.nan)  # notify RCDS that the search reached the bound
+            self.rcds.update_obj(
+                np.nan
+            )  # notify RCDS that the search reached the bound
             x_next = np.array(next(self.generator))  # request next candidate
 
         # Return the next value
