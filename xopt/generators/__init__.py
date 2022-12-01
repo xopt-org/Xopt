@@ -7,6 +7,7 @@ from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGen
 from xopt.generators.scipy.neldermead import NelderMeadGenerator
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
 from xopt.generators.bayesian.mggpo import MGGPOGenerator
+from xopt.generators.rcds.rcds import RCDSGenerator
 
 from xopt.generators.ga import CNSGAGenerator
 from xopt.generators.random import RandomGenerator
@@ -23,6 +24,7 @@ registered_generators = [
     ExpectedImprovementGenerator,
     ExtremumSeekingGenerator,
     MGGPOGenerator,
+    RCDSGenerator,
 ]
 
 generators = {gen.alias: gen for gen in registered_generators}
