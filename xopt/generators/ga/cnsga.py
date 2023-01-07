@@ -26,7 +26,7 @@ class CNSGAOptions(GeneratorOptions):
     crossover_probability: confloat(ge=0, le=1) = Field(0.9)
     mutation_probability: confloat(ge=0, le=1) = Field(1.0)
     population_file: str = Field(None)
-    output_path: str =Field(None)
+    output_path: str = Field(None)
 
 
 class CNSGAGenerator(Generator):
@@ -44,12 +44,16 @@ class CNSGAGenerator(Generator):
         super().__init__(vocs, options)
 
         # Internal data structures
-        self.children = []  # list of unevaluated inputs. This should be a list of dicts.
+        self.children = (
+            []
+        )  # list of unevaluated inputs. This should be a list of dicts.
         self.population = None  # The latest population data (fully evaluated)
         self.offspring = None  # Newly evaluated data, but not yet added to population
 
-        self._loaded_population = None # use these to generate children until the first pop is made
-        
+        self._loaded_population = (
+            None  # use these to generate children until the first pop is made
+        )
+
         # DEAP toolbox (internal)
         self.toolbox = cnsga_toolbox(vocs, selection="auto")
 
@@ -99,7 +103,7 @@ class CNSGAGenerator(Generator):
                 pop = self._loaded_population
         else:
             pop = self.population
-            
+
         # Use population to create children
         inputs = cnsga_variation(
             pop,
