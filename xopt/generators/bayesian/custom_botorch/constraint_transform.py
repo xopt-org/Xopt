@@ -9,14 +9,10 @@ from torch import Tensor
 
 class Constraint(OutcomeTransform):
     r"""Constraint-transform outcomes.
-
-    The Bilog transform [eriksson2021scalable]_ is useful for modeling constraining
-    functions. It magnifies values near zero and flattens extreme values outside the
-    domain [-1,1].
     """
 
     def __init__(self, constraints: dict, outputs: Optional[List[int]] = None) -> None:
-        r"""Bilog-transform outcomes.
+        r"""Constraint-transform outcomes.
 
         Args:
             outputs: Which of the outputs to Bilog-transform. If omitted, all
@@ -135,7 +131,7 @@ class Constraint(OutcomeTransform):
             )
         return Y_utf, Yvar
 
-    def untransform_posterior(self, posterior: Posterior) -> Posterior:
+    def untransform_posterior(self, posterior: Posterior) -> TransformedPosterior:
         r"""Un-transform the constraint-transformed posterior.
 
         Args:

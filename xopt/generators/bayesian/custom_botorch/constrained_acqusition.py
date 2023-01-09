@@ -73,7 +73,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         posterior = self.model.posterior(
             X=X, posterior_transform=self.posterior_transform
         )
-        samples = self.sampler(posterior)
+        samples = self.get_posterior_samples(posterior)
         obj = self.objective(samples, X=X)
 
         # multiply the output of the base acquisition function by the feasibility
