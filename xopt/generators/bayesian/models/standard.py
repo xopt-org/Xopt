@@ -1,5 +1,5 @@
 import torch
-from botorch import fit_gpytorch_model
+from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.transforms import Bilog, Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
@@ -68,7 +68,7 @@ def create_objective_models(
             )
         )
         mll = ExactMarginalLogLikelihood(models[-1].likelihood, models[-1])
-        fit_gpytorch_model(mll)
+        fit_gpytorch_mll(mll)
 
     return models
 
@@ -129,7 +129,7 @@ def create_constraint_models(
             models[-1].mean_module.constant.requires_grad = False
 
         mll = ExactMarginalLogLikelihood(models[-1].likelihood, models[-1])
-        fit_gpytorch_model(mll)
+        fit_gpytorch_mll(mll)
 
     # create model list
     return models

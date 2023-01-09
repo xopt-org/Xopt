@@ -7,7 +7,7 @@ import torch
 from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
-from botorch.sampling import SobolQMCNormalSampler
+from botorch.sampling import ListSampler, SobolQMCNormalSampler
 from gpytorch import Module
 
 from xopt.generator import Generator
@@ -115,7 +115,17 @@ class BayesianGenerator(Generator, ABC):
         Returns a function that can be used to evaluate the acquisition function
         """
         # re-create sampler/objective from options
-        self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
+
+        # need a list sampler for botorch > 0.8
+        if model.num_outputs > 1:
+            self.sampler = ListSampler(
+                *[
+                    SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
+                    for _ in range(model.num_outputs)
+                ]
+            )
+        else:
+            self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
         self.objective = self._get_objective()
 
         # get base acquisition function
