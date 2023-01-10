@@ -19,12 +19,11 @@ class TestUpperConfidenceBoundGenerator:
     def test_init(self):
         ucb_gen = UpperConfidenceBoundGenerator(TEST_VOCS_BASE)
         ucb_gen.options.dict()
-        ucb_gen.options.schema()
+        ucb_gen.options.json()
+        # ucb_gen.options.schema() wait till pydantic v2 for fix
 
         with pytest.raises(ValueError):
-            UpperConfidenceBoundGenerator(
-                TEST_VOCS_BASE, BayesianExplorationOptions()
-            )
+            UpperConfidenceBoundGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())
 
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(
@@ -96,10 +95,11 @@ class TestUpperConfidenceBoundGenerator:
         ucb_gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
         )
-        ucb_gen.add_data(pd.DataFrame({"x1": -1., "x2": -1., "y1": 100., "c1": -100},
-                                      index=[0]))
+        ucb_gen.add_data(
+            pd.DataFrame({"x1": -1.0, "x2": -1.0, "y1": 100.0, "c1": -100}, index=[0])
+        )
         ucb_gen.train_model()
         # evaluate acqf
         acqf = ucb_gen.get_acquisition(ucb_gen.model)
         with torch.no_grad():
-            assert acqf(torch.tensor((-1., -1.)).reshape(1, 1, 2)) >= 0.0
+            assert acqf(torch.tensor((-1.0, -1.0)).reshape(1, 1, 2)) >= 0.0
