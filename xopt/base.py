@@ -314,7 +314,7 @@ class Xopt:
             output = state_to_dict(self)
             with open(self.options.dump_file, "w") as f:
                 yaml.dump(output, f)
-            logger.debug(f"Dumping state to:{self.options.dump_file}")
+            logger.debug(f"Dumped state to YAML file: {self.options.dump_file}")
 
     @property
     def data(self):
