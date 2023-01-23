@@ -9,7 +9,7 @@ dependencies:
   - pydantic>=1.10.0
   - pyyaml
   - pytorch
-  - botorch
+#  - botorch
   - gpytorch
   - pandas
   - ipywidgets
@@ -32,5 +32,6 @@ dependencies:
   - flake8
   - pip:
     - ufmt
+    - git+git://github.com/pytorch/botorch
 #  - pip:
 #    - git+git://github.com/some/repo
