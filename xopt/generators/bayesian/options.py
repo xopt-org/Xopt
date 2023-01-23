@@ -45,7 +45,7 @@ class OptimOptions(XoptBaseModel):
     )
 
 
-class ModelOptions(BaseModel):
+class ModelOptions(XoptBaseModel):
     """Options for defining the GP model in BO"""
 
     function: Callable
