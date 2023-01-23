@@ -17,6 +17,7 @@ class TestExpectedImprovement:
         ucb_gen.options.dict()
         # ucb_gen.options.schema()
 
+
         with pytest.raises(ValueError):
             ExpectedImprovementGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())
 
