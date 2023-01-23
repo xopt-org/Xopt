@@ -9,7 +9,7 @@ from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
-class TestBayesianExplorationGenerator:
+class TestMOBOGenerator:
     def test_init(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.objectives.update({"y2": "MINIMIZE"})
@@ -25,8 +25,8 @@ class TestBayesianExplorationGenerator:
         bad_options.acq.proximal_lengthscales = [1.0, 1.0]
 
         bad_options2 = deepcopy(MOBOGenerator.default_options())
-        bad_options2.optim.raw_samples = 1
-        bad_options2.acq.monte_carlo_samples = 1
+        bad_options2.optim.raw_samples = 5
+        bad_options2.acq.monte_carlo_samples = 10
         bad_options2.acq.proximal_lengthscales = [1.0, 1.0, 1.0]
 
         for ele in [bad_options, bad_options2]:
@@ -35,8 +35,8 @@ class TestBayesianExplorationGenerator:
 
         base_options = deepcopy(MOBOGenerator.default_options())
         base_options.acq.reference_point = {"y1": 1.5, "y2": 1.5}
-        base_options.optim.raw_samples = 2
-        base_options.acq.monte_carlo_samples = 2
+        base_options.optim.raw_samples = 5
+        base_options.acq.monte_carlo_samples = 20
 
         proximal_biasing = deepcopy(base_options)
         proximal_biasing.acq.reference_point = {"y1": 1.5, "y2": 1.5}

@@ -75,11 +75,12 @@ class MOBOGenerator(BayesianGenerator):
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
-            prune_baseline=True,
             constraints=constraint_callables,
             ref_point=self.reference_point,
             sampler=self.sampler,
             objective=self.objective,
+            cache_root=False,
+            prune_baseline=True,
         )
 
         return acq

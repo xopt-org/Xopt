@@ -27,7 +27,6 @@ mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 
 
 if __name__ == "__main__":
-
     logger = logging.getLogger("xopt")
 
     # ARGS = 'xopt.in'.split()

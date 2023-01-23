@@ -5,7 +5,6 @@ from xopt.generators.bayesian.custom_botorch.constraint_transform import Constra
 
 class TestCustomBotorch:
     def test_constraint_transformation(self):
-
         constraints = [{0: ["GREATER_THAN", 0.5]}, {0: ["LESS_THAN", 0.5]}]
 
         for c in constraints:

@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
 from pydantic import ValidationError
-from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
-from xopt.vocs import VOCS
-from xopt.evaluator import Evaluator
-from xopt.resources.testing import TEST_VOCS_BASE
 from xopt import Xopt
+from xopt.evaluator import Evaluator
+from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.vocs import VOCS
 
 
 class TestExtremumSeekingGenerator:
@@ -171,7 +171,6 @@ class TestExtremumSeekingGenerator:
 
         # This function defines one step of the ES algorithm at iteration i
         def ES_step(p_n, i, cES_now, amplitude):
-
             # ES step for each parameter
             p_next = np.zeros(nES)
 
@@ -208,7 +207,6 @@ class TestExtremumSeekingGenerator:
 
         # Now we start the ES loop
         for i in np.arange(ES_steps - 1):
-
             # Normalize previous parameter values
             pES_n[i] = p_normalize(pES[i])
 

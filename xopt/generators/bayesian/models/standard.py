@@ -41,7 +41,6 @@ def create_standard_model(
 def create_objective_models(
     input_data, objective_data, input_transform, tkwargs, use_low_noise_prior=False
 ):
-
     # validate data
     if len(input_data) == 0:
         raise ValueError("input_data is empty/all Nans, cannot create model")

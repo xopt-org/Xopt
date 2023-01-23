@@ -353,7 +353,6 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
     odata = pd.DataFrame(index=data.index)
 
     for k in sorted(list(objectives)):
-
         # Protect against missing data
         if k not in data:
             odata[prefix + k] = np.inf
@@ -392,7 +391,6 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
     cdata = pd.DataFrame(index=data.index)
 
     for k in sorted(list(constraints)):
-
         # Protect against missing data
         if k not in data:
             cdata[prefix + k] = np.inf

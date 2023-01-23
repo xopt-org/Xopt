@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class CNSGAOptions(GeneratorOptions):
-
     population_size: int = 64
     crossover_probability: confloat(ge=0, le=1) = 0.9
     mutation_probability: confloat(ge=0, le=1) = 1.0
@@ -30,7 +29,6 @@ class CNSGAOptions(GeneratorOptions):
 
 
 class CNSGAGenerator(Generator):
-
     alias = "cnsga"
 
     @staticmethod
@@ -73,7 +71,6 @@ class CNSGAGenerator(Generator):
         crossover_probability=0.9,
         mutation_probability=1.0,
     ):
-
         self._vocs = vocs  # TODO: use proper options
         self.n_pop = n_pop
         self.crossover_probability = crossover_probability
@@ -91,7 +88,6 @@ class CNSGAGenerator(Generator):
             self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
 
     def create_children(self):
-
         # No population, so create random children
         if self.population is None:
             return [self.vocs.random_inputs() for _ in range(self.n_pop)]
@@ -113,7 +109,7 @@ class CNSGAGenerator(Generator):
         if len(self.offspring) >= self.n_pop:
             if self.population is None:
                 self.population = self.offspring.iloc[: self.n_pop]
-                self.offspring = self.offspring.iloc[self.n_pop:]
+                self.offspring = self.offspring.iloc[self.n_pop :]
             else:
                 candidates = pd.concat([self.population, self.offspring])
                 self.population = cnsga_select(
