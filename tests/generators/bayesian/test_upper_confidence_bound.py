@@ -21,7 +21,6 @@ class TestUpperConfidenceBoundGenerator:
         ucb_gen.options.dict()
         # ucb_gen.options.schema()
 
-
         with pytest.raises(ValueError):
             UpperConfidenceBoundGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())
 

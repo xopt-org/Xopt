@@ -28,7 +28,6 @@ class CNSGAOptions(GeneratorOptions):
     output_path: str = Field(None, description="Output path for population files")
 
 
-
 class CNSGAGenerator(Generator):
     alias = "cnsga"
 
