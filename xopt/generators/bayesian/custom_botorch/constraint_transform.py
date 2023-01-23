@@ -8,8 +8,7 @@ from torch import Tensor
 
 
 class Constraint(OutcomeTransform):
-    r"""Constraint-transform outcomes.
-    """
+    r"""Constraint-transform outcomes."""
 
     def __init__(self, constraints: dict, outputs: Optional[List[int]] = None) -> None:
         r"""Constraint-transform outcomes.

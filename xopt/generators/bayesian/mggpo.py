@@ -116,6 +116,7 @@ class MGGPOGenerator(BayesianGenerator):
             ref_point=self.reference_point,
             sampler=self.sampler,
             objective=self.objective,
+            cache_root=False,
         )
 
         return acq

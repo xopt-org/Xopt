@@ -1,8 +1,8 @@
 from os import path
 
-from setuptools import find_packages, setup
-
 import versioneer
+
+from setuptools import find_packages, setup
 
 cur_dir = path.abspath(path.dirname(__file__))
 

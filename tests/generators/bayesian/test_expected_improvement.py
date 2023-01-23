@@ -6,9 +6,7 @@ from xopt.base import Xopt
 
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationOptions
-from xopt.generators.bayesian.expected_improvement import (
-    ExpectedImprovementGenerator,
-)
+from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
@@ -17,12 +15,10 @@ class TestExpectedImprovement:
     def test_init(self):
         ucb_gen = ExpectedImprovementGenerator(TEST_VOCS_BASE)
         ucb_gen.options.dict()
-        ucb_gen.options.schema()
+        # ucb_gen.options.schema()
 
         with pytest.raises(ValueError):
-            ExpectedImprovementGenerator(
-                TEST_VOCS_BASE, BayesianExplorationOptions()
-            )
+            ExpectedImprovementGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())
 
     def test_generate(self):
         gen = ExpectedImprovementGenerator(

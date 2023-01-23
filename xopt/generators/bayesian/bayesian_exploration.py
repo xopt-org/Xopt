@@ -59,7 +59,9 @@ class BayesianExplorationGenerator(BayesianGenerator):
         )
 
         cqPV = ConstrainedMCAcquisitionFunction(
-            model, qPV, create_constraint_callables(self.vocs),
+            model,
+            qPV,
+            create_constraint_callables(self.vocs),
         )
 
         return cqPV

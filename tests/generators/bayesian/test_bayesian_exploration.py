@@ -12,9 +12,7 @@ class TestBayesianExplorationGenerator:
         BayesianExplorationGenerator(TEST_VOCS_BASE)
 
         with pytest.raises(ValueError):
-            BayesianExplorationGenerator(
-                TEST_VOCS_BASE, UpperConfidenceBoundOptions()
-            )
+            BayesianExplorationGenerator(TEST_VOCS_BASE, UpperConfidenceBoundOptions())
 
     def test_generate(self):
         gen = BayesianExplorationGenerator(

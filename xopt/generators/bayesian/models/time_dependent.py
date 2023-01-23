@@ -19,7 +19,6 @@ def create_time_dependent_model(
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
 ) -> ModelListGP:
-
     # create dataframes for processed data
     input_data, objective_data, constraint_data = split_data(data, vocs)
     # add time column to variable data

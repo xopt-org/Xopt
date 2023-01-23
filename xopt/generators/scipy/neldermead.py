@@ -1,15 +1,14 @@
-from abc import abstractmethod
-
 import logging
 import warnings
+from abc import abstractmethod
 
 from typing import Dict, List
-
-from numpy import shape, asfarray
 
 import numpy as np
 
 import pandas as pd
+
+from numpy import asfarray, shape
 
 from xopt.generator import Generator, GeneratorOptions
 
@@ -90,7 +89,6 @@ class ScipyOptimizeGenerator(Generator):
         self._lock = False  # unlock
 
     def generate(self, n_candidates) -> List[Dict]:
-
         # Check if any options were changed from init. If so, reset the algorithm
         if self.options != self._saved_options:
             self._algorithm = None
@@ -320,7 +318,6 @@ def _neldermead_generator(
 
     # while (fcalls[0] < maxfun and iterations < maxiter):
     while True:
-
         if (
             np.max(np.ravel(np.abs(sim[1:] - sim[0]))) <= xatol
             and np.max(np.abs(fsim[0] - fsim[1:])) <= fatol
