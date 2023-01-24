@@ -1,20 +1,19 @@
 import math
 from abc import ABC
-from copy import copy, deepcopy
 from concurrent.futures import ThreadPoolExecutor
-
+from copy import copy, deepcopy
 
 import pandas as pd
 import pytest
 import yaml
+from xopt.base import Xopt, XoptOptions
+from xopt.errors import XoptError
 
 from xopt.evaluator import Evaluator
-from xopt.base import Xopt, XoptOptions
-from xopt.vocs import VOCS
-from xopt.errors import XoptError
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
+from xopt.vocs import VOCS
 
 
 class DummyGenerator(Generator, ABC):

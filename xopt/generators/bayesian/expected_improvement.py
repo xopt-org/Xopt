@@ -61,7 +61,9 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
-            model, qEI, create_constraint_callables(self.vocs),
+            model,
+            qEI,
+            create_constraint_callables(self.vocs),
         )
 
         return cqUCB

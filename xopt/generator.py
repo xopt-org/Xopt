@@ -24,9 +24,7 @@ _GeneratorOptions = TypeVar("_GeneratorOptions", bound=GeneratorOptions)
 class Generator(ABC):
     alias = None
 
-    def __init__(
-        self, vocs: VOCS, options: GeneratorOptions = None
-    ):
+    def __init__(self, vocs: VOCS, options: GeneratorOptions = None):
         """
         Initialize the generator.
 

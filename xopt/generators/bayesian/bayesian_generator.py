@@ -8,6 +8,7 @@ from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
+from botorch.sampling.get_sampler import get_sampler
 from gpytorch import Module
 
 from xopt.generator import Generator
@@ -57,19 +58,8 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
-            if self.options.optim.use_nearby_initial_points:
-                # generate starting points for optimization (note in real domain)
-                inputs = self.get_input_data(self.data)
-                batch_initial_points = sample_truncated_normal_perturbations(
-                    inputs[-1].unsqueeze(0),
-                    n_discrete_points=self.options.optim.raw_samples,
-                    sigma=0.5,
-                    bounds=bounds,
-                ).unsqueeze(-2)
-                raw_samples = None
-            else:
-                batch_initial_points = None
-                raw_samples = self.options.optim.raw_samples
+            # get initial points for optimization (if specified)
+            batch_initial_points, raw_samples = self._get_initial_batch_points(bounds)
 
             acq_funct = self.get_acquisition(self._model)
 
@@ -115,7 +105,13 @@ class BayesianGenerator(Generator, ABC):
         Returns a function that can be used to evaluate the acquisition function
         """
         # re-create sampler/objective from options
-        self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
+
+        # need a sampler for botorch > 0.8
+        self.sampler = get_sampler(
+            model.posterior(self.get_input_data(self.data)),
+            sample_shape=torch.Size([self.options.acq.monte_carlo_samples]),
+        )
+
         self.objective = self._get_objective()
 
         # get base acquisition function
@@ -140,6 +136,23 @@ class BayesianGenerator(Generator, ABC):
 
     def get_outcome_data(self, data: pd.DataFrame):
         return torch.tensor(data[self.vocs.output_names].to_numpy(), **self._tkwargs)
+
+    def _get_initial_batch_points(self, bounds):
+        if self.options.optim.use_nearby_initial_points:
+            # generate starting points for optimization (note in real domain)
+            inputs = self.get_input_data(self.data)
+            batch_initial_points = sample_truncated_normal_perturbations(
+                inputs[-1].unsqueeze(0),
+                n_discrete_points=self.options.optim.raw_samples,
+                sigma=0.5,
+                bounds=bounds,
+            ).unsqueeze(-2)
+            raw_samples = None
+        else:
+            batch_initial_points = None
+            raw_samples = self.options.optim.raw_samples
+
+        return batch_initial_points, raw_samples
 
     @abstractmethod
     def _get_acquisition(self, model):

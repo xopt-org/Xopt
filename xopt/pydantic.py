@@ -48,11 +48,11 @@ class CallableModel(BaseModel):
         callable = values.pop("callable")
 
         if not isinstance(
-                callable,
-                (
-                        str,
-                        Callable,
-                ),
+            callable,
+            (
+                str,
+                Callable,
+            ),
         ):
             raise ValueError(
                 "Callable must be object or a string. Provided %s", type(callable)
@@ -60,7 +60,6 @@ class CallableModel(BaseModel):
 
         # parse string to callable
         if isinstance(callable, (str,)):
-
             # for function loading
             if "bind" in values:
                 callable = get_callable_from_string(callable, bind=values.pop("bind"))
@@ -296,7 +295,6 @@ class NormalExecutor(
 ):
     @validator("executor", always=True)
     def validate_executor(cls, v, values):
-
         if v is None:
             v = values["loader"].load()
 
@@ -342,7 +340,6 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
         module = import_module(module_name)
 
     except ModuleNotFoundError:
-
         try:
             module_split = module_name.rsplit(".", 1)
 
@@ -461,11 +458,9 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
     sig_kwargs = {}
     # Now go parameter by parameter and assemble kwargs
     for i, param in enumerate(signature.parameters.values()):
-
         if param.kind in [param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY]:
             # if param not bound use default/ compose field rep
             if not sig_kw.get(param.name):
-
                 # create a field representation
                 if param.default == param.empty:
                     sig_kwargs[param.name] = param.empty

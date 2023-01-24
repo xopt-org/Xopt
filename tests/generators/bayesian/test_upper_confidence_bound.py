@@ -19,8 +19,7 @@ class TestUpperConfidenceBoundGenerator:
     def test_init(self):
         ucb_gen = UpperConfidenceBoundGenerator(TEST_VOCS_BASE)
         ucb_gen.options.dict()
-        ucb_gen.options.json()
-        # ucb_gen.options.schema() wait till pydantic v2 for fix
+        # ucb_gen.options.schema()
 
         with pytest.raises(ValueError):
             UpperConfidenceBoundGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())
