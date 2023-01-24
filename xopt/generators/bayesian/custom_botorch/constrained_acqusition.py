@@ -1,9 +1,7 @@
 from typing import Callable, List, Optional
 
 import torch
-from botorch.acquisition import (
-    MCAcquisitionFunction,
-)
+from botorch.acquisition import MCAcquisitionFunction
 from botorch.acquisition.objective import GenericMCObjective, PosteriorTransform
 from botorch.models.model import Model
 from botorch.utils import apply_constraints
@@ -73,11 +71,9 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         posterior = self.model.posterior(
             X=X, posterior_transform=self.posterior_transform
         )
-        samples = self.sampler(posterior)
+        samples = self.get_posterior_samples(posterior)
         obj = self.objective(samples, X=X)
 
         # multiply the output of the base acquisition function by the feasibility
         base_val = torch.nn.functional.softplus(self.base_acqusition(X), beta=10)
-        return base_val * obj.max(dim=-1)[
-            0
-        ].mean(dim=0)
+        return base_val * obj.max(dim=-1)[0].mean(dim=0)

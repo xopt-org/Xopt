@@ -4,7 +4,6 @@ from xopt.generator import Generator, GeneratorOptions
 
 
 class RandomGenerator(Generator):
-
     alias = "random"
 
     def __init__(self, vocs, options: GeneratorOptions = None):

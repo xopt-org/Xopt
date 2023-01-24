@@ -32,7 +32,6 @@ class MiscClass:
 
 
 class TestJsonEncoders:
-
     misc_class = MiscClass()
 
     @pytest.mark.parametrize(
@@ -97,7 +96,6 @@ class TestJsonEncoders:
 
 
 class TestSignatureValidateAndCompose:
-
     misc_class = MiscClass()
 
     @pytest.mark.parametrize(
@@ -195,7 +193,6 @@ class TestSignatureValidateAndCompose:
         ],
     )
     def test_validate_classmethod(self, args, kwargs):
-
         signature_model = validate_and_compose_signature(
             self.misc_class.misc_cls_method, *args, **kwargs
         )
@@ -217,7 +214,6 @@ class TestSignatureValidateAndCompose:
         ],
     )
     def test_validate_staticmethod(self, args, kwargs):
-
         signature_model = validate_and_compose_signature(
             self.misc_class.misc_static_method, *args, **kwargs
         )
@@ -239,7 +235,6 @@ class TestSignatureValidateAndCompose:
         ],
     )
     def test_validate_bound_method(self, args, kwargs):
-
         signature_model = validate_and_compose_signature(
             self.misc_class.misc_method, *args, **kwargs
         )
@@ -250,7 +245,6 @@ class TestSignatureValidateAndCompose:
 
 
 class TestCallableModel:
-
     misc_class = MiscClass()
 
     @pytest.mark.parametrize(
@@ -304,7 +298,6 @@ class TestCallableModel:
 
 
 class TestObjLoader:
-
     misc_class_loader_type = ObjLoader[MiscClass]
 
     def test_class_loader(self):

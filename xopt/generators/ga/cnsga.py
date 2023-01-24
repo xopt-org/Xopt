@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class CNSGAOptions(GeneratorOptions):
-
     population_size: int = Field(64, description="Population size")
     crossover_probability: confloat(ge=0, le=1) = Field(0.9, description="Crossover probability")
     mutation_probability: confloat(ge=0, le=1) = Field(1.0, description="Mutation probability")
@@ -30,7 +29,6 @@ class CNSGAOptions(GeneratorOptions):
 
 
 class CNSGAGenerator(Generator):
-
     alias = "cnsga"
 
     @staticmethod
@@ -75,7 +73,6 @@ class CNSGAGenerator(Generator):
         crossover_probability=0.9,
         mutation_probability=1.0,
     ):
-
         self._vocs = vocs  # TODO: use proper options
         self.n_pop = n_pop
         self.crossover_probability = crossover_probability
@@ -93,7 +90,6 @@ class CNSGAGenerator(Generator):
             self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
 
     def create_children(self):
-
         # No population, so create random children
         if self.population is None:
             # Special case when pop is loaded from file

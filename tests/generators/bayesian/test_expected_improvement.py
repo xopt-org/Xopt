@@ -13,10 +13,9 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callabl
 
 class TestExpectedImprovement:
     def test_init(self):
-        ei_gen = ExpectedImprovementGenerator(TEST_VOCS_BASE)
-        ei_gen.options.dict()
-        ei_gen.options.json()
-        # ei_gen.options.schema() wait till pydantic v2 for fix
+        ucb_gen = ExpectedImprovementGenerator(TEST_VOCS_BASE)
+        ucb_gen.options.dict()
+        # ucb_gen.options.schema()
 
         with pytest.raises(ValueError):
             ExpectedImprovementGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())

@@ -1,6 +1,8 @@
 # conda env create -f environment.yml
 name: xopt-dev
 channels:
+  - pytorch
+  - gpytorch
   - conda-forge
 dependencies:
   - python=3.9
@@ -8,9 +10,9 @@ dependencies:
   - numpy
   - pydantic>=1.10.0
   - pyyaml
-  - pytorch
-  - botorch==0.7.3
-  - gpytorch
+#  - pytorch
+#  - botorch
+#  - gpytorch
   - pandas
   - ipywidgets
   - tqdm
@@ -30,7 +32,9 @@ dependencies:
   - mkdocstrings-python
   - pre-commit
   - flake8
+  - pip
   - pip:
     - ufmt
+    - git+https://github.com/pytorch/botorch
 #  - pip:
 #    - git+git://github.com/some/repo
