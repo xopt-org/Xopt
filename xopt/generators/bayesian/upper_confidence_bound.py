@@ -1,3 +1,6 @@
+import json
+import pprint
+
 from botorch.acquisition import qUpperConfidenceBound
 from pydantic import Field
 
@@ -15,6 +18,7 @@ from xopt.generators.bayesian.time_dependent import (
     TDModelOptions,
     TimeDependentBayesianGenerator,
 )
+from xopt.pydantic import get_descriptions_defaults
 from xopt.vocs import VOCS
 
 
@@ -35,8 +39,19 @@ class TDUCBOptions(UCBOptions):
     model = TDModelOptions()
 
 
+def format_option_descriptions(options_dict):
+    return json.dumps(options_dict, indent=4)
+
+
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
+    __doc__ = (
+        """Implements Bayeisan Optimization using the Upper Confidence Bound 
+    acquisition function"""
+        + "\n"
+        + "\nModel Options\n"
+        + f"{format_option_descriptions(get_descriptions_defaults(UCBOptions()))}"
+    )
 
     def __init__(self, vocs: VOCS, options: UCBOptions = None):
         """
