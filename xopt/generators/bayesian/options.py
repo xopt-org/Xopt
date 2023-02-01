@@ -1,10 +1,11 @@
 from typing import Callable, List
 
 from pydantic import BaseModel, create_model, Field, root_validator
+from pydantic.fields import ModelField
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.pydantic import JSON_ENCODERS, XoptBaseModel
+from xopt.pydantic import JSON_ENCODERS, XoptBaseModel, get_descriptions_defaults
 from xopt.utils import get_function, get_function_defaults
 
 
@@ -34,7 +35,7 @@ class OptimOptions(XoptBaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-        "selection",
+                    "selection",
     )
     use_nearby_initial_points: bool = Field(
         False, description="flag to use local samples to start acqf optimization"
@@ -81,10 +82,14 @@ class BayesianOptions(GeneratorOptions):
         3, description="number of random initial points to measure during first step"
     )
 
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = JSON_ENCODERS
+        extra = "forbid"
+
 
 if __name__ == "__main__":
     options = BayesianOptions()
     options.optim.raw_samples = 30
-    print(options.dict())
 
-    print(BayesianOptions.schema())
+    print(get_descriptions_defaults(options))
