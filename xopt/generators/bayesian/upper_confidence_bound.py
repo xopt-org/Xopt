@@ -1,6 +1,7 @@
 import json
 import pprint
 
+import yaml
 from botorch.acquisition import qUpperConfidenceBound
 from pydantic import Field
 
@@ -40,7 +41,7 @@ class TDUCBOptions(UCBOptions):
 
 
 def format_option_descriptions(options_dict):
-    return json.dumps(options_dict, indent=4)
+    return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
@@ -48,8 +49,6 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     __doc__ = (
         """Implements Bayeisan Optimization using the Upper Confidence Bound 
     acquisition function"""
-        + "\n"
-        + "\nModel Options\n"
         + f"{format_option_descriptions(get_descriptions_defaults(UCBOptions()))}"
     )
 
