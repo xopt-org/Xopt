@@ -44,7 +44,7 @@ def format_option_descriptions(options_dict):
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
     __doc__ = (
-        """Implements Bayeisan Optimization using the Upper Confidence Bound 
+        """Implements Bayeisan Optimization using the Upper Confidence Bound
     acquisition function"""
         + f"{format_option_descriptions(get_descriptions_defaults(UCBOptions()))}"
     )
