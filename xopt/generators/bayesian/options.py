@@ -5,7 +5,7 @@ from pydantic.fields import ModelField
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.pydantic import JSON_ENCODERS, XoptBaseModel, get_descriptions_defaults
+from xopt.pydantic import get_descriptions_defaults, JSON_ENCODERS, XoptBaseModel
 from xopt.utils import get_function, get_function_defaults
 
 
@@ -35,7 +35,7 @@ class OptimOptions(XoptBaseModel):
     sequential: bool = Field(
         True,
         description="flag to use sequential optimization for q-batch point "
-                    "selection",
+        "selection",
     )
     use_nearby_initial_points: bool = Field(
         False, description="flag to use local samples to start acqf optimization"

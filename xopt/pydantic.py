@@ -37,8 +37,10 @@ def get_descriptions_defaults(model: BaseModel):
             if issubclass(val.type_, BaseModel):
                 description_dict[name] = get_descriptions_defaults(getattr(model, name))
             else:
-                description_dict[name] = [val.field_info.description,
-                                          val.field_info.default]
+                description_dict[name] = [
+                    val.field_info.description,
+                    val.field_info.default,
+                ]
 
         except TypeError:
             # if the val is an object or callable type
