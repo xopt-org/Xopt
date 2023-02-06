@@ -4,7 +4,7 @@ from typing import Type, TypeVar
 
 import pandas as pd
 
-from xopt.pydantic import XoptBaseModel, JSON_ENCODERS
+from xopt.pydantic import JSON_ENCODERS, XoptBaseModel
 from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,6 @@ class GeneratorOptions(XoptBaseModel):
         json_encoders = JSON_ENCODERS
         extra = "forbid"
         allow_mutation = False
-
 
 
 _GeneratorOptions = TypeVar("_GeneratorOptions", bound=GeneratorOptions)
