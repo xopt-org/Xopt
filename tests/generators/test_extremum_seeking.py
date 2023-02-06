@@ -19,13 +19,13 @@ class TestExtremumSeekingGenerator:
     def test_es_options(self):
         gen = ExtremumSeekingGenerator(TEST_VOCS_BASE)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(TypeError):
             gen.options.k = "yo"
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(TypeError):
             gen.options.oscillation_size = 0.0
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(TypeError):
             gen.options.decay_rate = -1.0
 
         gen.options.oscillation_size = 0.2
