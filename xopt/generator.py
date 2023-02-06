@@ -19,7 +19,7 @@ class GeneratorOptions(XoptBaseModel):
         arbitrary_types_allowed = True
         json_encoders = JSON_ENCODERS
         extra = "forbid"
-        allow_mutation = False
+        allow_mutation = True
 
 
 _GeneratorOptions = TypeVar("_GeneratorOptions", bound=GeneratorOptions)
