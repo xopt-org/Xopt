@@ -25,11 +25,6 @@ jobs:
           channels: conda-forge
           activate-environment: xopt-dev
           environment-file: environment.yml
-          
-      - name: flake8
-        shell: bash -l {0}
-        run: |
-          flake8 .
 
       - name: Install Xopt
         shell: bash -l {0}

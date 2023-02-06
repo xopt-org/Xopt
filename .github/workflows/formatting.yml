@@ -1,8 +1,10 @@
-name: Examples
+name: Formatting
 
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '0 0 * * *'  # every day at midnight
 
 jobs:
   build:
@@ -19,22 +21,12 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
-         miniforge-variant: Mambaforge
+          miniforge-variant: Mambaforge
           channels: conda-forge
           activate-environment: xopt-dev
           environment-file: environment.yml
-
-      - name: Create environment
+          
+      - name: flake8
         shell: bash -l {0}
         run: |
-          mamba install nbformat nbconvert ipython matplotlib
-
-      - name: Install Xopt
-        shell: bash -l {0}
-        run: |
-          pip install --no-dependencies .
-
-      - name: Run Examples
-        shell: bash -l {0}
-        run: |
-          python scripts/run_examples.py -p "$(pwd)/docs" -s
+          flake8 .
