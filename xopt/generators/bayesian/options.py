@@ -1,7 +1,6 @@
 from typing import Callable, List
 
 from pydantic import BaseModel, create_model, Field, root_validator
-from pydantic.fields import ModelField
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.models.standard import create_standard_model

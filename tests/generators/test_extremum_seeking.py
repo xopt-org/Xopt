@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from pydantic import ValidationError
 from xopt import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
