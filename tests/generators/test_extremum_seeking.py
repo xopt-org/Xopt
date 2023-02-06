@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+from pydantic import ValidationError
+
 from xopt import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
@@ -18,13 +20,13 @@ class TestExtremumSeekingGenerator:
     def test_es_options(self):
         gen = ExtremumSeekingGenerator(TEST_VOCS_BASE)
 
-        with pytest.raises(TypeError):
+        with pytest.raises(ValidationError):
             gen.options.k = "yo"
 
-        with pytest.raises(TypeError):
+        with pytest.raises(ValidationError):
             gen.options.oscillation_size = 0.0
 
-        with pytest.raises(TypeError):
+        with pytest.raises(ValidationError):
             gen.options.decay_rate = -1.0
 
         gen.options.oscillation_size = 0.2
