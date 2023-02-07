@@ -13,6 +13,7 @@ from xopt.vocs import VOCS
 from ...errors import XoptError
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
+from ...utils import format_option_descriptions
 
 
 class MOBOAcqOptions(AcqOptions):
@@ -27,6 +28,11 @@ class MOBOOptions(BayesianOptions):
 
 class MOBOGenerator(BayesianGenerator):
     alias = "mobo"
+    __doc__ = (
+            """Implements Multi-Objective Bayesian Optimization using the Expected 
+            Hypervolume Improvement acquisition function"""
+            + f"{format_option_descriptions(MOBOOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: MOBOOptions = None):
         options = options or MOBOOptions()
