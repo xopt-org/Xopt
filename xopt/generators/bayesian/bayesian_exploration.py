@@ -23,8 +23,8 @@ from xopt.vocs import VOCS
 class BayesianExplorationGenerator(BayesianGenerator):
     alias = "bayesian_exploration"
     __doc__ = (
-            """Implements Bayeisan Exploration acquisition function"""
-            + f"{format_option_descriptions(BayesianOptions())}"
+        """Implements Bayeisan Exploration acquisition function"""
+        + f"{format_option_descriptions(BayesianOptions())}"
     )
 
     def __init__(self, vocs: VOCS, options: BayesianOptions = None):

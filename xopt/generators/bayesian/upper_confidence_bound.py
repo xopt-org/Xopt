@@ -96,9 +96,9 @@ class TDUpperConfidenceBoundGenerator(
 ):
     alias = "time_dependent_upper_confidence_bound"
     __doc__ = (
-            """Implements Time-Dependent Bayeisan Optimization using the Upper 
+        """Implements Time-Dependent Bayeisan Optimization using the Upper 
             Confidence Bound acquisition function"""
-            + f"{format_option_descriptions(TDUCBOptions())}"
+        + f"{format_option_descriptions(TDUCBOptions())}"
     )
 
     def __init__(self, vocs: VOCS, options: TDUCBOptions = None):

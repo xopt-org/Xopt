@@ -18,9 +18,9 @@ from xopt.vocs import VOCS
 class ExpectedImprovementGenerator(BayesianGenerator):
     alias = "expected_improvement"
     __doc__ = (
-            """Implements Bayeisan Optimization using the Upper Confidence Bound
+        """Implements Bayeisan Optimization using the Upper Confidence Bound
         acquisition function"""
-            + f"{format_option_descriptions(BayesianOptions())}"
+        + f"{format_option_descriptions(BayesianOptions())}"
     )
 
     def __init__(self, vocs: VOCS, options: BayesianOptions = None):
