@@ -17,6 +17,7 @@ from xopt.generators.bayesian.time_dependent import (
     TimeDependentBayesianGenerator,
 )
 from xopt.pydantic import get_descriptions_defaults
+from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
 
@@ -37,16 +38,12 @@ class TDUCBOptions(UCBOptions):
     model = TDModelOptions()
 
 
-def format_option_descriptions(options_dict):
-    return "\n\nGenerator Options\n" + yaml.dump(options_dict)
-
-
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
     __doc__ = (
         """Implements Bayeisan Optimization using the Upper Confidence Bound
     acquisition function"""
-        + f"{format_option_descriptions(get_descriptions_defaults(UCBOptions()))}"
+        + f"{format_option_descriptions(UCBOptions())}"
     )
 
     def __init__(self, vocs: VOCS, options: UCBOptions = None):
@@ -98,6 +95,11 @@ class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
     alias = "time_dependent_upper_confidence_bound"
+    __doc__ = (
+            """Implements Time-Dependent Bayeisan Optimization using the Upper 
+            Confidence Bound acquisition function"""
+            + f"{format_option_descriptions(TDUCBOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: TDUCBOptions = None):
         options = options or TDUCBOptions()
