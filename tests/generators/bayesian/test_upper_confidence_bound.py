@@ -7,7 +7,7 @@ import torch
 from xopt.base import Xopt
 
 from xopt.evaluator import Evaluator
-from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationOptions
+from xopt.generators.bayesian.options import BayesianOptions
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
@@ -22,7 +22,7 @@ class TestUpperConfidenceBoundGenerator:
         # ucb_gen.options.schema()
 
         with pytest.raises(ValueError):
-            UpperConfidenceBoundGenerator(TEST_VOCS_BASE, BayesianExplorationOptions())
+            UpperConfidenceBoundGenerator(TEST_VOCS_BASE, BayesianOptions())
 
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(

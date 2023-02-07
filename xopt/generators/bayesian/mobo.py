@@ -29,14 +29,14 @@ class MOBOOptions(BayesianOptions):
 class MOBOGenerator(BayesianGenerator):
     alias = "mobo"
     __doc__ = (
-        """Implements Multi-Objective Bayesian Optimization using the Expected 
+        """Implements Multi-Objective Bayesian Optimization using the Expected
             Hypervolume Improvement acquisition function"""
         + f"{format_option_descriptions(MOBOOptions())}"
     )
 
     def __init__(self, vocs: VOCS, options: MOBOOptions = None):
         options = options or MOBOOptions()
-        if not isinstance(options, MOBOOptions):
+        if not type(options) is MOBOOptions:
             raise ValueError("options must be a MOBOOptions object")
 
         super().__init__(vocs, options)

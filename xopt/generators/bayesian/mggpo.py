@@ -32,7 +32,7 @@ class MGGPOGenerator(BayesianGenerator):
     alias = "mggpo"
 
     def __init__(self, vocs: VOCS, options: MGGPOOptions = MGGPOOptions()):
-        if not isinstance(options, MGGPOOptions):
+        if not type(options) is MGGPOOptions:
             raise ValueError("options must be a MGGPOOptions object")
 
         super().__init__(vocs, options)

@@ -36,7 +36,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             Specific options for this generator
         """
         options = options or BayesianOptions()
-        if not isinstance(options, BayesianOptions):
+        if not type(options) is BayesianOptions:
             raise ValueError("options must be a `BayesianOptions` object")
 
         if vocs.n_objectives != 1:
