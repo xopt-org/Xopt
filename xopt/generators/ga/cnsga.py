@@ -22,9 +22,15 @@ logger = logging.getLogger(__name__)
 
 class CNSGAOptions(GeneratorOptions):
     population_size: int = Field(64, description="Population size")
-    crossover_probability: confloat(ge=0, le=1) = Field(0.9, description="Crossover probability")
-    mutation_probability: confloat(ge=0, le=1) = Field(1.0, description="Mutation probability")
-    population_file: str = Field(None, description="Population file to load (CSV format)")
+    crossover_probability: confloat(ge=0, le=1) = Field(
+        0.9, description="Crossover probability"
+    )
+    mutation_probability: confloat(ge=0, le=1) = Field(
+        1.0, description="Mutation probability"
+    )
+    population_file: str = Field(
+        None, description="Population file to load (CSV format)"
+    )
     output_path: str = Field(None, description="Output path for population files")
 
 
