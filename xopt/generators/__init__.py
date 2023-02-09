@@ -1,3 +1,5 @@
+import warnings
+
 from xopt.errors import XoptError
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
 from xopt.generators.random import RandomGenerator
@@ -15,7 +17,7 @@ try:
     registered_generators += [CNSGAGenerator]
 
 except ModuleNotFoundError:
-    print("WARNING: `deap` not found, CNSGAGenerator is not available")
+    warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
 
 # generators needing botorch
 try:
@@ -40,7 +42,7 @@ try:
     ]
 
 except ModuleNotFoundError:
-    print("WARNING: `botorch` not found, Bayesian generators are not available")
+    warnings.warn("WARNING: `botorch` not found, Bayesian generators are not available")
 
 # generators requiring deap AND botorch
 try:
@@ -48,7 +50,9 @@ try:
 
     registered_generators += [MGGPOGenerator]
 except ModuleNotFoundError:
-    print("WARNING: `deap` and `botorch` not found, MGGPOGenerator is not available")
+    warnings.warn(
+        "WARNING: `deap` and `botorch` not found, MGGPOGenerator is not " "available"
+    )
 
 try:
     from xopt.generators.scipy.neldermead import NelderMeadGenerator
@@ -56,7 +60,7 @@ try:
     registered_generators += [NelderMeadGenerator]
 
 except ModuleNotFoundError:
-    print("WARNING: `scipy` not found, NelderMeadGenerator is not available")
+    warnings.warn("WARNING: `scipy` not found, NelderMeadGenerator is not available")
 
 
 generators = {gen.alias: gen for gen in registered_generators}
