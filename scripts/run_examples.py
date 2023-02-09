@@ -18,9 +18,11 @@ import nbformat
 from nbconvert import PythonExporter
 
 
-IGNORE = {}
+IGNORE = {
+    "xopt_parallel.ipynb",
+}
 
-SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt"]
+SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt", "es", "scipy"]
 
 
 def parse_ipynb(file: Path) -> str:
