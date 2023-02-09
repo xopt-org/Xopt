@@ -13,8 +13,9 @@ from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
     TDAcqOptions,
     TDModelOptions,
-    TimeDependentBayesianGenerator,
+    TimeDependentBayesianGenerator, TDOptions,
 )
+from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
 
@@ -30,13 +31,18 @@ class UCBOptions(BayesianOptions):
     acq = UpperConfidenceBoundOptions()
 
 
-class TDUCBOptions(UCBOptions):
+class TDUCBOptions(UCBOptions, TDOptions):
     acq = TDUpperConfidenceBoundOptions()
     model = TDModelOptions()
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
+    __doc__ = (
+        """Implements Bayeisan Optimization using the Upper Confidence Bound
+    acquisition function"""
+        + f"{format_option_descriptions(UCBOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: UCBOptions = None):
         """
@@ -87,10 +93,15 @@ class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
     alias = "time_dependent_upper_confidence_bound"
+    __doc__ = (
+        """Implements Time-Dependent Bayeisan Optimization using the Upper
+            Confidence Bound acquisition function"""
+        + f"{format_option_descriptions(TDUCBOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: TDUCBOptions = None):
         options = options or TDUCBOptions()
-        if not isinstance(options, UCBOptions):
+        if not type(options) is TDUCBOptions:
             raise ValueError("options must be a TDUCBOptions object")
 
         super(TDUpperConfidenceBoundGenerator, self).__init__(vocs, options)

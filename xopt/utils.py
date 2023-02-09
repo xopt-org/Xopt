@@ -6,7 +6,9 @@ import time
 import traceback
 
 import pandas as pd
+import yaml
 
+from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
 
@@ -140,3 +142,9 @@ def safe_call(func, *args, **kwargs):
         outputs["result"] = result
         outputs["runtime"] = time.perf_counter() - t
     return outputs
+
+
+# functions for formatting documentation
+def format_option_descriptions(options_object):
+    options_dict = get_descriptions_defaults(options_object)
+    return "\n\nGenerator Options\n" + yaml.dump(options_dict)
