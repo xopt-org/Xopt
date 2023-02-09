@@ -11,11 +11,17 @@ from xopt.generators.bayesian.objectives import (
     create_mc_objective,
 )
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
     alias = "expected_improvement"
+    __doc__ = (
+        """Implements Bayeisan Optimization using the Upper Confidence Bound
+        acquisition function"""
+        + f"{format_option_descriptions(BayesianOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: BayesianOptions = None):
         """
@@ -30,7 +36,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             Specific options for this generator
         """
         options = options or BayesianOptions()
-        if not isinstance(options, BayesianOptions):
+        if not type(options) is BayesianOptions:
             raise ValueError("options must be a `BayesianOptions` object")
 
         if vocs.n_objectives != 1:
