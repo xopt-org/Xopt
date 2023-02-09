@@ -20,7 +20,7 @@ from nbconvert import PythonExporter
 
 IGNORE = {}
 
-SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt", "es"]
+SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt", "scipy"]
 
 
 def parse_ipynb(file: Path) -> str:
