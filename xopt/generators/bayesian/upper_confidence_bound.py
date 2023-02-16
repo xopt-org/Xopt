@@ -13,7 +13,8 @@ from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
     TDAcqOptions,
     TDModelOptions,
-    TimeDependentBayesianGenerator, TDOptions,
+    TDOptions,
+    TimeDependentBayesianGenerator,
 )
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS

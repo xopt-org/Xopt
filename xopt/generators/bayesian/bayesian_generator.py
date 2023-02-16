@@ -164,9 +164,11 @@ class BayesianGenerator(Generator, ABC):
 
     @property
     def model(self):
+        if self._model is None:
+            self.train_model(self.data)
         return self._model
 
-    def _get_bounds(self):
+    def _get_bounds(self) -> torch.Tensor:
         bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
         # if specified modify bounds to limit maximum travel distances
         if self.options.optim.max_travel_distances is not None:
