@@ -80,9 +80,7 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
     alias = "multi_fidelity"
     __doc__ = (
         """Implements Multi-fidelity Bayeisan optimizationn
-        
         Assumes a fidelity parameter [0,1]
-        
         """
         + f"{format_option_descriptions(MultiFidelityOptions())}"
     )
@@ -118,8 +116,6 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
             return self.vocs.random_inputs(self.options.n_initial)
 
         else:
-            tkwargs = {"dtype": torch.double, "device": "cpu"}
-
             # update internal model with internal data
             self.train_model(self.data)
 

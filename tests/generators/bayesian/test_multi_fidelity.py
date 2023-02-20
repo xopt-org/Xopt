@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from pydantic.error_wrappers import ValidationError
 
 from xopt.generators.bayesian.models.multi_fidelity import create_multifidelity_model
 from xopt.generators.bayesian.multi_fidelity import MultiFidelityBayesianGenerator
