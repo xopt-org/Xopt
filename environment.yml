@@ -10,7 +10,7 @@ dependencies:
   - numpy
   - pydantic>=1.10.0
   - pyyaml
-  - botorch
+  - botorch>=0.8.2
   - pandas
   - ipywidgets
   - tqdm
