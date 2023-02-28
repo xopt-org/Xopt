@@ -10,9 +10,7 @@ dependencies:
   - numpy
   - pydantic>=1.10.0
   - pyyaml
-#  - pytorch
-#  - botorch
-#  - gpytorch
+  - botorch
   - pandas
   - ipywidgets
   - tqdm
@@ -35,6 +33,5 @@ dependencies:
   - pip
   - pip:
     - ufmt
-    - git+https://github.com/pytorch/botorch
 #  - pip:
 #    - git+git://github.com/some/repo
