@@ -37,7 +37,7 @@ class FeasibilityObjective(GenericMCObjective):
             A `sample_shape x batch_shape x q`-dim Tensor of objective values
             weighted by feasibility (assuming maximization).
         """
-        obj = super().forward(samples=samples)
+        obj = super().forward(samples=samples).to(samples)
         return apply_constraints(
             obj=obj,
             constraints=self.constraints,
