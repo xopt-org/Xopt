@@ -14,6 +14,8 @@ from gpytorch import Module
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
+from xopt.generators.bayesian.objectives import create_mc_objective, \
+    create_constraint_callables
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
@@ -155,6 +157,17 @@ class BayesianGenerator(Generator, ABC):
     @abstractmethod
     def _get_acquisition(self, model):
         pass
+
+    def _get_objective(self):
+        """ return default objective (scalar objective) determined by vocs """
+        return create_mc_objective(self.vocs, self._tkwargs)
+
+    def _get_constraint_callables(self):
+        """ return default objective (scalar objective) determined by vocs """
+        constraint_callables = create_constraint_callables(self.vocs)
+        if len(constraint_callables) == 0:
+            constraint_callables = None
+        return constraint_callables
 
     @property
     def model(self):

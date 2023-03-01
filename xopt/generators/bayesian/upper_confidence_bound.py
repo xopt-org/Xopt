@@ -70,18 +70,17 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         return UCBOptions()
 
     def _get_acquisition(self, model):
-        objective = create_mc_objective(self.vocs, self._tkwargs)
         qUCB = qUpperConfidenceBound(
             model,
             sampler=self.sampler,
-            objective=objective,
+            objective=self._get_objective(),
             beta=self.options.acq.beta,
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
             model,
             qUCB,
-            create_constraint_callables(self.vocs),
+            self._get_constraint_callables(),
         )
 
         return cqUCB

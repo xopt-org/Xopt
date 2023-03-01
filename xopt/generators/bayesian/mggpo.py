@@ -98,23 +98,21 @@ class MGGPOGenerator(BayesianGenerator):
 
         return torch.tensor(pt, **self._tkwargs)
 
+    def _get_objective(self):
+        return create_mobo_objective(self.vocs, self._tkwargs)
+
     def _get_acquisition(self, model):
         # get reference point from data
         inputs = self.get_input_data(self.data)
-
-        # get list of constraining functions
-        constraint_callables = create_constraint_callables(self.vocs)
-
-        objective = create_mobo_objective(self.vocs, self._tkwargs)
 
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
             prune_baseline=True,
-            constraints=constraint_callables,
+            constraints=self._get_constraint_callables(),
             ref_point=self.reference_point,
             sampler=self.sampler,
-            objective=objective,
+            objective=self._get_objective(),
             cache_root=False,
         )
 
