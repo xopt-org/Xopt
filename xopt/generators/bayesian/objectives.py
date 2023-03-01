@@ -1,11 +1,8 @@
 from functools import partial
-from typing import Callable, List, Optional
 
 import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
-from botorch.utils import apply_constraints
-from torch import Tensor
 
 
 def constraint_function(Z, vocs, index, quantile_cutoff=0.0):

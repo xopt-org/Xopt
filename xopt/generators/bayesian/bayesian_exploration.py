@@ -11,9 +11,6 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-)
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
@@ -64,8 +61,6 @@ class BayesianExplorationGenerator(BayesianGenerator):
         )
 
         return cqPV
-
-
 
 
 class qPosteriorVariance(MCAcquisitionFunction):
