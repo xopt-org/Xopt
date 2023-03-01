@@ -80,6 +80,9 @@ class BayesianOptions(GeneratorOptions):
     n_initial: int = Field(
         3, description="number of random initial points to measure during first step"
     )
+    use_cuda: bool = Field(
+        False, description="use cuda (GPU) to do bayesian optimization"
+    )
 
     class Config:
         arbitrary_types_allowed = True
