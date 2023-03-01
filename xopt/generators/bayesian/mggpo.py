@@ -6,15 +6,13 @@ from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprove
 from pydantic import Field
 
 from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
     create_mobo_objective,
 )
 from xopt.generators.ga.cnsga import CNSGAGenerator, CNSGAOptions
-
 from xopt.vocs import VOCS
-from ...errors import XoptError
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
+from ...errors import XoptError
 
 
 class MGGPOAcqOptions(AcqOptions):
