@@ -55,6 +55,16 @@ class TestBayesianGenerator(TestCase):
         test_data = deepcopy(TEST_VOCS_DATA)
         gen2.train_model(test_data)
 
+        # test with GPU if available
+        if torch.cuda.is_available():
+            test_vocs = deepcopy(TEST_VOCS_BASE)
+            test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
+            gen3 = BayesianGenerator(test_vocs)
+            gen3.options.use_cuda = True
+            test_data = deepcopy(TEST_VOCS_DATA)
+            model = gen3.train_model(test_data)
+            assert model.models[0].train_targets.is_cuda
+
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
         gen = BayesianGenerator(sinusoid_vocs)
