@@ -5,10 +5,6 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mc_objective,
-)
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
     TDAcqOptions,
@@ -69,21 +65,18 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     def default_options() -> UCBOptions:
         return UCBOptions()
 
-    def _get_objective(self):
-        return create_mc_objective(self.vocs)
-
     def _get_acquisition(self, model):
         qUCB = qUpperConfidenceBound(
             model,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
             beta=self.options.acq.beta,
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
             model,
             qUCB,
-            create_constraint_callables(self.vocs),
+            self._get_constraint_callables(),
         )
 
         return cqUCB

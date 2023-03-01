@@ -75,16 +75,18 @@ class StandardModel(ModelConstructor):
             likelihood=self.likelihood,
         )
 
+from xopt.vocs import VOCS
+
 
 def create_standard_model(
-    data,
-    vocs,
+    data: pd.DataFrame,
+    vocs: VOCS,
+    tkwargs: dict,
     use_conservative_prior_lengthscale: bool = False,
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
 ):
     input_data, objective_data, constraint_data = vocs.extract_data(data)
-    tkwargs = {"dtype": torch.double, "device": "cpu"}
 
     input_transform = Normalize(
         vocs.n_variables, bounds=torch.tensor(vocs.bounds, **tkwargs)

@@ -37,7 +37,7 @@ class FeasibilityObjective(GenericMCObjective):
             A `sample_shape x batch_shape x q`-dim Tensor of objective values
             weighted by feasibility (assuming maximization).
         """
-        obj = super().forward(samples=samples)
+        obj = super().forward(samples=samples).to(samples)
         return apply_constraints(
             obj=obj,
             constraints=self.constraints,
@@ -56,6 +56,11 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
     ) -> None:
+
+        # make it consistent with botorch constrained EHVI
+        if constraints is None:
+            constraints = []
+
         super().__init__(
             model=model,
             sampler=base_acqusition.sampler,
