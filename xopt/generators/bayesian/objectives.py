@@ -46,12 +46,12 @@ def create_constraint_callables(vocs, quantile_cutoff=0.5):
         return None
 
 
-def create_mc_objective(vocs):
+def create_mc_objective(vocs, tkwargs):
     """
     create the objective object
 
     """
-    weights = torch.zeros(vocs.n_outputs).double()
+    weights = torch.zeros(vocs.n_outputs, **tkwargs)
     for idx, ele in enumerate(vocs.objective_names):
         weights[idx] = -1.0
 
@@ -61,12 +61,12 @@ def create_mc_objective(vocs):
     return GenericMCObjective(obj_callable)
 
 
-def create_constrained_mc_objective(vocs, quantile_cutoff=0.0):
+def create_constrained_mc_objective(vocs, tkwargs, quantile_cutoff=0.0):
     """
     create the objective object
 
     """
-    weights = torch.zeros(vocs.n_outputs).double()
+    weights = torch.zeros(vocs.n_outputs, **tkwargs)
     for idx, ele in enumerate(vocs.objective_names):
         weights[idx] = -1.0
 
@@ -82,13 +82,13 @@ def create_constrained_mc_objective(vocs, quantile_cutoff=0.0):
     return constrained_obj
 
 
-def create_mobo_objective(vocs):
+def create_mobo_objective(vocs, tkwargs):
     """
     botorch assumes maximization so we need to negate any objectives that have
     minimize keyword and zero out anything that is a constraint
     """
     n_objectives = len(vocs.objectives)
-    weights = torch.zeros(n_objectives).double()
+    weights = torch.zeros(n_objectives).to(**tkwargs)
 
     for idx, ele in enumerate(vocs.objectives):
         weights[idx] = -1.0

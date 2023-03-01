@@ -48,9 +48,6 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     def default_options() -> BayesianOptions:
         return BayesianOptions()
 
-    def _get_objective(self):
-        return create_mc_objective(self.vocs)
-
     def _get_acquisition(self, model):
         valid_data = self.data[
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
@@ -58,12 +55,13 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         objective_data = self.vocs.objective_data(valid_data, "")
 
         best_f = torch.tensor(objective_data.max(), **self._tkwargs)
+        objective = create_mc_objective(self.vocs, self._tkwargs)
 
         qEI = qExpectedImprovement(
             model,
             best_f=best_f,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=objective,
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(

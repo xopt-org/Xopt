@@ -67,9 +67,6 @@ class MOBOGenerator(BayesianGenerator):
 
         return torch.tensor(pt, **self._tkwargs)
 
-    def _get_objective(self):
-        return create_mobo_objective(self.vocs)
-
     def _get_acquisition(self, model):
         inputs = self.get_input_data(self.data)
 
@@ -78,13 +75,15 @@ class MOBOGenerator(BayesianGenerator):
         if len(constraint_callables) == 0:
             constraint_callables = None
 
+        objective = create_mobo_objective(self.vocs, self._tkwargs)
+
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
             constraints=constraint_callables,
             ref_point=self.reference_point,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=objective,
             cache_root=False,
             prune_baseline=True,
         )

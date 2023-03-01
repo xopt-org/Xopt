@@ -76,9 +76,6 @@ class MGGPOGenerator(BayesianGenerator):
         super().add_data(new_data)
         self.ga_generator.add_data(self.data)
 
-    def _get_objective(self):
-        return create_mobo_objective(self.vocs)
-
     @property
     def reference_point(self):
         if self.options.acq.reference_point is None:
@@ -108,6 +105,8 @@ class MGGPOGenerator(BayesianGenerator):
         # get list of constraining functions
         constraint_callables = create_constraint_callables(self.vocs)
 
+        objective = create_mobo_objective(self.vocs, self._tkwargs)
+
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
@@ -115,7 +114,7 @@ class MGGPOGenerator(BayesianGenerator):
             constraints=constraint_callables,
             ref_point=self.reference_point,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=objective,
             cache_root=False,
         )
 
