@@ -1,4 +1,5 @@
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
@@ -13,6 +14,8 @@ from gpytorch import Module
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
+from xopt.generators.bayesian.objectives import create_mc_objective, \
+    create_constraint_callables
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
@@ -30,9 +33,6 @@ class BayesianGenerator(Generator, ABC):
         self._model = None
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
-        self.objective = self._get_objective()
-
-        self._tkwargs = {"dtype": torch.double, "device": "cpu"}
 
     @staticmethod
     def default_options() -> BayesianOptions:
@@ -73,7 +73,7 @@ class BayesianGenerator(Generator, ABC):
                 num_restarts=self.options.optim.num_restarts,
             )
             logger.debug("Best candidate from optimize", candidates, out)
-            return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
+            return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
@@ -91,7 +91,9 @@ class BayesianGenerator(Generator, ABC):
 
         kwargs = self.options.model.kwargs.dict()
 
-        _model = self.options.model.function(valid_data, self.vocs, **kwargs)
+        _model = self.options.model.function(
+            valid_data, self.vocs, self._tkwargs, **kwargs
+        )
 
         # validate returned model
         self._validate_model(_model)
@@ -111,8 +113,6 @@ class BayesianGenerator(Generator, ABC):
             model.posterior(self.get_input_data(self.data)),
             sample_shape=torch.Size([self.options.acq.monte_carlo_samples]),
         )
-
-        self.objective = self._get_objective()
 
         # get base acquisition function
         acq = self._get_acquisition(model)
@@ -158,13 +158,35 @@ class BayesianGenerator(Generator, ABC):
     def _get_acquisition(self, model):
         pass
 
-    @abstractmethod
     def _get_objective(self):
-        pass
+        """ return default objective (scalar objective) determined by vocs """
+        return create_mc_objective(self.vocs, self._tkwargs)
+
+    def _get_constraint_callables(self):
+        """ return default objective (scalar objective) determined by vocs """
+        constraint_callables = create_constraint_callables(self.vocs)
+        if len(constraint_callables) == 0:
+            constraint_callables = None
+        return constraint_callables
 
     @property
     def model(self):
         return self._model
+
+    @property
+    def _tkwargs(self):
+        # set device and data type for generator
+        device = "cpu"
+        if self.options.use_cuda:
+            if torch.cuda.is_available():
+                device = "cuda"
+            else:
+                warnings.warn(
+                    "Cuda requested in generator options but not found on "
+                    "machine! Using CPU instead"
+                )
+
+        return {"dtype": torch.double, "device": device}
 
     def _get_bounds(self):
         bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)

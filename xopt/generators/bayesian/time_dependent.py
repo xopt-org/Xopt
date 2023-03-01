@@ -103,7 +103,11 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         kwargs = self.options.model.kwargs.dict()
 
         _model = self.options.model.function(
-            valid_data, self.vocs, added_time=self.options.acq.added_time, **kwargs
+            valid_data,
+            self.vocs,
+            self._tkwargs,
+            added_time=self.options.acq.added_time,
+            **kwargs
         )
 
         if update_internal:
