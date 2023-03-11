@@ -152,7 +152,7 @@ class CNSGAGenerator(Generator):
         Similar to write_population
         """
         if self.offspring is None:
-            logger.warning(f"No offspring to write")
+            logger.warning("No offspring to write")
             return
 
         if filename is None:
@@ -168,7 +168,7 @@ class CNSGAGenerator(Generator):
         Similar to write_offspring
         """
         if self.population is None:
-            logger.warning(f"No population to write")
+            logger.warning("No population to write")
             return
 
         if filename is None:
