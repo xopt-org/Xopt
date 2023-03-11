@@ -148,3 +148,24 @@ def safe_call(func, *args, **kwargs):
 def format_option_descriptions(options_object):
     options_dict = get_descriptions_defaults(options_object)
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
+
+
+def read_xopt_csv(*files):
+    """
+    Read several Xopt-style CSV files into data
+    
+    Parameters
+    ----------
+    file1, file2, ...: path-like
+        One or more Xopt csv files
+    
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with xopt_index as the index column
+    """
+    dfs = []
+    for file in files:
+        df = pd.read_csv(file, index_col="xopt_index")
+        dfs.append(df)
+    return pd.concat(dfs)
