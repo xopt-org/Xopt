@@ -153,12 +153,12 @@ def format_option_descriptions(options_object):
 def read_xopt_csv(*files):
     """
     Read several Xopt-style CSV files into data
-    
+
     Parameters
     ----------
     file1, file2, ...: path-like
         One or more Xopt csv files
-    
+
     Returns
     -------
     pd.DataFrame
