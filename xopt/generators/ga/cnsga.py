@@ -125,11 +125,13 @@ class CNSGAGenerator(Generator):
             self.population = cnsga_select(
                 candidates, self.n_pop, self.vocs, self.toolbox
             )
-            self.children = []  # reset children
-            self.offspring = None  # reset offspring
 
             if self.options.output_path is not None:
+                self.write_offspring()
                 self.write_population()
+
+            self.children = []  # reset children
+            self.offspring = None  # reset offspring
 
     def generate(self, n_candidates) -> List[Dict]:
         """
@@ -143,10 +145,31 @@ class CNSGAGenerator(Generator):
 
         return [self.children.pop() for _ in range(n_candidates)]
 
+    def write_offspring(self, filename=None):
+        """
+        Write the current offspring to a CSV file.
+
+        Similar to write_population
+        """
+        if self.offspring is None:
+            logger.warning("No offspring to write")
+            return
+
+        if filename is None:
+            filename = f"{self.alias}_offspring_{xopt.utils.isotime(include_microseconds=True)}.csv"
+            filename = os.path.join(self.options.output_path, filename)
+
+        self.offspring.to_csv(filename, index_label="xopt_index")
+
     def write_population(self, filename=None):
         """
         Write the current population to a CSV file.
+
+        Similar to write_offspring
         """
+        if self.population is None:
+            logger.warning("No population to write")
+            return
 
         if filename is None:
             filename = f"{self.alias}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
