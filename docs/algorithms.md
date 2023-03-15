@@ -18,11 +18,11 @@ incorperate unknown constrianing functions into optimization based on what is
 specified in ```VOCS```
 
 - ```ExpectedImprovementGenerator```: implements Expected Improvement single 
-  objective BO. Automatically balences trade-offs between exploration and 
+  objective BO. Automatically balances trade-offs between exploration and 
   exploitation and is thus useful for general purpose optimization. 
 - ```UpperConfidenceBoundGenerator```: implements Upper Confidence Bound single 
   objective BO. Requires a hyperparameter $\beta$ that explicitly sets the tradeoff 
-  between exploration and exploitation. Default value of $\beta=2$ is a good 
+  between exploration and exploitation. Default value of ```beta=2``` is a good 
   starting point. Increase $\beta$ to prioritize exploration and decrease $\beta$ to 
   prioritize exploitation.
 - ```BayesianExplorationGenerator```: implements the Bayesian Exploration algorithm 
