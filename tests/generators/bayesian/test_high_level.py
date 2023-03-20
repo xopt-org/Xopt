@@ -33,7 +33,7 @@ class TestHighLevel:
             acq_val = acq(pts.unsqueeze(1))
             assert torch.allclose(acq_val.max(), torch.tensor(9.36).double(), atol=0.1)
 
-    def test_mobo(self):
+    def test_constrained_mobo(self):
         YAML = """
         xopt: {}
         generator:
@@ -59,20 +59,20 @@ class TestHighLevel:
                 c2: [LESS_THAN, 0.5]
         """
         X = Xopt(config=yaml.safe_load(YAML))
-        X.step()
-        X.step()
+        X.step()  # generates random data
+        X.step()  # actually evaluates mobo
 
+    def test_mobo(self):
         YAML = """
             xopt: {}
             generator:
                 name: mobo
                 n_initial: 5
                 optim:
-                    num_restarts: 1
+                    num_restarts: 2
                     raw_samples: 2
                 acq:
                     reference_point: {y1: 1.5, y2: 1.5}
-                    proximal_lengthscales: [1.5, 1.5]
 
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -85,5 +85,40 @@ class TestHighLevel:
                 constraints: {}
         """
         X = Xopt(config=yaml.safe_load(YAML))
+        X.step()  # generates random data
+        X.step()  # actually evaluates mobo
+
+    def test_restart(self):
+        YAML = """
+                    xopt: {dump_file: dump.yml}
+                    generator:
+                        name: mobo
+                        n_initial: 5
+                        optim:
+                            num_restarts: 1
+                            raw_samples: 2
+                        acq:
+                            reference_point: {y1: 1.5, y2: 1.5}
+                            proximal_lengthscales: [1.5, 1.5]
+
+                    evaluator:
+                        function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+                    vocs:
+                        variables:
+                            x1: [0, 3.14159]
+                            x2: [0, 3.14159]
+                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                        constraints: {}
+                """
+        X = Xopt(config=yaml.safe_load(YAML))
         X.step()
         X.step()
+
+        # test restart
+        X2 = Xopt(config=yaml.safe_load(open("dump.yml")))
+        X2.step()
+
+        import os
+
+        os.remove("dump.yml")

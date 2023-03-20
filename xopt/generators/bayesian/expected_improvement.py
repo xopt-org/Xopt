@@ -6,16 +6,18 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mc_objective,
-)
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
     alias = "expected_improvement"
+    __doc__ = (
+        """Implements Bayeisan Optimization using the Upper Confidence Bound
+        acquisition function"""
+        + f"{format_option_descriptions(BayesianOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: BayesianOptions = None):
         """
@@ -30,7 +32,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             Specific options for this generator
         """
         options = options or BayesianOptions()
-        if not isinstance(options, BayesianOptions):
+        if not type(options) is BayesianOptions:
             raise ValueError("options must be a `BayesianOptions` object")
 
         if vocs.n_objectives != 1:
@@ -41,9 +43,6 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     @staticmethod
     def default_options() -> BayesianOptions:
         return BayesianOptions()
-
-    def _get_objective(self):
-        return create_mc_objective(self.vocs)
 
     def _get_acquisition(self, model):
         valid_data = self.data[
@@ -57,11 +56,13 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             model,
             best_f=best_f,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
-            model, qEI, create_constraint_callables(self.vocs), infeasible_cost=0.0
+            model,
+            qEI,
+            self._get_constraint_callables(),
         )
 
         return cqUCB

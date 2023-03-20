@@ -4,18 +4,14 @@ from enum import Enum
 from threading import Lock
 from typing import Callable, Dict
 
+import numpy as np
+
 import pandas as pd
 from pydantic import BaseModel, Field, root_validator
 
-import numpy as np
-
 from xopt.errors import XoptError
 from xopt.pydantic import JSON_ENCODERS, NormalExecutor
-from xopt.utils import (
-    get_function,
-    get_function_defaults,
-    safe_call,
-)
+from xopt.utils import get_function, get_function_defaults, safe_call
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +58,6 @@ class Evaluator(BaseModel):
 
     @root_validator(pre=True)
     def validate_all(cls, values):
-
         f = get_function(values["function"])
         kwargs = values.get("function_kwargs", {})
         kwargs = {**get_function_defaults(f), **kwargs}

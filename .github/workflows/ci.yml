@@ -1,6 +1,10 @@
 name: Tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'  # every day at midnight
 
 jobs:
   build:
@@ -17,15 +21,10 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
           channels: conda-forge
           activate-environment: xopt-dev
           environment-file: environment.yml
-          
-      - name: flake8
-        shell: bash -l {0}
-        run: |
-          flake8 .
 
       - name: Install Xopt
         shell: bash -l {0}

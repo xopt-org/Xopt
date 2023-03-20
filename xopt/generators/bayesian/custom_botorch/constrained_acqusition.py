@@ -1,9 +1,7 @@
 from typing import Callable, List, Optional
 
 import torch
-from botorch.acquisition import (
-    MCAcquisitionFunction,
-)
+from botorch.acquisition import MCAcquisitionFunction
 from botorch.acquisition.objective import GenericMCObjective, PosteriorTransform
 from botorch.models.model import Model
 from botorch.utils import apply_constraints
@@ -39,7 +37,7 @@ class FeasibilityObjective(GenericMCObjective):
             A `sample_shape x batch_shape x q`-dim Tensor of objective values
             weighted by feasibility (assuming maximization).
         """
-        obj = super().forward(samples=samples)
+        obj = super().forward(samples=samples).to(samples)
         return apply_constraints(
             obj=obj,
             constraints=self.constraints,
@@ -55,10 +53,14 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         model: Model,
         base_acqusition: MCAcquisitionFunction,
         constraints: List[Callable],
-        infeasible_cost=0.0,
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
     ) -> None:
+
+        # make it consistent with botorch constrained EHVI
+        if constraints is None:
+            constraints = []
+
         super().__init__(
             model=model,
             sampler=base_acqusition.sampler,
@@ -66,7 +68,6 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             posterior_transform=posterior_transform,
             X_pending=X_pending,
         )
-        self.infeasible_cost = infeasible_cost
         self.base_acqusition = base_acqusition
 
     @concatenate_pending_points
@@ -75,10 +76,9 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         posterior = self.model.posterior(
             X=X, posterior_transform=self.posterior_transform
         )
-        samples = self.sampler(posterior)
+        samples = self.get_posterior_samples(posterior)
         obj = self.objective(samples, X=X)
 
         # multiply the output of the base acquisition function by the feasibility
-        return (self.base_acqusition(X) + self.infeasible_cost) * obj.max(dim=-1)[
-            0
-        ].mean(dim=0)
+        base_val = torch.nn.functional.softplus(self.base_acqusition(X), beta=10)
+        return base_val * obj.max(dim=-1)[0].mean(dim=0)

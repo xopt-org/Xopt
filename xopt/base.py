@@ -4,10 +4,10 @@ from copy import deepcopy
 from pydantic import Field
 
 from xopt import _version
-from xopt.generators import get_generator_and_defaults
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
+from xopt.generators import get_generator_and_defaults
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
@@ -111,7 +111,6 @@ class Xopt:
     def run(self):
         """run until either xopt is done or the generator is done"""
         while not self.is_done:
-
             # Stopping criteria
             if self.options.max_evaluations:
                 if len(self.data) >= self.options.max_evaluations:
@@ -314,7 +313,7 @@ class Xopt:
             output = state_to_dict(self)
             with open(self.options.dump_file, "w") as f:
                 yaml.dump(output, f)
-            logger.debug(f"Dumping state to:{self.options.dump_file}")
+            logger.debug(f"Dumped state to YAML file: {self.options.dump_file}")
 
     @property
     def data(self):

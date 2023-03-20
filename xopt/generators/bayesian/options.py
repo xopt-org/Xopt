@@ -4,7 +4,7 @@ from pydantic import BaseModel, create_model, Field, root_validator
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.models.standard import create_standard_model
-from xopt.pydantic import JSON_ENCODERS, XoptBaseModel
+from xopt.pydantic import get_descriptions_defaults, JSON_ENCODERS, XoptBaseModel
 from xopt.utils import get_function, get_function_defaults
 
 
@@ -37,7 +37,7 @@ class OptimOptions(XoptBaseModel):
         "selection",
     )
     use_nearby_initial_points: bool = Field(
-        True, description="flag to use local samples to start acqf optimization"
+        False, description="flag to use local samples to start acqf optimization"
     )
     max_travel_distances: List[float] = Field(
         None,
@@ -45,7 +45,7 @@ class OptimOptions(XoptBaseModel):
     )
 
 
-class ModelOptions(BaseModel):
+class ModelOptions(XoptBaseModel):
     """Options for defining the GP model in BO"""
 
     function: Callable
@@ -80,11 +80,18 @@ class BayesianOptions(GeneratorOptions):
     n_initial: int = Field(
         3, description="number of random initial points to measure during first step"
     )
+    use_cuda: bool = Field(
+        False, description="use cuda (GPU) to do bayesian optimization"
+    )
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = JSON_ENCODERS
+        extra = "forbid"
 
 
 if __name__ == "__main__":
     options = BayesianOptions()
     options.optim.raw_samples = 30
-    print(options.dict())
 
-    print(BayesianOptions.schema())
+    print(get_descriptions_defaults(options))
