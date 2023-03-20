@@ -1,5 +1,5 @@
-from xopt.evaluator import Evaluator
 from xopt.base import Xopt
+from xopt.evaluator import Evaluator
 from xopt.generators.ga.cnsga import CNSGAGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.testing import TEST_YAML

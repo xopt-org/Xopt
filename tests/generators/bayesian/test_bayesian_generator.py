@@ -55,6 +55,16 @@ class TestBayesianGenerator(TestCase):
         test_data = deepcopy(TEST_VOCS_DATA)
         gen2.train_model(test_data)
 
+        # test with GPU if available
+        if torch.cuda.is_available():
+            test_vocs = deepcopy(TEST_VOCS_BASE)
+            test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
+            gen3 = BayesianGenerator(test_vocs)
+            gen3.options.use_cuda = True
+            test_data = deepcopy(TEST_VOCS_DATA)
+            model = gen3.train_model(test_data)
+            assert model.models[0].train_targets.is_cuda
+
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
         gen = BayesianGenerator(sinusoid_vocs)
@@ -129,3 +139,34 @@ class TestBayesianGenerator(TestCase):
         gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
         bounds = gen._get_bounds()
         assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
+
+        # test with max_travel_distances specified and data
+        high_d_vocs = deepcopy(TEST_VOCS_BASE)
+        high_d_vocs.variables["x3"] = [0, 1]
+
+        defaults = BayesianGenerator.default_options()
+        defaults.optim.max_travel_distances = [0.1, 0.2, 0.1]
+
+        gen = BayesianGenerator(high_d_vocs, defaults)
+        gen.add_data(
+            pd.DataFrame(
+                {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
+            )
+        )
+        bounds = gen._get_bounds()
+        assert torch.allclose(
+            bounds, torch.tensor([[0.4, 3.0, 0.4], [0.6, 7.0, 0.6]]).to(bounds)
+        )
+
+        # test with bad max_distances
+        defaults = BayesianGenerator.default_options()
+        defaults.optim.max_travel_distances = [0.1, 0.2]
+
+        gen = BayesianGenerator(high_d_vocs, defaults)
+        gen.add_data(
+            pd.DataFrame(
+                {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
+            )
+        )
+        with pytest.raises(ValueError):
+            gen._get_bounds()

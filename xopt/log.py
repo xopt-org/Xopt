@@ -28,7 +28,6 @@ def validate_level(level) -> int:
 
 
 def set_handler_with_logger(logger_name="xopt", file=sys.stdout, level="WARNING"):
-
     logger = logging.getLogger(logger_name)
 
     if isinstance(file, str):
@@ -55,7 +54,6 @@ def set_handler_with_logger(logger_name="xopt", file=sys.stdout, level="WARNING"
 
 
 def configure_logger(logger_name="xopt", file=sys.stdout, level="INFO"):
-
     logger = logging.getLogger(logger_name)
 
     handler = set_handler_with_logger(logger_name=logger_name, file=file, level=level)

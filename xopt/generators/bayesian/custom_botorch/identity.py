@@ -6,7 +6,6 @@ from torch import Tensor
 
 class Identity(AcquisitionFunction):
     def __init__(self, model) -> None:
-
         super().__init__(model)
 
     @t_batch_mode_transform()

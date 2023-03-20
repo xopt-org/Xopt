@@ -1,9 +1,9 @@
 from copy import copy
 
 import yaml
+from xopt.base import parse_config, state_to_dict, Xopt
 
 from xopt.evaluator import Evaluator
-from xopt.base import Xopt, parse_config, state_to_dict
 from xopt.generators import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML
 

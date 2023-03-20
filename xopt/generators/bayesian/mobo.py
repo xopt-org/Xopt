@@ -5,14 +5,13 @@ from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprove
 from pydantic import Field
 
 from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
     create_mobo_objective,
 )
-
 from xopt.vocs import VOCS
-from ...errors import XoptError
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
+from ...errors import XoptError
+from ...utils import format_option_descriptions
 
 
 class MOBOAcqOptions(AcqOptions):
@@ -27,10 +26,15 @@ class MOBOOptions(BayesianOptions):
 
 class MOBOGenerator(BayesianGenerator):
     alias = "mobo"
+    __doc__ = (
+        """Implements Multi-Objective Bayesian Optimization using the Expected
+            Hypervolume Improvement acquisition function"""
+        + f"{format_option_descriptions(MOBOOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: MOBOOptions = None):
         options = options or MOBOOptions()
-        if not isinstance(options, MOBOOptions):
+        if not type(options) is MOBOOptions:
             raise ValueError("options must be a MOBOOptions object")
 
         super().__init__(vocs, options)
@@ -62,24 +66,22 @@ class MOBOGenerator(BayesianGenerator):
         return torch.tensor(pt, **self._tkwargs)
 
     def _get_objective(self):
-        return create_mobo_objective(self.vocs)
+        return create_mobo_objective(self.vocs, self._tkwargs)
 
     def _get_acquisition(self, model):
         inputs = self.get_input_data(self.data)
 
-        # get list of constraining functions
-        constraint_callables = create_constraint_callables(self.vocs)
-        if len(constraint_callables) == 0:
-            constraint_callables = None
+        # fix problem with qNEHVI interpretation with constraints
 
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
-            prune_baseline=True,
-            constraints=constraint_callables,
+            constraints=self._get_constraint_callables(),
             ref_point=self.reference_point,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
+            cache_root=False,
+            prune_baseline=True,
         )
 
         return acq

@@ -5,15 +5,13 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mc_objective,
-)
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
     TDAcqOptions,
-    TimeDependentBayesianGenerator, TDModelOptions,
+    TDModelOptions,
+    TimeDependentBayesianGenerator, TDOptions,
 )
+from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
 
@@ -29,13 +27,18 @@ class UCBOptions(BayesianOptions):
     acq = UpperConfidenceBoundOptions()
 
 
-class TDUCBOptions(UCBOptions):
+class TDUCBOptions(UCBOptions, TDOptions):
     acq = TDUpperConfidenceBoundOptions()
     model = TDModelOptions()
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     alias = "upper_confidence_bound"
+    __doc__ = (
+        """Implements Bayeisan Optimization using the Upper Confidence Bound
+    acquisition function"""
+        + f"{format_option_descriptions(UCBOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: UCBOptions = None):
         """
@@ -62,19 +65,18 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     def default_options() -> UCBOptions:
         return UCBOptions()
 
-    def _get_objective(self):
-        return create_mc_objective(self.vocs)
-
     def _get_acquisition(self, model):
         qUCB = qUpperConfidenceBound(
             model,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
             beta=self.options.acq.beta,
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
-            model, qUCB, create_constraint_callables(self.vocs), infeasible_cost=0.0
+            model,
+            qUCB,
+            self._get_constraint_callables(),
         )
 
         return cqUCB
@@ -84,10 +86,15 @@ class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
     alias = "time_dependent_upper_confidence_bound"
+    __doc__ = (
+        """Implements Time-Dependent Bayeisan Optimization using the Upper
+            Confidence Bound acquisition function"""
+        + f"{format_option_descriptions(TDUCBOptions())}"
+    )
 
     def __init__(self, vocs: VOCS, options: TDUCBOptions = None):
         options = options or TDUCBOptions()
-        if not isinstance(options, UCBOptions):
+        if not type(options) is TDUCBOptions:
             raise ValueError("options must be a TDUCBOptions object")
 
         super(TDUpperConfidenceBoundGenerator, self).__init__(vocs, options)

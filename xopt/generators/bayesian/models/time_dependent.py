@@ -14,12 +14,12 @@ from xopt.generators.bayesian.models.utils import split_data
 def create_time_dependent_model(
     data,
     vocs,
+    tkwargs: dict,
     added_time: float = 0.0,
     use_conservative_prior_lengthscale: bool = False,
     use_conservative_prior_mean: bool = False,
     use_low_noise_prior: bool = False,
 ) -> ModelListGP:
-
     # create dataframes for processed data
     input_data, objective_data, constraint_data = split_data(data, vocs)
     # add time column to variable data
@@ -37,7 +37,6 @@ def create_time_dependent_model(
         ]
     )
 
-    tkwargs = {"dtype": torch.double, "device": "cpu"}
     input_transform = Normalize(
         vocs.n_variables + 1, bounds=torch.tensor(bounds, **tkwargs)
     )
