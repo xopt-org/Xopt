@@ -28,7 +28,7 @@ def rosenbrock(x):
     )
 
 
-def evaluate_rosenbrock(inputs: Dict, label="y") -> Dict[str, float]:
+def evaluate_rosenbrock(inputs: Dict, label="y", dummy=1) -> Dict[str, float]:
     """
     Evaluate the Rosenbrock function with labeled inputs and outputs.
 
