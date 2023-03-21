@@ -116,12 +116,12 @@ class ScipyOptimizeGenerator(Generator):
                 self._algorithm
             )  # raw x point and any state to be passed back
             self._lock = True
-            
+
             inputs = dict(zip(self.vocs.variable_names, self.x))
             if self.vocs.constants is not None:
                 inputs.update(self.vocs.constants)
             self.inputs = [inputs]
-            
+
         except StopIteration:
             self._is_done = True
 
