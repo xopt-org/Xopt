@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 from xopt.generator import Generator, GeneratorOptions
-from pydantic import validator, Field
+from pydantic import validator
 
 logger = logging.getLogger(__name__)
 
@@ -329,7 +329,6 @@ class RCDS:
             )
             return x0, f0, nf
 
-        V = len(x0)
         if len(x0) != len(dv):
             logger.debug("Error: x0 and dv dimension do not match.")
             return x0, f0, nf
