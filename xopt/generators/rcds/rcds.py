@@ -16,7 +16,6 @@ class RCDS:
         noise=0.1,
         step=1e-2,
         tol=1e-5,
-        max_it=10,
     ):
         """
         Input:
@@ -24,14 +23,12 @@ class RCDS:
             init_mat: initial direction matrix
             noise: estimated noise level
             step, tol: floating number, step size and tolerance
-            max_it, max_eval: integer, maximum number of iterations/evaluations
         """
         self.x0 = np.matrix(x0).T  # convert to a col vector
         self.Imat = init_mat
         self.noise = noise
         self.step = step
         self.tol = tol
-        self.maxIt = max_it
 
         # Internal vars
         self.cnt = 0
@@ -49,7 +46,6 @@ class RCDS:
         x0 = self.x0
         step = self.step
         tol = self.tol
-        maxIt = self.maxIt
         self.Nvar = len(x0)
         yield x0
         f0, _ = self.func_obj(x0)
@@ -63,7 +59,7 @@ class RCDS:
             Dmat = self.Imat
         else:
             Dmat = np.matrix(np.identity(self.Nvar))
-        while it < maxIt:
+        while True:
             logger.debug("iteration {}".format(it))
             it += 1
             # step /=1.2
@@ -410,7 +406,6 @@ class RCDSOptions(GeneratorOptions):
     noise: float = 1e-5
     step: float = 1e-2
     tol: float = 1e-5
-    max_it: int = 10
 
     @validator("step", "tol", pre=True)
     def must_positive(cls, v):
@@ -466,7 +461,6 @@ class RCDSGenerator(Generator):
             noise=options.noise,
             step=options.step,
             tol=options.tol,
-            max_it=options.max_it,
         )
         self.generator = self.rcds.powellmain()
 
