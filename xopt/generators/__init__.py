@@ -1,12 +1,10 @@
 import warnings
 
 from xopt.errors import XoptError
+from xopt.generators.random import RandomGenerator
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
 from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.generators.rcds.rcds import RCDSGenerator
-
-from xopt.generators.ga import CNSGAGenerator
-from xopt.generators.random import RandomGenerator
 
 # add generators here to be registered
 registered_generators = [
