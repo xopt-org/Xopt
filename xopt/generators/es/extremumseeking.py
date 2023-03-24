@@ -71,9 +71,17 @@ class ExtremumSeekingGenerator(Generator):
         self.last_outcome = None  # float
 
     def add_data(self, new_data: pd.DataFrame):
+        assert (
+            len(new_data) == 1
+        ), f"length of new_data must be 1, found: {len(new_data)}"
+
         self.data = new_data.iloc[-1:]
         self.last_input = self.data[self.vocs.variable_names].to_numpy()[0]
-        self.last_outcome = self.data[self.vocs.output_names].to_numpy()[0]
+
+        res = self.vocs.objective_data(new_data).to_numpy()
+        assert res.shape == (1, 1)
+        self.last_outcome = res[0, 0]
+
         self.i += 1
 
     # Function that normalizes paramters
