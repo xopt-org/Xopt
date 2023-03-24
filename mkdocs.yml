@@ -29,6 +29,7 @@ nav:
             - Nelder-Mead: examples/scipy/neldermead.ipynb
         - Other:
             - Extremum seeking: examples/es/extremum_seeking.ipynb
+            - RCDS: examples/rcds/rcds.ipynb
 
 
     - API:
@@ -77,7 +78,7 @@ extra:
       name: Xopt
 
 extra_css:
-  - stylesheets/extra.css      
+  - stylesheets/extra.css
 
 plugins:
     - search

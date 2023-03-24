@@ -58,8 +58,14 @@ Scipy Generators
 These generators serve as wrappers for algorithms implemented in scipy.
 - ```NelderMeadGenerator```: implements Nelder-Mead (simplex) optimization.
 
+RCDS Generators
+===
+- ```RCDSGenerator```: implements the RCDS algorithm. RCDS could be applied in noisy
+  online optimization scenarios
+
 Custom Generators
 ====
-Any general algorithm can be implemented by subclassing the abstract ```Generator``` 
-class and used in the Xopt framework. If you implement a generator for your use case 
-please consider opening a pull request so that we can add it to Xopt! 
+Any general algorithm can be implemented by subclassing the abstract ```Generator```
+class and used in the Xopt framework. If you implement a generator for your use case
+please consider opening a pull request so that we can add it to Xopt!
+
