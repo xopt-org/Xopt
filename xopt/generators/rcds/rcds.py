@@ -465,8 +465,12 @@ class RCDSGenerator(Generator):
         self.generator = self.rcds.powellmain()
 
     def add_data(self, new_data: pd.DataFrame):
-        data = new_data.iloc[-1:]
-        obj = data[self.vocs.output_names].to_numpy()[0, 0]
+        assert (
+            len(new_data) == 1
+        ), f"length of new_data must be 1, found: {len(new_data)}"
+        res = self.vocs.objective_data(new_data).to_numpy()
+        assert res.shape == (1, 1)
+        obj = res[0, 0]
         self.rcds.update_obj(obj)
 
     def generate(self, n_candidates) -> pd.DataFrame:
