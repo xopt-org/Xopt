@@ -1,9 +1,11 @@
 import logging
 import math
+
 import numpy as np
 import pandas as pd
-from xopt.generator import Generator, GeneratorOptions
 from pydantic import validator
+
+from xopt.generator import Generator, GeneratorOptions
 
 logger = logging.getLogger(__name__)
 

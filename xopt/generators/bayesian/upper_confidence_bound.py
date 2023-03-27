@@ -7,9 +7,10 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
 )
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
-    TDAcqOptions,
-    TDModelOptions,
-    TimeDependentBayesianGenerator, TDOptions,
+    TimeDependentAcqOptions,
+    TimeDependentBayesianGenerator,
+    TimeDependentModelOptions,
+    TimeDependentOptions,
 )
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
@@ -19,7 +20,7 @@ class UpperConfidenceBoundOptions(AcqOptions):
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
 
 
-class TDUpperConfidenceBoundOptions(TDAcqOptions):
+class TDUpperConfidenceBoundOptions(TimeDependentAcqOptions):
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
 
 
@@ -27,9 +28,9 @@ class UCBOptions(BayesianOptions):
     acq = UpperConfidenceBoundOptions()
 
 
-class TDUCBOptions(UCBOptions, TDOptions):
+class TDUCBOptions(UCBOptions, TimeDependentOptions):
     acq = TDUpperConfidenceBoundOptions()
-    model = TDModelOptions()
+    model = TimeDependentModelOptions()
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):

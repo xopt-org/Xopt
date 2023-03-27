@@ -38,6 +38,7 @@ class TestUpperConfidenceBoundGenerator:
 
         # candidate = gen.generate(2)
         # assert len(candidate) == 2
+
     def test_cuda(self):
         gen = UpperConfidenceBoundGenerator(
             TEST_VOCS_BASE,
