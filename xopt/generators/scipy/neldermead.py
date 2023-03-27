@@ -68,9 +68,7 @@ class ScipyOptimizeGenerator(Generator):
     @initial_point.setter
     def initial_point(self, value):
         if value is None:
-            value = self.vocs.random_inputs(
-                include_constants=False, include_linked_variables=False
-            )
+            value = self.vocs.random_inputs()
         self.options.initial_point = value
 
     def add_data(self, new_data: pd.DataFrame):
@@ -118,7 +116,12 @@ class ScipyOptimizeGenerator(Generator):
                 self._algorithm
             )  # raw x point and any state to be passed back
             self._lock = True
-            self.inputs = [dict(zip(self.vocs.variable_names, self.x))]
+
+            inputs = dict(zip(self.vocs.variable_names, self.x))
+            if self.vocs.constants is not None:
+                inputs.update(self.vocs.constants)
+            self.inputs = [inputs]
+
         except StopIteration:
             self._is_done = True
 
