@@ -34,10 +34,16 @@ Currenty **Xopt** provides:
 
 Rather, **Xopt** asks you to define this function.
 
-Overview
+Getting Started
 ===============
-[Xopt Overview PDF](assets/xopt_overview.pdf) gives an overview of Xopt's design and usage.
+[Xopt Overview PDF](assets/xopt_overview.pdf) gives an overview of Xopt's design and 
+usage.
 
+[Xopt Built-In Generators](algorithms.md) provides a list of available algorithms 
+implemented in the Xopt ```Generator``` framework.
+
+[Simple Bayesian Optimization Example](examples/bayes_opt/bo_tutorial.ipynb) shows 
+Xopt usage for a simple optimization problem.
 
 
 Configuring an Xopt run
