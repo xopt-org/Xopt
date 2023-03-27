@@ -2,9 +2,7 @@ from copy import deepcopy
 
 import torch
 
-from xopt.generators.bayesian.objectives import (
-    create_mobo_objective,
-)
+from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.resources.testing import TEST_VOCS_BASE
 
 

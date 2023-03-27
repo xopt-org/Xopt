@@ -14,8 +14,11 @@ from gpytorch import Module
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
-from xopt.generators.bayesian.objectives import create_mc_objective, \
-    create_constraint_callables
+from xopt.generators.bayesian.models.utils import get_model_constructor
+from xopt.generators.bayesian.objectives import (
+    create_constraint_callables,
+    create_mc_objective,
+)
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
 
@@ -33,6 +36,9 @@ class BayesianGenerator(Generator, ABC):
         self._model = None
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
+        self.model_constructor = get_model_constructor(options.model)(
+            vocs, options.model
+        )
 
     @staticmethod
     def default_options() -> BayesianOptions:
@@ -84,16 +90,7 @@ class BayesianGenerator(Generator, ABC):
         if data is None:
             data = self.data
 
-        # drop nans
-        valid_data = data[
-            pd.unique(self.vocs.variable_names + self.vocs.output_names)
-        ].dropna()
-
-        kwargs = self.options.model.kwargs.dict()
-
-        _model = self.options.model.function(
-            valid_data, self.vocs, self._tkwargs, **kwargs
-        )
+        _model = self.model_constructor.build_model(data, self._tkwargs)
 
         # validate returned model
         self._validate_model(_model)
@@ -159,11 +156,11 @@ class BayesianGenerator(Generator, ABC):
         pass
 
     def _get_objective(self):
-        """ return default objective (scalar objective) determined by vocs """
+        """return default objective (scalar objective) determined by vocs"""
         return create_mc_objective(self.vocs, self._tkwargs)
 
     def _get_constraint_callables(self):
-        """ return default objective (scalar objective) determined by vocs """
+        """return default objective (scalar objective) determined by vocs"""
         constraint_callables = create_constraint_callables(self.vocs)
         if len(constraint_callables) == 0:
             constraint_callables = None
