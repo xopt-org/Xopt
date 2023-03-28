@@ -43,14 +43,6 @@ class StandardModelConstructor(ModelConstructor):
             self.constraint_data,
         ) = self.vocs.extract_data(valid_data)
 
-        # xopt assumes minimization, so objective data is multiplied by -1 to make it
-        # a minimization problem, this creates issues with interpretable modeling so
-        # we revert this, negating objectives values for maximization is done using
-        # objectives (see create_mc_objective in objectives.py)
-        #for name in self.vocs.objective_names:
-        #    if self.vocs.objectives[name] == "MAXIMIZE":
-        #        self.objective_data[name] = -1 * self.objective_data[name]
-
         self.train_X = torch.tensor(self.input_data.to_numpy(), **self.tkwargs)
         self.input_transform.to(**self.tkwargs)
         if self.likelihood is not None:

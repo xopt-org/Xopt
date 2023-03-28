@@ -35,6 +35,31 @@ class TestBayesianGenerator(TestCase):
         with torch.no_grad():
             model(test_pts)
 
+        # test with maximize and minimize
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives["y1"] = "MINIMIZE"
+        test_data = deepcopy(TEST_VOCS_DATA)
+        gen = BayesianGenerator(test_vocs)
+        model = gen.train_model(test_data)
+        assert torch.allclose(
+            model.models[0].outcome_transform(torch.tensor(test_data["y1"].to_numpy()))[
+                0
+            ],
+            model.train_targets[0],
+        )
+
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives["y1"] = "MAXIMIZE"
+        test_data = deepcopy(TEST_VOCS_DATA)
+        gen = BayesianGenerator(test_vocs)
+        model = gen.train_model(test_data)
+        assert torch.allclose(
+            model.models[0].outcome_transform(torch.tensor(test_data["y1"].to_numpy()))[
+                0
+            ],
+            model.train_targets[0],
+        )
+
         # try with input data that contains Nans due to xopt raising an error
         # currently we drop all rows containing Nans
         test_data = deepcopy(TEST_VOCS_DATA)
