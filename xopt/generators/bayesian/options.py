@@ -2,7 +2,6 @@ from typing import Dict, List, Type, Union
 
 import gpytorch
 import torch
-from gpytorch.means import Mean
 from pydantic import Field
 
 from xopt.generator import GeneratorOptions

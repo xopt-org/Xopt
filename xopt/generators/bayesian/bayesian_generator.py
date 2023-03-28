@@ -40,7 +40,7 @@ class BayesianGenerator(Generator, ABC):
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
         self.model_constructor = get_model_constructor(options.model)(
-            vocs, options.model
+            self.vocs, options.model
         )
 
     @staticmethod

@@ -1,18 +1,17 @@
 import time
 import warnings
 from abc import ABC
-from typing import Callable, Dict, List
+from typing import Dict, List
 
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from gpytorch import Module
-from pydantic import BaseModel, create_model, Field, root_validator
+from pydantic import Field
 
 from xopt.errors import XoptError
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelOptions
-from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
+from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.vocs import VOCS
 
 

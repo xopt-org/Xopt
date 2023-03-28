@@ -1,12 +1,9 @@
-import pytest
-
 from xopt.generators.bayesian.options import (
     AcqOptions,
     BayesianOptions,
     ModelOptions,
     OptimOptions,
 )
-from xopt.utils import get_function_defaults
 
 
 class TestBayesianOptions:
