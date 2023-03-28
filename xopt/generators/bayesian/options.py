@@ -1,5 +1,8 @@
-from typing import List, Type
+from typing import Dict, List, Type, Union
 
+import gpytorch
+import torch
+from gpytorch.means import Mean
 from pydantic import Field
 
 from xopt.generator import GeneratorOptions
@@ -53,8 +56,17 @@ class ModelOptions(XoptBaseModel):
         description="custom model constructor definition, overrides specified name",
     )
     use_low_noise_prior: bool = Field(
-        True, description="specify if model should " "assume a low noise environmen"
+        True, description="specify if model should assume a low noise environment"
     )
+    covar_modules: Union[gpytorch.Module, Dict[str, gpytorch.Module]] = Field(
+        {}, description="covariance modules for GP models"
+    )
+    mean_modules: Union[torch.nn.Module, Dict[str, torch.nn.Module]] = Field(
+        {}, description="prior mean modules for GP models"
+    )
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class BayesianOptions(GeneratorOptions):

@@ -20,5 +20,5 @@ class TestUtils:
         # test to make sure values are correct - minimize axis should be negated
         test_samples = torch.rand(5, 4, 3)
         output = obj(test_samples)
-        assert torch.allclose(output[..., 1], -test_samples[..., 1])
+        assert torch.allclose(output[..., 1], test_samples[..., 1])
         assert torch.allclose(output[..., 0], -test_samples[..., 0])

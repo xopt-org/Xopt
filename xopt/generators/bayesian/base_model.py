@@ -7,7 +7,6 @@ from botorch.models.model import Model
 from gpytorch import ExactMarginalLogLikelihood
 from torch import Tensor
 
-from xopt.generators.bayesian.options import ModelOptions
 from xopt.vocs import VOCS
 
 
@@ -28,7 +27,7 @@ class ModelConstructor(ABC):
         pass
 
     @staticmethod
-    def _build_single_task_gp(train_X: Tensor, train_Y: Tensor, **kwargs) -> Model:
+    def build_single_task_gp(train_X: Tensor, train_Y: Tensor, **kwargs) -> Model:
         """convience method for creating and training simple SingleTaskGP models"""
         if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
             raise ValueError("no data found to train model!")

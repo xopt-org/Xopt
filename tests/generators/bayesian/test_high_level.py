@@ -32,7 +32,7 @@ class TestHighLevel:
         with torch.no_grad():
             acq_val = acq(pts.unsqueeze(1))
             assert torch.allclose(
-                acq_val.max(), torch.tensor(9.9958).double(), atol=0.1
+                acq_val.max(), torch.tensor(9.9955).double(), atol=0.1
             )
 
     def test_constrained_mobo(self):

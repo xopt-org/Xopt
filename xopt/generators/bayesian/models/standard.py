@@ -1,12 +1,13 @@
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
-from botorch.models.transforms import Bilog, Normalize, Standardize
+from botorch.models.transforms import Normalize, Standardize
+from gpytorch import Module
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-from torch import Tensor
 
 from xopt.generators.bayesian.base_model import ModelConstructor
+from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.vocs import VOCS
 
 
@@ -23,65 +24,112 @@ class StandardModelConstructor(ModelConstructor):
         if self.options.use_low_noise_prior:
             self.likelihood = GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
 
-    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
-        """construct independent model for each objective and constraint"""
-        # set tkwargs
-        tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
+        self.input_data = None
+        self.objective_data = None
+        self.constraint_data = None
+        self.train_X = None
+        self.tkwargs = None
 
+    def collect_data(self, data):
         # drop nans
         valid_data = data[
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
         ].dropna()
 
         # get data
-        input_data, objective_data, constraint_data = self.vocs.extract_data(valid_data)
-        train_X = torch.tensor(input_data.to_numpy(), **tkwargs)
-        self.input_transform.to(**tkwargs)
-        self.likelihood.to(**tkwargs)
+        (
+            self.input_data,
+            self.objective_data,
+            self.constraint_data,
+        ) = self.vocs.extract_data(valid_data)
 
-        return self.build_standard_model(
-            train_X, objective_data, constraint_data, tkwargs
-        )
+        # xopt assumes minimization, so objective data is multiplied by -1 to make it
+        # a minimization problem, this creates issues with interpretable modeling so
+        # we revert this, negating objectives values for maximization is done using
+        # objectives (see create_mc_objective in objectives.py)
+        #for name in self.vocs.objective_names:
+        #    if self.vocs.objectives[name] == "MAXIMIZE":
+        #        self.objective_data[name] = -1 * self.objective_data[name]
 
-    def build_standard_model(
-        self,
-        train_X: Tensor,
-        objective_data: pd.DataFrame,
-        constraint_data: pd.DataFrame,
-        tkwargs,
-        **model_kwargs
-    ):
+        self.train_X = torch.tensor(self.input_data.to_numpy(), **self.tkwargs)
+        self.input_transform.to(**self.tkwargs)
+        if self.likelihood is not None:
+            self.likelihood.to(**self.tkwargs)
+
+    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
+        """construct independent model for each objective and constraint"""
+        # set tkwargs
+        self.tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
+
+        # collect data from dataframe
+        self.collect_data(data)
+
+        # build model
+        return self.build_standard_model()
+
+    def build_standard_model(self, **model_kwargs):
         models = []
-        for name in objective_data.keys():
-            train_Y = torch.tensor(
-                objective_data[name].to_numpy(), **tkwargs
-            ).unsqueeze(-1)
+        for name in self.vocs.output_names:
             outcome_transform = Standardize(1)
+            covar_module = self._get_module(self.options.covar_modules, name)
+            mean_module = self._get_module(self.options.mean_modules, name)
+
+            # objective specifics
+            if name in self.vocs.objective_names:
+                # if we are doing minimization add a negative sign to the prior model
+                # if self.vocs.objectives[name] == "MINIMIZE" and mean_module is not
+                # None:
+                #    mean_module = _NegativeModule(mean_module)
+
+                train_Y = torch.tensor(
+                    self.objective_data[name].to_numpy(), **self.tkwargs
+                ).unsqueeze(-1)
+
+            # constraint specifics
+            elif name in self.vocs.constraint_names:
+                train_Y = torch.tensor(
+                    self.constraint_data[name].to_numpy(), **self.tkwargs
+                ).unsqueeze(-1)
+
+            else:
+                raise RuntimeError(
+                    "if you are recieving this message there is "
+                    "something wrong with vocs"
+                )
+
+            if mean_module is not None:
+                mean_module = CustomMean(
+                    mean_module, self.input_transform, outcome_transform
+                )
+
             models.append(
-                self._build_single_task_gp(
-                    train_X,
+                self.build_single_task_gp(
+                    self.train_X,
                     train_Y,
                     input_transform=self.input_transform,
                     outcome_transform=outcome_transform,
+                    covar_module=covar_module,
+                    mean_module=mean_module,
                     likelihood=self.likelihood,
-                    **model_kwargs
-                )
-            )
-
-        for name in constraint_data.keys():
-            train_C = torch.tensor(
-                constraint_data[name].to_numpy(), **tkwargs
-            ).unsqueeze(-1)
-            outcome_transform = Bilog()
-            models.append(
-                self._build_single_task_gp(
-                    train_X,
-                    train_C,
-                    input_transform=self.input_transform,
-                    outcome_transform=outcome_transform,
-                    likelihood=self.likelihood,
-                    **model_kwargs
                 )
             )
 
         return ModelListGP(*models)
+
+    @staticmethod
+    def _get_module(base, name):
+        if isinstance(base, Module):
+            return base
+        elif isinstance(base, dict):
+            return base.get(name)
+        else:
+            return None
+
+
+class _NegativeModule(Module):
+    def __init__(self, base):
+        super().__init__()
+        self.base = base
+
+    def forward(self, X):
+        return -self.base(X)
