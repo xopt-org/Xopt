@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import conlist
+from pydantic import conlist, Field
 
 from xopt.pydantic import XoptBaseModel
 
@@ -47,6 +47,14 @@ class VOCS(XoptBaseModel):
     objectives: Dict[str, ObjectiveEnum] = {}
     constants: Dict[str, Any] = {}
     linked_variables: Dict[str, str] = {}
+
+    # internal flags
+    negate_maximize: bool = Field(
+        True,
+        hidden=True,
+        description="Flag to negate maximize objective values when "
+        "passed to generators, set to False for model based generators",
+    )
 
     class Config:
         validate_assignment = True  # Not sure this helps in this case
@@ -239,7 +247,7 @@ class VOCS(XoptBaseModel):
         Returns:
             result: processed Dataframe
         """
-        return form_objective_data(self.objectives, data, prefix)
+        return form_objective_data(self.objectives, data, prefix, self.negate_maximize)
 
     def constraint_data(
         self,
@@ -334,7 +342,9 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
     return vdata
 
 
-def form_objective_data(objectives: Dict, data, prefix="objective_"):
+def form_objective_data(
+    objectives: Dict, data, prefix="objective_", negate_maximize: bool = True
+):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
@@ -362,7 +372,7 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
         if operator not in OBJECTIVE_WEIGHT:
             raise ValueError(f"Unknown objective operator: {operator}")
 
-        weight = OBJECTIVE_WEIGHT[operator]
+        weight = OBJECTIVE_WEIGHT[operator] if negate_maximize else 1.0
         odata[prefix + k] = (weight * data[k]).fillna(np.inf)  # Protect against nans
 
     return odata
