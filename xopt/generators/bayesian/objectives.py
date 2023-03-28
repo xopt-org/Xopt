@@ -50,7 +50,10 @@ def create_mc_objective(vocs, tkwargs):
     """
     weights = torch.zeros(vocs.n_outputs, **tkwargs)
     for idx, ele in enumerate(vocs.objective_names):
-        weights[idx] = -1.0
+        if vocs.objectives[ele] == "MINIMIZE":
+            weights[idx] = -1.0
+        elif vocs.objectives[ele] == "MAXIMIZE":
+            weights[idx] = 1.0
 
     def obj_callable(Z):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
@@ -67,7 +70,10 @@ def create_mobo_objective(vocs, tkwargs):
     weights = torch.zeros(n_objectives).to(**tkwargs)
 
     for idx, ele in enumerate(vocs.objectives):
-        weights[idx] = -1.0
+        if vocs.objectives[ele] == "MINIMIZE":
+            weights[idx] = -1.0
+        elif vocs.objectives[ele] == "MAXIMIZE":
+            weights[idx] = 1.0
 
     return WeightedMCMultiOutputObjective(
         weights, outcomes=list(range(n_objectives)), num_outcomes=n_objectives

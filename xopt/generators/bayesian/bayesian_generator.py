@@ -33,6 +33,9 @@ class BayesianGenerator(Generator, ABC):
 
         super().__init__(vocs, options)
 
+        # set negate maximize vocs flag
+        self.vocs.negate_maximize = False
+
         self._model = None
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
@@ -103,7 +106,6 @@ class BayesianGenerator(Generator, ABC):
         """
         Returns a function that can be used to evaluate the acquisition function
         """
-        # re-create sampler/objective from options
 
         # need a sampler for botorch > 0.8
         self.sampler = get_sampler(
