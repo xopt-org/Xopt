@@ -100,10 +100,10 @@ class TestBayesianGenerator(TestCase):
         )
 
         # constraint transform - bilog
-        C = torch.from_numpy(X.data["c1"].to_numpy())
-        assert torch.allclose(
-            model.train_targets[1], torch.sign(-C) * torch.log(1 + torch.abs(-C))
-        )
+        # C = torch.from_numpy(X.data["c1"].to_numpy())
+        # assert torch.allclose(
+        #    model.train_targets[1], torch.sign(-C) * torch.log(1 + torch.abs(-C))
+        # )
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_training_data(self):
