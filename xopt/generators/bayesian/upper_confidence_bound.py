@@ -12,6 +12,7 @@ from xopt.generators.bayesian.time_dependent import (
     TimeDependentModelOptions,
     TimeDependentOptions,
 )
+from xopt.generators.bayesian.turbo import TuRBOBayesianGenerator
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
@@ -81,6 +82,12 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         )
 
         return cqUCB
+
+
+class TuRBOUpperConfidenceBoundGenerator(
+    TuRBOBayesianGenerator, UpperConfidenceBoundGenerator
+):
+    alias = "turbo_upper_confidence_bound"
 
 
 class TDUpperConfidenceBoundGenerator(
