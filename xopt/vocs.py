@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import conlist, Field
+from pydantic import conlist
 
 from xopt.pydantic import XoptBaseModel
 
@@ -47,14 +47,6 @@ class VOCS(XoptBaseModel):
     objectives: Dict[str, ObjectiveEnum] = {}
     constants: Dict[str, Any] = {}
     linked_variables: Dict[str, str] = {}
-
-    # internal flags
-    negate_maximize: bool = Field(
-        True,
-        hidden=True,
-        description="Flag to negate maximize objective values when "
-        "passed to generators, set to False for model based generators",
-    )
 
     class Config:
         validate_assignment = True  # Not sure this helps in this case
@@ -112,10 +104,10 @@ class VOCS(XoptBaseModel):
     def all_names(self):
         """Returns all vocs names (variables, constants, objectives, constraints"""
         return (
-            self.variable_names
-            + self.constant_names
-            + self.objective_names
-            + self.constraint_names
+                self.variable_names
+                + self.constant_names
+                + self.objective_names
+                + self.constraint_names
         )
 
     @property
@@ -149,7 +141,7 @@ class VOCS(XoptBaseModel):
         return self.n_objectives + self.n_constraints
 
     def random_inputs(
-        self, n=None, include_constants=True, include_linked_variables=True
+            self, n=None, include_constants=True, include_linked_variables=True
     ):
         """
         Uniform sampling of the variables.
@@ -214,9 +206,9 @@ class VOCS(XoptBaseModel):
 
     # Extract optimization data (in correct column order)
     def variable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "variable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing variables according to `vocs.variables` in sorted
@@ -232,9 +224,10 @@ class VOCS(XoptBaseModel):
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "objective_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "objective_",
+            return_raw=False
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
@@ -247,12 +240,12 @@ class VOCS(XoptBaseModel):
         Returns:
             result: processed Dataframe
         """
-        return form_objective_data(self.objectives, data, prefix, self.negate_maximize)
+        return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "constraint_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing constraint data transformed according to
@@ -268,9 +261,9 @@ class VOCS(XoptBaseModel):
         return form_constraint_data(self.constraints, data, prefix)
 
     def feasibility_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "feasible_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
@@ -302,13 +295,15 @@ class VOCS(XoptBaseModel):
         """
         validate_input_data(self, input_points)
 
-    def extract_data(self, data: pd.DataFrame):
+    def extract_data(self, data: pd.DataFrame, return_raw=False):
         """
         split dataframe into seperate dataframes for variables, objectives and
-        constraints based on vocs
+        constraints based on vocs - objective data is transformed based on
+        `vocs.objectives` properties
 
         Args:
             data: dataframe to be split
+            return_raw: if True, return untransformed objective data
 
         Returns:
             variable_data: dataframe containing variable data
@@ -316,7 +311,7 @@ class VOCS(XoptBaseModel):
             constraint_data: dataframe containing constraint data
         """
         variable_data = self.variable_data(data, "")
-        objective_data = self.objective_data(data, "")
+        objective_data = self.objective_data(data, "", return_raw)
         constraint_data = self.constraint_data(data, "")
         return variable_data, objective_data, constraint_data
 
@@ -343,12 +338,13 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
 
 
 def form_objective_data(
-    objectives: Dict, data, prefix="objective_", negate_maximize: bool = True
+        objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
-    Weights are applied to convert all objectives into mimimization form.
+    Weights are applied to convert all objectives into mimimization form unless
+    `return_raw` is True
 
     Returns a dataframe with the objective data intented to be minimized.
 
@@ -372,7 +368,7 @@ def form_objective_data(
         if operator not in OBJECTIVE_WEIGHT:
             raise ValueError(f"Unknown objective operator: {operator}")
 
-        weight = OBJECTIVE_WEIGHT[operator] if negate_maximize else 1.0
+        weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
         odata[prefix + k] = (weight * data[k]).fillna(np.inf)  # Protect against nans
 
     return odata

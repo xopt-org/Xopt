@@ -33,9 +33,6 @@ class BayesianGenerator(Generator, ABC):
 
         super().__init__(vocs, options)
 
-        # set negate maximize vocs flag
-        self.vocs.negate_maximize = False
-
         self._model = None
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
