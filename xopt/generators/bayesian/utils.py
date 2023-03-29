@@ -1,7 +1,8 @@
 import torch
 
-from .objectives import create_constraint_callables
 from .custom_botorch.constrained_acqusition import FeasibilityObjective
+
+from .objectives import create_constraint_callables
 
 
 def feasibility(X, model, sampler, vocs, posterior_transform=None):
