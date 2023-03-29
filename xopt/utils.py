@@ -187,17 +187,25 @@ def visualize_model(generator, data):
             mean = post.mean
             l, u = post.mvn.confidence_region()
 
-            ax[0].plot(test_x, mean[..., i], f"C{i}",
-                       label=f"{generator.vocs.output_names[i]} model")
-            ax[0].fill_between(test_x, l[..., i].flatten(), u[..., i].flatten(),
-                               alpha=0.5)
-            generator.data.plot(x=generator.vocs.variable_names[0],
-                                y=generator.vocs.output_names[i],
-                                ax=ax[0], style=f"oC{i}")
+            ax[0].plot(
+                test_x,
+                mean[..., i],
+                f"C{i}",
+                label=f"{generator.vocs.output_names[i]} model",
+            )
+            ax[0].fill_between(
+                test_x, l[..., i].flatten(), u[..., i].flatten(), alpha=0.5
+            )
+            generator.data.plot(
+                x=generator.vocs.variable_names[0],
+                y=generator.vocs.output_names[i],
+                ax=ax[0],
+                style=f"oC{i}",
+            )
 
         ax[0].legend()
 
         acq = generator.get_acquisition(model)(test_x.reshape(-1, 1, 1).double())
 
-        ax[1].plot(test_x, acq, label='Acquisition Function')
+        ax[1].plot(test_x, acq, label="Acquisition Function")
         ax[1].legend()
