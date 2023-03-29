@@ -104,10 +104,10 @@ class VOCS(XoptBaseModel):
     def all_names(self):
         """Returns all vocs names (variables, constants, objectives, constraints"""
         return (
-                self.variable_names
-                + self.constant_names
-                + self.objective_names
-                + self.constraint_names
+            self.variable_names
+            + self.constant_names
+            + self.objective_names
+            + self.constraint_names
         )
 
     @property
@@ -141,7 +141,7 @@ class VOCS(XoptBaseModel):
         return self.n_objectives + self.n_constraints
 
     def random_inputs(
-            self, n=None, include_constants=True, include_linked_variables=True
+        self, n=None, include_constants=True, include_linked_variables=True
     ):
         """
         Uniform sampling of the variables.
@@ -206,9 +206,9 @@ class VOCS(XoptBaseModel):
 
     # Extract optimization data (in correct column order)
     def variable_data(
-            self,
-            data: Union[pd.DataFrame, List[Dict], List[Dict]],
-            prefix: str = "variable_",
+        self,
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing variables according to `vocs.variables` in sorted
@@ -224,10 +224,10 @@ class VOCS(XoptBaseModel):
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(
-            self,
-            data: Union[pd.DataFrame, List[Dict], List[Dict]],
-            prefix: str = "objective_",
-            return_raw=False
+        self,
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        prefix: str = "objective_",
+        return_raw=False,
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
@@ -243,9 +243,9 @@ class VOCS(XoptBaseModel):
         return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
-            self,
-            data: Union[pd.DataFrame, List[Dict], List[Dict]],
-            prefix: str = "constraint_",
+        self,
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing constraint data transformed according to
@@ -261,9 +261,9 @@ class VOCS(XoptBaseModel):
         return form_constraint_data(self.constraints, data, prefix)
 
     def feasibility_data(
-            self,
-            data: Union[pd.DataFrame, List[Dict], List[Dict]],
-            prefix: str = "feasible_",
+        self,
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
@@ -338,7 +338,7 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
 
 
 def form_objective_data(
-        objectives: Dict, data, prefix="objective_", return_raw: bool = False
+    objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
