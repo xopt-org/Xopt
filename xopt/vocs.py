@@ -227,6 +227,7 @@ class VOCS(XoptBaseModel):
         self,
         data: Union[pd.DataFrame, List[Dict], List[Dict]],
         prefix: str = "objective_",
+        return_raw=False,
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
@@ -239,7 +240,7 @@ class VOCS(XoptBaseModel):
         Returns:
             result: processed Dataframe
         """
-        return form_objective_data(self.objectives, data, prefix)
+        return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
         self,
@@ -294,13 +295,15 @@ class VOCS(XoptBaseModel):
         """
         validate_input_data(self, input_points)
 
-    def extract_data(self, data: pd.DataFrame):
+    def extract_data(self, data: pd.DataFrame, return_raw=False):
         """
         split dataframe into seperate dataframes for variables, objectives and
-        constraints based on vocs
+        constraints based on vocs - objective data is transformed based on
+        `vocs.objectives` properties
 
         Args:
             data: dataframe to be split
+            return_raw: if True, return untransformed objective data
 
         Returns:
             variable_data: dataframe containing variable data
@@ -308,7 +311,7 @@ class VOCS(XoptBaseModel):
             constraint_data: dataframe containing constraint data
         """
         variable_data = self.variable_data(data, "")
-        objective_data = self.objective_data(data, "")
+        objective_data = self.objective_data(data, "", return_raw)
         constraint_data = self.constraint_data(data, "")
         return variable_data, objective_data, constraint_data
 
@@ -334,11 +337,14 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
     return vdata
 
 
-def form_objective_data(objectives: Dict, data, prefix="objective_"):
+def form_objective_data(
+    objectives: Dict, data, prefix="objective_", return_raw: bool = False
+):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
-    Weights are applied to convert all objectives into mimimization form.
+    Weights are applied to convert all objectives into mimimization form unless
+    `return_raw` is True
 
     Returns a dataframe with the objective data intented to be minimized.
 
@@ -362,7 +368,7 @@ def form_objective_data(objectives: Dict, data, prefix="objective_"):
         if operator not in OBJECTIVE_WEIGHT:
             raise ValueError(f"Unknown objective operator: {operator}")
 
-        weight = OBJECTIVE_WEIGHT[operator]
+        weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
         odata[prefix + k] = (weight * data[k]).fillna(np.inf)  # Protect against nans
 
     return odata

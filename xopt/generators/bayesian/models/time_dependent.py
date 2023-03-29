@@ -3,55 +3,56 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize
+from pydantic import Field
 
-from xopt.generators.bayesian.models.standard import (
-    create_constraint_models,
-    create_objective_models,
-)
-from xopt.generators.bayesian.models.utils import split_data
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.options import ModelOptions
+from xopt.vocs import VOCS
 
 
-def create_time_dependent_model(
-    data,
-    vocs,
-    tkwargs: dict,
-    added_time: float = 0.0,
-    use_conservative_prior_lengthscale: bool = False,
-    use_conservative_prior_mean: bool = False,
-    use_low_noise_prior: bool = False,
-) -> ModelListGP:
-    # create dataframes for processed data
-    input_data, objective_data, constraint_data = split_data(data, vocs)
-    # add time column to variable data
-    input_data = pd.concat([input_data, data["time"]], axis=1)
-    # add bounds for input transformation
-    bounds = np.hstack(
-        [
-            vocs.bounds,
-            np.array(
-                (
-                    data["time"].to_numpy().min(),
-                    data["time"].to_numpy().max() + 2 * added_time,
-                )
-            ).reshape(2, 1),
-        ]
+class TimeDependentModelOptions(ModelOptions):
+    name: str = "time_dependent_standard"
+    added_time: float = Field(
+        1.0,
+        description="additional time added to target time "
+        "for optimization, make sure its "
+        "larger than computation time for the "
+        "GP model",
     )
 
-    input_transform = Normalize(
-        vocs.n_variables + 1, bounds=torch.tensor(bounds, **tkwargs)
-    )
 
-    objective_models = create_objective_models(
-        input_data, objective_data, input_transform, tkwargs, use_low_noise_prior
-    )
-    constraint_models = create_constraint_models(
-        input_data,
-        constraint_data,
-        input_transform,
-        tkwargs,
-        use_low_noise_prior,
-        use_conservative_prior_lengthscale,
-        use_conservative_prior_mean,
-    )
+class TimeDependentModelConstructor(StandardModelConstructor):
+    def __init__(self, vocs: VOCS, options: TimeDependentModelOptions):
+        if not type(options) is TimeDependentModelOptions:
+            raise ValueError("options must be a TimeDependentModelOptions object")
 
-    return ModelListGP(*objective_models, *constraint_models)
+        super().__init__(vocs, options)
+
+    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
+        self.tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
+
+        self.collect_data(data)
+
+        # add time column to variable data
+        self.input_data = pd.concat([self.input_data, data["time"]], axis=1)
+        self.train_X = torch.tensor(self.input_data.to_numpy(), **tkwargs)
+
+        # add bounds for input transformation
+        bounds = np.hstack(
+            [
+                self.vocs.bounds,
+                np.array(
+                    (
+                        data["time"].to_numpy().min(),
+                        data["time"].to_numpy().max() + 2 * self.options.added_time,
+                    )
+                ).reshape(2, 1),
+            ]
+        )
+
+        self.input_transform = Normalize(
+            self.vocs.n_variables + 1, bounds=torch.tensor(bounds, **tkwargs)
+        )
+        self.input_transform.to(**tkwargs)
+
+        return self.build_standard_model()

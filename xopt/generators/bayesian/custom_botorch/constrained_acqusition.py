@@ -56,7 +56,6 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
     ) -> None:
-
         # make it consistent with botorch constrained EHVI
         if constraints is None:
             constraints = []

@@ -1,11 +1,12 @@
-from typing import Callable, List
+from typing import Dict, List, Type, Union
 
-from pydantic import BaseModel, create_model, Field, root_validator
+import gpytorch
+import torch
+from pydantic import Field
 
 from xopt.generator import GeneratorOptions
-from xopt.generators.bayesian.models.standard import create_standard_model
+from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.pydantic import get_descriptions_defaults, JSON_ENCODERS, XoptBaseModel
-from xopt.utils import get_function, get_function_defaults
 
 
 class AcqOptions(XoptBaseModel):
@@ -48,28 +49,23 @@ class OptimOptions(XoptBaseModel):
 class ModelOptions(XoptBaseModel):
     """Options for defining the GP model in BO"""
 
-    function: Callable
-    kwargs: BaseModel
+    name: str = Field("standard", description="name of model constructor")
+    custom_constructor: Type[ModelConstructor] = Field(
+        None,
+        description="custom model constructor definition, overrides specified name",
+    )
+    use_low_noise_prior: bool = Field(
+        True, description="specify if model should assume a low noise environment"
+    )
+    covar_modules: Union[gpytorch.Module, Dict[str, gpytorch.Module]] = Field(
+        {}, description="covariance modules for GP models"
+    )
+    mean_modules: Union[torch.nn.Module, Dict[str, torch.nn.Module]] = Field(
+        {}, description="prior mean modules for GP models"
+    )
 
     class Config:
         arbitrary_types_allowed = True
-        json_encoders = JSON_ENCODERS
-        extra = "forbid"
-        allow_mutation = False
-
-    @root_validator(pre=True)
-    def validate_all(cls, values):
-        if "function" in values.keys():
-            f = get_function(values["function"])
-        else:
-            f = create_standard_model
-
-        kwargs = values.get("kwargs", {})
-        kwargs = {**get_function_defaults(f), **kwargs}
-        values["function"] = f
-        values["kwargs"] = create_model("kwargs", **kwargs)()
-
-        return values
 
 
 class BayesianOptions(GeneratorOptions):
