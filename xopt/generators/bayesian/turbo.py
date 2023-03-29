@@ -72,6 +72,7 @@ class TuRBOBayesianGenerator(BayesianGenerator, ABC):
             raise RuntimeError("getting trust region requires a GP model to be trained")
 
         bounds = self._get_bounds()
+        bound_widths = bounds[1] - bounds[0]
 
         # get location of best point so far
         variable_data = self.vocs.variable_data(self.data, "")
@@ -87,10 +88,20 @@ class TuRBOBayesianGenerator(BayesianGenerator, ABC):
 
         # Scale the TR to be proportional to the lengthscales of the objective model
         x_center = best_x.clone()
-        weights = self.model.models[0].covar_module.base_kernel.lengthscale.detach()
-        # weights = weights / torch.prod(weights.pow(1.0 / len(weights)))
-        tr_lb = torch.clamp(x_center - weights * self.turbo_state.length / 2.0, *bounds)
-        tr_ub = torch.clamp(x_center + weights * self.turbo_state.length / 2.0, *bounds)
+        lengthscales = self.model.models[
+            0
+        ].covar_module.base_kernel.lengthscale.detach()
+
+        # calculate the ratios of lengthscales for each axis
+        weights = lengthscales / torch.prod(lengthscales.pow(1.0 / len(lengthscales)))
+
+        # calculate the tr bounding box
+        tr_lb = torch.clamp(
+            x_center - weights * self.turbo_state.length * bound_widths / 2.0, *bounds
+        )
+        tr_ub = torch.clamp(
+            x_center + weights * self.turbo_state.length * bound_widths / 2.0, *bounds
+        )
         return torch.cat((tr_lb, tr_ub), dim=0)
 
     def reset_turbo_state(self):
@@ -101,19 +112,19 @@ class TuRBOBayesianGenerator(BayesianGenerator, ABC):
 class TurboState:
     dim: int
     batch_size: int
-    length: float = 1.0
-    length_min: float = 0.5
-    length_max: float = 100
+    length: float = 0.5  # normalized between zero and one
+    length_min: float = 0.5**7
+    length_max: float = 2
     failure_counter: int = 0
     failure_tolerance: int = float("nan")  # Note: Post-initialized
     success_counter: int = 0
-    success_tolerance: int = 2  # Note: The original paper uses 3
-    best_value: float = -float("inf")
+    success_tolerance: int = 10  # Note: The original paper uses 3
+    best_value: float = float("inf")
     restart_triggered: bool = False
 
     def __post_init__(self):
         self.failure_tolerance = math.ceil(
-            max([4.0 / self.batch_size, float(self.dim) / self.batch_size])
+            max([4.0 / self.batch_size, float(self.dim) / (self.batch_size)])
         )
 
 
@@ -123,7 +134,7 @@ def update_state(state, Y_next):
     NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
     minimization
     """
-    if max(Y_next) < state.best_value + 1e-3 * math.fabs(state.best_value):
+    if min(Y_next) < state.best_value + 1e-3 * math.fabs(state.best_value):
         state.success_counter += 1
         state.failure_counter = 0
     else:
@@ -137,7 +148,7 @@ def update_state(state, Y_next):
         state.length /= 2.0
         state.failure_counter = 0
 
-    state.best_value = max(state.best_value, max(Y_next).item())
+    state.best_value = min(state.best_value, min(Y_next).item())
     if state.length < state.length_min:
         state.restart_triggered = True
     return state
