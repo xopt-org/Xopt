@@ -31,18 +31,10 @@ class TimeDependentModelConstructor(StandardModelConstructor):
     def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
         self.tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
 
-        # drop nans
-        valid_data = data[
-            pd.unique(self.vocs.variable_names + self.vocs.output_names)
-        ].dropna()
-
-        # create dataframes for processed data
-        input_data, self.objective_data, self.constraint_data = self.vocs.extract_data(
-            valid_data
-        )
+        self.collect_data(data)
 
         # add time column to variable data
-        self.input_data = pd.concat([input_data, data["time"]], axis=1)
+        self.input_data = pd.concat([self.input_data, data["time"]], axis=1)
         self.train_X = torch.tensor(self.input_data.to_numpy(), **tkwargs)
 
         # add bounds for input transformation
@@ -62,6 +54,5 @@ class TimeDependentModelConstructor(StandardModelConstructor):
             self.vocs.n_variables + 1, bounds=torch.tensor(bounds, **tkwargs)
         )
         self.input_transform.to(**tkwargs)
-        self.likelihood.to(**tkwargs)
 
         return self.build_standard_model()

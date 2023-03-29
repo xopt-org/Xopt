@@ -41,7 +41,7 @@ class StandardModelConstructor(ModelConstructor):
             self.input_data,
             self.objective_data,
             self.constraint_data,
-        ) = self.vocs.extract_data(valid_data)
+        ) = self.vocs.extract_data(valid_data, return_raw=True)
 
         self.train_X = torch.tensor(self.input_data.to_numpy(), **self.tkwargs)
         self.input_transform.to(**self.tkwargs)
