@@ -2,11 +2,10 @@ from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import patch
 
-import pytest
 import torch
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.turbo import get_trust_region, update_state, TurboState
+from xopt.generators.bayesian.turbo import get_trust_region, TurboState
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
