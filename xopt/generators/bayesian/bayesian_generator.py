@@ -7,7 +7,6 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
-from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from botorch.sampling.get_sampler import get_sampler
 from gpytorch import Module
