@@ -20,6 +20,7 @@ from xopt.generators.bayesian.objectives import (
     create_mc_objective,
 )
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.generators.bayesian.turbo import get_trust_region, TurboState, update_state
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -39,6 +40,11 @@ class BayesianGenerator(Generator, ABC):
         self.model_constructor = get_model_constructor(options.model)(
             self.vocs, options.model
         )
+
+        # set up turbo if requested
+        if self.options.optim.use_turbo:
+            self.turbo_state = TurboState(self.vocs.n_variables, 1)
+            self.first_call = True
 
     @staticmethod
     def default_options() -> BayesianOptions:
@@ -64,8 +70,22 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
-            # get initial points for optimization (if specified)
-            batch_initial_points, raw_samples = self._get_initial_batch_points(bounds)
+            # if using turbo, update turbo state and set bounds according to turbo state
+            if self.options.optim.use_turbo:
+                objective_data = self.vocs.objective_data(self.data, "")
+
+                # if this is the first time we are updating the state use the best f
+                # instead of the last f
+                if self.first_call:
+                    y_last = torch.tensor(objective_data.min().to_numpy(),
+                                          **self._tkwargs)
+                    self.first_call = False
+                else:
+                    y_last = torch.tensor(objective_data.iloc[-1].to_numpy(),
+                                          **self._tkwargs)
+                self.turbo_state = update_state(self.turbo_state, y_last)
+
+                bounds = self.trust_region
 
             acq_funct = self.get_acquisition(self._model)
 
@@ -74,8 +94,7 @@ class BayesianGenerator(Generator, ABC):
                 acq_function=acq_funct,
                 bounds=bounds,
                 q=n_candidates,
-                raw_samples=raw_samples,
-                batch_initial_conditions=batch_initial_points,
+                raw_samples=self.options.optim.raw_samples,
                 num_restarts=self.options.optim.num_restarts,
             )
             logger.debug("Best candidate from optimize", candidates, out)
@@ -133,23 +152,6 @@ class BayesianGenerator(Generator, ABC):
     def get_outcome_data(self, data: pd.DataFrame):
         return torch.tensor(data[self.vocs.output_names].to_numpy(), **self._tkwargs)
 
-    def _get_initial_batch_points(self, bounds):
-        if self.options.optim.use_nearby_initial_points:
-            # generate starting points for optimization (note in real domain)
-            inputs = self.get_input_data(self.data)
-            batch_initial_points = sample_truncated_normal_perturbations(
-                inputs[-1].unsqueeze(0),
-                n_discrete_points=self.options.optim.raw_samples,
-                sigma=0.5,
-                bounds=bounds,
-            ).unsqueeze(-2)
-            raw_samples = None
-        else:
-            batch_initial_points = None
-            raw_samples = self.options.optim.raw_samples
-
-        return batch_initial_points, raw_samples
-
     @abstractmethod
     def _get_acquisition(self, model):
         pass
@@ -183,6 +185,21 @@ class BayesianGenerator(Generator, ABC):
                 )
 
         return {"dtype": torch.double, "device": device}
+
+    @property
+    def trust_region(self):
+        if self.options.optim.use_turbo:
+            return get_trust_region(
+                    self.vocs,
+                    self.model,
+                    self._get_bounds(),
+                    self.data,
+                    self.turbo_state,
+                    self._tkwargs,
+                )
+        else:
+            raise RuntimeError("cannot get trust region when `use_turbo` option is "
+                               "False")
 
     def _get_bounds(self):
         bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)

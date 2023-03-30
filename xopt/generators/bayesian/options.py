@@ -27,7 +27,7 @@ class OptimOptions(XoptBaseModel):
     """Options for optimizing the acquisition function in BO"""
 
     num_restarts: int = Field(
-        5, description="number of restarts during acquistion " "function optimization"
+        20, description="number of restarts during acquistion function optimization"
     )
     raw_samples: int = Field(
         20, description="number of raw samples used to seed optimization"
@@ -37,12 +37,12 @@ class OptimOptions(XoptBaseModel):
         description="flag to use sequential optimization for q-batch point "
         "selection",
     )
-    use_nearby_initial_points: bool = Field(
-        False, description="flag to use local samples to start acqf optimization"
-    )
     max_travel_distances: List[float] = Field(
         None,
         description="limits for travel distance between points in normalized space",
+    )
+    use_turbo: bool = Field(
+        False, description="flag to use Trust region Bayesian Optimization (TuRBO)"
     )
 
 
