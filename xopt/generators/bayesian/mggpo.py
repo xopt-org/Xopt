@@ -5,12 +5,8 @@ import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
 from pydantic import Field
 
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mobo_objective,
-)
+from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.ga.cnsga import CNSGAGenerator, CNSGAOptions
-
 from xopt.vocs import VOCS
 from ...errors import XoptError
 from .bayesian_generator import BayesianGenerator
@@ -76,9 +72,6 @@ class MGGPOGenerator(BayesianGenerator):
         super().add_data(new_data)
         self.ga_generator.add_data(self.data)
 
-    def _get_objective(self):
-        return create_mobo_objective(self.vocs)
-
     @property
     def reference_point(self):
         if self.options.acq.reference_point is None:
@@ -101,21 +94,21 @@ class MGGPOGenerator(BayesianGenerator):
 
         return torch.tensor(pt, **self._tkwargs)
 
+    def _get_objective(self):
+        return create_mobo_objective(self.vocs, self._tkwargs)
+
     def _get_acquisition(self, model):
         # get reference point from data
         inputs = self.get_input_data(self.data)
-
-        # get list of constraining functions
-        constraint_callables = create_constraint_callables(self.vocs)
 
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
             prune_baseline=True,
-            constraints=constraint_callables,
+            constraints=self._get_constraint_callables(),
             ref_point=self.reference_point,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
             cache_root=False,
         )
 

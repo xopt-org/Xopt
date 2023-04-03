@@ -39,6 +39,21 @@ class TestUpperConfidenceBoundGenerator:
         # candidate = gen.generate(2)
         # assert len(candidate) == 2
 
+    def test_cuda(self):
+        gen = UpperConfidenceBoundGenerator(
+            TEST_VOCS_BASE,
+        )
+
+        if torch.cuda.is_available():
+            gen.options.use_cuda = True
+            gen.options.optim.raw_samples = 1
+            gen.options.optim.num_restarts = 1
+            gen.options.acq.monte_carlo_samples = 1
+            gen.data = TEST_VOCS_DATA
+
+            candidate = gen.generate(1)
+            assert len(candidate) == 1
+
     def test_generate_w_overlapping_objectives_constraints(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {"y1": ["GREATER_THAN", 0.0]}

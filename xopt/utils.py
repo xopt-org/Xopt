@@ -6,7 +6,9 @@ import time
 import traceback
 
 import pandas as pd
+import torch
 import yaml
+from matplotlib import pyplot as plt
 
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
@@ -147,3 +149,62 @@ def safe_call(func, *args, **kwargs):
 def format_option_descriptions(options_object):
     options_dict = get_descriptions_defaults(options_object)
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
+
+
+def read_xopt_csv(*files):
+    """
+    Read several Xopt-style CSV files into data
+
+    Parameters
+    ----------
+    file1, file2, ...: path-like
+        One or more Xopt csv files
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with xopt_index as the index column
+    """
+    dfs = []
+    for file in files:
+        df = pd.read_csv(file, index_col="xopt_index")
+        dfs.append(df)
+    return pd.concat(dfs)
+
+
+def visualize_model(generator, data):
+    test_x = torch.linspace(*torch.tensor(generator.vocs.bounds.flatten()), 100)
+    generator.add_data(data)
+    model = generator.train_model()
+
+    fig, ax = plt.subplots(2, 1, sharex="all")
+    fig.set_size_inches(6, 6)
+    with torch.no_grad():
+        post = model.posterior(test_x.reshape(-1, 1, 1).double())
+
+        for i in range(len(generator.vocs.output_names)):
+            mean = post.mean
+            l, u = post.mvn.confidence_region()
+
+            ax[0].plot(
+                test_x,
+                mean[..., i],
+                f"C{i}",
+                label=f"{generator.vocs.output_names[i]} model",
+            )
+            ax[0].fill_between(
+                test_x, l[..., i].flatten(), u[..., i].flatten(), alpha=0.5
+            )
+            generator.data.plot(
+                x=generator.vocs.variable_names[0],
+                y=generator.vocs.output_names[i],
+                ax=ax[0],
+                style=f"oC{i}",
+            )
+
+        ax[0].legend()
+
+        acq = generator.get_acquisition(model)(test_x.reshape(-1, 1, 1).double())
+
+        ax[1].plot(test_x, acq, label="Acquisition Function")
+        ax[1].legend()

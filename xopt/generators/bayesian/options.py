@@ -1,11 +1,12 @@
-from typing import Callable, List
+from typing import Dict, List, Type, Union
 
-from pydantic import BaseModel, create_model, Field, root_validator
+import gpytorch
+import torch
+from pydantic import Field
 
 from xopt.generator import GeneratorOptions
-from xopt.generators.bayesian.models.standard import create_standard_model
+from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.pydantic import get_descriptions_defaults, JSON_ENCODERS, XoptBaseModel
-from xopt.utils import get_function, get_function_defaults
 
 
 class AcqOptions(XoptBaseModel):
@@ -26,7 +27,7 @@ class OptimOptions(XoptBaseModel):
     """Options for optimizing the acquisition function in BO"""
 
     num_restarts: int = Field(
-        5, description="number of restarts during acquistion " "function optimization"
+        20, description="number of restarts during acquistion function optimization"
     )
     raw_samples: int = Field(
         20, description="number of raw samples used to seed optimization"
@@ -36,40 +37,36 @@ class OptimOptions(XoptBaseModel):
         description="flag to use sequential optimization for q-batch point "
         "selection",
     )
-    use_nearby_initial_points: bool = Field(
-        False, description="flag to use local samples to start acqf optimization"
-    )
     max_travel_distances: List[float] = Field(
         None,
         description="limits for travel distance between points in normalized space",
+    )
+    use_turbo: bool = Field(
+        False, description="flag to use Trust region Bayesian Optimization (TuRBO) "
+                           "for local optimization"
     )
 
 
 class ModelOptions(XoptBaseModel):
     """Options for defining the GP model in BO"""
 
-    function: Callable
-    kwargs: BaseModel
+    name: str = Field("standard", description="name of model constructor")
+    custom_constructor: Type[ModelConstructor] = Field(
+        None,
+        description="custom model constructor definition, overrides specified name",
+    )
+    use_low_noise_prior: bool = Field(
+        True, description="specify if model should assume a low noise environment"
+    )
+    covar_modules: Union[gpytorch.Module, Dict[str, gpytorch.Module]] = Field(
+        {}, description="covariance modules for GP models"
+    )
+    mean_modules: Union[torch.nn.Module, Dict[str, torch.nn.Module]] = Field(
+        {}, description="prior mean modules for GP models"
+    )
 
     class Config:
         arbitrary_types_allowed = True
-        json_encoders = JSON_ENCODERS
-        extra = "forbid"
-        allow_mutation = False
-
-    @root_validator(pre=True)
-    def validate_all(cls, values):
-        if "function" in values.keys():
-            f = get_function(values["function"])
-        else:
-            f = create_standard_model
-
-        kwargs = values.get("kwargs", {})
-        kwargs = {**get_function_defaults(f), **kwargs}
-        values["function"] = f
-        values["kwargs"] = create_model("kwargs", **kwargs)()
-
-        return values
 
 
 class BayesianOptions(GeneratorOptions):
@@ -79,6 +76,9 @@ class BayesianOptions(GeneratorOptions):
 
     n_initial: int = Field(
         3, description="number of random initial points to measure during first step"
+    )
+    use_cuda: bool = Field(
+        False, description="use cuda (GPU) to do bayesian optimization"
     )
 
     class Config:

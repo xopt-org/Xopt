@@ -1,4 +1,5 @@
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
@@ -6,14 +7,19 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
-from botorch.optim.initializers import sample_truncated_normal_perturbations
 from botorch.sampling import SobolQMCNormalSampler
 from botorch.sampling.get_sampler import get_sampler
 from gpytorch import Module
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
+from xopt.generators.bayesian.models.utils import get_model_constructor
+from xopt.generators.bayesian.objectives import (
+    create_constraint_callables,
+    create_mc_objective,
+)
 from xopt.generators.bayesian.options import BayesianOptions
+from xopt.generators.bayesian.turbo import get_trust_region, TurboState, update_state
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -30,9 +36,14 @@ class BayesianGenerator(Generator, ABC):
         self._model = None
         self._acquisition = None
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
-        self.objective = self._get_objective()
+        self.model_constructor = get_model_constructor(options.model)(
+            self.vocs, options.model
+        )
 
-        self._tkwargs = {"dtype": torch.double, "device": "cpu"}
+        # set up turbo if requested
+        if self.options.optim.use_turbo:
+            self.turbo_state = TurboState(self.vocs.n_variables, 1)
+            self.first_call = True
 
     @staticmethod
     def default_options() -> BayesianOptions:
@@ -58,8 +69,22 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             self.train_model(self.data)
 
-            # get initial points for optimization (if specified)
-            batch_initial_points, raw_samples = self._get_initial_batch_points(bounds)
+            # if using turbo, update turbo state and set bounds according to turbo state
+            if self.options.optim.use_turbo:
+                objective_data = self.vocs.objective_data(self.data, "")
+
+                # if this is the first time we are updating the state use the best f
+                # instead of the last f
+                if self.first_call:
+                    y_last = torch.tensor(objective_data.min().to_numpy(),
+                                          **self._tkwargs)
+                    self.first_call = False
+                else:
+                    y_last = torch.tensor(objective_data.iloc[-1].to_numpy(),
+                                          **self._tkwargs)
+                self.turbo_state = update_state(self.turbo_state, y_last)
+
+                bounds = self.trust_region
 
             acq_funct = self.get_acquisition(self._model)
 
@@ -68,12 +93,11 @@ class BayesianGenerator(Generator, ABC):
                 acq_function=acq_funct,
                 bounds=bounds,
                 q=n_candidates,
-                raw_samples=raw_samples,
-                batch_initial_conditions=batch_initial_points,
+                raw_samples=self.options.optim.raw_samples,
                 num_restarts=self.options.optim.num_restarts,
             )
             logger.debug("Best candidate from optimize", candidates, out)
-            return self.vocs.convert_numpy_to_inputs(candidates.detach().numpy())
+            return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
@@ -84,14 +108,7 @@ class BayesianGenerator(Generator, ABC):
         if data is None:
             data = self.data
 
-        # drop nans
-        valid_data = data[
-            pd.unique(self.vocs.variable_names + self.vocs.output_names)
-        ].dropna()
-
-        kwargs = self.options.model.kwargs.dict()
-
-        _model = self.options.model.function(valid_data, self.vocs, **kwargs)
+        _model = self.model_constructor.build_model(data, self._tkwargs)
 
         # validate returned model
         self._validate_model(_model)
@@ -104,15 +121,12 @@ class BayesianGenerator(Generator, ABC):
         """
         Returns a function that can be used to evaluate the acquisition function
         """
-        # re-create sampler/objective from options
 
         # need a sampler for botorch > 0.8
         self.sampler = get_sampler(
             model.posterior(self.get_input_data(self.data)),
             sample_shape=torch.Size([self.options.acq.monte_carlo_samples]),
         )
-
-        self.objective = self._get_objective()
 
         # get base acquisition function
         acq = self._get_acquisition(model)
@@ -137,30 +151,20 @@ class BayesianGenerator(Generator, ABC):
     def get_outcome_data(self, data: pd.DataFrame):
         return torch.tensor(data[self.vocs.output_names].to_numpy(), **self._tkwargs)
 
-    def _get_initial_batch_points(self, bounds):
-        if self.options.optim.use_nearby_initial_points:
-            # generate starting points for optimization (note in real domain)
-            inputs = self.get_input_data(self.data)
-            batch_initial_points = sample_truncated_normal_perturbations(
-                inputs[-1].unsqueeze(0),
-                n_discrete_points=self.options.optim.raw_samples,
-                sigma=0.5,
-                bounds=bounds,
-            ).unsqueeze(-2)
-            raw_samples = None
-        else:
-            batch_initial_points = None
-            raw_samples = self.options.optim.raw_samples
-
-        return batch_initial_points, raw_samples
-
     @abstractmethod
     def _get_acquisition(self, model):
         pass
 
-    @abstractmethod
     def _get_objective(self):
-        pass
+        """return default objective (scalar objective) determined by vocs"""
+        return create_mc_objective(self.vocs, self._tkwargs)
+
+    def _get_constraint_callables(self):
+        """return default objective (scalar objective) determined by vocs"""
+        constraint_callables = create_constraint_callables(self.vocs)
+        if len(constraint_callables) == 0:
+            constraint_callables = None
+        return constraint_callables
 
     @property
     def model(self):
@@ -168,7 +172,37 @@ class BayesianGenerator(Generator, ABC):
             self.train_model(self.data)
         return self._model
 
-    def _get_bounds(self) -> torch.Tensor:
+    @property
+    def _tkwargs(self):
+        # set device and data type for generator
+        device = "cpu"
+        if self.options.use_cuda:
+            if torch.cuda.is_available():
+                device = "cuda"
+            else:
+                warnings.warn(
+                    "Cuda requested in generator options but not found on "
+                    "machine! Using CPU instead"
+                )
+
+        return {"dtype": torch.double, "device": device}
+
+    @property
+    def trust_region(self):
+        if self.options.optim.use_turbo:
+            return get_trust_region(
+                    self.vocs,
+                    self.model,
+                    self._get_bounds(),
+                    self.data,
+                    self.turbo_state,
+                    self._tkwargs,
+                )
+        else:
+            raise RuntimeError("cannot get trust region when `use_turbo` option is "
+                               "False")
+
+    def _get_bounds(self):
         bounds = torch.tensor(self.vocs.bounds, **self._tkwargs)
         # if specified modify bounds to limit maximum travel distances
         if self.options.optim.max_travel_distances is not None:

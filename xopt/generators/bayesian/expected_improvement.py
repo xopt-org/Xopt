@@ -6,10 +6,6 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mc_objective,
-)
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
@@ -48,9 +44,6 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     def default_options() -> BayesianOptions:
         return BayesianOptions()
 
-    def _get_objective(self):
-        return create_mc_objective(self.vocs)
-
     def _get_acquisition(self, model):
         valid_data = self.data[
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
@@ -63,13 +56,13 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             model,
             best_f=best_f,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
             model,
             qEI,
-            create_constraint_callables(self.vocs),
+            self._get_constraint_callables(),
         )
 
         return cqUCB

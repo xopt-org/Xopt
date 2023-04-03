@@ -5,16 +5,12 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mc_objective,
-)
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 from xopt.generators.bayesian.time_dependent import (
-    TDAcqOptions,
-    TDModelOptions,
-    TDOptions,
+    TimeDependentAcqOptions,
     TimeDependentBayesianGenerator,
+    TimeDependentModelOptions,
+    TimeDependentOptions,
 )
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
@@ -24,7 +20,7 @@ class UpperConfidenceBoundOptions(AcqOptions):
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
 
 
-class TDUpperConfidenceBoundOptions(TDAcqOptions):
+class TDUpperConfidenceBoundOptions(TimeDependentAcqOptions):
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
 
 
@@ -32,9 +28,9 @@ class UCBOptions(BayesianOptions):
     acq = UpperConfidenceBoundOptions()
 
 
-class TDUCBOptions(UCBOptions, TDOptions):
+class TDUCBOptions(UCBOptions, TimeDependentOptions):
     acq = TDUpperConfidenceBoundOptions()
-    model = TDModelOptions()
+    model = TimeDependentModelOptions()
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
@@ -67,24 +63,21 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         super().__init__(vocs, options)
 
     @staticmethod
-    def default_options() -> UCBOptions:
+    def default_options() -> BayesianOptions:
         return UCBOptions()
-
-    def _get_objective(self):
-        return create_mc_objective(self.vocs)
 
     def _get_acquisition(self, model):
         qUCB = qUpperConfidenceBound(
             model,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
             beta=self.options.acq.beta,
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
             model,
             qUCB,
-            create_constraint_callables(self.vocs),
+            self._get_constraint_callables(),
         )
 
         return cqUCB
