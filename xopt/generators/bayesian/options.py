@@ -42,7 +42,8 @@ class OptimOptions(XoptBaseModel):
         description="limits for travel distance between points in normalized space",
     )
     use_turbo: bool = Field(
-        False, description="flag to use Trust region Bayesian Optimization (TuRBO)"
+        False, description="flag to use Trust region Bayesian Optimization (TuRBO) "
+                           "for local optimization"
     )
 
 
