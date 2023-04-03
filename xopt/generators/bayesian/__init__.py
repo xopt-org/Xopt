@@ -5,6 +5,7 @@ from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
 
+
 __all__ = [
     "BayesianExplorationGenerator",
     "MOBOGenerator",

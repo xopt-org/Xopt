@@ -63,7 +63,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         super().__init__(vocs, options)
 
     @staticmethod
-    def default_options() -> UCBOptions:
+    def default_options() -> BayesianOptions:
         return UCBOptions()
 
     def _get_acquisition(self, model):
