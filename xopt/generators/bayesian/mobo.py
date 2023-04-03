@@ -4,11 +4,7 @@ import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
 from pydantic import Field
 
-from xopt.generators.bayesian.objectives import (
-    create_constraint_callables,
-    create_mobo_objective,
-)
-
+from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.vocs import VOCS
 from ...errors import XoptError
 from ...utils import format_option_descriptions
@@ -68,23 +64,20 @@ class MOBOGenerator(BayesianGenerator):
         return torch.tensor(pt, **self._tkwargs)
 
     def _get_objective(self):
-        return create_mobo_objective(self.vocs)
+        return create_mobo_objective(self.vocs, self._tkwargs)
 
     def _get_acquisition(self, model):
         inputs = self.get_input_data(self.data)
 
-        # get list of constraining functions
-        constraint_callables = create_constraint_callables(self.vocs)
-        if len(constraint_callables) == 0:
-            constraint_callables = None
+        # fix problem with qNEHVI interpretation with constraints
 
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
-            constraints=constraint_callables,
+            constraints=self._get_constraint_callables(),
             ref_point=self.reference_point,
             sampler=self.sampler,
-            objective=self.objective,
+            objective=self._get_objective(),
             cache_root=False,
             prune_baseline=True,
         )

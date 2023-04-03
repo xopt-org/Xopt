@@ -5,6 +5,7 @@ repo_name: ChristopherMayes/Xopt
 nav:
     - Home: index.md
     - Installation: installation.md
+    - Algorithms: algorithms.md
     - Examples:
         - Basics:
             - examples/basic/xopt_basic.ipynb
@@ -19,6 +20,7 @@ nav:
                 - Upper confidence bound: examples/bayes_opt/upper_confidence_bound.ipynb
                 - Expected improvement: examples/bayes_opt/expected_improvement_rosenbrock.ipynb
                 - Custom GP models: examples/bayes_opt/custom_model.ipynb
+                - High dimensional BO: examples/bayes_opt/turbo_tutorial.ipynb
                 - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
                 - Multi-generation gaussian process optimization: examples/bayes_opt/mggpo.ipynb
                 - Time dependent upper confidence bound: examples/bayes_opt/time_dependent_bo.ipynb
@@ -28,6 +30,7 @@ nav:
             - Nelder-Mead: examples/scipy/neldermead.ipynb
         - Other:
             - Extremum seeking: examples/es/extremum_seeking.ipynb
+            - RCDS: examples/rcds/rcds.ipynb
 
 
     - API:
@@ -76,7 +79,7 @@ extra:
       name: Xopt
 
 extra_css:
-  - stylesheets/extra.css      
+  - stylesheets/extra.css
 
 plugins:
     - search

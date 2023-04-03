@@ -35,7 +35,6 @@ class TestMOBOGenerator:
 
         base_options = deepcopy(MOBOGenerator.default_options())
         base_options.acq.reference_point = {"y1": 1.5, "y2": 1.5}
-        base_options.optim.raw_samples = 5
         base_options.acq.monte_carlo_samples = 20
 
         proximal_biasing = deepcopy(base_options)

@@ -22,7 +22,7 @@ IGNORE = {
     "xopt_parallel.ipynb",
 }
 
-SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt", "es", "scipy"]
+SUB_DIRS = ["basic", "bayes_exp", "cnsga", "bayes_opt", "es", "scipy", "rcds"]
 
 
 def parse_ipynb(file: Path) -> str:
