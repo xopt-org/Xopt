@@ -1,73 +1,93 @@
 from copy import deepcopy
 
-import numpy as np
-import pandas as pd
 import pytest
 import torch
+from pandas import Series
 
-from xopt.generators.bayesian.models.multi_fidelity import create_multifidelity_model
+from xopt.generators.bayesian.models.multi_fidelity import (
+    MultiFidelityModelConstructor,
+    MultiFidelityModelOptions,
+)
 from xopt.generators.bayesian.multi_fidelity import MultiFidelityBayesianGenerator
-from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
 class TestMultiFidelityGenerator:
+    def test_multi_fidelity_model_constructor(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        data = deepcopy(TEST_VOCS_DATA)
+
+        # add a fidelity parameter
+        data["s"] = Series([1.0] * 10)
+
+        vocs.constraints = []
+        options = MultiFidelityModelOptions()
+
+        constructor = MultiFidelityModelConstructor(vocs, options)
+
+        # test collecting data
+        constructor.collect_data(data)
+        assert list(constructor.input_data.keys().values) == ["x1", "x2", "s"]
+
+        # build a model
+        constructor.build_model(data)
+
     def test_init(self):
         vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = []
+        vocs.constraints = {}
 
-        f_key = "s"
+        fidelity_parameter = "s"
 
         options = MultiFidelityBayesianGenerator.default_options()
-        options.model.fidelity_key = f_key
+        options.model.fidelity_parameter = fidelity_parameter
 
         MultiFidelityBayesianGenerator(vocs, options)
 
     def test_model_creation(self):
         vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = []
+        vocs.constraints = {}
 
-        f_key = "s"
-        data = pd.DataFrame(
-            {
-                "x1": np.random.randn(10),
-                "x2": np.random.randn(10),
-                "y1": np.random.randn(10),
-                f_key: np.random.rand(10),
-            }
-        )
+        data = deepcopy(TEST_VOCS_DATA)
 
-        create_multifidelity_model(data, vocs, f_key)
+        # add a fidelity parameter
+        fidelity_parameter = "s"
+        data[fidelity_parameter] = Series([1.0] * 10)
 
-        # test bad fidelity values
-        data = pd.DataFrame(
-            {
-                "x1": np.random.randn(10),
-                "x2": np.random.randn(10),
-                "y1": np.random.randn(10),
-                f_key: np.random.rand(10) + 1.0,
-            }
-        )
+        options = MultiFidelityBayesianGenerator.default_options()
+        options.model.fidelity_parameter = fidelity_parameter
+
+        generator = MultiFidelityBayesianGenerator(vocs, options)
+        generator.add_data(data)
+
+        generator.train_model(generator.data)
+
+        # try to add bad data
+        bad_data = deepcopy(TEST_VOCS_DATA)
+        bad_data[fidelity_parameter] = Series([10.0] * 10)
+        generator = MultiFidelityBayesianGenerator(vocs, options)
         with pytest.raises(ValueError):
-            create_multifidelity_model(data, vocs, f_key)
+            generator.add_data(bad_data)
+
+        bad_data = deepcopy(TEST_VOCS_DATA)
+        bad_data[fidelity_parameter] = Series([-1.0] * 10)
+        generator = MultiFidelityBayesianGenerator(vocs, options)
+        with pytest.raises(ValueError):
+            generator.add_data(bad_data)
 
     def test_acq(self):
         vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = []
+        vocs.constraints = {}
 
-        f_key = "s"
+        data = deepcopy(TEST_VOCS_DATA)
+
+        # add a fidelity parameter
+        fidelity_parameter = "s"
+        data[fidelity_parameter] = Series([1.0] * 10)
 
         options = MultiFidelityBayesianGenerator.default_options()
-        options.model.fidelity_key = f_key
+        options.model.fidelity_parameter = fidelity_parameter
 
         generator = MultiFidelityBayesianGenerator(vocs, options)
-        data = pd.DataFrame(
-            {
-                "x1": np.random.randn(10),
-                "x2": np.random.randn(10),
-                "y1": np.random.randn(10),
-                f_key: np.random.rand(10),
-            }
-        )
         generator.add_data(data)
 
         acq = generator.get_acquisition(generator.model)
@@ -81,30 +101,27 @@ class TestMultiFidelityGenerator:
         # test total cost
         assert (
             generator.calculate_total_cost()
-            == data[f_key].to_numpy().sum() + 10 * generator.options.acq.base_cost
+            == data[fidelity_parameter].to_numpy().sum()
+            + 10 * generator.options.acq.base_cost
         )
 
     def test_generation(self):
         vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = []
+        vocs.constraints = {}
 
-        f_key = "s"
+        data = deepcopy(TEST_VOCS_DATA)
+
+        # add a fidelity parameter
+        fidelity_parameter = "s"
+        data[fidelity_parameter] = Series([1.0] * 10)
 
         options = MultiFidelityBayesianGenerator.default_options()
-        options.model.fidelity_key = f_key
+        options.model.fidelity_parameter = fidelity_parameter
         options.optim.num_restarts = 1
         options.optim.raw_samples = 1
         options.acq.n_fantasies = 2
 
         generator = MultiFidelityBayesianGenerator(vocs, options)
-        data = pd.DataFrame(
-            {
-                "x1": np.random.randn(2),
-                "x2": np.random.randn(2),
-                "y1": np.random.randn(2),
-                f_key: np.random.rand(2),
-            }
-        )
         generator.add_data(data)
 
         # test single and and batch generation

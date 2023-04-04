@@ -1,5 +1,4 @@
 import logging
-from typing import Callable, Dict, List
 
 import pandas as pd
 import torch
@@ -12,15 +11,12 @@ from botorch.acquisition import (
 from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.models import AffineFidelityCostModel, SingleTaskMultiFidelityGP
 from botorch.optim import optimize_acqf, optimize_acqf_mixed
-from gpytorch import Module
-from pydantic import BaseModel, create_model, Field, root_validator
+from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.models.multi_fidelity import create_multifidelity_model
 from xopt.generators.bayesian.objectives import create_mc_objective
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
-from xopt.pydantic import JSON_ENCODERS
-from xopt.utils import format_option_descriptions, get_function, get_function_defaults
+from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -29,29 +25,8 @@ logger = logging.getLogger()
 class MultiFidelityModelOptions(ModelOptions):
     """Options for defining the Multi-fidelity GP model in BO"""
 
-    function: Callable
-    fidelity_key: str = Field("s", description="fieldity parameter name")
-    kwargs: BaseModel
-
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = JSON_ENCODERS
-        extra = "forbid"
-        allow_mutation = True
-
-    @root_validator(pre=True)
-    def validate_all(cls, values):
-        if "function" in values.keys():
-            f = get_function(values["function"])
-        else:
-            f = create_multifidelity_model
-
-        kwargs = values.get("kwargs", {})
-        kwargs = {**get_function_defaults(f), **kwargs}
-        values["function"] = f
-        values["kwargs"] = create_model("kwargs", **kwargs)()
-
-        return values
+    name: str = Field("multi_fidelity", description="name of model constructor")
+    fidelity_parameter: str = Field("s", description="fidelity parameter name")
 
 
 class MultiFidelityAcqOptions(AcqOptions):
@@ -66,8 +41,8 @@ class MultiFidelityAcqOptions(AcqOptions):
         "calculating knowledge gradient",
         ge=2,
     )
-    base_cost: float = Field(
-        1.0, description="base cost added to fidelity cost of running a sample"
+    fixed_cost: float = Field(
+        1.0, description="fixed cost added to fidelity cost of running a sample"
     )
 
 
@@ -104,56 +79,46 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for optimization")
 
-        super().__init__(vocs, options)
+        super().__init__(vocs, options, supports_batch_generation=True)
 
     @staticmethod
     def default_options() -> MultiFidelityOptions:
         return MultiFidelityOptions()
 
-    def generate(self, n_candidates: int) -> List[Dict]:
-        # if no data exists use random generator to generate candidates
-        if self.data.empty:
-            return self.vocs.random_inputs(self.options.n_initial)
+    def optimize_acqf(self, acq_funct, bounds, n_candidates):
+        # get candidates in real domain at discrete fidelities specified by options
+        ff_list = [{self.fidelity_index: ele} for ele in self.options.acq.fidelities]
+        candidates, out = optimize_acqf_mixed(
+            acq_function=acq_funct,
+            bounds=self._get_bounds(),
+            fixed_features_list=ff_list,
+            q=n_candidates,
+            num_restarts=self.options.optim.num_restarts,
+            raw_samples=self.options.optim.raw_samples,
+            # batch_initial_conditions=X_init,
+            options={"batch_limit": 5, "maxiter": 200},
+        )
+        logger.debug("Best candidate from optimize", candidates, out)
+        return candidates
 
-        else:
-            # update internal model with internal data
-            self.train_model(self.data)
+    def process_candidates(self, candidates):
+        # build candidate data frame with fidelity parameter
+        variable_values = self.vocs.convert_numpy_to_inputs(
+            candidates[:, :-1].detach().numpy()
+        )
+        fidelity_values = pd.DataFrame(
+            candidates[:, -1:].detach().numpy(), columns=[self.fidelity_parameter]
+        )
 
-            acq_funct = self.get_acquisition(self._model)
-
-            # get candidates in real domain at discrete fidelities specified by options
-            ff_list = [
-                {self.fidelity_index: ele} for ele in self.options.acq.fidelities
-            ]
-            candidates, out = optimize_acqf_mixed(
-                acq_function=acq_funct,
-                bounds=self._get_bounds(),
-                fixed_features_list=ff_list,
-                q=n_candidates,
-                num_restarts=self.options.optim.num_restarts,
-                raw_samples=self.options.optim.raw_samples,
-                # batch_initial_conditions=X_init,
-                options={"batch_limit": 5, "maxiter": 200},
-            )
-            logger.debug("Best candidate from optimize", candidates, out)
-
-            # build candidate data frame with fidelity parameter
-            variable_values = self.vocs.convert_numpy_to_inputs(
-                candidates[:, :-1].detach().numpy()
-            )
-            fidelity_values = pd.DataFrame(
-                candidates[:, -1:].detach().numpy(), columns=[self.fidelity_key]
-            )
-
-            return pd.concat((variable_values, fidelity_values), axis=1)
+        return pd.concat((variable_values, fidelity_values), axis=1)
 
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
         # calculate total cost of data samples using the fidelity parameter
         if data is None:
             data = self.data
 
-        f_data = data[self.fidelity_key].to_numpy()
-        return f_data.sum() + self.options.acq.base_cost * len(f_data)
+        f_data = data[self.fidelity_parameter].to_numpy()
+        return f_data.sum() + self.options.acq.fixed_cost * len(f_data)
 
     def _get_acquisition(self, model):
         """
@@ -174,9 +139,14 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
 
         """
         cost_model = AffineFidelityCostModel(
-            fidelity_weights=self.target_fidelity, fixed_cost=5.0
+            fidelity_weights=self.target_fidelity,
+            fixed_cost=self.options.acq.fixed_cost,
         )
         cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
+
+        # get only the objective model
+        assert len(model.models) == 1
+        model = model.models[0]
 
         curr_val_acqf = FixedFeatureAcquisitionFunction(
             acq_function=PosteriorMean(model),
@@ -202,41 +172,20 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
             project=self._project,
         )
 
-    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
-        """
-        Returns a ModelListGP containing independent models for the objectives and
-        constraints
-
-        """
-        if data is None:
-            data = self.data
-
-        # drop nans
-        valid_data = data[
-            pd.unique(
-                self.vocs.variable_names + self.vocs.output_names + [self.fidelity_key]
-            )
-        ].dropna()
-
-        kwargs = self.options.model.kwargs.dict()
-
-        _model = self.options.model.function(
-            valid_data, self.vocs, self.fidelity_key, **kwargs
-        )
-
-        # validate returned model
-        self._validate_model(_model)
-
-        if update_internal:
-            self._model = _model
-        return _model
-
     def _get_objective(self):
-        return create_mc_objective(self.vocs)
+        return create_mc_objective(self.vocs, self._tkwargs)
+
+    def add_data(self, new_data: pd.DataFrame):
+        # overwrite add data to check for valid fidelity values
+        if (new_data[self.fidelity_parameter] > 1.0).any() or (
+            new_data[self.fidelity_parameter] < 0.0
+        ).any():
+            raise ValueError("cannot add fidelity data that is outside the range [0,1]")
+        self.data = pd.concat([self.data, new_data], axis=0)
 
     @property
-    def fidelity_key(self):
-        return self.options.model.fidelity_key
+    def fidelity_parameter(self):
+        return self.options.model.fidelity_parameter
 
     @property
     def fidelity_index(self):
@@ -259,5 +208,5 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         return mf_bounds
 
     def _validate_model(self, model):
-        if not isinstance(model, SingleTaskMultiFidelityGP):
+        if not isinstance(model.models[0], SingleTaskMultiFidelityGP):
             raise ValueError("model must be SingleTaskMultiFidelityGP object")

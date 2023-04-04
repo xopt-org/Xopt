@@ -145,6 +145,7 @@ def safe_call(func, *args, **kwargs):
         outputs["runtime"] = time.perf_counter() - t
     return outputs
 
+
 # functions for formatting documentation
 def format_option_descriptions(options_object):
     options_dict = get_descriptions_defaults(options_object)

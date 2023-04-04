@@ -27,7 +27,12 @@ logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
-    def __init__(self, vocs: VOCS, options: BayesianOptions = None):
+    def __init__(
+        self,
+        vocs: VOCS,
+        options: BayesianOptions = None,
+        supports_batch_generation=False,
+    ):
         options = options or BayesianOptions()
         if not isinstance(options, BayesianOptions):
             raise ValueError("options must be of type BayesianOptions")
@@ -37,6 +42,7 @@ class BayesianGenerator(Generator, ABC):
         self._model = None
         self._acquisition = None
         self._trust_region = None
+        self.supports_batch_generation = supports_batch_generation
         self.sampler = SobolQMCNormalSampler(self.options.acq.monte_carlo_samples)
         self.model_constructor = get_model_constructor(options.model)(
             self.vocs, options.model
@@ -55,9 +61,9 @@ class BayesianGenerator(Generator, ABC):
         self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> List[Dict]:
-        if n_candidates > 1:
+        if n_candidates > 1 and not self.supports_batch_generation:
             raise NotImplementedError(
-                "Bayesian algorithms don't currently support parallel candidate "
+                "This Bayesian algorithm does not currently support parallel candidate "
                 "generation"
             )
 
@@ -78,8 +84,9 @@ class BayesianGenerator(Generator, ABC):
             # get candidates
             candidates = self.optimize_acqf(acq_funct, bounds, n_candidates)
 
-            logger.debug("Best candidate from optimize", candidates)
-            return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
+            # post process candidates
+            result = self.process_candidates(candidates)
+            return result
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
@@ -89,6 +96,8 @@ class BayesianGenerator(Generator, ABC):
         """
         if data is None:
             data = self.data
+        if data.empty:
+            raise ValueError("no data available to build model")
 
         _model = self.model_constructor.build_model(data, self._tkwargs)
 
@@ -142,6 +151,10 @@ class BayesianGenerator(Generator, ABC):
         )
         return candidates
 
+    def process_candidates(self, candidates):
+        logger.debug("Best candidate from optimize", candidates)
+        return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
+
     @abstractmethod
     def _get_acquisition(self, model):
         pass
@@ -179,6 +192,7 @@ class BayesianGenerator(Generator, ABC):
         return {"dtype": torch.double, "device": device}
 
     def _get_bounds(self):
+        """convert bounds from vocs to torch tensors"""
         return torch.tensor(self.vocs.bounds, **self._tkwargs)
 
     def get_optimization_bounds(self):
