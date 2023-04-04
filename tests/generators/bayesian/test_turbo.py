@@ -50,3 +50,6 @@ class TestTurbo(TestCase):
             turbo_state,
             {}
         )
+
+        assert torch.all(tr[0] >= bounds[0])
+        assert torch.all(tr[1] <= bounds[1])
