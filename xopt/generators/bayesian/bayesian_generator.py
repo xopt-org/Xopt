@@ -76,7 +76,7 @@ class BayesianGenerator(Generator, ABC):
             model = self.train_model(self.data)
 
             # calculate optimization bounds
-            bounds = self.get_optimization_bounds()
+            bounds = self._get_optimization_bounds()
 
             # get acquisition function
             acq_funct = self.get_acquisition(model)
@@ -85,7 +85,7 @@ class BayesianGenerator(Generator, ABC):
             candidates = self.optimize_acqf(acq_funct, bounds, n_candidates)
 
             # post process candidates
-            result = self.process_candidates(candidates)
+            result = self._process_candidates(candidates)
             return result
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
@@ -151,7 +151,7 @@ class BayesianGenerator(Generator, ABC):
         )
         return candidates
 
-    def process_candidates(self, candidates):
+    def _process_candidates(self, candidates):
         logger.debug("Best candidate from optimize", candidates)
         return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
 
@@ -195,7 +195,7 @@ class BayesianGenerator(Generator, ABC):
         """convert bounds from vocs to torch tensors"""
         return torch.tensor(self.vocs.bounds, **self._tkwargs)
 
-    def get_optimization_bounds(self):
+    def _get_optimization_bounds(self):
         """
         gets optimization bounds based on the union of several domains
         - if use_turbo is True include trust region

@@ -41,7 +41,11 @@ class TestMultiFidelityGenerator:
         options = MultiFidelityBayesianGenerator.default_options()
         options.model.fidelity_parameter = fidelity_parameter
 
-        MultiFidelityBayesianGenerator(vocs, options)
+        gen = MultiFidelityBayesianGenerator(vocs, options)
+
+        # test reference point
+        pt = gen.reference_point
+        assert torch.allclose(pt, torch.tensor((-torch.inf, 0.0)).to(pt))
 
     def test_model_creation(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -93,16 +97,13 @@ class TestMultiFidelityGenerator:
         acq = generator.get_acquisition(generator.model)
 
         # evaluate acquisition function at a test point
-        batch_size = 1
-        n_fantasies = 128
-        test_x = torch.rand(3, batch_size + n_fantasies, 3).double()
+        test_x = torch.rand(3, 1, 3).double()
         acq(test_x)
 
         # test total cost
         assert (
             generator.calculate_total_cost()
-            == data[fidelity_parameter].to_numpy().sum()
-            + 10 * generator.options.acq.base_cost
+            == data[fidelity_parameter].to_numpy().sum() + 10
         )
 
     def test_generation(self):
@@ -119,7 +120,6 @@ class TestMultiFidelityGenerator:
         options.model.fidelity_parameter = fidelity_parameter
         options.optim.num_restarts = 1
         options.optim.raw_samples = 1
-        options.acq.n_fantasies = 2
 
         generator = MultiFidelityBayesianGenerator(vocs, options)
         generator.add_data(data)

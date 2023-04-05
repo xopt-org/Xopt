@@ -78,3 +78,26 @@ def create_mobo_objective(vocs, tkwargs):
     return WeightedMCMultiOutputObjective(
         weights, outcomes=list(range(n_objectives)), num_outcomes=n_objectives
     )
+
+
+def create_momf_objective(vocs, tkwargs):
+    """
+    create multi-objective multi-fidelity objective assuming that the last axis is
+    the fidelity parameter
+    botorch assumes maximization so we need to negate any objectives that have
+    minimize keyword and zero out anything that is a constraint
+    """
+    n_objectives = len(vocs.objectives) + 1
+    weights = torch.zeros(n_objectives).to(**tkwargs)
+
+    for idx, ele in enumerate(vocs.objectives):
+        if vocs.objectives[ele] == "MINIMIZE":
+            weights[idx] = -1.0
+        elif vocs.objectives[ele] == "MAXIMIZE":
+            weights[idx] = 1.0
+
+    # set fidelity objective (which is always maximize)
+    weights[-1] = 1.0
+    return WeightedMCMultiOutputObjective(
+        weights, outcomes=list(range(n_objectives)), num_outcomes=n_objectives
+    )
