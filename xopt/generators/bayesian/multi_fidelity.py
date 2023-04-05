@@ -1,20 +1,16 @@
 import logging
+from typing import Callable, List
 
+import numpy as np
 import pandas as pd
 import torch
-from botorch.acquisition import (
-    FixedFeatureAcquisitionFunction,
-    InverseCostWeightedUtility,
-    PosteriorMean,
-    qMultiFidelityKnowledgeGradient,
-)
-from botorch.acquisition.utils import project_to_target_fidelity
-from botorch.models import AffineFidelityCostModel, SingleTaskMultiFidelityGP
-from botorch.optim import optimize_acqf, optimize_acqf_mixed
+from botorch.models import SingleTaskGP, SingleTaskMultiFidelityGP
 from pydantic import Field
 
+from xopt.errors import XoptError
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.objectives import create_mc_objective
+from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
+from xopt.generators.bayesian.objectives import create_momf_objective
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
@@ -30,25 +26,21 @@ class MultiFidelityModelOptions(ModelOptions):
 
 
 class MultiFidelityAcqOptions(AcqOptions):
-    fidelities: list = Field(
-        [0.5, 0.75, 1.0],
-        description="fixed fidelities to evaluate the acquisiton function on (less "
-        "values equals better computational perfromance",
+    cost_function: Callable = Field(
+        lambda x: x[..., -1] + 1.0,
+        description="callable function that describes the cost "
+        "of evaluating the objective function",
     )
-    n_fantasies: int = Field(
-        128,
-        description="number of fantasy samples to take for "
-        "calculating knowledge gradient",
-        ge=2,
-    )
-    fixed_cost: float = Field(
-        1.0, description="fixed cost added to fidelity cost of running a sample"
+    reference_point: List[float] = Field(
+        None,
+        description="reference point for multi-objective, multi-fidelity "
+        "optimization",
     )
 
 
 class MultiFidelityOptions(BayesianOptions):
-    model = MultiFidelityModelOptions()
     acq = MultiFidelityAcqOptions()
+    model = MultiFidelityModelOptions()
 
 
 class MultiFidelityBayesianGenerator(BayesianGenerator):
@@ -85,40 +77,15 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
     def default_options() -> MultiFidelityOptions:
         return MultiFidelityOptions()
 
-    def optimize_acqf(self, acq_funct, bounds, n_candidates):
-        # get candidates in real domain at discrete fidelities specified by options
-        ff_list = [{self.fidelity_index: ele} for ele in self.options.acq.fidelities]
-        candidates, out = optimize_acqf_mixed(
-            acq_function=acq_funct,
-            bounds=self._get_bounds(),
-            fixed_features_list=ff_list,
-            q=n_candidates,
-            num_restarts=self.options.optim.num_restarts,
-            raw_samples=self.options.optim.raw_samples,
-            # batch_initial_conditions=X_init,
-            options={"batch_limit": 5, "maxiter": 200},
-        )
-        logger.debug("Best candidate from optimize", candidates, out)
-        return candidates
-
-    def process_candidates(self, candidates):
-        # build candidate data frame with fidelity parameter
-        variable_values = self.vocs.convert_numpy_to_inputs(
-            candidates[:, :-1].detach().numpy()
-        )
-        fidelity_values = pd.DataFrame(
-            candidates[:, -1:].detach().numpy(), columns=[self.fidelity_parameter]
-        )
-
-        return pd.concat((variable_values, fidelity_values), axis=1)
-
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
-        # calculate total cost of data samples using the fidelity parameter
+        """calculate total cost of data samples using the fidelity parameter"""
         if data is None:
             data = self.data
 
-        f_data = data[self.fidelity_parameter].to_numpy()
-        return f_data.sum() + self.options.acq.fixed_cost * len(f_data)
+        f_data = self.get_input_data(data)
+
+        # apply callable function to get costs
+        return self.options.acq.cost_function(f_data).sum()
 
     def _get_acquisition(self, model):
         """
@@ -138,42 +105,33 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         FixedFeatureAcquisitionFunction on top of a PosteriorMean.
 
         """
-        cost_model = AffineFidelityCostModel(
-            fidelity_weights=self.target_fidelity,
-            fixed_cost=self.options.acq.fixed_cost,
-        )
-        cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
 
-        # get only the objective model
-        assert len(model.models) == 1
-        model = model.models[0]
+        X_baseline = self.get_input_data(self.data)
 
-        curr_val_acqf = FixedFeatureAcquisitionFunction(
-            acq_function=PosteriorMean(model),
-            d=self.vocs.n_variables + 1,
-            columns=[self.fidelity_index],
-            values=[1],
-        )
-
-        _, current_value = optimize_acqf(
-            acq_function=curr_val_acqf,
-            bounds=self._get_bounds()[:, :-1],
-            q=1,
-            num_restarts=self.options.optim.num_restarts,
-            raw_samples=self.options.optim.raw_samples,
-            options={"batch_limit": 10, "maxiter": 200},
-        )
-
-        return qMultiFidelityKnowledgeGradient(
+        acq_func = NMOMF(
             model=model,
-            num_fantasies=self.options.acq.n_fantasies,
-            current_value=current_value,
-            cost_aware_utility=cost_aware_utility,
-            project=self._project,
+            X_baseline=X_baseline,
+            ref_point=self.reference_point,
+            cost_call=self.options.acq.cost_function,
+            objective=self._get_objective(),
+            constraints=self._get_constraint_callables(),
+            cache_root=False,
+            prune_baseline=True,
         )
+
+        return acq_func
 
     def _get_objective(self):
-        return create_mc_objective(self.vocs, self._tkwargs)
+        return create_momf_objective(self.vocs, self._tkwargs)
+
+    def _get_optimization_bounds(self):
+        """
+        gets optimization bounds including fidelity parameter
+
+        """
+        bounds = self._get_bounds()
+        mf_bounds = torch.hstack((bounds, torch.tensor([0, 1]).reshape(2, 1)))
+        return mf_bounds
 
     def add_data(self, new_data: pd.DataFrame):
         # overwrite add data to check for valid fidelity values
@@ -182,6 +140,22 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         ).any():
             raise ValueError("cannot add fidelity data that is outside the range [0,1]")
         self.data = pd.concat([self.data, new_data], axis=0)
+
+    def get_input_data(self, data):
+        return torch.tensor(
+            data[self.vocs.variable_names + [self.fidelity_parameter]].to_numpy(),
+            **self._tkwargs,
+        )
+
+    def _process_candidates(self, candidates):
+        logger.debug("Best candidate from optimize", candidates)
+        result = self.vocs.convert_numpy_to_inputs(
+            candidates[..., :-1].detach().cpu().numpy()
+        )
+        # add fidelity parameter
+        result[self.fidelity_parameter] = candidates[..., -1].detach().cpu().numpy()
+
+        return result
 
     @property
     def fidelity_parameter(self):
@@ -195,18 +169,32 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
     def target_fidelity(self):
         return {self.fidelity_index: 1.0}
 
-    def get_acquisition(self, model):
-        acq = self._get_acquisition(model)
-        return acq
-
-    def _project(self, X):
-        return project_to_target_fidelity(X=X, target_fidelities=self.target_fidelity)
-
-    def _get_bounds(self) -> torch.Tensor:
-        bounds = super()._get_bounds()
-        mf_bounds = torch.hstack((bounds, torch.tensor([0, 1]).reshape(2, 1)))
-        return mf_bounds
-
     def _validate_model(self, model):
-        if not isinstance(model.models[0], SingleTaskMultiFidelityGP):
-            raise ValueError("model must be SingleTaskMultiFidelityGP object")
+        if not isinstance(model, SingleTaskGP):
+            raise ValueError("model must be SingleTaskGP object")
+
+    @property
+    def reference_point(self):
+        if self.vocs.n_objectives == 1:
+            # case for multi-fidelity single objective
+            if self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE":
+                pt = [-10, 0.0]
+            else:
+                pt = [10, 0.0]
+
+        else:
+            # case for multi-fidelity multi-objective
+            pt = []
+            for name in self.vocs.objective_names:
+                ref_val = self.options.acq.reference_point[name]
+                if self.vocs.objectives[name] == "MINIMIZE":
+                    pt += [-ref_val]
+                elif self.vocs.objectives[name] == "MAXIMIZE":
+                    pt += [ref_val]
+                else:
+                    raise ValueError(
+                        f"objective type {self.vocs.objectives[name]} not\
+                            supported"
+                    )
+
+        return torch.tensor(pt, **self._tkwargs)

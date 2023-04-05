@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_mll
-from botorch.models import ModelListGP, SingleTaskMultiFidelityGP
+from botorch.models import ModelListGP, SingleTaskGP, SingleTaskMultiFidelityGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.likelihoods import GaussianLikelihood
@@ -39,9 +39,12 @@ class MultiFidelityModelConstructor(StandardModelConstructor):
         self.input_data = pd.concat(
             (self.input_data, data[self.options.fidelity_parameter].dropna()), axis=1
         )
+        self.objective_data = pd.concat(
+            (self.objective_data, data[self.options.fidelity_parameter].dropna()), axis=1
+        )
         self.train_X = torch.tensor(self.input_data.to_numpy(), **self.tkwargs)
 
-    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
+    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> SingleTaskGP:
         """construct independent model for each objective and constraint"""
         # overwrite tkwargs if specified
         self.tkwargs = tkwargs or self.tkwargs
@@ -62,27 +65,28 @@ class MultiFidelityModelConstructor(StandardModelConstructor):
         if (max(self.train_X[:, -1]) > 1).any() or (min(self.train_X[:, -1]) < 0).any():
             raise ValueError("fidelity values must be in the domain [0,1]")
 
-        # get fidelity index
-        f_index = -1
-
         # create models for objectives
         objective_name = self.vocs.objective_names[0]
         train_Y = torch.tensor(
-            self.objective_data[objective_name].to_numpy(), **self.tkwargs
-        ).unsqueeze(-1)
+            self.objective_data[
+                [objective_name, self.options.fidelity_parameter]
+            ].to_numpy(),
+            **self.tkwargs
+        )
+        if len(train_Y.shape) == 1:
+            train_Y = train_Y.unsqueeze(-1)
 
-        model = SingleTaskMultiFidelityGP(
+        model = SingleTaskGP(
             self.train_X,
             train_Y,
             input_transform=input_transform,
-            outcome_transform=Standardize(1),
+            outcome_transform=Standardize(m=train_Y.shape[-1]),
             likelihood=self.likelihood,
-            iteration_fidelity=f_index,
         )
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         fit_gpytorch_mll(mll)
 
-        return ModelListGP(model)
+        return model
 
 
 def create_multifidelity_model(
