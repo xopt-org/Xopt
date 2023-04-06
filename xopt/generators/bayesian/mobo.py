@@ -2,10 +2,12 @@ from typing import Dict
 
 import torch
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
+from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from pydantic import Field
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.vocs import VOCS
+from .utils import calculate_hypervolume, set_botorch_weights
 from ...errors import XoptError
 from ...utils import format_option_descriptions
 from .bayesian_generator import BayesianGenerator
@@ -32,10 +34,10 @@ class MOBOGenerator(BayesianGenerator):
 
     def __init__(self, vocs: VOCS, options: MOBOOptions = None):
         options = options or MOBOOptions()
-        if not type(options) is MOBOOptions:
+        if not isinstance(options, MOBOOptions):
             raise ValueError("options must be a MOBOOptions object")
 
-        super().__init__(vocs, options)
+        super().__init__(vocs, options, supports_batch_generation=True)
 
     @staticmethod
     def default_options() -> MOBOOptions:
@@ -70,7 +72,6 @@ class MOBOGenerator(BayesianGenerator):
         inputs = self.get_input_data(self.data)
 
         # fix problem with qNEHVI interpretation with constraints
-
         acq = qNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
@@ -83,3 +84,20 @@ class MOBOGenerator(BayesianGenerator):
         )
 
         return acq
+
+    def calculate_hypervolume(self):
+        """compute hypervolume given data"""
+        objective_data = torch.tensor(
+            self.vocs.objective_data(self.data, return_raw=True).to_numpy())
+        n_objectives = self.vocs.n_objectives
+        weights = torch.zeros(n_objectives)
+        weights = set_botorch_weights(weights, self.vocs)
+        objective_data = objective_data * weights
+
+        # compute hypervolume
+        bd = DominatedPartitioning(
+            ref_point=self.reference_point, Y=objective_data
+        )
+        volume = bd.compute_hypervolume().item()
+
+        return volume
