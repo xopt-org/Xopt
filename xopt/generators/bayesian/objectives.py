@@ -4,6 +4,18 @@ import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 
+from xopt.generators.bayesian.custom_botorch.constrained_acqusition import \
+    FeasibilityObjective
+from xopt.generators.bayesian.utils import get_objective_weights
+
+
+def feasibility(X, model, sampler, vocs, posterior_transform=None):
+    constraints = create_constraint_callables(vocs)
+    posterior = model.posterior(X=X, posterior_transform=posterior_transform)
+    samples = sampler(posterior)
+    objective = FeasibilityObjective(constraints)
+    return torch.mean(objective(samples, X), dim=0)
+
 
 def constraint_function(Z, vocs, index, quantile_cutoff=0.0):
     """
@@ -48,12 +60,7 @@ def create_mc_objective(vocs, tkwargs):
     create the objective object
 
     """
-    weights = torch.zeros(vocs.n_outputs, **tkwargs)
-    for idx, ele in enumerate(vocs.objective_names):
-        if vocs.objectives[ele] == "MINIMIZE":
-            weights[idx] = -1.0
-        elif vocs.objectives[ele] == "MAXIMIZE":
-            weights[idx] = 1.0
+    weights = get_objective_weights(vocs, tkwargs)
 
     def obj_callable(Z):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
@@ -66,17 +73,10 @@ def create_mobo_objective(vocs, tkwargs):
     botorch assumes maximization so we need to negate any objectives that have
     minimize keyword and zero out anything that is a constraint
     """
-    n_objectives = len(vocs.objectives)
-    weights = torch.zeros(n_objectives).to(**tkwargs)
-
-    for idx, ele in enumerate(vocs.objectives):
-        if vocs.objectives[ele] == "MINIMIZE":
-            weights[idx] = -1.0
-        elif vocs.objectives[ele] == "MAXIMIZE":
-            weights[idx] = 1.0
+    weights = get_objective_weights(vocs, tkwargs)
 
     return WeightedMCMultiOutputObjective(
-        weights, outcomes=list(range(n_objectives)), num_outcomes=n_objectives
+        weights, outcomes=list(range(vocs.n_objectives)), num_outcomes=vocs.n_objectives
     )
 
 
@@ -87,17 +87,11 @@ def create_momf_objective(vocs, tkwargs):
     botorch assumes maximization so we need to negate any objectives that have
     minimize keyword and zero out anything that is a constraint
     """
-    n_objectives = len(vocs.objectives) + 1
-    weights = torch.zeros(n_objectives).to(**tkwargs)
+    n_objectives = vocs.n_outputs + 1
+    weights = get_objective_weights(vocs, tkwargs)
 
-    for idx, ele in enumerate(vocs.objectives):
-        if vocs.objectives[ele] == "MINIMIZE":
-            weights[idx] = -1.0
-        elif vocs.objectives[ele] == "MAXIMIZE":
-            weights[idx] = 1.0
-
-    # set fidelity objective (which is always maximize)
-    weights[-1] = 1.0
+    # append fidelity objective (which is always maximize)
+    weights = torch.cat((weights, torch.ones(1).to(weights)))
     return WeightedMCMultiOutputObjective(
-        weights, outcomes=list(range(n_objectives)), num_outcomes=n_objectives
+        weights, outcomes=list(range(n_outputs)), num_outcomes=n_objectives
     )

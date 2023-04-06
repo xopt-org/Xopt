@@ -5,6 +5,7 @@ from typing import Dict, List
 
 import pandas as pd
 import torch
+from botorch.acquisition import qUpperConfidenceBound
 from botorch.models import ModelListGP
 from botorch.optim import optimize_acqf
 from botorch.sampling import SobolQMCNormalSampler
@@ -12,6 +13,9 @@ from botorch.sampling.get_sampler import get_sampler
 from gpytorch import Module
 
 from xopt.generator import Generator
+from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+    ConstrainedMCAcquisitionFunction,
+)
 from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 from xopt.generators.bayesian.models.utils import get_model_constructor
 from xopt.generators.bayesian.objectives import (
@@ -150,6 +154,27 @@ class BayesianGenerator(Generator, ABC):
             num_restarts=self.options.optim.num_restarts,
         )
         return candidates
+
+    def get_optimum(self):
+        """select the best point(s) (for multi-objective generators, given by the
+        model using the Posterior mean"""
+        c_posterior_mean = ConstrainedMCAcquisitionFunction(
+            self.model,
+            qUpperConfidenceBound(
+                model=self.model, beta=0.0, objective=self._get_objective()
+            ),
+            self._get_constraint_callables(),
+        )
+
+        result, out = optimize_acqf(
+            acq_function=c_posterior_mean,
+            bounds=self._get_bounds(),
+            q=1,
+            raw_samples=self.options.optim.raw_samples * 5,
+            num_restarts=self.options.optim.num_restarts * 5,
+        )
+
+        return self._process_candidates(result)
 
     def _process_candidates(self, candidates):
         logger.debug("Best candidate from optimize", candidates)

@@ -1,17 +1,25 @@
 import logging
+from copy import deepcopy
 from typing import Callable, List
 
 import numpy as np
 import pandas as pd
 import torch
+from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound, \
+    GenericMCObjective
 from botorch.models import SingleTaskGP, SingleTaskMultiFidelityGP
+from botorch.optim import optimize_acqf
 from pydantic import Field
 
 from xopt.errors import XoptError
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+    ConstrainedMCAcquisitionFunction,
+)
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.objectives import create_momf_objective
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
+from xopt.generators.bayesian.utils import compute_hypervolume
 from xopt.utils import format_option_descriptions
 from xopt.vocs import VOCS
 
@@ -27,7 +35,7 @@ class MultiFidelityModelOptions(ModelOptions):
 
 class MultiFidelityAcqOptions(AcqOptions):
     cost_function: Callable = Field(
-        lambda x: x[..., -1] + 1.0,
+        lambda x: x + 1.0,
         description="callable function that describes the cost "
         "of evaluating the objective function",
     )
@@ -73,6 +81,12 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
 
         super().__init__(vocs, options, supports_batch_generation=True)
 
+        # create an augmented vocs that includes the fidelity parameter for both the
+        # variable and constraint
+        self._vocs = deepcopy(self.vocs)
+        self._vocs.variables[self.fidelity_parameter] = [0,1]
+        self._vocs.objectives[self.fidelity_parameter] = "MAXIMIZE"
+
     @staticmethod
     def default_options() -> MultiFidelityOptions:
         return MultiFidelityOptions()
@@ -85,7 +99,7 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         f_data = self.get_input_data(data)
 
         # apply callable function to get costs
-        return self.options.acq.cost_function(f_data).sum()
+        return self.options.acq.cost_function(f_data[..., -1]).sum()
 
     def _get_acquisition(self, model):
         """
@@ -108,11 +122,15 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
 
         X_baseline = self.get_input_data(self.data)
 
+        # wrap the cost function such that it only has to accept the fidelity parameter
+        def true_cost_function(X):
+            return self.options.acq.cost_function(X[..., -1])
+
         acq_func = NMOMF(
             model=model,
             X_baseline=X_baseline,
             ref_point=self.reference_point,
-            cost_call=self.options.acq.cost_function,
+            cost_call=true_cost_function,
             objective=self._get_objective(),
             constraints=self._get_constraint_callables(),
             cache_root=False,
@@ -165,13 +183,47 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
     def fidelity_index(self):
         return self.vocs.n_variables
 
-    @property
-    def target_fidelity(self):
-        return {self.fidelity_index: 1.0}
-
     def _validate_model(self, model):
         if not isinstance(model, SingleTaskGP):
             raise ValueError("model must be SingleTaskGP object")
+
+    def get_optimum(self):
+        """select the best point at the maximum fidelity"""
+
+        # define single objective based on vocs
+        weights = torch.zeros(self.vocs.n_outputs + 1, **self._tkwargs)
+        for idx, ele in enumerate(self.vocs.objective_names):
+            if self.vocs.objectives[ele] == "MINIMIZE":
+                weights[idx] = -1.0
+            elif self.vocs.objectives[ele] == "MAXIMIZE":
+                weights[idx] = 1.0
+
+        def obj_callable(Z):
+            return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
+
+        c_posterior_mean = ConstrainedMCAcquisitionFunction(
+            self.model,
+            qUpperConfidenceBound(
+                model=self.model, beta=0.0, objective=GenericMCObjective(obj_callable)
+            ),
+            self._get_constraint_callables(),
+        )
+
+        max_fidelity_c_posterior_mean = FixedFeatureAcquisitionFunction(
+            c_posterior_mean, self.vocs.n_variables + 1, [self.vocs.n_variables], [1.0]
+        )
+
+        result, out = optimize_acqf(
+            acq_function=max_fidelity_c_posterior_mean,
+            bounds=self._get_bounds(),
+            q=1,
+            raw_samples=self.options.optim.raw_samples * 5,
+            num_restarts=self.options.optim.num_restarts * 5,
+        )
+
+        return self.vocs.convert_numpy_to_inputs(
+            result.detach().cpu().numpy()
+        )
 
     @property
     def reference_point(self):
@@ -198,3 +250,12 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
                     )
 
         return torch.tensor(pt, **self._tkwargs)
+
+    def compute_hypervolume(self):
+        """ compute hypervolume given data"""
+
+        # create a copy of vocs that includes the fidelity parameter
+        vocs_copy = deepcopy(self.vocs)
+        vocs_copy.objectives[self.fidelity_parameter] = "MAXIMIZE"
+
+        return compute_hypervolume(self.data, vocs_copy, self.reference_point.numpy())
