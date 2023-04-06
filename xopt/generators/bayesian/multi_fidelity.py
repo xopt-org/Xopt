@@ -18,8 +18,7 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.mobo import MOBOOptions
-from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
-from xopt.generators.bayesian.utils import calculate_hypervolume
+from xopt.generators.bayesian.options import AcqOptions, ModelOptions
 from xopt.utils import format_option_descriptions
 from xopt.vocs import ObjectiveEnum, VOCS
 
@@ -194,7 +193,7 @@ class MultiFidelityBayesianGenerator(MOBOGenerator):
         fixed_bounds = torch.cat(
             (
                 boundst[: self.fidelity_variable_index],
-                boundst[self.fidelity_variable_index + 1 :],
+                boundst[self.fidelity_variable_index + 1:],
             )
         ).T
 

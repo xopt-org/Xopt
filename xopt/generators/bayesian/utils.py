@@ -1,7 +1,4 @@
-import numpy as np
-import pandas as pd
 import torch
-from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 
 from xopt.vocs import VOCS
 
@@ -39,9 +36,3 @@ def rectilinear_domain_union(A, B):
     )
 
     return out_bounds
-
-
-def calculate_hypervolume(data: pd.DataFrame, vocs: VOCS, reference_point: np.ndarray):
-    """compute the hypervolume from a data set"""
-    # get objective data
-

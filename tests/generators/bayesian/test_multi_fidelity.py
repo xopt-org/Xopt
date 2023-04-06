@@ -111,4 +111,3 @@ class TestMultiFidelityGenerator:
         # test getting the best point at max fidelity
         # get optimal value at max fidelity
         generator.get_optimum()
-

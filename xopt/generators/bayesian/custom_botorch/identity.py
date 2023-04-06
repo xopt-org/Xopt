@@ -21,5 +21,3 @@ class Identity(AcquisitionFunction):
         """
 
         return torch.ones(X.shape[:-2])
-
-
