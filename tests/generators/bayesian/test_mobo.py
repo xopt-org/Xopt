@@ -3,8 +3,6 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import pytest
-import torch
-from pandas import Series
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
@@ -62,12 +60,14 @@ class TestMOBOGenerator:
         vocs.objectives.update({"y2": "MINIMIZE"})
         vocs.constraints = {}
 
-        data = pd.DataFrame({
-            "x1": np.random.rand(2),
-            "x2": np.random.rand(2),
-            "y1": np.array((1.0, 0.0)),
-            "y2": np.array((0.0, 2.0))
-        })
+        data = pd.DataFrame(
+            {
+                "x1": np.random.rand(2),
+                "x2": np.random.rand(2),
+                "y1": np.array((1.0, 0.0)),
+                "y2": np.array((0.0, 2.0)),
+            }
+        )
 
         options = MOBOGenerator.default_options()
         options.acq.reference_point = {"y1": 10.0, "y2": 1.0}
@@ -82,4 +82,3 @@ class TestMOBOGenerator:
         generator.add_data(data)
 
         assert generator.calculate_hypervolume() == 0.0
-
