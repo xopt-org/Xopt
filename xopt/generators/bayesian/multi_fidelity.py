@@ -2,26 +2,26 @@ import logging
 from copy import deepcopy
 from typing import Callable, List
 
-import numpy as np
 import pandas as pd
 import torch
-from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound, \
-    GenericMCObjective
-from botorch.models import SingleTaskGP, SingleTaskMultiFidelityGP
+from botorch.acquisition import (
+    FixedFeatureAcquisitionFunction,
+    GenericMCObjective,
+    qUpperConfidenceBound,
+)
 from botorch.optim import optimize_acqf
 from pydantic import Field
 
-from xopt.errors import XoptError
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators import MOBOGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
-from xopt.generators.bayesian.objectives import create_momf_objective
+from xopt.generators.bayesian.mobo import MOBOOptions
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions, ModelOptions
-from xopt.generators.bayesian.utils import compute_hypervolume
+from xopt.generators.bayesian.utils import calculate_hypervolume
 from xopt.utils import format_option_descriptions
-from xopt.vocs import VOCS
+from xopt.vocs import ObjectiveEnum, VOCS
 
 logger = logging.getLogger()
 
@@ -29,7 +29,7 @@ logger = logging.getLogger()
 class MultiFidelityModelOptions(ModelOptions):
     """Options for defining the Multi-fidelity GP model in BO"""
 
-    name: str = Field("multi_fidelity", description="name of model constructor")
+    name: str = Field("standard", description="name of model constructor")
     fidelity_parameter: str = Field("s", description="fidelity parameter name")
 
 
@@ -46,12 +46,12 @@ class MultiFidelityAcqOptions(AcqOptions):
     )
 
 
-class MultiFidelityOptions(BayesianOptions):
+class MultiFidelityOptions(MOBOOptions):
     acq = MultiFidelityAcqOptions()
     model = MultiFidelityModelOptions()
 
 
-class MultiFidelityBayesianGenerator(BayesianGenerator):
+class MultiFidelityBayesianGenerator(MOBOGenerator):
     alias = "multi_fidelity"
     __doc__ = (
         """Implements Multi-fidelity Bayeisan optimizationn
@@ -79,13 +79,13 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for optimization")
 
-        super().__init__(vocs, options, supports_batch_generation=True)
-
         # create an augmented vocs that includes the fidelity parameter for both the
         # variable and constraint
-        self._vocs = deepcopy(self.vocs)
-        self._vocs.variables[self.fidelity_parameter] = [0,1]
-        self._vocs.objectives[self.fidelity_parameter] = "MAXIMIZE"
+        _vocs = deepcopy(vocs)
+        _vocs.variables[options.model.fidelity_parameter] = [0, 1]
+        _vocs.objectives[options.model.fidelity_parameter] = ObjectiveEnum("MAXIMIZE")
+
+        super().__init__(_vocs, options)
 
     @staticmethod
     def default_options() -> MultiFidelityOptions:
@@ -99,7 +99,9 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         f_data = self.get_input_data(data)
 
         # apply callable function to get costs
-        return self.options.acq.cost_function(f_data[..., -1]).sum()
+        return self.options.acq.cost_function(
+            f_data[..., self.fidelity_variable_index]
+        ).sum()
 
     def _get_acquisition(self, model):
         """
@@ -124,7 +126,7 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
 
         # wrap the cost function such that it only has to accept the fidelity parameter
         def true_cost_function(X):
-            return self.options.acq.cost_function(X[..., -1])
+            return self.options.acq.cost_function(X[..., self.fidelity_variable_index])
 
         acq_func = NMOMF(
             model=model,
@@ -139,59 +141,31 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
 
         return acq_func
 
-    def _get_objective(self):
-        return create_momf_objective(self.vocs, self._tkwargs)
-
-    def _get_optimization_bounds(self):
-        """
-        gets optimization bounds including fidelity parameter
-
-        """
-        bounds = self._get_bounds()
-        mf_bounds = torch.hstack((bounds, torch.tensor([0, 1]).reshape(2, 1)))
-        return mf_bounds
-
     def add_data(self, new_data: pd.DataFrame):
         # overwrite add data to check for valid fidelity values
         if (new_data[self.fidelity_parameter] > 1.0).any() or (
             new_data[self.fidelity_parameter] < 0.0
         ).any():
             raise ValueError("cannot add fidelity data that is outside the range [0,1]")
-        self.data = pd.concat([self.data, new_data], axis=0)
-
-    def get_input_data(self, data):
-        return torch.tensor(
-            data[self.vocs.variable_names + [self.fidelity_parameter]].to_numpy(),
-            **self._tkwargs,
-        )
-
-    def _process_candidates(self, candidates):
-        logger.debug("Best candidate from optimize", candidates)
-        result = self.vocs.convert_numpy_to_inputs(
-            candidates[..., :-1].detach().cpu().numpy()
-        )
-        # add fidelity parameter
-        result[self.fidelity_parameter] = candidates[..., -1].detach().cpu().numpy()
-
-        return result
+        super().add_data(new_data)
 
     @property
     def fidelity_parameter(self):
         return self.options.model.fidelity_parameter
 
     @property
-    def fidelity_index(self):
-        return self.vocs.n_variables
+    def fidelity_variable_index(self):
+        return self.vocs.variable_names.index(self.fidelity_parameter)
 
-    def _validate_model(self, model):
-        if not isinstance(model, SingleTaskGP):
-            raise ValueError("model must be SingleTaskGP object")
+    @property
+    def fidelity_objective_index(self):
+        return self.vocs.objective_names.index(self.fidelity_parameter)
 
     def get_optimum(self):
         """select the best point at the maximum fidelity"""
 
         # define single objective based on vocs
-        weights = torch.zeros(self.vocs.n_outputs + 1, **self._tkwargs)
+        weights = torch.zeros(self.vocs.n_outputs, **self._tkwargs)
         for idx, ele in enumerate(self.vocs.objective_names):
             if self.vocs.objectives[ele] == "MINIMIZE":
                 weights[idx] = -1.0
@@ -210,52 +184,57 @@ class MultiFidelityBayesianGenerator(BayesianGenerator):
         )
 
         max_fidelity_c_posterior_mean = FixedFeatureAcquisitionFunction(
-            c_posterior_mean, self.vocs.n_variables + 1, [self.vocs.n_variables], [1.0]
+            c_posterior_mean,
+            self.vocs.n_variables,
+            [self.fidelity_variable_index],
+            [1.0],
         )
+
+        boundst = self._get_bounds().T
+        fixed_bounds = torch.cat(
+            (
+                boundst[: self.fidelity_variable_index],
+                boundst[self.fidelity_variable_index + 1 :],
+            )
+        ).T
 
         result, out = optimize_acqf(
             acq_function=max_fidelity_c_posterior_mean,
-            bounds=self._get_bounds(),
+            bounds=fixed_bounds,
             q=1,
             raw_samples=self.options.optim.raw_samples * 5,
             num_restarts=self.options.optim.num_restarts * 5,
         )
+        vnames = deepcopy(self.vocs.variable_names)
+        del vnames[self.fidelity_variable_index]
+        df = pd.DataFrame(result.detach().cpu().numpy(), columns=vnames)
+        df[self.fidelity_parameter] = 1.0
 
-        return self.vocs.convert_numpy_to_inputs(
-            result.detach().cpu().numpy()
-        )
+        return self.vocs.convert_dataframe_to_inputs(df)
 
     @property
     def reference_point(self):
-        if self.vocs.n_objectives == 1:
-            # case for multi-fidelity single objective
-            if self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE":
-                pt = [-10, 0.0]
+        # case for multi-fidelity multi-objective
+        pt = []
+        for name in self.vocs.objective_names:
+            if name == self.fidelity_parameter:
+                ref_val = 0.0
             else:
-                pt = [10, 0.0]
-
-        else:
-            # case for multi-fidelity multi-objective
-            pt = []
-            for name in self.vocs.objective_names:
-                ref_val = self.options.acq.reference_point[name]
-                if self.vocs.objectives[name] == "MINIMIZE":
-                    pt += [-ref_val]
-                elif self.vocs.objectives[name] == "MAXIMIZE":
-                    pt += [ref_val]
+                # if this is a single objective problem then there will be no
+                # reference point in the acq options
+                if self.options.acq.reference_point is None:
+                    ref_val = 10.0
                 else:
-                    raise ValueError(
-                        f"objective type {self.vocs.objectives[name]} not\
-                            supported"
-                    )
+                    ref_val = self.options.acq.reference_point[name]
+
+            if self.vocs.objectives[name] == "MINIMIZE":
+                pt += [-ref_val]
+            elif self.vocs.objectives[name] == "MAXIMIZE":
+                pt += [ref_val]
+            else:
+                raise ValueError(
+                    f"objective type {self.vocs.objectives[name]} not\
+                        supported"
+                )
 
         return torch.tensor(pt, **self._tkwargs)
-
-    def compute_hypervolume(self):
-        """ compute hypervolume given data"""
-
-        # create a copy of vocs that includes the fidelity parameter
-        vocs_copy = deepcopy(self.vocs)
-        vocs_copy.objectives[self.fidelity_parameter] = "MAXIMIZE"
-
-        return compute_hypervolume(self.data, vocs_copy, self.reference_point.numpy())

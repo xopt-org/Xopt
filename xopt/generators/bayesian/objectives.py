@@ -4,9 +4,10 @@ import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import \
-    FeasibilityObjective
-from xopt.generators.bayesian.utils import get_objective_weights
+from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+    FeasibilityObjective,
+)
+from xopt.generators.bayesian.utils import set_botorch_weights
 
 
 def feasibility(X, model, sampler, vocs, posterior_transform=None):
@@ -60,7 +61,10 @@ def create_mc_objective(vocs, tkwargs):
     create the objective object
 
     """
-    weights = get_objective_weights(vocs, tkwargs)
+    n_outputs = vocs.n_outputs
+    weights = torch.zeros(n_outputs).to(**tkwargs)
+
+    weights = set_botorch_weights(weights, vocs)
 
     def obj_callable(Z):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
@@ -73,25 +77,10 @@ def create_mobo_objective(vocs, tkwargs):
     botorch assumes maximization so we need to negate any objectives that have
     minimize keyword and zero out anything that is a constraint
     """
-    weights = get_objective_weights(vocs, tkwargs)
+    n_objectives = vocs.n_objectives
+    weights = torch.zeros(n_objectives).to(**tkwargs)
+    weights = set_botorch_weights(weights, vocs)
 
     return WeightedMCMultiOutputObjective(
         weights, outcomes=list(range(vocs.n_objectives)), num_outcomes=vocs.n_objectives
-    )
-
-
-def create_momf_objective(vocs, tkwargs):
-    """
-    create multi-objective multi-fidelity objective assuming that the last axis is
-    the fidelity parameter
-    botorch assumes maximization so we need to negate any objectives that have
-    minimize keyword and zero out anything that is a constraint
-    """
-    n_objectives = vocs.n_outputs + 1
-    weights = get_objective_weights(vocs, tkwargs)
-
-    # append fidelity objective (which is always maximize)
-    weights = torch.cat((weights, torch.ones(1).to(weights)))
-    return WeightedMCMultiOutputObjective(
-        weights, outcomes=list(range(n_outputs)), num_outcomes=n_objectives
     )

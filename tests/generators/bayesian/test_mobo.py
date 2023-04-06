@@ -1,7 +1,11 @@
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 import pytest
+import torch
+from pandas import Series
+
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
@@ -52,3 +56,30 @@ class TestMOBOGenerator:
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.step()
             X.step()
+
+    def test_hypervolume_calculation(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.objectives.update({"y2": "MINIMIZE"})
+        vocs.constraints = {}
+
+        data = pd.DataFrame({
+            "x1": np.random.rand(2),
+            "x2": np.random.rand(2),
+            "y1": np.array((1.0, 0.0)),
+            "y2": np.array((0.0, 2.0))
+        })
+
+        options = MOBOGenerator.default_options()
+        options.acq.reference_point = {"y1": 10.0, "y2": 1.0}
+
+        generator = MOBOGenerator(vocs, options)
+        generator.add_data(data)
+
+        assert generator.calculate_hypervolume() == 9.0
+
+        vocs.objectives["y1"] = "MAXIMIZE"
+        generator = MOBOGenerator(vocs, options)
+        generator.add_data(data)
+
+        assert generator.calculate_hypervolume() == 0.0
+
