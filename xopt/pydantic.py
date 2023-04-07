@@ -7,6 +7,7 @@ from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
+import torch.nn
 from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
 
@@ -25,6 +26,8 @@ JSON_ENCODERS = {
     np.ndarray: lambda x: x.tolist(),
     np.int64: lambda x: int(x),
     np.float64: lambda x: float(x),
+    torch.nn.Module: lambda x: x.state_dict(),
+    torch.Tensor: lambda x: x.detach().cpu().numpy().tolist()
 }
 
 

@@ -32,7 +32,7 @@ try:
         ExpectedImprovementGenerator,
     )
     from xopt.generators.bayesian.mobo import MOBOGenerator
-    from xopt.generators.bayesian.multi_fidelity import MultiFidelityBayesianGenerator
+    from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
     from xopt.generators.bayesian.upper_confidence_bound import (
         TDUpperConfidenceBoundGenerator,
         UpperConfidenceBoundGenerator,
@@ -44,7 +44,7 @@ try:
         BayesianExplorationGenerator,
         TDUpperConfidenceBoundGenerator,
         ExpectedImprovementGenerator,
-        MultiFidelityBayesianGenerator,
+        MultiFidelityGenerator,
     ]
 
 except ModuleNotFoundError:

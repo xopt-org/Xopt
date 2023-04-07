@@ -7,11 +7,11 @@ from pydantic import Field
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.vocs import VOCS
+from ...errors import XoptError
+from ...utils import format_option_descriptions
 from .bayesian_generator import BayesianGenerator
 from .options import AcqOptions, BayesianOptions
 from .utils import set_botorch_weights
-from ...errors import XoptError
-from ...utils import format_option_descriptions
 
 
 class MOBOAcqOptions(AcqOptions):
@@ -90,6 +90,13 @@ class MOBOGenerator(BayesianGenerator):
         objective_data = torch.tensor(
             self.vocs.objective_data(self.data, return_raw=True).to_numpy()
         )
+
+        # hypervolume must only take into account feasible data points
+        if self.vocs.n_constraints > 0:
+            objective_data = objective_data[
+                self.vocs.feasibility_data(self.data)["feasible"].to_list()
+            ]
+
         n_objectives = self.vocs.n_objectives
         weights = torch.zeros(n_objectives)
         weights = set_botorch_weights(weights, self.vocs)
