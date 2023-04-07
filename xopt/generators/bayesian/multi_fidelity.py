@@ -12,7 +12,7 @@ from botorch.acquisition import (
 from botorch.optim import optimize_acqf
 from pydantic import Field
 
-from xopt.generators import MOBOGenerator
+from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
@@ -50,7 +50,7 @@ class MultiFidelityOptions(MOBOOptions):
     model = MultiFidelityModelOptions()
 
 
-class MultiFidelityBayesianGenerator(MOBOGenerator):
+class MultiFidelityGenerator(MOBOGenerator):
     alias = "multi_fidelity"
     __doc__ = (
         """Implements Multi-fidelity Bayeisan optimizationn
@@ -74,9 +74,6 @@ class MultiFidelityBayesianGenerator(MOBOGenerator):
         options = options or MultiFidelityOptions()
         if not type(options) is MultiFidelityOptions:
             raise ValueError("options must be a `MultiFidelityOptions` object")
-
-        if vocs.n_objectives != 1:
-            raise ValueError("vocs must have one objective for optimization")
 
         # create an augmented vocs that includes the fidelity parameter for both the
         # variable and constraint

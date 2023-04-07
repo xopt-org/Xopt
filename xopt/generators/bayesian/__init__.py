@@ -4,6 +4,7 @@ from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
+from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
 
 
 __all__ = [
@@ -11,4 +12,6 @@ __all__ = [
     "MOBOGenerator",
     "UpperConfidenceBoundGenerator",
     "ExpectedImprovementGenerator",
+    "MultiFidelityGenerator"
+
 ]

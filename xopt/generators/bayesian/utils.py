@@ -5,7 +5,7 @@ from xopt.vocs import VOCS
 
 def set_botorch_weights(weights, vocs: VOCS):
     """set weights to multiply xopt objectives for botorch objectives"""
-    for idx, ele in enumerate(vocs.objectives):
+    for idx, ele in enumerate(vocs.objective_names):
         if vocs.objectives[ele] == "MINIMIZE":
             weights[idx] = -1.0
         elif vocs.objectives[ele] == "MAXIMIZE":
