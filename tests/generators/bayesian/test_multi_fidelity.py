@@ -4,7 +4,7 @@ import pytest
 import torch
 from pandas import Series
 
-from xopt.generators.bayesian.multi_fidelity import MultiFidelityBayesianGenerator
+from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
@@ -15,10 +15,10 @@ class TestMultiFidelityGenerator:
 
         fidelity_parameter = "s"
 
-        options = MultiFidelityBayesianGenerator.default_options()
+        options = MultiFidelityGenerator.default_options()
         options.model.fidelity_parameter = fidelity_parameter
 
-        gen = MultiFidelityBayesianGenerator(vocs, options)
+        gen = MultiFidelityGenerator(vocs, options)
 
         # test reference point
         pt = gen.reference_point
@@ -34,10 +34,10 @@ class TestMultiFidelityGenerator:
         fidelity_parameter = "s"
         data[fidelity_parameter] = Series([1.0] * 10)
 
-        options = MultiFidelityBayesianGenerator.default_options()
+        options = MultiFidelityGenerator.default_options()
         options.model.fidelity_parameter = fidelity_parameter
 
-        generator = MultiFidelityBayesianGenerator(vocs, options)
+        generator = MultiFidelityGenerator(vocs, options)
         generator.add_data(data)
 
         generator.train_model(generator.data)
@@ -45,13 +45,13 @@ class TestMultiFidelityGenerator:
         # try to add bad data
         bad_data = deepcopy(TEST_VOCS_DATA)
         bad_data[fidelity_parameter] = Series([10.0] * 10)
-        generator = MultiFidelityBayesianGenerator(vocs, options)
+        generator = MultiFidelityGenerator(vocs, options)
         with pytest.raises(ValueError):
             generator.add_data(bad_data)
 
         bad_data = deepcopy(TEST_VOCS_DATA)
         bad_data[fidelity_parameter] = Series([-1.0] * 10)
-        generator = MultiFidelityBayesianGenerator(vocs, options)
+        generator = MultiFidelityGenerator(vocs, options)
         with pytest.raises(ValueError):
             generator.add_data(bad_data)
 
@@ -65,10 +65,10 @@ class TestMultiFidelityGenerator:
         fidelity_parameter = "s"
         data[fidelity_parameter] = Series([1.0] * 10)
 
-        options = MultiFidelityBayesianGenerator.default_options()
+        options = MultiFidelityGenerator.default_options()
         options.model.fidelity_parameter = fidelity_parameter
 
-        generator = MultiFidelityBayesianGenerator(vocs, options)
+        generator = MultiFidelityGenerator(vocs, options)
         generator.add_data(data)
 
         acq = generator.get_acquisition(generator.model)
@@ -93,12 +93,12 @@ class TestMultiFidelityGenerator:
         fidelity_parameter = "s"
         data[fidelity_parameter] = Series([1.0] * 10)
 
-        options = MultiFidelityBayesianGenerator.default_options()
+        options = MultiFidelityGenerator.default_options()
         options.model.fidelity_parameter = fidelity_parameter
         options.optim.num_restarts = 1
         options.optim.raw_samples = 1
 
-        generator = MultiFidelityBayesianGenerator(vocs, options)
+        generator = MultiFidelityGenerator(vocs, options)
         generator.add_data(data)
 
         # test getting the objective
