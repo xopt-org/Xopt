@@ -1,7 +1,7 @@
 Pre-Configured Generators in Xopt
 ===============
 A number of algorithms are implemented in Xopt using the ```Generator``` class for 
-out-of-the-box usage. 
+off-the-shelf usage. 
 Below is a 
 description of the different generators that are available in Xopt and their target 
 use cases.
@@ -35,11 +35,17 @@ specified in ```VOCS```
 - ```MOBOGenerator```: implements Multi-Objective BO using the 
   Expected Hypervolume Improvement (EHVI) acquisition function. This is an ideal 
   general purpose multi-objective optimizer when objective evaluations cannot be 
-  massively parallelized (below 5-10 parallel evaluations).
-- ```MGGPO```: implements Multi-Generation Gaussian Process Optimization using the 
+  massively parallelized (< 10 parallel evaluations).
+- ```MGGPOGenerator```: implements Multi-Generation Gaussian Process Optimization using 
+  the 
   Expected Hypervolume Improvement (EHVI) acquisition function. This is an ideal 
   general purpose multi-objective optimizer when objective evaluations can be 
-  massively parallelized (above 5-10 parallel evaluations).
+  massively parallelized (> 10 parallel evaluations) .
+- ```MultiFidelityGenerator```: implements Multi-Fidelity BO which can take 
+  advantage of lower fidelity evaluations of objectives and constraints to reduce 
+  the computational cost of solving single or multi-objective optimization problems 
+  in sequential or small scale parallel (< 10 parallel evaluations) 
+  contexts. 
 
 Evolutionary Generators
 =====
@@ -68,4 +74,3 @@ Custom Generators
 Any general algorithm can be implemented by subclassing the abstract ```Generator```
 class and used in the Xopt framework. If you implement a generator for your use case
 please consider opening a pull request so that we can add it to Xopt!
-
