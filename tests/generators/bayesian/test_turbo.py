@@ -22,14 +22,7 @@ class TestTurbo(TestCase):
 
         turbo_state = TurboState(gen.vocs.n_variables, 1)
 
-        tr = get_trust_region(
-            gen.vocs,
-            model,
-            bounds,
-            gen.data,
-            turbo_state,
-            {}
-        )
+        tr = get_trust_region(gen.vocs, model, bounds, gen.data, turbo_state, {})
         assert torch.all(tr[0] >= bounds[0])
         assert torch.all(tr[1] <= bounds[1])
 
@@ -42,11 +35,7 @@ class TestTurbo(TestCase):
 
         turbo_state = TurboState(gen.vocs.n_variables, 1)
 
-        tr = get_trust_region(
-            gen.vocs,
-            model,
-            bounds,
-            gen.data,
-            turbo_state,
-            {}
-        )
+        tr = get_trust_region(gen.vocs, model, bounds, gen.data, turbo_state, {})
+
+        assert torch.all(tr[0] >= bounds[0])
+        assert torch.all(tr[1] <= bounds[1])
