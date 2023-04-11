@@ -31,15 +31,12 @@ def get_trust_region(vocs, model, bounds, data, turbo_state, tkwargs):
     # assumes minimization
     best_idx = objective_data.idxmin()
     best_x = torch.tensor(
-        variable_data.loc[best_idx][vocs.variable_names].to_numpy(),
-        **tkwargs
+        variable_data.loc[best_idx][vocs.variable_names].to_numpy(), **tkwargs
     )
 
     # Scale the TR to be proportional to the lengthscales of the objective model
     x_center = best_x.clone()
-    lengthscales = model.models[
-        0
-    ].covar_module.base_kernel.lengthscale.detach()
+    lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
 
     # calculate the ratios of lengthscales for each axis
     weights = lengthscales / torch.prod(lengthscales.pow(1.0 / len(lengthscales)))
