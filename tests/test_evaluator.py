@@ -6,6 +6,7 @@ import pandas as pd
 from xopt import Evaluator
 from xopt.vocs import VOCS
 
+
 class TestEvaluator:
     @staticmethod
     def f(x, a=True):

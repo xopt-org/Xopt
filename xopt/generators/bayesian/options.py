@@ -1,13 +1,17 @@
-from typing import Dict, List, Type, Union
 from pathlib import Path
-import gpytorch
+from typing import Dict, List, Type, Union
+
 import torch
-from pydantic import Field, FilePath, validator, BaseModel
+from pydantic import Field, FilePath, validator
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.base_model import ModelConstructor
-from xopt.pydantic import get_descriptions_defaults, JSON_ENCODERS, XoptBaseModel, \
-    orjson_dumps
+from xopt.pydantic import (
+    get_descriptions_defaults,
+    JSON_ENCODERS,
+    orjson_dumps,
+    XoptBaseModel,
+)
 
 
 class AcqOptions(XoptBaseModel):

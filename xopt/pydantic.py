@@ -2,8 +2,6 @@ import copy
 import inspect
 import json
 import logging
-import random
-import string
 from concurrent.futures import Future
 from importlib import import_module
 from types import FunctionType, MethodType
@@ -112,11 +110,11 @@ class CallableModel(BaseModel):
         callable = values.pop("callable")
 
         if not isinstance(
-                callable,
-                (
-                        str,
-                        Callable,
-                ),
+            callable,
+            (
+                str,
+                Callable,
+            ),
         ):
             raise ValueError(
                 "Callable must be object or a string. Provided %s", type(callable)
@@ -213,8 +211,9 @@ class ObjLoader(
                 # re-init drop callable from loader vals to use new instance
                 loader = CallableModel(callable=obj_type, **values["loader"])
 
-        # update the class json encoders. Will only execute on initial type construction
-        #if obj_type not in cls.__config__.json_encoders:
+        # update the class json encoders. Will only execute on initial type
+        # construction
+        # if obj_type not in cls.__config__.json_encoders:
         #    cls.__config__.json_encoders[obj_type] = cls.__config__.json_encoders.pop(
         #        ObjType
         #    )
@@ -331,7 +330,7 @@ class BaseExecutor(
 
         # update encoders
         # update the class json encoders. Will only execute on initial type construction
-        #if executor_type not in cls.__config__.json_encoders:
+        # if executor_type not in cls.__config__.json_encoders:
         #    cls.__config__.json_encoders[
         #        executor_type
         #    ] = cls.__config__.json_encoders.pop(ObjType)

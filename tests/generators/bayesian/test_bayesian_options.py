@@ -111,4 +111,3 @@ class TestBayesianOptions:
         os.remove("test.yml")
         for name in my_vocs.output_names:
             os.remove(options["model"]["covar_modules"][name])
-
