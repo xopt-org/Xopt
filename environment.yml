@@ -33,5 +33,6 @@ dependencies:
   - pip
   - pip:
     - ufmt
+    - orjson
 #  - pip:
 #    - git+git://github.com/some/repo

@@ -12,12 +12,12 @@ from botorch.acquisition import (
 from botorch.optim import optimize_acqf
 from pydantic import Field
 
-from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
-from xopt.generators.bayesian.mobo import MOBOOptions
+
+from xopt.generators.bayesian.mobo import MOBOGenerator, MOBOOptions
 from xopt.generators.bayesian.options import AcqOptions, ModelOptions
 from xopt.utils import format_option_descriptions
 from xopt.vocs import ObjectiveEnum, VOCS
