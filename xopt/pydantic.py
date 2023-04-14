@@ -102,7 +102,7 @@ class CallableModel(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-        json_encoders = JSON_ENCODERS
+        json_dumps = orjson_dumps
         extra = Extra.forbid
 
     @root_validator(pre=True)
@@ -171,7 +171,7 @@ class ObjLoader(
     GenericModel,
     Generic[ObjType],
     arbitrary_types_allowed=True,
-    json_encoders=JSON_ENCODERS,
+    json_dumps=orjson_dumps,
 ):
     object: Optional[ObjType]
     loader: CallableModel = None
@@ -235,7 +235,7 @@ class BaseExecutor(
     GenericModel,
     Generic[ObjType],
     arbitrary_types_allowed=True,
-    json_encoders=JSON_ENCODERS,
+    json_dumps=orjson_dumps,
     copy_on_model_validation="none",
     # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
 ):
@@ -354,7 +354,7 @@ class NormalExecutor(
     BaseExecutor[ObjType],
     Generic[ObjType],
     arbitrary_types_allowed=True,
-    json_encoders=JSON_ENCODERS,
+    json_dumps=orjson_dumps,
 ):
     @validator("executor", always=True)
     def validate_executor(cls, v, values):
