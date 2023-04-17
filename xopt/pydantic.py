@@ -21,7 +21,7 @@ JSON_ENCODERS = {
     # and not recognized as callables
     FunctionType: lambda x: f"{x.__module__}.{x.__qualname__}",
     MethodType: lambda x: f"{x.__module__}.{x.__qualname__}",
-    Callable: lambda x: f"{x.__module__}.{type(x).__qualname__}",
+    Callable: lambda x: f"{x.__module__}.{x.__qualname__}",
     type: lambda x: f"{x.__module__}.{x.__name__}",
     # for encoding instances of the ObjType}
     # ObjType: lambda x: f"{x.__module__}.{x.__class__.__qualname__}",
@@ -44,12 +44,13 @@ def recursive_serialize(v, base_key=""):
                 if isinstance(value, _type):
                     v[key] = func(value)
 
-        # check to make sure object has been serialized
+        # check to make sure object has been serialized,
+        # if not use a generic serializer
         try:
             json.dumps(v[key])
         except (TypeError, OverflowError):
-            print(v[key])
-            raise RuntimeError
+            v[key] = f"{v[key].__module__}.{v[key].__class__.__qualname__}"
+
     return v
 
 

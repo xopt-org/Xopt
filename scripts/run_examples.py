@@ -24,6 +24,7 @@ IGNORE = {
 
 SUB_DIRS = [
     "basic",
+    "developer",
     "bayes_exp",
     "cnsga",
     "single_objective_bayes_opt",
