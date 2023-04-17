@@ -132,8 +132,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the tutorials.")
     parser.add_argument(
-        "-p", "--path", metavar="path", default='../docs/examples', help="repo "
-                                                                        "directory."
+        "-p",
+        "--path",
+        metavar="path",
+        default="docs/examples",
+        help="repo " "directory.",
     )
     parser.add_argument(
         "-s", "--smoke", action="store_true", help="Run in smoke test mode."
