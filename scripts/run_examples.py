@@ -20,6 +20,7 @@ from nbconvert import PythonExporter
 
 IGNORE = {
     "xopt_parallel.ipynb",
+    "executors.ipynb",
 }
 
 SUB_DIRS = [
@@ -96,7 +97,7 @@ def run_tutorials(
     print(f"Running tutorials in {'smoke test' if smoke_test else 'standard'} mode.")
     if not smoke_test:
         print("This may take a long time...")
-    tutorial_base = Path(repo_dir).joinpath("examples")
+    tutorial_base = Path(repo_dir)
     num_runs = 0
     num_errors = 0
     os.chdir(tutorial_base)
@@ -131,7 +132,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the tutorials.")
     parser.add_argument(
-        "-p", "--path", metavar="path", required=True, help="repo directory."
+        "-p", "--path", metavar="path", default='docs/examples', help="repo directory."
     )
     parser.add_argument(
         "-s", "--smoke", action="store_true", help="Run in smoke test mode."
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     run_tutorials(
-        repo_dir=args.path,
+        repo_dir=os.path.abspath(args.path),
         include_ignored=args.include_ignored,
         smoke_test=args.smoke,
     )
