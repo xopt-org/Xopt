@@ -190,7 +190,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         fixed_bounds = torch.cat(
             (
                 boundst[: self.fidelity_variable_index],
-                boundst[self.fidelity_variable_index + 1:],
+                boundst[self.fidelity_variable_index + 1 :],
             )
         ).T
 
