@@ -1,5 +1,6 @@
 import copy
 import inspect
+import json
 import logging
 from concurrent.futures import Future
 from importlib import import_module
@@ -7,6 +8,8 @@ from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
+import orjson
+import torch.nn
 from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
 
@@ -18,14 +21,53 @@ JSON_ENCODERS = {
     # and not recognized as callables
     FunctionType: lambda x: f"{x.__module__}.{x.__qualname__}",
     MethodType: lambda x: f"{x.__module__}.{x.__qualname__}",
-    Callable: lambda x: f"{x.__module__}.{type(x).__qualname__}",
+    Callable: lambda x: f"{x.__module__}.{x.__qualname__}",
     type: lambda x: f"{x.__module__}.{x.__name__}",
     # for encoding instances of the ObjType}
-    ObjType: lambda x: f"{x.__module__}.{x.__class__.__qualname__}",
+    # ObjType: lambda x: f"{x.__module__}.{x.__class__.__qualname__}",
     np.ndarray: lambda x: x.tolist(),
     np.int64: lambda x: int(x),
     np.float64: lambda x: float(x),
+    # torch.nn.Module: lambda x: process_torch_module(x),
+    # torch.Tensor: lambda x: x.detach().cpu().numpy().tolist(),
 }
+
+
+def recursive_serialize(v, base_key=""):
+    for key, value in v.items():
+        if isinstance(value, dict):
+            v[key] = recursive_serialize(value, key)
+        elif isinstance(value, torch.nn.Module):
+            v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
+        else:
+            for _type, func in JSON_ENCODERS.items():
+                if isinstance(value, _type):
+                    v[key] = func(value)
+
+        # check to make sure object has been serialized,
+        # if not use a generic serializer
+        try:
+            json.dumps(v[key])
+        except (TypeError, OverflowError):
+            v[key] = f"{v[key].__module__}.{v[key].__class__.__qualname__}"
+
+    return v
+
+
+# define custom json_dumps using orjson
+def orjson_dumps(v, *, default):
+    v = recursive_serialize(v)
+    # orjson.dumps returns bytes, to match standard json.dumps we need to decode
+    return orjson.dumps(v, default=default).decode()
+
+
+def process_torch_module(module, name):
+    """save module to file based on module name and return file path to json"""
+    # module_name = "".join(random.choices(string.ascii_uppercase + string.digits,
+    #                                     k=7)) + ".pt"
+    module_name = f"{name}.pt"
+    torch.save(module, module_name)
+    return module_name
 
 
 def get_descriptions_defaults(model: BaseModel):
@@ -52,7 +94,7 @@ def get_descriptions_defaults(model: BaseModel):
 class XoptBaseModel(BaseModel):
     class Config:
         extra = "forbid"
-        json_encoders = JSON_ENCODERS
+        json_dumps = orjson_dumps
 
 
 class CallableModel(BaseModel):
@@ -61,7 +103,7 @@ class CallableModel(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-        json_encoders = JSON_ENCODERS
+        json_dumps = orjson_dumps
         extra = Extra.forbid
 
     @root_validator(pre=True)
@@ -130,7 +172,7 @@ class ObjLoader(
     GenericModel,
     Generic[ObjType],
     arbitrary_types_allowed=True,
-    json_encoders=JSON_ENCODERS,
+    json_dumps=orjson_dumps,
 ):
     object: Optional[ObjType]
     loader: CallableModel = None
@@ -170,11 +212,12 @@ class ObjLoader(
                 # re-init drop callable from loader vals to use new instance
                 loader = CallableModel(callable=obj_type, **values["loader"])
 
-        # update the class json encoders. Will only execute on initial type construction
-        if obj_type not in cls.__config__.json_encoders:
-            cls.__config__.json_encoders[obj_type] = cls.__config__.json_encoders.pop(
-                ObjType
-            )
+        # update the class json encoders. Will only execute on initial type
+        # construction
+        # if obj_type not in cls.__config__.json_encoders:
+        #    cls.__config__.json_encoders[obj_type] = cls.__config__.json_encoders.pop(
+        #        ObjType
+        #    )
         return {"object_type": obj_type, "loader": loader}
 
     def load(self, store: bool = False):
@@ -193,7 +236,7 @@ class BaseExecutor(
     GenericModel,
     Generic[ObjType],
     arbitrary_types_allowed=True,
-    json_encoders=JSON_ENCODERS,
+    json_dumps=orjson_dumps,
     copy_on_model_validation="none",
     # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
 ):
@@ -288,10 +331,10 @@ class BaseExecutor(
 
         # update encoders
         # update the class json encoders. Will only execute on initial type construction
-        if executor_type not in cls.__config__.json_encoders:
-            cls.__config__.json_encoders[
-                executor_type
-            ] = cls.__config__.json_encoders.pop(ObjType)
+        # if executor_type not in cls.__config__.json_encoders:
+        #    cls.__config__.json_encoders[
+        #        executor_type
+        #    ] = cls.__config__.json_encoders.pop(ObjType)
 
         return {
             "executor_type": executor_type,
@@ -312,7 +355,7 @@ class NormalExecutor(
     BaseExecutor[ObjType],
     Generic[ObjType],
     arbitrary_types_allowed=True,
-    json_encoders=JSON_ENCODERS,
+    json_dumps=orjson_dumps,
 ):
     @validator("executor", always=True)
     def validate_executor(cls, v, values):

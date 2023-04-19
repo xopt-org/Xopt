@@ -1,12 +1,17 @@
+from pathlib import Path
 from typing import Dict, List, Type, Union
 
-import gpytorch
 import torch
-from pydantic import Field
+from pydantic import Field, FilePath, validator
 
 from xopt.generator import GeneratorOptions
 from xopt.generators.bayesian.base_model import ModelConstructor
-from xopt.pydantic import get_descriptions_defaults, JSON_ENCODERS, XoptBaseModel
+from xopt.pydantic import (
+    get_descriptions_defaults,
+    JSON_ENCODERS,
+    orjson_dumps,
+    XoptBaseModel,
+)
 
 
 class AcqOptions(XoptBaseModel):
@@ -42,8 +47,9 @@ class OptimOptions(XoptBaseModel):
         description="limits for travel distance between points in normalized space",
     )
     use_turbo: bool = Field(
-        False, description="flag to use Trust region Bayesian Optimization (TuRBO) "
-                           "for local optimization"
+        False,
+        description="flag to use Trust region Bayesian Optimization (TuRBO) "
+        "for local optimization",
     )
 
 
@@ -55,18 +61,39 @@ class ModelOptions(XoptBaseModel):
         None,
         description="custom model constructor definition, overrides specified name",
     )
+
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
     )
-    covar_modules: Union[gpytorch.Module, Dict[str, gpytorch.Module]] = Field(
-        {}, description="covariance modules for GP models"
-    )
-    mean_modules: Union[torch.nn.Module, Dict[str, torch.nn.Module]] = Field(
-        {}, description="prior mean modules for GP models"
-    )
+
+    covar_modules: Union[
+        torch.nn.Module, FilePath, Dict[str, torch.nn.Module], Dict[str, FilePath]
+    ] = Field({}, description="covariance modules for GP models")
+
+    mean_modules: Union[
+        torch.nn.Module, FilePath, Dict[str, torch.nn.Module], Dict[str, FilePath]
+    ] = Field({}, description="prior mean modules for GP models")
 
     class Config:
+        extra = "forbid"
         arbitrary_types_allowed = True
+        json_encoders = {}
+        json_dumps = orjson_dumps
+
+    @validator("covar_modules", "mean_modules")
+    def validate_torch_modules(cls, v):
+        if isinstance(v, Path):
+            return torch.load(v)
+        elif isinstance(v, dict):
+            new_v = {}
+            for name, item in v.items():
+                if isinstance(item, Path):
+                    new_v[name] = torch.load(item)
+                else:
+                    new_v[name] = v[name]
+            return new_v
+        else:
+            return v
 
 
 class BayesianOptions(GeneratorOptions):
