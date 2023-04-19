@@ -15,15 +15,18 @@ nav:
             - Bayesian Exploration:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
-            - Bayesian Optimization:
-                - Bayesian optimization tutorial: examples/bayes_opt/bo_tutorial.ipynb
-                - Upper confidence bound: examples/bayes_opt/upper_confidence_bound.ipynb
-                - Expected improvement: examples/bayes_opt/expected_improvement_rosenbrock.ipynb
-                - Custom GP models: examples/bayes_opt/custom_model.ipynb
-                - High dimensional BO: examples/bayes_opt/turbo_tutorial.ipynb
-                - Expected hypervolume improvement: examples/bayes_opt/mobo.ipynb
-                - Multi-generation gaussian process optimization: examples/bayes_opt/mggpo.ipynb
-                - Time dependent upper confidence bound: examples/bayes_opt/time_dependent_bo.ipynb
+            - Single Objective Bayesian Optimization:
+                - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
+                - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
+                - Expected improvement: examples/single_objective_bayes_opt/expected_improvement_rosenbrock.ipynb
+                - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
+                - Trust region: examples/single_objective_bayes_opt/turbo_tutorial.ipynb
+                - Multi-Fidelity: examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb
+                - Time dependent upper confidence bound: examples/single_objective_bayes_opt/time_dependent_bo.ipynb
+            - Multi-Objective Bayesian Optimization:
+                - Expected hypervolume improvement: examples/multi_objective_bayes_opt/mobo.ipynb
+                - Multi-fidelity expected hypervolume improvement: examples/multi_objective_bayes_opt/multi_fidelity_mobo.ipynb
+                - Multi-generation gaussian process optimization: examples/multi_objective_bayes_opt/mggpo.ipynb
         - Evolutionary:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
         - SciPy:

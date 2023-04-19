@@ -130,26 +130,12 @@ class TestBayesianGenerator(TestCase):
         #    model.train_targets[1], torch.sign(-C) * torch.log(1 + torch.abs(-C))
         # )
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
-    def test_get_training_data(self):
-        gen = BayesianGenerator(TEST_VOCS_BASE)
-        inputs, outputs = gen.get_training_data(TEST_VOCS_DATA)
-        inames = list(TEST_VOCS_BASE.variables.keys())
-        onames = list(TEST_VOCS_BASE.objectives.keys()) + list(
-            TEST_VOCS_BASE.constraints.keys()
-        )
-
-        true_inputs = torch.from_numpy(TEST_VOCS_DATA[inames].to_numpy())
-        true_outputs = torch.from_numpy(TEST_VOCS_DATA[onames].to_numpy())
-        assert torch.allclose(inputs, true_inputs)
-        assert torch.allclose(outputs, true_outputs)
-
     # TODO: test passing UCB options to bayesian exploration
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_bounds(self):
         gen = BayesianGenerator(TEST_VOCS_BASE)
-        bounds = gen._get_bounds()
+        bounds = gen._get_optimization_bounds()
         assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds))
 
         # test with max_travel_distances specified but no data
@@ -157,12 +143,12 @@ class TestBayesianGenerator(TestCase):
         defaults.optim.max_travel_distances = [0.1, 0.2]
         gen = BayesianGenerator(TEST_VOCS_BASE, defaults)
         with pytest.raises(ValueError):
-            gen._get_bounds()
+            gen._get_optimization_bounds()
 
         # test with max_travel_distances specified and data
         gen = BayesianGenerator(TEST_VOCS_BASE, defaults)
         gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
-        bounds = gen._get_bounds()
+        bounds = gen._get_optimization_bounds()
         assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
 
         # test with max_travel_distances specified and data
@@ -178,7 +164,7 @@ class TestBayesianGenerator(TestCase):
                 {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
             )
         )
-        bounds = gen._get_bounds()
+        bounds = gen._get_optimization_bounds()
         assert torch.allclose(
             bounds, torch.tensor([[0.4, 3.0, 0.4], [0.6, 7.0, 0.6]]).to(bounds)
         )
@@ -194,4 +180,4 @@ class TestBayesianGenerator(TestCase):
             )
         )
         with pytest.raises(ValueError):
-            gen._get_bounds()
+            gen._get_optimization_bounds()
