@@ -180,11 +180,12 @@ def visualize_model(generator, data, axes=None):
     if axes is None:
         # Lazy import
         from matplotlib import pyplot as plt
+
         fig, ax = plt.subplots(2, 1, sharex="all")
         fig.set_size_inches(6, 6)
     else:
         ax = axes
-        
+
     with torch.no_grad():
         post = model.posterior(test_x.reshape(-1, 1, 1).double())
 
