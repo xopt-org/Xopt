@@ -182,7 +182,7 @@ def visualize_model(generator, data, axes=None):
         from matplotlib import pyplot as plt
         fig, ax = plt.subplots(2, 1, sharex="all")
         fig.set_size_inches(6, 6)
-    else
+    else:
         ax = axes
         
     with torch.no_grad():
