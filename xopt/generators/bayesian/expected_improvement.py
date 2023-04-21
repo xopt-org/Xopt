@@ -14,7 +14,7 @@ from xopt.vocs import VOCS
 class ExpectedImprovementGenerator(BayesianGenerator):
     alias = "expected_improvement"
     __doc__ = (
-        """Implements Bayeisan Optimization using the Upper Confidence Bound
+        """Implements Bayeisan Optimization using the Expected Improvement
         acquisition function"""
         + f"{format_option_descriptions(BayesianOptions())}"
     )
@@ -59,10 +59,10 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             objective=self._get_objective(),
         )
 
-        cqUCB = ConstrainedMCAcquisitionFunction(
+        cqEI = ConstrainedMCAcquisitionFunction(
             model,
             qEI,
             self._get_constraint_callables(),
         )
 
-        return cqUCB
+        return cqEI
