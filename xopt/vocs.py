@@ -140,9 +140,8 @@ class VOCS(XoptBaseModel):
         """Returns the number of outputs (objectives and constraints)"""
         return self.n_objectives + self.n_constraints
 
-    def random_inputs(
-        self, n=None, include_constants=True, include_linked_variables=True
-    ):
+    def random_inputs(self, n=None, include_constants=True,
+                      include_linked_variables=True, seed=None):
         """
         Uniform sampling of the variables.
 
@@ -152,12 +151,14 @@ class VOCS(XoptBaseModel):
 
         Optional:
             n (integer) to make arrays of inputs, of size n.
+            seed (integer) to initialize the random number generator
 
         """
         inputs = {}
+        rng = np.random.default_rng(seed=seed)
         for key, val in self.variables.items():  # No need to sort here
             a, b = val
-            x = np.random.random(n)
+            x = rng.random(n)
             inputs[key] = x * a + (1 - x) * b
 
         # Constants
