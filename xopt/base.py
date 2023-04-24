@@ -339,8 +339,6 @@ class Xopt:
         new_data.index = np.arange(
             len(self._data) + 1, len(self._data) + len(new_data) + 1
         )
-        if hasattr(self, "_ix_last"):
-            self._ix_last = new_data.index[-1]
         self._data = pd.concat([self._data, new_data], axis=0)
         self._new_data = new_data
 
