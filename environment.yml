@@ -12,6 +12,7 @@ dependencies:
   - pandas
   - ipywidgets
   - tqdm
+  - orjson
 # parallel
   - mpi4py
   - dask
