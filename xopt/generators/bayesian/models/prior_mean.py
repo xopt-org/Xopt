@@ -12,14 +12,20 @@ class CustomMean(TransformedModel, Mean):
         model: torch.nn.Module,
         gp_input_transform: InputTransform,
         gp_outcome_transform: OutcomeTransform,
+        training_intended: bool = False
     ):
         """Custom prior mean for a GP based on an arbitrary model.
+
         Args:
             model: Representation of the model.
             gp_input_transform: Module used to transform inputs in the GP.
             gp_outcome_transform: Module used to transform outcomes in the GP.
+            training_intended: Whether training the model is intended. If False,
+              the model is put in evaluation mode and gradient computation is
+              deactivated.
         """
-        super().__init__(model, gp_input_transform, gp_outcome_transform)
+        super().__init__(model, gp_input_transform, gp_outcome_transform,
+                         training_intended=training_intended)
 
     def forward(self, x):
         # set transformers to eval mode
