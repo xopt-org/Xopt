@@ -1,5 +1,6 @@
 import pandas as pd
 import torch
+from typing import Optional
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import Module
@@ -59,41 +60,40 @@ class StandardModelConstructor(ModelConstructor):
         # build model
         return self.build_standard_model()
 
+    def build_mean_module(self, name, outcome_transform) -> Optional[CustomMean]:
+        """Builds the mean module for the output specified by name."""
+        mean_module = self._get_module(self.options.mean_modules, name)
+        if mean_module is not None:
+            mean_module = CustomMean(mean_module, self.input_transform,
+                                     outcome_transform)
+        return mean_module
+
+    def _get_train_targets(self, name) -> torch.Tensor:
+        """Returns training targets for the output specified by name."""
+        # objective specifics
+        if name in self.vocs.objective_names:
+            train_targets = torch.tensor(
+                self.objective_data[name].to_numpy(), **self.tkwargs
+            ).unsqueeze(-1)
+        # constraint specifics
+        elif name in self.vocs.constraint_names:
+            train_targets = torch.tensor(
+                self.constraint_data[name].to_numpy(), **self.tkwargs
+            ).unsqueeze(-1)
+        else:
+            raise RuntimeError(
+                "Output '{}' is not found in either objectives or "
+                "constraints.".format(name)
+            )
+        return train_targets
+
     def build_standard_model(self, **model_kwargs):
         models = []
         for name in self.vocs.output_names:
             outcome_transform = Standardize(1)
             covar_module = self._get_module(self.options.covar_modules, name)
-            mean_module = self._get_module(self.options.mean_modules, name)
-
-            # objective specifics
-            if name in self.vocs.objective_names:
-                # if we are doing minimization add a negative sign to the prior model
-                # if self.vocs.objectives[name] == "MINIMIZE" and mean_module is not
-                # None:
-                #    mean_module = _NegativeModule(mean_module)
-
-                train_Y = torch.tensor(
-                    self.objective_data[name].to_numpy(), **self.tkwargs
-                ).unsqueeze(-1)
-
-            # constraint specific
-            elif name in self.vocs.constraint_names:
-                train_Y = torch.tensor(
-                    self.constraint_data[name].to_numpy(), **self.tkwargs
-                ).unsqueeze(-1)
-
-            else:
-                raise RuntimeError(
-                    "if you are recieving this message there is "
-                    "something wrong with vocs"
-                )
-
-            if mean_module is not None:
-                mean_module = CustomMean(
-                    mean_module, self.input_transform, outcome_transform
-                )
-
+            mean_module = self.build_mean_module(name, outcome_transform)
+            train_Y = self._get_train_targets(name)
             models.append(
                 self.build_single_task_gp(
                     self.train_X,
@@ -105,7 +105,6 @@ class StandardModelConstructor(ModelConstructor):
                     likelihood=self.likelihood,
                 )
             )
-
         return ModelListGP(*models)
 
     @staticmethod
