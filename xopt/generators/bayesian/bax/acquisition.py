@@ -34,10 +34,12 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
             self.xs_exe
         )  # call model on some data to avoid errors. we don't need this result.
 
-        #     construct a batch of size n_samples fantasy models,
-        #     where each fantasy model is produced by taking the model
-        #     at the current iteration and conditioning it
-        #     on one of the sampled execution path subsequences:
+        """
+        construct a batch of size n_samples fantasy models,
+        where each fantasy model is produced by taking the model
+        at the current iteration and conditioning it
+        on one of the sampled execution path subsequences:
+        """
         xs_exe_transformed = self.model.input_transform(self.xs_exe)
         ys_exe_transformed = self.model.outcome_transform(self.ys_exe)[0]
         self.fmodels = self.model.condition_on_observations(
@@ -59,12 +61,13 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
             given design points `X`.
         """
 
-        #     Use the current & fantasy models to compute a
-        #     Monte-Carlo estimate of the Expected Information Gain:
-        #     see https://arxiv.org/pdf/2104.09460.pdf:
-        #     eq (4) and the last sentence of page 7)
-
-        # calculcate the variance of the posterior at this iteration for each input x
+        """
+        Use the current & fantasy models to compute a
+        Monte-Carlo estimate of the Expected Information Gain:
+        see https://arxiv.org/pdf/2104.09460.pdf:
+        eq (4) and the last sentence of page 7)
+        """
+        # calculcate the variance of the posterior for each input x
         p = self.model.posterior(X)
         var_p = p.variance
         var_p = var_p.reshape(var_p.shape[:-1])
@@ -89,10 +92,12 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         # compute the Monte-Carlo estimate of the Expected value of the entropy
         avg_h_fantasy = torch.mean(h_fantasies, dim=-2)
 
-        # use the above entropies to compute the Expected Information Gain,
-        # where the terms in the equation below correspond to the terms in
-        # eq (4) of https://arxiv.org/pdf/2104.09460.pdf
-        # (avg_h_fantasy is a Monte-Carlo estimate of the second term on the right)
+        """
+        use the above entropies to compute the Expected Information Gain,
+        where the terms in the equation below correspond to the terms in
+        eq (4) of https://arxiv.org/pdf/2104.09460.pdf
+        (avg_h_fantasy is a Monte-Carlo estimate of the second term on the right)
+        """
         eig = h_current - avg_h_fantasy
 
         return eig.reshape(X.shape[:-2])
@@ -122,7 +127,7 @@ class PosteriorUncertainty(AnalyticAcquisitionFunction):
             given design points `X`.
         """
 
-        # calculcate the variance of the posterior at this iteration for each input x
+        # calculcate the variance of the posterior for each input x
         p = self.model.posterior(X)
         var_p = p.variance
         var_p = var_p.reshape(X.shape[:-2])
