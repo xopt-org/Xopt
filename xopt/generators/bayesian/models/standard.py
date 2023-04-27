@@ -28,9 +28,9 @@ class StandardModelConstructor(ModelConstructor):
         self.objective_data = None
         self.constraint_data = None
         self.train_X = None
-        self.tkwargs = None
+        self.tkwargs = {"dtype": torch.double, "device": "cpu"}
 
-    def collect_data(self, data):
+    def collect_data(self, data: pd.DataFrame):
         # drop nans
         valid_data = data[
             pd.unique(self.vocs.variable_names + self.vocs.output_names)
@@ -50,8 +50,8 @@ class StandardModelConstructor(ModelConstructor):
 
     def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
         """construct independent model for each objective and constraint"""
-        # set tkwargs
-        self.tkwargs = tkwargs or {"dtype": torch.double, "device": "cpu"}
+        # overwrite tkwargs if specified
+        self.tkwargs = tkwargs or self.tkwargs
 
         # collect data from dataframe
         self.collect_data(data)
@@ -77,7 +77,7 @@ class StandardModelConstructor(ModelConstructor):
                     self.objective_data[name].to_numpy(), **self.tkwargs
                 ).unsqueeze(-1)
 
-            # constraint specifics
+            # constraint specific
             elif name in self.vocs.constraint_names:
                 train_Y = torch.tensor(
                     self.constraint_data[name].to_numpy(), **self.tkwargs

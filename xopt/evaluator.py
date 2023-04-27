@@ -218,9 +218,13 @@ def validate_outputs(outputs):
             f"{type(result)}, result is: {result}"
         )
     else:
-        raise XoptError(
-            "Xopt evaluator caught an exception: " f"{outputs['xopt_error_str']}"
-        )
+        error_string = "Xopt evaluator caught exception(s):\n\n"
+        for i in range(len(outputs["xopt_error_str"])):
+            error_string += f"Evaluation index {i}:\n"
+            error_string += outputs["xopt_error_str"].iloc[i]
+            error_string += "\n"
+
+        raise XoptError(error_string)
 
 
 class DummyExecutor(Executor):

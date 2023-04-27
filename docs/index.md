@@ -74,7 +74,6 @@ vocs:
     constraints:
         c1: [GREATER_THAN, 0]
         c2: [LESS_THAN, 0.5]
-    linked_variables: {x9: x1}
     constants: {a: dummy_constant}
 ```
 

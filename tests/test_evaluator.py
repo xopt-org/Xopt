@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from xopt import Evaluator
+from xopt.vocs import VOCS
 
 
 class TestEvaluator:
@@ -103,3 +104,14 @@ class TestEvaluator:
             test_dict["executor"] = Executor()
             ev = Evaluator(**test_dict)
             ev.json()
+
+    def test_multithreading(self):
+        MAX_WORKERS = 10
+
+        vocs = VOCS(variables={"x": [0, 1], "y": [0, 1]}, objectives={"f1": "MINIMIZE"})
+        in10 = vocs.random_inputs(10)
+
+        # Create Executor insance
+        executor = ProcessPoolExecutor(max_workers=MAX_WORKERS)
+        ev = Evaluator(function=self.f, executor=executor, max_workers=MAX_WORKERS)
+        ev.evaluate_data(in10)
