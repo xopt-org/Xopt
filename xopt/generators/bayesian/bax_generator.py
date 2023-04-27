@@ -3,15 +3,12 @@ import logging
 import time
 from typing import Callable, Dict, List
 
-import pandas as pd
 from botorch.optim import optimize_acqf
 from botorch.optim.initializers import sample_truncated_normal_perturbations
-from gpytorch import Module
 
 from xopt.generators.bayesian.bax.acquisition import ExpectedInformationGain
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.models.emittance import create_emittance_model
 from xopt.generators.bayesian.objectives import create_mc_objective
 from xopt.generators.bayesian.options import BayesianOptions
 from xopt.vocs import VOCS
@@ -79,7 +76,7 @@ class BAXGenerator(BayesianGenerator):
             acq_funct = self.get_acquisition(self._model)
 
             middle = time.time()
-            print("get_acquisition() took", middle - start, "seconds.")
+            logger.debug("get_acquisition() took", middle - start, "seconds.")
 
             batch_initial_points, raw_samples = self._get_initial_batch_points(bounds)
 
@@ -94,36 +91,10 @@ class BAXGenerator(BayesianGenerator):
             )
 
             end = time.time()
-            print("optimize_acqf() took", end - middle, "seconds.")
+            logger.debug("optimize_acqf() took", end - middle, "seconds.")
 
             logger.debug("Best candidate from optimize", candidates, out)
             return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
-
-    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
-        """
-        Returns a ModelListGP containing independent models for the objectives and
-        constraints
-
-        """
-        if data is None:
-            data = self.data
-
-        # drop nans
-        valid_data = data[
-            pd.unique(self.vocs.variable_names + self.vocs.output_names)
-        ].dropna()
-
-        _model = create_emittance_model(
-            valid_data, self.vocs, self.meas_param, noise="low"
-        )
-
-        # validate returned model
-        self._validate_model(_model)
-
-        if update_internal:
-            self._model = _model
-
-        return _model
 
     def _get_objective(self):
         return create_mc_objective(self.vocs)
