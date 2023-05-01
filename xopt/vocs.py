@@ -155,10 +155,14 @@ class VOCS(XoptBaseModel):
 
         """
         inputs = {}
-        rng = np.random.default_rng(seed=seed)
+        if seed is None:
+            rng_sample_function = np.random.random
+        else:
+            rng = np.random.default_rng(seed=seed)
+            rng_sample_function = rng.random
         for key, val in self.variables.items():  # No need to sort here
             a, b = val
-            x = rng.random(n)
+            x = rng_sample_function(n)
             inputs[key] = x * a + (1 - x) * b
 
         # Constants
