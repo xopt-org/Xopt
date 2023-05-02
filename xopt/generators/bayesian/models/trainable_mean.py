@@ -16,5 +16,5 @@ class TrainableMeanModelConstructor(StandardModelConstructor):
         mean_module = self._get_module(self.options.mean_modules, name)
         if mean_module is not None:
             mean_module = CustomMean(mean_module, self.input_transform,
-                                     outcome_transform, training_intended=True)
+                                     outcome_transform, fixed_model=False)
         return mean_module
