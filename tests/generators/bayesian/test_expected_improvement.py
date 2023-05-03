@@ -1,14 +1,16 @@
+import torch
+import numpy as np
 from copy import deepcopy
-
 import pytest
+from botorch.optim import optimize_acqf
+from botorch.acquisition import ExpectedImprovement
 
 from xopt.base import Xopt
-
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.upper_confidence_bound import UCBOptions
-
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
+from xopt.resources.test_functions.sinusoid_1d import sinusoid_vocs, evaluate_sinusoid
 
 
 class TestExpectedImprovement:
@@ -82,3 +84,48 @@ class TestExpectedImprovement:
         # now use bayes opt
         for _ in range(1):
             xopt.step()
+
+    def test_acquisition_accuracy(self):
+        # fix random seeds for BoTorch
+        torch.manual_seed(0)
+        np.random.seed(0)
+
+        vocs = sinusoid_vocs
+        vocs.constraints = {}
+        for objective in ["MINIMIZE", "MAXIMIZE"]:
+            vocs.objectives["y1"] = objective
+            evaluator = Evaluator(function=evaluate_sinusoid)
+            generator = ExpectedImprovementGenerator(vocs)
+            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+            X.step()
+
+            distance = 0.0
+            for i in range(3):
+                model = X.generator.train_model()
+
+                # analytical acquisition
+                if objective == "MAXIMIZE":
+                    maximize = True
+                    best_f = torch.tensor(X.data["y1"].values).max()
+                else:
+                    maximize = False
+                    best_f = torch.tensor(X.data["y1"].values).min()
+                acq_analytical = ExpectedImprovement(model, best_f=best_f,
+                                                     maximize=maximize)
+                candidate_analytical, _ = optimize_acqf(
+                    acq_function=acq_analytical,
+                    bounds=torch.tensor(vocs.bounds),
+                    q=1,
+                    num_restarts=20,
+                    raw_samples=100
+                )
+
+                # xopt step
+                X.step()
+
+                # calculate distance from analytical candidate
+                distance += torch.abs(
+                    X.data["x1"].values[-1] - candidate_analytical.squeeze())
+
+            # distance should be small
+            assert distance < 0.1
