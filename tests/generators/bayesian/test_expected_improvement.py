@@ -1,16 +1,15 @@
 import torch
-import numpy as np
+import pandas as pd
 from copy import deepcopy
 import pytest
-from botorch.optim import optimize_acqf
 from botorch.acquisition import ExpectedImprovement
 
 from xopt.base import Xopt
+from xopt.vocs import VOCS, ObjectiveEnum
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.upper_confidence_bound import UCBOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
-from xopt.resources.test_functions.sinusoid_1d import sinusoid_vocs, evaluate_sinusoid
 
 
 class TestExpectedImprovement:
@@ -86,46 +85,36 @@ class TestExpectedImprovement:
             xopt.step()
 
     def test_acquisition_accuracy(self):
-        # fix random seeds for BoTorch
-        torch.manual_seed(0)
-        np.random.seed(0)
+        train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
+        train_y = torch.sin(2 * torch.pi * train_x)
+        train_data = pd.DataFrame(
+            {"x1": train_x.numpy(), "y1": train_y.numpy()})
+        test_x = torch.linspace(0.0, 1.0, 1000)
 
-        vocs = sinusoid_vocs
-        vocs.constraints = {}
-        for objective in ["MINIMIZE", "MAXIMIZE"]:
-            vocs.objectives["y1"] = objective
-            evaluator = Evaluator(function=evaluate_sinusoid)
+        for objective in ObjectiveEnum:
+            vocs = VOCS(**{"variables": {"x1": [0.0, 1.0]},
+                           "objectives": {"y1": objective}})
             generator = ExpectedImprovementGenerator(vocs)
-            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
-            X.step()
+            generator.add_data(train_data)
+            model = generator.train_model().models[0]
 
-            distance = 0.0
-            for i in range(3):
-                model = X.generator.train_model()
+            # xopt acquisition function
+            acq = generator.get_acquisition(model)
 
-                # analytical acquisition
-                if objective == "MAXIMIZE":
-                    maximize = True
-                    best_f = torch.tensor(X.data["y1"].values).max()
-                else:
-                    maximize = False
-                    best_f = torch.tensor(X.data["y1"].values).min()
-                acq_analytical = ExpectedImprovement(model, best_f=best_f,
-                                                     maximize=maximize)
-                candidate_analytical, _ = optimize_acqf(
-                    acq_function=acq_analytical,
-                    bounds=torch.tensor(vocs.bounds),
-                    q=1,
-                    num_restarts=20,
-                    raw_samples=100
-                )
+            # analytical acquisition function
+            if objective == "MAXIMIZE":
+                an_acq = ExpectedImprovement(model, best_f=train_y.max(),
+                                             maximize=True)
+            else:
+                an_acq = ExpectedImprovement(model, best_f=train_y.min(),
+                                             maximize=False)
 
-                # xopt step
-                X.step()
+            # compare candidates (maximum in test data)
+            with torch.no_grad():
+                acq_v = acq(test_x.reshape(-1, 1, 1))
+                candidate = test_x[torch.argmax(acq_v)]
+                an_acq_v = an_acq(test_x.reshape(-1, 1, 1))
+                an_candidate = test_x[torch.argmax(an_acq_v)]
 
-                # calculate distance from analytical candidate
-                distance += torch.abs(
-                    X.data["x1"].values[-1] - candidate_analytical.squeeze())
-
-            # distance should be small
-            assert distance < 0.1
+            # difference should be small
+            assert torch.abs(an_candidate - candidate) < 0.01
