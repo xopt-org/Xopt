@@ -1,4 +1,3 @@
-import pandas as pd
 import torch
 from botorch.acquisition import qExpectedImprovement
 
