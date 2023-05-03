@@ -72,12 +72,17 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
     @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
-        posterior = self.model.posterior(
-            X=X, posterior_transform=self.posterior_transform
-        )
-        samples = self.get_posterior_samples(posterior)
-        obj = self.objective(samples, X=X)
+        if self.objective.constraints:
+            posterior = self.model.posterior(
+                X=X, posterior_transform=self.posterior_transform
+            )
+            samples = self.get_posterior_samples(posterior)
+            obj = self.objective(samples, X=X)
 
-        # multiply the output of the base acquisition function by the feasibility
-        base_val = torch.nn.functional.softplus(self.base_acqusition(X), beta=10)
-        return base_val * obj.max(dim=-1)[0].mean(dim=0)
+            # multiply the output of the base acquisition function by
+            # the feasibility
+            base_val = torch.nn.functional.softplus(
+                self.base_acqusition(X), beta=10)
+            return base_val * obj.max(dim=-1)[0].mean(dim=0)
+        else:
+            return self.base_acqusition(X)
