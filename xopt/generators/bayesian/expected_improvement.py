@@ -50,7 +50,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         ].dropna()
         objective_data = self.vocs.objective_data(valid_data, "")
 
-        best_f = torch.tensor(objective_data.max(), **self._tkwargs)
+        best_f = -torch.tensor(objective_data.min(), **self._tkwargs)
 
         qEI = qExpectedImprovement(
             model,
