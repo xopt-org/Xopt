@@ -45,11 +45,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         return BayesianOptions()
 
     def _get_acquisition(self, model):
-        valid_data = self.data[
-            pd.unique(self.vocs.variable_names + self.vocs.output_names)
-        ].dropna()
-        objective_data = self.vocs.objective_data(valid_data, "")
-
+        objective_data = self.vocs.objective_data(self.data, "").dropna()
         best_f = -torch.tensor(objective_data.min(), **self._tkwargs)
 
         qEI = qExpectedImprovement(
