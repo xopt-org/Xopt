@@ -35,7 +35,6 @@ class TimeDependentModelConstructor(StandardModelConstructor):
 
         # add time column to variable data
         self.input_data = pd.concat([self.input_data, data["time"]], axis=1)
-        self.train_X = torch.tensor(self.input_data.to_numpy(), **tkwargs)
 
         # add bounds for input transformation
         bounds = np.hstack(

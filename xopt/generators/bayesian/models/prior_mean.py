@@ -12,14 +12,18 @@ class CustomMean(TransformedModel, Mean):
         model: torch.nn.Module,
         gp_input_transform: InputTransform,
         gp_outcome_transform: OutcomeTransform,
+        fixed_model: bool = False
     ):
         """Custom prior mean for a GP based on an arbitrary model.
+
         Args:
             model: Representation of the model.
             gp_input_transform: Module used to transform inputs in the GP.
             gp_outcome_transform: Module used to transform outcomes in the GP.
+            fixed_model: Inherited from TransformedModel.
         """
-        super().__init__(model, gp_input_transform, gp_outcome_transform)
+        super().__init__(model, gp_input_transform, gp_outcome_transform,
+                         fixed_model=fixed_model)
 
     def forward(self, x):
         # set transformers to eval mode

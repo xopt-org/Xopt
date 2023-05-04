@@ -1,5 +1,6 @@
 import pandas as pd
 import torch
+from typing import Optional
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import Module
@@ -27,23 +28,16 @@ class StandardModelConstructor(ModelConstructor):
         self.input_data = None
         self.objective_data = None
         self.constraint_data = None
-        self.train_X = None
         self.tkwargs = {"dtype": torch.double, "device": "cpu"}
 
     def collect_data(self, data: pd.DataFrame):
-        # drop nans
-        valid_data = data[
-            pd.unique(self.vocs.variable_names + self.vocs.output_names)
-        ].dropna()
-
         # get data
         (
             self.input_data,
             self.objective_data,
             self.constraint_data,
-        ) = self.vocs.extract_data(valid_data, return_raw=True)
+        ) = self.vocs.extract_data(data, return_raw=True)
 
-        self.train_X = torch.tensor(self.input_data.to_numpy(), **self.tkwargs)
         self.input_transform.to(**self.tkwargs)
         if self.likelihood is not None:
             self.likelihood.to(**self.tkwargs)
@@ -59,44 +53,46 @@ class StandardModelConstructor(ModelConstructor):
         # build model
         return self.build_standard_model()
 
+    def build_mean_module(self, name, outcome_transform) -> Optional[CustomMean]:
+        """Builds the mean module for the output specified by name."""
+        mean_module = self._get_module(self.options.mean_modules, name)
+        if mean_module is not None:
+            mean_module = CustomMean(mean_module, self.input_transform,
+                                     outcome_transform)
+        return mean_module
+
+    def _get_training_data(self, name) -> (torch.Tensor, torch.Tensor):
+        """Returns (train_X, train_Y) for the output specified by name."""
+        # objective specifics
+        if name in self.vocs.objective_names:
+            target_data = self.objective_data
+        # constraint specifics
+        elif name in self.vocs.constraint_names:
+            target_data = self.constraint_data
+        else:
+            raise RuntimeError(
+                "Output '{}' is not found in either objectives or "
+                "constraints.".format(name)
+            )
+        train_X = torch.tensor(
+            self.input_data[~target_data[name].isnull()].to_numpy(),
+            **self.tkwargs)
+        train_Y = torch.tensor(
+            target_data[~target_data[name].isnull()][name].to_numpy(),
+            **self.tkwargs).unsqueeze(-1)
+        return train_X, train_Y
+
     def build_standard_model(self, **model_kwargs):
+        pd.options.mode.use_inf_as_na = True
         models = []
         for name in self.vocs.output_names:
             outcome_transform = Standardize(1)
             covar_module = self._get_module(self.options.covar_modules, name)
-            mean_module = self._get_module(self.options.mean_modules, name)
-
-            # objective specifics
-            if name in self.vocs.objective_names:
-                # if we are doing minimization add a negative sign to the prior model
-                # if self.vocs.objectives[name] == "MINIMIZE" and mean_module is not
-                # None:
-                #    mean_module = _NegativeModule(mean_module)
-
-                train_Y = torch.tensor(
-                    self.objective_data[name].to_numpy(), **self.tkwargs
-                ).unsqueeze(-1)
-
-            # constraint specific
-            elif name in self.vocs.constraint_names:
-                train_Y = torch.tensor(
-                    self.constraint_data[name].to_numpy(), **self.tkwargs
-                ).unsqueeze(-1)
-
-            else:
-                raise RuntimeError(
-                    "if you are recieving this message there is "
-                    "something wrong with vocs"
-                )
-
-            if mean_module is not None:
-                mean_module = CustomMean(
-                    mean_module, self.input_transform, outcome_transform
-                )
-
+            mean_module = self.build_mean_module(name, outcome_transform)
+            train_X, train_Y = self._get_training_data(name)
             models.append(
                 self.build_single_task_gp(
-                    self.train_X,
+                    train_X,
                     train_Y,
                     input_transform=self.input_transform,
                     outcome_transform=outcome_transform,
@@ -105,7 +101,6 @@ class StandardModelConstructor(ModelConstructor):
                     likelihood=self.likelihood,
                 )
             )
-
         return ModelListGP(*models)
 
     @staticmethod
