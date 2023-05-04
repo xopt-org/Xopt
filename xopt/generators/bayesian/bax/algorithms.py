@@ -18,11 +18,11 @@ class Algorithm:
 
     def unif_random_sample_domain(self, n_samples, domain):
         ndim = len(domain)
+
+        # uniform sample, rescaled, and shifted to cover the domain
         x_samples = torch.rand(n_samples, ndim) * torch.tensor(
             [bounds[1] - bounds[0] for bounds in domain]
-        ) + torch.tensor(
-            [bounds[0] for bounds in domain]
-        )  # uniform sample, rescaled, and shifted to cover the domain
+        ) + torch.tensor([bounds[0] for bounds in domain])
 
         return x_samples
 
@@ -65,11 +65,11 @@ class GridScanAlgo(Algorithm):
         )
 
         if self.ndim == 1:
-            xs_n_by_d = x_mesh_columnized_tuple[0]
+            mesh_points_serialized = x_mesh_columnized_tuple[0]
         else:
-            xs_n_by_d = torch.cat(x_mesh_columnized_tuple, dim=1)
+            mesh_points_serialized = torch.cat(x_mesh_columnized_tuple, dim=1)
 
-        return xs_n_by_d, x_mesh_tuple
+        return mesh_points_serialized, x_mesh_tuple
 
     def eval_sample_grid_scans(self, model: Model):
         sample_xs, x_mesh_tuple = self.build_input_mesh()
@@ -89,7 +89,7 @@ class GridScanAlgo(Algorithm):
         return sample_xs, sample_ys, x_mesh_tuple, y_mesh_samples
 
 
-class GridOpt(GridScanAlgo):
+class GridMinimize(GridScanAlgo):
     def get_exe_paths(self, model: Model):
         sample_xs, sample_ys = self.eval_sample_grid_scans(model)[:2]
 
