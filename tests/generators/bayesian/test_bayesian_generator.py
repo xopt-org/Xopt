@@ -32,8 +32,9 @@ class TestBayesianGenerator(TestCase):
         test_pts = torch.tensor(
             pd.DataFrame(TEST_VOCS_BASE.random_inputs(5, False, False)).to_numpy()
         )
+
         with torch.no_grad():
-            model(test_pts)
+            model.posterior(test_pts)
 
         # test with maximize and minimize
         test_vocs = deepcopy(TEST_VOCS_BASE)
