@@ -61,4 +61,5 @@ class BaxGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         single_task_model = model.models[0]
         eig = ExpectedInformationGain(single_task_model, self.algo)
+        self.algo_results = eig.algo_results
         return eig
