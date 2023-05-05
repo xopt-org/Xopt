@@ -9,22 +9,12 @@ from torch import Tensor
 class Algorithm:
     def __init__(
         self,
-        n_samples: int,
         domain: Tensor,  # shape (ndim, 2)
+        n_samples: int,
     ) -> None:
-        self.n_samples = n_samples
         self.domain = torch.tensor(domain)
+        self.n_samples = n_samples
         self.ndim = domain.shape[0]
-
-    def unif_random_sample_domain(self, n_samples, domain):
-        ndim = len(domain)
-
-        # uniform sample, rescaled, and shifted to cover the domain
-        x_samples = torch.rand(n_samples, ndim) * torch.tensor(
-            [bounds[1] - bounds[0] for bounds in domain]
-        ) + torch.tensor([bounds[0] for bounds in domain])
-
-        return x_samples
 
 
 class GridScanAlgo(Algorithm):
@@ -35,8 +25,8 @@ class GridScanAlgo(Algorithm):
         n_steps_sample_grid: Union[int, list[int]],
     ) -> None:
         self.domain = domain
-        self.ndim = domain.shape[0]
         self.n_samples = n_samples
+        self.ndim = domain.shape[0]
 
         if isinstance(
             n_steps_sample_grid, int
@@ -81,27 +71,34 @@ class GridScanAlgo(Algorithm):
 
         y_mesh_samples = sample_ys.reshape(self.n_samples, *x_mesh_tuple[0].shape)
 
-        self.sample_xs = sample_xs
-        self.sample_ys = sample_ys
-        self.x_mesh_tuple = x_mesh_tuple
-        self.y_mesh_samples = y_mesh_samples
-
         return sample_xs, sample_ys, x_mesh_tuple, y_mesh_samples
 
 
 class GridMinimize(GridScanAlgo):
     def get_exe_paths(self, model: Model):
-        sample_xs, sample_ys = self.eval_sample_grid_scans(model)[:2]
+        (
+            sample_xs,
+            sample_ys,
+            x_mesh_tuple,
+            y_mesh_samples,
+        ) = self.eval_sample_grid_scans(model)
 
         # get exe path subsequences (in this case, just 1 (x,y) pair from each sample)
         ys_opt, min_ids = torch.min(sample_ys, dim=1)
         xs_opt = sample_xs[min_ids]
 
-        self.xs_exe = xs_opt.reshape(
+        xs_exe = xs_opt.reshape(
             -1, 1, self.ndim
         )  # xs_exe.shape = (n_samples, len_exe_path, ndim)
-        self.ys_exe = ys_opt.reshape(
-            -1, 1, 1
-        )  # ys_exe.shape = (n_samples, len_exe_path, 1)
+        ys_exe = ys_opt.reshape(-1, 1, 1)  # ys_exe.shape = (n_samples, len_exe_path, 1)
 
-        return self.xs_exe, self.ys_exe
+        results_dict = {
+            "xs_exe": xs_exe,
+            "ys_exe": ys_exe,
+            "sample_xs": sample_xs,
+            "sample_ys": sample_ys,
+            "x_mesh_tuple": x_mesh_tuple,
+            "y_mesh_samples": y_mesh_samples,
+        }
+
+        return xs_exe, ys_exe, results_dict
