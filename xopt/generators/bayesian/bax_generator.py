@@ -5,7 +5,7 @@ from typing import Callable, Union
 from pydantic import Field
 
 from xopt.generators.bayesian.bax.acquisition import ExpectedInformationGain
-from xopt.generators.bayesian.bax.algorithms import GridMinimizeExecutor
+from xopt.generators.bayesian.bax.algorithms import GridMinimize
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
@@ -16,10 +16,10 @@ from xopt.vocs import VOCS
 logger = logging.getLogger()
 
 
-class AlgorithmExecutorOptions(XoptBaseModel):
+class AlgorithmOptions(XoptBaseModel):
     """Options for defining the algorithm in BAX"""
 
-    AlgoClass: Callable = Field(
+    Algo: Callable = Field(
         description="Class constructor for a specific Bayesian algorithm executor"
     )
     n_samples: int = Field(
@@ -27,9 +27,9 @@ class AlgorithmExecutorOptions(XoptBaseModel):
     )
 
 
-class GridMinimizeExecutorOptions(AlgorithmExecutorOptions):
-    AlgoClass: Callable = Field(
-        GridMinimizeExecutor,
+class GridMinimizeOptions(AlgorithmOptions):
+    Algo: Callable = Field(
+        GridMinimize,
         description="Class constructor for a specific Bayesian algorithm executor",
     )
     n_steps_sample_grid: Union[int, list[int]] = Field(
@@ -40,7 +40,7 @@ class GridMinimizeExecutorOptions(AlgorithmExecutorOptions):
 class BayesianAlgorithmExecutionOptions(AcqOptions):
     """Options for defining the acquisition function in BO"""
 
-    algo: AlgorithmExecutorOptions = GridMinimizeExecutorOptions()
+    algo: AlgorithmOptions = GridMinimizeOptions()
 
 
 class BaxOptions(BayesianOptions):
@@ -91,6 +91,6 @@ class BaxGenerator(BayesianGenerator):
 
     def construct_algo_executor(self):
         algo_options = self.options.acq.algo.dict()
-        AlgoClass = algo_options.pop("AlgoClass")
-        algo = AlgoClass(domain=self.vocs.bounds.T, **algo_options)
+        Algo = algo_options.pop("Algo")
+        algo = Algo(domain=self.vocs.bounds.T, **algo_options)
         return algo
