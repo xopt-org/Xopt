@@ -4,7 +4,7 @@ from botorch.models.model import Model
 from botorch.utils.transforms import t_batch_mode_transform
 from torch import Tensor
 
-from xopt.generators.bayesian.bax.algorithms import Algorithm
+from xopt.generators.bayesian.bax.algorithms import AlgorithmExecutor
 
 
 class ExpectedInformationGain(AnalyticAcquisitionFunction):
@@ -16,7 +16,7 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         >>> eig = EIG(test_X)
     """
 
-    def __init__(self, model: Model, algo: type[Algorithm]) -> None:
+    def __init__(self, model: Model, algo_executor: type[AlgorithmExecutor]) -> None:
         r"""Single-outcome Expected Improvement (analytic).
 
         Args:
@@ -24,10 +24,10 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         """
 
         super().__init__(model=model)
-        self.algo = algo
+        self.algo_executor = algo_executor
 
         # get sample-wise algorithm execution (BAX) results
-        self.xs_exe, self.ys_exe, self.algo_results = self.algo.get_exe_paths(
+        self.xs_exe, self.ys_exe, self.algo_results = self.algo_executor.get_exe_paths(
             self.model
         )
 

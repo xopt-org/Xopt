@@ -1,32 +1,50 @@
 # +
 import logging
+from typing import Callable, Union
 
 from pydantic import Field
 
 from xopt.generators.bayesian.bax.acquisition import ExpectedInformationGain
-from xopt.generators.bayesian.bax.algorithms import Algorithm
+from xopt.generators.bayesian.bax.algorithms import GridMinimizeExecutor
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
 
+from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 
 
+class AlgorithmExecutorOptions(XoptBaseModel):
+    """Options for defining the algorithm in BAX"""
+
+    AlgoClass: Callable = Field(
+        description="Class constructor for a specific Bayesian algorithm executor"
+    )
+    n_samples: int = Field(
+        20, description="number of posterior samples on which to execute the algorithm"
+    )
+
+
+class GridMinimizeExecutorOptions(AlgorithmExecutorOptions):
+    AlgoClass: Callable = Field(
+        GridMinimizeExecutor,
+        description="Class constructor for a specific Bayesian algorithm executor",
+    )
+    n_steps_sample_grid: Union[int, list[int]] = Field(
+        25, description="number of steps to use per dimension for the sample grid scans"
+    )
+
+
 class BayesianAlgorithmExecutionOptions(AcqOptions):
     """Options for defining the acquisition function in BO"""
 
-    algo: Algorithm = Field(
-        description="Class with functions for Bayesian execution of some algorithm."
-    )
-
-    class Config:
-        arbitrary_types_allowed = True
+    algo: AlgorithmExecutorOptions = GridMinimizeExecutorOptions()
 
 
 class BaxOptions(BayesianOptions):
-    acq: BayesianAlgorithmExecutionOptions
+    acq = BayesianAlgorithmExecutionOptions()
 
 
 class BaxGenerator(BayesianGenerator):
@@ -35,7 +53,7 @@ class BaxGenerator(BayesianGenerator):
     def __init__(
         self,
         vocs: VOCS,
-        options: BayesianOptions = None,
+        options: BaxOptions = None,
     ):
         """
         Generator that uses Expected Information Gain acquisition function
@@ -51,15 +69,28 @@ class BaxGenerator(BayesianGenerator):
         options: BayesianOptions
             Specific options for this generator
         """
+        options = options or BaxOptions()
+        if not isinstance(options, BaxOptions):
+            raise ValueError("options must be a BaxOptions object")
 
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for optimization")
 
         super().__init__(vocs, options)
-        self.algo = self.options.acq.algo
+        self.algo_executor = self.construct_algo_executor()
+
+    @staticmethod
+    def default_options() -> BayesianOptions:
+        return BaxOptions()
 
     def _get_acquisition(self, model):
         single_task_model = model.models[0]
-        eig = ExpectedInformationGain(single_task_model, self.algo)
+        eig = ExpectedInformationGain(single_task_model, self.algo_executor)
         self.algo_results = eig.algo_results
         return eig
+
+    def construct_algo_executor(self):
+        algo_options = self.options.acq.algo.dict()
+        AlgoClass = algo_options.pop("AlgoClass")
+        algo = AlgoClass(domain=self.vocs.bounds.T, **algo_options)
+        return algo

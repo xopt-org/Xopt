@@ -6,7 +6,7 @@ from botorch.models.model import Model
 from torch import Tensor
 
 
-class Algorithm:
+class AlgorithmExecutor:
     def __init__(
         self,
         domain: Tensor,  # shape (ndim, 2)
@@ -17,7 +17,7 @@ class Algorithm:
         self.ndim = domain.shape[0]
 
 
-class GridScanAlgo(Algorithm):
+class GridScanAlgoExecutor(AlgorithmExecutor):
     def __init__(
         self,
         domain: Tensor,  # shape (ndim, 2) tensor
@@ -28,9 +28,8 @@ class GridScanAlgo(Algorithm):
         self.n_samples = n_samples
         self.ndim = domain.shape[0]
 
-        if isinstance(
-            n_steps_sample_grid, int
-        ):  # check to see if n_steps_sample_grid is an int
+        # check to see if n_steps_sample_grid is an int
+        if isinstance(n_steps_sample_grid, int):
             # if so, we make it a list with that integer repeated for every dimension
             n_steps_sample_grid = [n_steps_sample_grid] * int(self.ndim)
 
@@ -74,7 +73,7 @@ class GridScanAlgo(Algorithm):
         return sample_xs, sample_ys, x_mesh_tuple, y_mesh_samples
 
 
-class GridMinimize(GridScanAlgo):
+class GridMinimizeExecutor(GridScanAlgoExecutor):
     def get_exe_paths(self, model: Model):
         (
             sample_xs,
