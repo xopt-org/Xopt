@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Dict, Union
 
 import torch
 from botorch.models.model import Model
@@ -11,8 +11,10 @@ class Algorithm:
         self,
         domain: Tensor,  # shape (ndim, 2)
         n_samples: int,
+        tkwargs: Dict = {"dtype": torch.double, "device": "cpu"},
     ) -> None:
-        self.domain = torch.tensor(domain)
+        self._tkwargs = tkwargs
+        self.domain = torch.tensor(domain, **self._tkwargs)
         self.n_samples = n_samples
         self.ndim = domain.shape[0]
 
@@ -23,10 +25,9 @@ class GridScanAlgo(Algorithm):
         domain: Tensor,  # shape (ndim, 2) tensor
         n_samples: int,
         n_steps_sample_grid: Union[int, list[int]],
+        tkwargs: Dict = {"dtype": torch.double, "device": "cpu"},
     ) -> None:
-        self.domain = domain
-        self.n_samples = n_samples
-        self.ndim = domain.shape[0]
+        super().__init__(domain, n_samples, tkwargs)
 
         # check to see if n_steps_sample_grid is an int
         if isinstance(n_steps_sample_grid, int):
@@ -43,7 +44,7 @@ class GridScanAlgo(Algorithm):
 
     def build_input_mesh(self):
         linspace_list = [
-            torch.linspace(bounds[0], bounds[1], n_steps).double()
+            torch.linspace(bounds[0], bounds[1], n_steps).double().to(**self._tkwargs)
             for n_steps, bounds in zip(self.n_steps_sample_grid, self.domain)
         ]
 
