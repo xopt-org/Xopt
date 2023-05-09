@@ -44,7 +44,7 @@ class GridScanAlgo(Algorithm):
 
     def build_input_mesh(self):
         linspace_list = [
-            torch.linspace(bounds[0], bounds[1], n_steps).double().to(**self._tkwargs)
+            torch.linspace(bounds[0], bounds[1], n_steps, **self._tkwargs).double()
             for n_steps, bounds in zip(self.n_steps_sample_grid, self.domain)
         ]
 
