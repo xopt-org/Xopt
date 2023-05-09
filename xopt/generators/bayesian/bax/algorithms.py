@@ -6,7 +6,7 @@ from botorch.models.model import Model
 from torch import Tensor
 
 
-class AlgorithmExecutor:
+class Algorithm:
     def __init__(
         self,
         domain: Tensor,  # shape (ndim, 2)
@@ -17,7 +17,7 @@ class AlgorithmExecutor:
         self.ndim = domain.shape[0]
 
 
-class GridScanAlgoExecutor(AlgorithmExecutor):
+class GridScanAlgo(Algorithm):
     def __init__(
         self,
         domain: Tensor,  # shape (ndim, 2) tensor
@@ -73,7 +73,7 @@ class GridScanAlgoExecutor(AlgorithmExecutor):
         return sample_xs, sample_ys, x_mesh_tuple, y_mesh_samples
 
 
-class GridMinimizeExecutor(GridScanAlgoExecutor):
+class GridMinimize(GridScanAlgo):
     def get_exe_paths(self, model: Model):
         (
             sample_xs,
