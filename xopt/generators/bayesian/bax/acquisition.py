@@ -16,7 +16,7 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         >>> eig = EIG(test_X)
     """
 
-    def __init__(self, model: Model, algo_executor: type[Algorithm]) -> None:
+    def __init__(self, model: Model, algo: type[Algorithm]) -> None:
         r"""Single-outcome Expected Improvement (analytic).
 
         Args:
@@ -24,10 +24,10 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         """
 
         super().__init__(model=model)
-        self.algo_executor = algo_executor
+        self.algo = algo
 
         # get sample-wise algorithm execution (BAX) results
-        self.xs_exe, self.ys_exe, self.algo_results = self.algo_executor.get_exe_paths(
+        self.xs_exe, self.ys_exe, self.algo_results = self.algo.get_exe_paths(
             self.model
         )
 

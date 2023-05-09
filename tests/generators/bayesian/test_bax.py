@@ -22,7 +22,7 @@ class TestBaxGenerator:
         # bax_gen.options.schema()
 
         with pytest.raises(ValueError):
-            bax_gen(TEST_VOCS_BASE, BayesianOptions())
+            BaxGenerator(TEST_VOCS_BASE, BayesianOptions())
 
     def test_generate(self):
         gen = BaxGenerator(
@@ -50,6 +50,7 @@ class TestBaxGenerator:
             gen.options.optim.num_restarts = 1
             gen.options.acq.monte_carlo_samples = 1
             gen.data = TEST_VOCS_DATA
+            gen.construct_algo()
 
             candidate = gen.generate(1)
             assert len(candidate) == 1

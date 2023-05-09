@@ -77,7 +77,6 @@ class BaxGenerator(BayesianGenerator):
             raise ValueError("vocs must have one objective for optimization")
 
         super().__init__(vocs, options)
-        self.algo_executor = self.construct_algo_executor()
 
     @staticmethod
     def default_options() -> BayesianOptions:
@@ -85,12 +84,12 @@ class BaxGenerator(BayesianGenerator):
 
     def _get_acquisition(self, model):
         single_task_model = model.models[0]
-        eig = ExpectedInformationGain(single_task_model, self.algo_executor)
+        algo = self.construct_algo()
+        eig = ExpectedInformationGain(single_task_model, algo)
         self.algo_results = eig.algo_results
         return eig
 
-    def construct_algo_executor(self):
+    def construct_algo(self):
         algo_options = self.options.acq.algo.dict()
         Algo = algo_options.pop("Algo")
-        algo = Algo(domain=self.vocs.bounds.T, **algo_options)
-        return algo
+        return Algo(domain=self.vocs.bounds.T, **algo_options, tkwargs=self._tkwargs)
