@@ -1,8 +1,8 @@
 # +
 import logging
-from typing import Callable, Union
+from typing import Union
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from xopt.generators.bayesian.bax.acquisition import ExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import GridMinimize
@@ -19,19 +19,20 @@ logger = logging.getLogger()
 class AlgorithmOptions(XoptBaseModel):
     """Options for defining the algorithm in BAX"""
 
-    Algo: Callable = Field(
-        description="Class constructor for a specific Bayesian algorithm executor"
-    )
+    _AlgoClass = PrivateAttr()  # pass desired Algorithm class as an arg
+
     n_samples: int = Field(
         20, description="number of posterior samples on which to execute the algorithm"
     )
 
+    @property
+    def AlgoClass(self):
+        return self._AlgoClass
+
 
 class GridMinimizeOptions(AlgorithmOptions):
-    Algo: Callable = Field(
-        GridMinimize,
-        description="Class constructor for a specific Bayesian algorithm executor",
-    )
+    _AlgoClass = PrivateAttr(GridMinimize)
+
     n_steps_sample_grid: Union[int, list[int]] = Field(
         25, description="number of steps to use per dimension for the sample grid scans"
     )
@@ -91,5 +92,6 @@ class BaxGenerator(BayesianGenerator):
 
     def construct_algo(self):
         algo_options = self.options.acq.algo.dict()
-        Algo = algo_options.pop("Algo")
-        return Algo(domain=self.vocs.bounds.T, **algo_options, tkwargs=self._tkwargs)
+        return self.options.acq.algo.AlgoClass(
+            domain=self.vocs.bounds.T, **algo_options, tkwargs=self._tkwargs
+        )
