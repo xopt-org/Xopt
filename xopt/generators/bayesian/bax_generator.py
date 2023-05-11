@@ -21,6 +21,7 @@ class AlgorithmOptions(XoptBaseModel):
 
     _AlgoClass = PrivateAttr()  # pass desired Algorithm class as an arg
 
+    # n_samples is a field universal to all BAX algorithms
     n_samples: int = Field(
         20, description="number of posterior samples on which to execute the algorithm"
     )
@@ -33,6 +34,7 @@ class AlgorithmOptions(XoptBaseModel):
 class GridMinimizeOptions(AlgorithmOptions):
     _AlgoClass = PrivateAttr(GridMinimize)
 
+    # add fields specific to this algorithm
     n_steps_sample_grid: Union[int, list[int]] = Field(
         25, description="number of steps to use per dimension for the sample grid scans"
     )
