@@ -11,46 +11,17 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.options import BayesianOptions
-from xopt.utils import format_option_descriptions
-from xopt.vocs import VOCS
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
-    alias = "bayesian_exploration"
-    __doc__ = (
-        """Implements Bayeisan Exploration acquisition function"""
-        + f"{format_option_descriptions(BayesianOptions())}"
-    )
-
-    def __init__(self, vocs: VOCS, options: BayesianOptions = None):
-        """
-        Generator using UpperConfidenceBound acquisition function
-
-        Parameters
-        ----------
-        vocs: dict
-            Standard vocs for xopt
-
-        options: BayesianOptions
-            Options for the generator
-        """
-        options = options or BayesianOptions()
-        if not isinstance(options, BayesianOptions):
-            raise ValueError("options must be a BayesianOptions object")
-
-        if vocs.n_objectives != 1:
-            raise ValueError("vocs must have one objective for exploration")
-        super().__init__(vocs, options)
-
-    @staticmethod
-    def default_options() -> BayesianOptions:
-        return BayesianOptions()
+    name = "bayesian_exploration"
+    supports_batch_generation = True
 
     def _get_acquisition(self, model):
+        sampler = self._get_sampler(model)
         qPV = qPosteriorVariance(
             model,
-            sampler=self.sampler,
+            sampler=sampler,
             objective=self._get_objective(),
         )
 

@@ -15,7 +15,7 @@ class TestTurbo(TestCase):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.variables = {"x1": [0, 1]}
-        gen = BayesianGenerator(test_vocs)
+        gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
         model = gen.train_model()
         bounds = gen._get_bounds()
@@ -28,7 +28,7 @@ class TestTurbo(TestCase):
 
         # test in 2D
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        gen = BayesianGenerator(test_vocs)
+        gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
         model = gen.train_model()
         bounds = gen._get_bounds()

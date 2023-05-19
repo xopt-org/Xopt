@@ -5,24 +5,30 @@ from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.model import Model
 from gpytorch import ExactMarginalLogLikelihood
+from pydantic import BaseModel, Field
 from torch import Tensor
 
 from xopt.vocs import VOCS
 
 
-class ModelConstructor(ABC):
+class ModelConstructor(BaseModel, ABC):
     """
     Abstract class that defines instructions for building heterogeneous botorch models
     used in Xopt Bayesian generators.
 
     """
 
-    def __init__(self, vocs: VOCS, options):
-        self.vocs = vocs
-        self.options = options
+    name: str = None
+    vocs: VOCS = Field(allow_mutation=False, description="generator VOCS", exclude=True)
+
+    class Config:
+        validate_assignment = True
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     @abstractmethod
-    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
+    def build_model(self, data: pd.DataFrame) -> ModelListGP:
         """return a trained botorch model for objectives and constraints"""
         pass
 

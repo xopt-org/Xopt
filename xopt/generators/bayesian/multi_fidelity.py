@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Callable, List
+from typing import Callable, Optional
 
 import pandas as pd
 import torch
@@ -10,82 +10,51 @@ from botorch.acquisition import (
     qUpperConfidenceBound,
 )
 from botorch.optim import optimize_acqf
-from pydantic import Field
+from pydantic import Field, validator
 
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
-
-from xopt.generators.bayesian.mobo import MOBOGenerator, MOBOOptions
-from xopt.generators.bayesian.options import AcqOptions, ModelOptions
-from xopt.utils import format_option_descriptions
+from xopt.generators.bayesian.mobo import MOBOGenerator
+from xopt.generators.bayesian.options import AcquisitionOptions
 from xopt.vocs import ObjectiveEnum, VOCS
 
 logger = logging.getLogger()
 
 
-class MultiFidelityModelOptions(ModelOptions):
-    """Options for defining the Multi-fidelity GP model in BO"""
-
-    name: str = Field("standard", description="name of model constructor")
-    fidelity_parameter: str = Field("s", description="fidelity parameter name")
-
-
-class MultiFidelityAcqOptions(AcqOptions):
+class MultiFidelityAcquisitionOptions(AcquisitionOptions):
     cost_function: Callable = Field(
         lambda x: x + 1.0,
         description="callable function that describes the cost "
         "of evaluating the objective function",
     )
-    reference_point: List[float] = Field(
-        None,
-        description="reference point for multi-objective, multi-fidelity "
-        "optimization",
-    )
-
-
-class MultiFidelityOptions(MOBOOptions):
-    acq = MultiFidelityAcqOptions()
-    model = MultiFidelityModelOptions()
 
 
 class MultiFidelityGenerator(MOBOGenerator):
-    alias = "multi_fidelity"
-    __doc__ = (
-        """Implements Multi-fidelity Bayeisan optimizationn
+    name = "multi_fidelity"
+    acquisition_options: MultiFidelityAcquisitionOptions = (
+        MultiFidelityAcquisitionOptions()
+    )
+    fidelity_parameter: str = Field(
+        "s", description="fidelity parameter name", const=True
+    )
+    reference_point: Optional[dict] = {"s": -10.0}
+
+    __doc__ = """Implements Multi-fidelity Bayeisan optimizationn
         Assumes a fidelity parameter [0,1]
         """
-        + f"{format_option_descriptions(MultiFidelityOptions())}"
-    )
 
-    def __init__(self, vocs: VOCS, options: MultiFidelityOptions = None):
-        """
-        Generator using Expected improvement acquisition function
+    class Config:
+        validate_assignment = True
 
-        Parameters
-        ----------
-        vocs: dict
-            Standard vocs dictionary for xopt
+    @validator("vocs", pre=True)
+    def validate_vocs(cls, v: VOCS):
+        v.variables["s"] = [0, 1]
+        v.objectives["s"] = ObjectiveEnum("MAXIMIZE")
+        assert v.constraints == {}
 
-        options: BayesianOptions
-            Specific options for this generator
-        """
-        options = options or MultiFidelityOptions()
-        if not type(options) is MultiFidelityOptions:
-            raise ValueError("options must be a `MultiFidelityOptions` object")
-
-        # create an augmented vocs that includes the fidelity parameter for both the
-        # variable and constraint
-        _vocs = deepcopy(vocs)
-        _vocs.variables[options.model.fidelity_parameter] = [0, 1]
-        _vocs.objectives[options.model.fidelity_parameter] = ObjectiveEnum("MAXIMIZE")
-
-        super().__init__(_vocs, options)
-
-    @staticmethod
-    def default_options() -> MultiFidelityOptions:
-        return MultiFidelityOptions()
+        return v
 
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
         """calculate total cost of data samples using the fidelity parameter"""
@@ -95,7 +64,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         f_data = self.get_input_data(data)
 
         # apply callable function to get costs
-        return self.options.acq.cost_function(
+        return self.acquisition_options.cost_function(
             f_data[..., self.fidelity_variable_index]
         ).sum()
 
@@ -122,12 +91,14 @@ class MultiFidelityGenerator(MOBOGenerator):
 
         # wrap the cost function such that it only has to accept the fidelity parameter
         def true_cost_function(X):
-            return self.options.acq.cost_function(X[..., self.fidelity_variable_index])
+            return self.acquisition_options.cost_function(
+                X[..., self.fidelity_variable_index]
+            )
 
         acq_func = NMOMF(
             model=model,
             X_baseline=X_baseline,
-            ref_point=self.reference_point,
+            ref_point=self.torch_reference_point,
             cost_call=true_cost_function,
             objective=self._get_objective(),
             constraints=self._get_constraint_callables(),
@@ -144,10 +115,6 @@ class MultiFidelityGenerator(MOBOGenerator):
         ).any():
             raise ValueError("cannot add fidelity data that is outside the range [0,1]")
         super().add_data(new_data)
-
-    @property
-    def fidelity_parameter(self):
-        return self.options.model.fidelity_parameter
 
     @property
     def fidelity_variable_index(self):
@@ -190,7 +157,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         fixed_bounds = torch.cat(
             (
                 boundst[: self.fidelity_variable_index],
-                boundst[self.fidelity_variable_index + 1:],
+                boundst[self.fidelity_variable_index + 1 :],
             )
         ).T
 
@@ -198,8 +165,8 @@ class MultiFidelityGenerator(MOBOGenerator):
             acq_function=max_fidelity_c_posterior_mean,
             bounds=fixed_bounds,
             q=1,
-            raw_samples=self.options.optim.raw_samples * 5,
-            num_restarts=self.options.optim.num_restarts * 5,
+            raw_samples=self.optimization_options.raw_samples * 5,
+            num_restarts=self.optimization_options.num_restarts * 5,
         )
         vnames = deepcopy(self.vocs.variable_names)
         del vnames[self.fidelity_variable_index]
@@ -207,30 +174,3 @@ class MultiFidelityGenerator(MOBOGenerator):
         df[self.fidelity_parameter] = 1.0
 
         return self.vocs.convert_dataframe_to_inputs(df)
-
-    @property
-    def reference_point(self):
-        # case for multi-fidelity multi-objective
-        pt = []
-        for name in self.vocs.objective_names:
-            if name == self.fidelity_parameter:
-                ref_val = 0.0
-            else:
-                # if this is a single objective problem then there will be no
-                # reference point in the acq options
-                if self.options.acq.reference_point is None:
-                    ref_val = 10.0
-                else:
-                    ref_val = self.options.acq.reference_point[name]
-
-            if self.vocs.objectives[name] == "MINIMIZE":
-                pt += [-ref_val]
-            elif self.vocs.objectives[name] == "MAXIMIZE":
-                pt += [ref_val]
-            else:
-                raise ValueError(
-                    f"objective type {self.vocs.objectives[name]} not\
-                        supported"
-                )
-
-        return torch.tensor(pt, **self._tkwargs)

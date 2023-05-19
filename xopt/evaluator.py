@@ -5,7 +5,6 @@ from threading import Lock
 from typing import Callable, Dict
 
 import numpy as np
-
 import pandas as pd
 from pydantic import BaseModel, Field, root_validator
 

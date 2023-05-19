@@ -1,95 +1,91 @@
+import os.path
+from typing import Dict, Optional
+
 import pandas as pd
 import torch
-from typing import Optional
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
-from gpytorch import Module
+from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
+from pydantic import Field, validator
+from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.vocs import VOCS
+from xopt.pydantic import orjson_dumps
+
+DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 
 
 class StandardModelConstructor(ModelConstructor):
-    def __init__(self, vocs: VOCS, options):
-        super().__init__(vocs, options)
-        # get input transform
-        self.input_transform = Normalize(
+    name = "standard"
+    use_low_noise_prior: bool = Field(
+        True, description="specify if model should assume a low noise environment"
+    )
+    covar_modules: Dict[str, Kernel] = Field(
+        {}, description="covariance modules for GP models"
+    )
+    mean_modules: Dict[str, Module] = Field(
+        {}, description="prior mean modules for GP models"
+    )
+    dtype: torch.dtype = Field(torch.double)
+    device: str = Field("cpu")
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_dumps = orjson_dumps
+        validate_assignment = True
+
+    @validator("covar_modules", "mean_modules", pre=True)
+    def validate_torch_modules(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError("must be dict")
+        else:
+            for key, val in v.items():
+                if isinstance(val, str):
+                    if os.path.exists(val):
+                        v[key] = torch.load(val)
+
+        return v
+
+    @validator("dtype", pre=True)
+    def validate_dtype(cls, v):
+        if isinstance(v, str):
+            try:
+                return DECODERS[v]
+            except KeyError:
+                raise ValueError(f"cannot convert {v}")
+        return v
+
+    @property
+    def input_transform(self):
+        return Normalize(
             self.vocs.n_variables, bounds=torch.tensor(self.vocs.bounds)
-        )
+        ).to(**self.tkwargs)
 
-        # get likelihood
-        self.likelihood = None
-        if self.options.use_low_noise_prior:
-            self.likelihood = GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
+    @property
+    def likelihood(self):
+        if self.use_low_noise_prior:
+            return GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
+        else:
+            return GaussianLikelihood()
 
-        self.input_data = None
-        self.objective_data = None
-        self.constraint_data = None
-        self.tkwargs = {"dtype": torch.double, "device": "cpu"}
+    @property
+    def tkwargs(self):
+        return {"dtype": self.dtype, "device": self.device}
 
-    def collect_data(self, data: pd.DataFrame):
-        # get data
-        (
-            self.input_data,
-            self.objective_data,
-            self.constraint_data,
-        ) = self.vocs.extract_data(data, return_raw=True)
-
-        self.input_transform.to(**self.tkwargs)
-        if self.likelihood is not None:
-            self.likelihood.to(**self.tkwargs)
-
-    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
+    def build_model(self, data: pd.DataFrame) -> ModelListGP:
         """construct independent model for each objective and constraint"""
-        # overwrite tkwargs if specified
-        self.tkwargs = tkwargs or self.tkwargs
-
-        # collect data from dataframe
-        self.collect_data(data)
 
         # build model
-        return self.build_standard_model()
-
-    def build_mean_module(self, name, outcome_transform) -> Optional[CustomMean]:
-        """Builds the mean module for the output specified by name."""
-        mean_module = self._get_module(self.options.mean_modules, name)
-        if mean_module is not None:
-            mean_module = CustomMean(mean_module, self.input_transform,
-                                     outcome_transform)
-        return mean_module
-
-    def _get_training_data(self, name) -> (torch.Tensor, torch.Tensor):
-        """Returns (train_X, train_Y) for the output specified by name."""
-        # objective specifics
-        if name in self.vocs.objective_names:
-            target_data = self.objective_data
-        # constraint specifics
-        elif name in self.vocs.constraint_names:
-            target_data = self.constraint_data
-        else:
-            raise RuntimeError(
-                "Output '{}' is not found in either objectives or "
-                "constraints.".format(name)
-            )
-        train_X = torch.tensor(
-            self.input_data[~target_data[name].isnull()].to_numpy(),
-            **self.tkwargs)
-        train_Y = torch.tensor(
-            target_data[~target_data[name].isnull()][name].to_numpy(),
-            **self.tkwargs).unsqueeze(-1)
-        return train_X, train_Y
-
-    def build_standard_model(self, **model_kwargs):
         pd.options.mode.use_inf_as_na = True
         models = []
         for name in self.vocs.output_names:
             outcome_transform = Standardize(1)
-            covar_module = self._get_module(self.options.covar_modules, name)
+            covar_module = self._get_module(self.covar_modules, name)
             mean_module = self.build_mean_module(name, outcome_transform)
-            train_X, train_Y = self._get_training_data(name)
+            train_X, train_Y = self._get_training_data(name, data)
             models.append(
                 self.build_single_task_gp(
                     train_X,
@@ -102,6 +98,41 @@ class StandardModelConstructor(ModelConstructor):
                 )
             )
         return ModelListGP(*models)
+
+    def build_mean_module(self, name, outcome_transform) -> Optional[CustomMean]:
+        """Builds the mean module for the output specified by name."""
+        mean_module = self._get_module(self.mean_modules, name)
+        if mean_module is not None:
+            mean_module = CustomMean(
+                mean_module, self.input_transform, outcome_transform
+            )
+        return mean_module
+
+    def _get_training_data(self, name, data) -> (torch.Tensor, torch.Tensor):
+        """Returns (train_X, train_Y) for the output specified by name."""
+        # collect data from dataframe
+        input_data, objective_data, constraint_data = self.vocs.extract_data(
+            data, return_raw=True
+        )
+
+        # objective specifics
+        if name in self.vocs.objective_names:
+            target_data = objective_data
+        # constraint specifics
+        elif name in self.vocs.constraint_names:
+            target_data = constraint_data
+        else:
+            raise RuntimeError(
+                "Output '{}' is not found in either objectives or "
+                "constraints.".format(name)
+            )
+        train_X = torch.tensor(
+            input_data[~target_data[name].isnull()].to_numpy(), **self.tkwargs
+        )
+        train_Y = torch.tensor(
+            target_data[~target_data[name].isnull()][name].to_numpy(), **self.tkwargs
+        ).unsqueeze(-1)
+        return train_X, train_Y
 
     @staticmethod
     def _get_module(base, name):

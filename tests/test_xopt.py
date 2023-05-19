@@ -6,9 +6,9 @@ from copy import copy, deepcopy
 import pandas as pd
 import pytest
 import yaml
+
 from xopt.base import Xopt, XoptOptions
 from xopt.errors import XoptError
-
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
@@ -17,6 +17,8 @@ from xopt.vocs import VOCS
 
 
 class DummyGenerator(Generator, ABC):
+    name = "dummy"
+
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
@@ -43,7 +45,7 @@ class TestXopt:
             pass
 
         evaluator = Evaluator(function=dummy)
-        gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
+        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
     def test_function_checking(self):
@@ -63,7 +65,7 @@ class TestXopt:
 
         # init with generator and evaluator
         evaluator = Evaluator(function=f)
-        generator = RandomGenerator(vocs)
+        generator = RandomGenerator(vocs=vocs)
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
@@ -75,7 +77,7 @@ class TestXopt:
 
         # init with generator and evaluator
         evaluator = Evaluator(function=g)  # Has non-dict return type
-        generator = RandomGenerator(vocs)
+        generator = RandomGenerator(vocs=vocs)
         X2 = Xopt(
             generator=generator,
             evaluator=evaluator,
@@ -86,7 +88,7 @@ class TestXopt:
             X2.step()
 
     def test_submit_bad_data(self):
-        generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
+        generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
             generator=generator,
@@ -97,7 +99,7 @@ class TestXopt:
             X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
 
     def test_add_data(self):
-        generator = DummyGenerator(deepcopy(TEST_VOCS_BASE))
+        generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
             generator=generator,
@@ -113,7 +115,7 @@ class TestXopt:
 
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
@@ -149,7 +151,7 @@ class TestXopt:
             raise ValueError
 
         evaluator = Evaluator(function=bad_function)
-        gen = RandomGenerator(deepcopy(TEST_VOCS_BASE))
+        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
         # should be able to run with strict=False (default)
@@ -163,7 +165,7 @@ class TestXopt:
 
     def test_random(self):
         evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
             generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
@@ -177,7 +179,7 @@ class TestXopt:
 
     def test_checkpointing(self):
         evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(deepcopy(TEST_VOCS_BASE))
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
             generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
@@ -208,3 +210,14 @@ class TestXopt:
             import os
 
             os.remove(X.options.dump_file)
+
+    def test_random_evaluate(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+        xopt.random_evaluate(2)
+        xopt.random_evaluate(1)
+        assert len(xopt.data) == 3

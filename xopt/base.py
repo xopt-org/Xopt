@@ -7,7 +7,8 @@ from xopt import _version
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
-from xopt.generators import get_generator_and_defaults
+from xopt.generators import get_generator
+# from xopt.generators import get_generator_and_defaults
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
@@ -347,7 +348,7 @@ class Xopt:
 
     @property
     def is_done(self):
-        return self._is_done or self.generator.is_done
+        return self._is_done
 
     @property
     def new_data(self):
@@ -407,11 +408,11 @@ Config as YAML:
 
     # Convenience methods
 
-    def random_inputs(self, *args, **kwargs):
+    def random_inputs(self, n_samples, *args, **kwargs):
         """
         Convenence method to call vocs.random_inputs
         """
-        return self.vocs.random_inputs(*args, **kwargs)
+        return self.vocs.random_inputs(n=n_samples, *args, **kwargs)
 
     def evaluate(self, inputs: Dict, **kwargs):
         """
@@ -419,12 +420,16 @@ Config as YAML:
         """
         return self.evaluator.evaluate(inputs, **kwargs)
 
-    def random_evaluate(self, *args, **kwargs):
+    def random_evaluate(self, n_samples, *args, **kwargs):
         """
         Convenience method to generate random inputs using vocs
-        and evaluate them using evaluator.evaluate.
+        and evaluate them (adding data to Xopt object and generator.
         """
-        result = self.evaluate(self.random_inputs(*args, **kwargs))
+        index = [1] if n_samples == 1 else None
+        random_inputs = pd.DataFrame(
+            self.random_inputs(n_samples, *args, **kwargs), index=index
+        )
+        result = self.evaluate_data(random_inputs)
         return result
 
 
@@ -461,14 +466,8 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     vocs = VOCS(**config["vocs"])
 
     # create generator
-    generator_type, generator_options = get_generator_and_defaults(
-        config["generator"].pop("name")
-    )
-    # TODO: use version number in some way
-    if "version" in config["generator"].keys():
-        config["generator"].pop("version")
-
-    generator = generator_type(vocs, generator_options.parse_obj(config["generator"]))
+    generator_class = get_generator(config["generator"].pop("name"))
+    generator = generator_class(vocs=vocs, **config["generator"])
 
     # Create evaluator
     evaluator = Evaluator(**config["evaluator"])
@@ -499,8 +498,8 @@ def state_to_dict(X, include_data=True):
     output = {
         "xopt": json.loads(X.options.json()),
         "generator": {
-            "name": X.generator.alias,
-            **json.loads(X.generator.options.json()),
+            "name": type(X.generator).name,
+            **json.loads(X.generator.json()),
         },
         "evaluator": json.loads(X.evaluator.json()),
         "vocs": json.loads(X.vocs.json()),
