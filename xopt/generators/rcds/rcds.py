@@ -3,9 +3,9 @@ import math
 
 import numpy as np
 import pandas as pd
-from pydantic import validator
+from pydantic.types import PositiveFloat
 
-from xopt.generator import Generator, GeneratorOptions
+from xopt.generator import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -402,24 +402,6 @@ class RCDS:
         return obj, obj_raw
 
 
-class RCDSOptions(GeneratorOptions):
-    x0: list = None
-    init_mat: np.ndarray = None
-    noise: float = 1e-5
-    step: float = 1e-2
-    tol: float = 1e-5
-
-    @validator("step", "tol", pre=True)
-    def must_positive(cls, v):
-        if v <= 0:
-            raise ValueError("must larger than 0")
-        return v
-
-    class Config:
-        arbitrary_types_allowed = True
-        validate_assignment = True
-
-
 class RCDSGenerator(Generator):
     """
     RCDS algorithm.
@@ -432,37 +414,35 @@ class RCDSGenerator(Generator):
     This algorithm must be stepped serially.
     """
 
-    alias = "rcds"
+    name = "rcds"
+    x0: list = None
+    init_mat: np.ndarray = None
+    noise: PositiveFloat = 1e-5
+    step: PositiveFloat = 1e-2
+    tol: PositiveFloat = 1e-5
 
-    @staticmethod
-    def default_options() -> RCDSOptions:
-        return RCDSOptions()
+    class Config:
+        arbitrary_types_allowed = True
+        validate_assignment = True
 
-    def __init__(self, vocs, options: RCDSOptions = None):
-        options = options or RCDSOptions()
-        if not isinstance(options, RCDSOptions):
-            raise ValueError("options must be a RCDSOptions object")
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        if vocs.n_objectives != 1:
-            raise ValueError("vocs must have one objective for optimization")
-
-        super().__init__(vocs, options)
-
-        bound_low, bound_up = vocs.bounds
+        bound_low, bound_up = self.vocs.bounds
         self.ub = bound_up
         self.lb = bound_low
         x_ave = (bound_up + bound_low) / 2
-        if options.x0 is None:
+        if self.x0 is None:
             x0 = x_ave
         else:
-            x0 = options.x0
+            x0 = self.x0
 
         self.rcds = RCDS(
             x0=x0,
-            init_mat=options.init_mat,
-            noise=options.noise,
-            step=options.step,
-            tol=options.tol,
+            init_mat=self.init_mat,
+            noise=self.noise,
+            step=self.step,
+            tol=self.tol,
         )
         self.generator = self.rcds.powellmain()
 

@@ -1,7 +1,6 @@
 import warnings
 
 from xopt.errors import XoptError
-from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
 from xopt.generators.random import RandomGenerator
 from xopt.generators.rcds.rcds import RCDSGenerator
@@ -10,7 +9,6 @@ from xopt.generators.rcds.rcds import RCDSGenerator
 registered_generators = [
     RandomGenerator,
     ExtremumSeekingGenerator,
-    MGGPOGenerator,
     RCDSGenerator,
 ]
 
@@ -69,15 +67,12 @@ except ModuleNotFoundError:
     warnings.warn("WARNING: `scipy` not found, NelderMeadGenerator is not available")
 
 
-generators = {gen.alias: gen for gen in registered_generators}
-generator_default_options = {
-    gen.alias: gen.default_options() for gen in registered_generators
-}
+generators = {gen.name: gen for gen in registered_generators}
 
 
-def get_generator_and_defaults(name: str):
+def get_generator(name: str):
     try:
-        return generators[name], generator_default_options[name]
+        return generators[name]
     except KeyError:
         raise XoptError(
             f"No generator named {name}, available generators are {list(generators.keys())}"

@@ -9,7 +9,7 @@ from deap import algorithms as deap_algorithms, base as deap_base, tools as deap
 from pydantic import confloat, Field
 
 import xopt.utils
-from xopt.generator import Generator, GeneratorOptions
+from xopt.generator import Generator
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
 
@@ -20,7 +20,9 @@ from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstrai
 logger = logging.getLogger(__name__)
 
 
-class CNSGAOptions(GeneratorOptions):
+class CNSGAGenerator(Generator):
+    name = "cnsga"
+    supports_multi_objective = True
     population_size: int = Field(64, description="Population size")
     crossover_probability: confloat(ge=0, le=1) = Field(
         0.9, description="Crossover probability"
@@ -33,19 +35,11 @@ class CNSGAOptions(GeneratorOptions):
     )
     output_path: str = Field(None, description="Output path for population files")
 
+    class Config:
+        extra = "allow"
 
-class CNSGAGenerator(Generator):
-    alias = "cnsga"
-
-    @staticmethod
-    def default_options() -> CNSGAOptions:
-        return CNSGAOptions()
-
-    def __init__(self, vocs, options: CNSGAOptions = None):
-        options = options or CNSGAOptions()
-        if not isinstance(options, CNSGAOptions):
-            raise TypeError("options must be of type CNSGAOptions")
-        super().__init__(vocs, options)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         # Internal data structures
         self.children = (
@@ -59,13 +53,13 @@ class CNSGAGenerator(Generator):
         )
 
         # DEAP toolbox (internal)
-        self.toolbox = cnsga_toolbox(vocs, selection="auto")
+        self.toolbox = cnsga_toolbox(self.vocs, selection="auto")
 
-        if options.population_file is not None:
-            self.load_population_csv(options.population_file)
+        if self.population_file is not None:
+            self.load_population_csv(self.population_file)
 
-        if options.output_path is not None:
-            assert os.path.isdir(options.output_path), "Output directory does not exist"
+        if self.output_path is not None:
+            assert os.path.isdir(self.output_path), "Output directory does not exist"
 
         # if data is not None:
         #    self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
@@ -111,8 +105,8 @@ class CNSGAGenerator(Generator):
             pop,
             self.vocs,
             self.toolbox,
-            crossover_probability=self.options.crossover_probability,
-            mutation_probability=self.options.mutation_probability,
+            crossover_probability=self.crossover_probability,
+            mutation_probability=self.mutation_probability,
         )
         return inputs.to_dict(orient="records")
 
@@ -126,7 +120,7 @@ class CNSGAGenerator(Generator):
                 candidates, self.n_pop, self.vocs, self.toolbox
             )
 
-            if self.options.output_path is not None:
+            if self.output_path is not None:
                 self.write_offspring()
                 self.write_population()
 
@@ -156,8 +150,8 @@ class CNSGAGenerator(Generator):
             return
 
         if filename is None:
-            filename = f"{self.alias}_offspring_{xopt.utils.isotime(include_microseconds=True)}.csv"
-            filename = os.path.join(self.options.output_path, filename)
+            filename = f"{self.name}_offspring_{xopt.utils.isotime(include_microseconds=True)}.csv"
+            filename = os.path.join(self.output_path, filename)
 
         self.offspring.to_csv(filename, index_label="xopt_index")
 
@@ -172,8 +166,8 @@ class CNSGAGenerator(Generator):
             return
 
         if filename is None:
-            filename = f"{self.alias}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
-            filename = os.path.join(self.options.output_path, filename)
+            filename = f"{self.name}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
+            filename = os.path.join(self.output_path, filename)
 
         self.population.to_csv(filename, index_label="xopt_index")
 
@@ -193,9 +187,9 @@ class CNSGAGenerator(Generator):
     @property
     def n_pop(self):
         """
-        Convenience alias for `options.population_size`
+        Convenience name for `options.population_size`
         """
-        return self.options.population_size
+        return self.population_size
 
 
 def uniform(low, up, size=None):

@@ -168,7 +168,9 @@ def _validate_model(model: Model, proximal_weights: Tensor) -> None:
                     "training inputs"
                 )
 
-            if not input_transform == _get_input_transform(model.models[i]):
+            if not _compare_input_transforms(
+                input_transform, _get_input_transform(model.models[i])
+            ):
                 raise UnsupportedError(
                     "Proximal acquisition function does not support non-identical "
                     "input transforms"
@@ -201,3 +203,9 @@ def _get_input_transform(model: Model) -> Optional[InputTransform]:
         return model.input_transform
     except AttributeError:
         return None
+
+
+def _compare_input_transforms(transform_1: InputTransform, transform_2: InputTransform):
+    return torch.allclose(transform_1.offset, transform_2.offset) and torch.allclose(
+        transform_1.coefficient, transform_2.coefficient
+    )

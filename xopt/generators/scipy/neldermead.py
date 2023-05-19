@@ -1,40 +1,41 @@
 import logging
 import warnings
 from abc import abstractmethod
-
 from typing import Dict, List
 
 import numpy as np
-
 import pandas as pd
-
 from numpy import asfarray, shape
+from pydantic import Field
 
-from xopt.generator import Generator, GeneratorOptions
+from xopt.generator import Generator
 
 logger = logging.getLogger(__name__)
 
 
 class ScipyOptimizeGenerator(Generator):
+    name = "scipy_optimize"
+    initial_point: Dict[str, float] = None  # replaces x0 argument
     """
     Base class for scipy.optimize routines that have been converted to generator form.
 
     These algorithms must be stepped serially.
     """
 
-    alias = None
+    class Config:
+        extra = "allow"
 
-    def __init__(self, vocs, options):
-        super().__init__(vocs, options)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.initial_point is None:
+            self.initial_point = self.vocs.random_inputs()
 
         # Internal data structures
         self.y = None  # Used to coordinate with func
         self._lock = False  # mechanism to lock function calls
         self._algorithm = None  # Will initialize on first generate
 
-        self.initial_point = options.initial_point  # Handles None also.
-
-        self._saved_options = options.copy()  # Used to keep track of changed options
+        self._saved_options = self.copy()  # Used to keep track of changed options
 
     # Wrapper to refer to internal data
     def func(self, x):
@@ -44,9 +45,7 @@ class ScipyOptimizeGenerator(Generator):
     @property
     def x0(self):
         """Raw internal initial point for convenience"""
-        return np.array(
-            [self.options.initial_point[k] for k in self.vocs.variable_names]
-        )
+        return np.array([self.initial_point[k] for k in self.vocs.variable_names])
 
     @abstractmethod
     def _init_algorithm(self):
@@ -60,16 +59,6 @@ class ScipyOptimizeGenerator(Generator):
         #    self.x0,
         #    **kwargs)
         #
-
-    @property
-    def initial_point(self):
-        return self.options.initial_point
-
-    @initial_point.setter
-    def initial_point(self, value):
-        if value is None:
-            value = self.vocs.random_inputs()
-        self.options.initial_point = value
 
     def add_data(self, new_data: pd.DataFrame):
         assert (
@@ -90,7 +79,7 @@ class ScipyOptimizeGenerator(Generator):
         # Check if any options were changed from init. If so, reset the algorithm
         if self.options != self._saved_options:
             self._algorithm = None
-            self._saved_options = self.options.copy()
+            self._saved_options = self.copy()
 
         # Actually start the algorithm.
         if self._algorithm is None:
@@ -128,8 +117,12 @@ class ScipyOptimizeGenerator(Generator):
         return self.inputs
 
 
-class NelderMeadOptions(GeneratorOptions):
-    initial_point: Dict[str, float] = None  # replaces x0 argument
+class NelderMeadGenerator(ScipyOptimizeGenerator):
+    """
+    Nelder-Mead algorithm from SciPy in Xopt's Generator form.
+    """
+
+    name = "neldermead"
     initial_simplex: Dict[
         str, List[float]
     ] = None  # This overrides the use of initial_point
@@ -138,34 +131,13 @@ class NelderMeadOptions(GeneratorOptions):
     xatol: float = 1e-4
     fatol: float = 1e-4
 
-
-class NelderMeadGenerator(ScipyOptimizeGenerator):
-    """
-    Nelder-Mead algorithm from SciPy in Xopt's Generator form.
-    """
-
-    alias = "neldermead"
-
-    @staticmethod
-    def default_options() -> NelderMeadOptions:
-        return NelderMeadOptions()
-
-    def __init__(self, vocs, options: NelderMeadOptions = None):
-        options = options or NelderMeadOptions()
-        if not isinstance(options, NelderMeadOptions):
-            raise TypeError("options must be of type NedlerMeadOptions")
-        super().__init__(vocs, options)
-
     def _init_algorithm(self):
         """
         sets self._algorithm to the generator function (initializing it).
         """
-
-        options = self.options  # convenience
-
-        if options.initial_simplex:
+        if self.initial_simplex:
             sim = np.array(
-                [self.options.initial_simplex[k] for k in self.vocs.variable_names]
+                [self.initial_simplex[k] for k in self.vocs.variable_names]
             ).T
         else:
             sim = None
@@ -173,9 +145,9 @@ class NelderMeadGenerator(ScipyOptimizeGenerator):
         self._algorithm = _neldermead_generator(  # adapted from scipy.optimize
             self.func,  # Handled by base class
             self.x0,  # Handled by base class
-            adaptive=self.options.adaptive,
-            xatol=self.options.xatol,
-            fatol=self.options.fatol,
+            adaptive=self.adaptive,
+            xatol=self.xatol,
+            fatol=self.fatol,
             initial_simplex=sim,
             bounds=self.vocs.bounds,
         )

@@ -11,28 +11,28 @@ from xopt.vocs import VOCS
 
 class TestExtremumSeekingGenerator:
     def test_es_generate_multiple_points(self):
-        gen = ExtremumSeekingGenerator(TEST_VOCS_BASE)
+        gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
         with pytest.raises(NotImplementedError):
             gen.generate(2)
 
     def test_es_options(self):
-        gen = ExtremumSeekingGenerator(TEST_VOCS_BASE)
+        gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
 
         with pytest.raises(ValidationError):
-            gen.options.k = "yo"
+            gen.k = "yo"
 
         with pytest.raises(ValidationError):
-            gen.options.oscillation_size = 0.0
+            gen.oscillation_size = 0.0
 
         with pytest.raises(ValidationError):
-            gen.options.decay_rate = -1.0
+            gen.decay_rate = -1.0
 
-        gen.options.oscillation_size = 0.2
-        gen.options.decay_rate = 2
-        assert gen.options.oscillation_size == 0.2
-        assert gen.options.decay_rate == 2
+        gen.oscillation_size = 0.2
+        gen.decay_rate = 2
+        assert gen.oscillation_size == 0.2
+        assert gen.decay_rate == 2
 
     def test_es_agreement(self):
         """Compare the first 100 steps between Vanilla ES and Xopt ES"""
@@ -269,7 +269,7 @@ class TestExtremumSeekingGenerator:
             return outcome_dict
 
         evaluator = Evaluator(function=f_ES_minimize)
-        generator = ExtremumSeekingGenerator(vocs)
+        generator = ExtremumSeekingGenerator(vocs=vocs)
         X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
 
         for i in range(ES_steps):

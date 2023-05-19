@@ -13,15 +13,10 @@ class TestMultiFidelityGenerator:
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
 
-        fidelity_parameter = "s"
-
-        options = MultiFidelityGenerator.default_options()
-        options.model.fidelity_parameter = fidelity_parameter
-
-        gen = MultiFidelityGenerator(vocs, options)
+        gen = MultiFidelityGenerator(vocs=vocs)
 
         # test reference point
-        pt = gen.reference_point
+        pt = gen.torch_reference_point
         assert torch.allclose(pt, torch.tensor((0.0, -10.0)).to(pt))
 
     def test_model_creation(self):

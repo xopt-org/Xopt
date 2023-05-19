@@ -3,9 +3,11 @@ from copy import deepcopy
 import pandas as pd
 import torch
 import yaml
-from xopt import Xopt
 
-from xopt.generators import UpperConfidenceBoundGenerator
+from xopt import Xopt
+from xopt.generators.bayesian.upper_confidence_bound import (
+    UpperConfidenceBoundGenerator,
+)
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
@@ -13,9 +15,9 @@ class TestHighLevel:
     def test_ucb(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {}
-        ucb_gen = UpperConfidenceBoundGenerator(test_vocs)
-        ucb_gen.options.acq.beta = 0.0
-        ucb_gen.options.acq.monte_carlo_samples = 512
+        ucb_gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+        ucb_gen.acquisition_options.beta = 0.0
+        ucb_gen.acquisition_options.monte_carlo_samples = 512
         # add data
         data = pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0], "y1": [1.0, -10.0]})
         ucb_gen.add_data(data)
@@ -41,11 +43,11 @@ class TestHighLevel:
         generator:
             name: mobo
             n_initial: 5
+            reference_point: {y1: 1.5, y2: 1.5}
             optim:
                 num_restarts: 1
                 raw_samples: 2
             acq:
-                reference_point: {y1: 1.5, y2: 1.5}
                 proximal_lengthscales: [1.5, 1.5]
 
         evaluator:
@@ -61,7 +63,7 @@ class TestHighLevel:
                 c2: [LESS_THAN, 0.5]
         """
         X = Xopt(config=yaml.safe_load(YAML))
-        X.step()  # generates random data
+        X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
     def test_mobo(self):
@@ -70,11 +72,10 @@ class TestHighLevel:
             generator:
                 name: mobo
                 n_initial: 5
+                reference_point: {y1: 1.5, y2: 1.5}
                 optim:
                     num_restarts: 2
-                    raw_samples: 2
-                acq:
-                    reference_point: {y1: 1.5, y2: 1.5}
+                    raw_samples: 2                    
 
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -87,34 +88,34 @@ class TestHighLevel:
                 constraints: {}
         """
         X = Xopt(config=yaml.safe_load(YAML))
-        X.step()  # generates random data
+        X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
     def test_restart(self):
         YAML = """
-                    xopt: {dump_file: dump.yml}
-                    generator:
-                        name: mobo
-                        n_initial: 5
-                        optim:
-                            num_restarts: 1
-                            raw_samples: 2
-                        acq:
-                            reference_point: {y1: 1.5, y2: 1.5}
-                            proximal_lengthscales: [1.5, 1.5]
+                xopt: {dump_file: dump.yml}
+                generator:
+                    name: mobo
+                    n_initial: 5
+                    reference_point: {y1: 1.5, y2: 1.5}
+                    optim:
+                        num_restarts: 1
+                        raw_samples: 2
+                    acq:
+                        proximal_lengthscales: [1.5, 1.5]
 
-                    evaluator:
-                        function: xopt.resources.test_functions.tnk.evaluate_TNK
+                evaluator:
+                    function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-                    vocs:
-                        variables:
-                            x1: [0, 3.14159]
-                            x2: [0, 3.14159]
-                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
-                        constraints: {}
+                vocs:
+                    variables:
+                        x1: [0, 3.14159]
+                        x2: [0, 3.14159]
+                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                    constraints: {}
                 """
         X = Xopt(config=yaml.safe_load(YAML))
-        X.step()
+        X.random_evaluate(3)
         X.step()
 
         # test restart

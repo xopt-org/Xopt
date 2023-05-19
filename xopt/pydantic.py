@@ -2,6 +2,7 @@ import copy
 import inspect
 import json
 import logging
+import os.path
 from concurrent.futures import Future
 from importlib import import_module
 from types import FunctionType, MethodType
@@ -39,6 +40,8 @@ def recursive_serialize(v, base_key=""):
             v[key] = recursive_serialize(value, key)
         elif isinstance(value, torch.nn.Module):
             v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
+        elif isinstance(value, torch.dtype):
+            v[key] = str(value)
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(value, _type):
@@ -54,11 +57,41 @@ def recursive_serialize(v, base_key=""):
     return v
 
 
+DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
+
+
+def recursive_deserialize(v: dict):
+    """deserialize strings from xopt outputs"""
+    for key, value in v.items():
+        # process dicts
+        if isinstance(value, dict):
+            v[key] = recursive_deserialize(value)
+
+        elif isinstance(value, str):
+            # process files
+            if os.path.exists(value):
+                if value.split(".")[-1] == "pt":
+                    v[key] = torch.load(value)
+
+            # process torch dtypes
+            elif value in DECODERS:
+                v[key] = DECODERS[value]
+
+    return v
+
+
 # define custom json_dumps using orjson
 def orjson_dumps(v, *, default):
-    v = recursive_serialize(v)
+    base_key = v["name"] if "name" in v else ""
+    v = recursive_serialize(v, base_key=base_key)
     # orjson.dumps returns bytes, to match standard json.dumps we need to decode
     return orjson.dumps(v, default=default).decode()
+
+
+def orjson_loads(v, default=None):
+    v = orjson.loads(v)
+    v = recursive_deserialize(v)
+    return v
 
 
 def process_torch_module(module, name):
@@ -66,6 +99,7 @@ def process_torch_module(module, name):
     # module_name = "".join(random.choices(string.ascii_uppercase + string.digits,
     #                                     k=7)) + ".pt"
     module_name = f"{name}.pt"
+    print(module_name)
     torch.save(module, module_name)
     return module_name
 

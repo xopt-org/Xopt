@@ -1,34 +1,43 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar
+from typing import ClassVar
 
 import pandas as pd
+from pydantic import BaseModel, Field
 
-from xopt.pydantic import JSON_ENCODERS, XoptBaseModel
 from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
 
 
-class GeneratorOptions(XoptBaseModel):
-    """
-    Options for the generator.
-    """
+class Generator(BaseModel, ABC):
+    name: ClassVar[str] = Field(allow_mutation=False, description="generator name")
+    vocs: VOCS = Field(allow_mutation=False, description="generator VOCS", exclude=True)
+    data: pd.DataFrame = Field(
+        pd.DataFrame(), description="generator data", exclude=True
+    )
+
+    supports_batch_generation: bool = Field(
+        default=False,
+        allow_mutation=False,
+        exclude=True,
+        description="flag that describes if this "
+        "generator can generate "
+        "batches of points",
+    )
+    supports_multi_objective: bool = Field(
+        default=False,
+        allow_mutation=False,
+        description="flag that describes if this generator can solve multi-objective "
+        "problems",
+        exclude=True,
+    )
 
     class Config:
+        validate_assignment = True
         arbitrary_types_allowed = True
-        json_encoders = JSON_ENCODERS
-        extra = "forbid"
-        allow_mutation = True
 
-
-_GeneratorOptions = TypeVar("_GeneratorOptions", bound=GeneratorOptions)
-
-
-class Generator(ABC):
-    alias = None
-
-    def __init__(self, vocs: VOCS, options: GeneratorOptions = None):
+    def __init__(self, **kwargs):
         """
         Initialize the generator.
 
@@ -36,16 +45,9 @@ class Generator(ABC):
             vocs: The vocs to use.
             options: The options to use.
         """
-        logger.info(f"Initializing generator {self.alias},")
-        options = options or GeneratorOptions()
-        if not isinstance(options, GeneratorOptions):
-            raise TypeError("options must be of type GeneratorOptions")
-
-        self._vocs = vocs.copy()
-        self._options = options.copy()
-        self._is_done = False
-        self._data = pd.DataFrame()
-        self._check_options(self._options)
+        super().__init__(**kwargs)
+        _check_vocs(self.vocs, self.supports_multi_objective)
+        logger.info(f"Initialized generator {self.name}")
 
     @abstractmethod
     def generate(self, n_candidates) -> pd.DataFrame:
@@ -64,36 +66,7 @@ class Generator(ABC):
         """
         pass
 
-    @staticmethod
-    @abstractmethod
-    def default_options() -> Type[GeneratorOptions]:
-        """
-        Get the default options for the generator.
-        """
-        pass
 
-    def _check_options(self, options: XoptBaseModel):
-        """
-        Raise error if options are not compatable, overwrite in each generator if needed
-        """
-        pass
-
-    @property
-    def is_done(self):
-        return self._is_done
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, value: pd.DataFrame):
-        self._data = pd.DataFrame(value)
-
-    @property
-    def vocs(self):
-        return self._vocs
-
-    @property
-    def options(self):
-        return self._options
+def _check_vocs(vocs, multi_objective_allowed):
+    if vocs.n_objectives != 1 and not multi_objective_allowed:
+        raise ValueError("vocs must have one objective for optimization")
