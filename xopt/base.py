@@ -8,6 +8,7 @@ from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
+
 # from xopt.generators import get_generator_and_defaults
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS

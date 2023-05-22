@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class Generator(BaseModel, ABC):
     name: ClassVar[str] = Field(allow_mutation=False, description="generator name")
-    vocs: VOCS = Field(allow_mutation=False, description="generator VOCS", exclude=True)
+    vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: pd.DataFrame = Field(
         pd.DataFrame(), description="generator data", exclude=True
     )
