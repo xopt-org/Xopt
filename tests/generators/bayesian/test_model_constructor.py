@@ -86,6 +86,9 @@ class TestModelConstructor:
 
         constructor.json()
 
+        import os
+        os.remove("covar_modules_y1.pt")
+
     def test_model_saving(self):
         my_vocs = VOCS(
             variables={"x": [0, 1]},

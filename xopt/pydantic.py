@@ -81,8 +81,7 @@ def recursive_deserialize(v: dict):
 
 
 # define custom json_dumps using orjson
-def orjson_dumps(v, *, default):
-    base_key = v["name"] if "name" in v else ""
+def orjson_dumps(v, *, default, base_key=""):
     v = recursive_serialize(v, base_key=base_key)
     # orjson.dumps returns bytes, to match standard json.dumps we need to decode
     return orjson.dumps(v, default=default).decode()
@@ -99,7 +98,6 @@ def process_torch_module(module, name):
     # module_name = "".join(random.choices(string.ascii_uppercase + string.digits,
     #                                     k=7)) + ".pt"
     module_name = f"{name}.pt"
-    print(module_name)
     torch.save(module, module_name)
     return module_name
 

@@ -5,6 +5,7 @@ from typing import ClassVar
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from xopt.pydantic import orjson_dumps, orjson_loads
 from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,9 @@ class Generator(BaseModel, ABC):
     class Config:
         validate_assignment = True
         arbitrary_types_allowed = True
+        json_dumps = orjson_dumps
+        json_loads = orjson_loads
+        extra = "forbid"
 
     def __init__(self, **kwargs):
         """

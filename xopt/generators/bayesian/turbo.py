@@ -21,7 +21,7 @@ https://proceedings.neurips.cc/paper/2019/file/6c990b7aca7bc7058f5e98ea909e924b-
 
 
 class TurboState(BaseModel):
-    vocs: VOCS
+    vocs: VOCS = Field(exclude=True)
     dim: PositiveInt
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")
     length: float = Field(
@@ -100,7 +100,7 @@ class TurboState(BaseModel):
         )
         return torch.cat((tr_lb, tr_ub), dim=0)
 
-    def _set_best_point(self, data):
+    def set_best_point(self, data):
         # get location of best point so far
         variable_data = self.vocs.variable_data(data, "")
         objective_data = self.vocs.objective_data(data, "")
@@ -121,7 +121,7 @@ class TurboState(BaseModel):
         NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
         minimization
         """
-        self._set_best_point(data)
+        self.set_best_point(data)
         Y_last = self._get_last_observed_value(data)
 
         if Y_last < self.best_value + 1e-3 * math.fabs(self.best_value):
