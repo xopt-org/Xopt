@@ -1,6 +1,7 @@
 import logging
 import warnings
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Dict
 
 import pandas as pd
@@ -25,7 +26,7 @@ from xopt.generators.bayesian.objectives import (
     create_mc_objective,
 )
 from xopt.generators.bayesian.options import AcquisitionOptions, OptimizationOptions
-from xopt.generators.bayesian.turbo import get_trust_region, TurboState, update_state
+from xopt.generators.bayesian.turbo import TurboState
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
 from xopt.pydantic import orjson_dumps, orjson_loads
 
@@ -77,8 +78,8 @@ class BayesianGenerator(Generator, ABC):
         super().__init__(**kwargs)
 
         # set up turbo if requested
-        if self.optimization_options.use_turbo:
-            self.turbo_state = TurboState(self.vocs.n_variables, 1)
+        if self.optimization_options.use_turbo and self.turbo_state is None:
+            self.turbo_state = TurboState(self.vocs)
 
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
@@ -100,6 +101,10 @@ class BayesianGenerator(Generator, ABC):
         else:
             # update internal model with internal data
             model = self.train_model(self.data)
+
+            # update TurBO state if used
+            if self.turbo_state is not None:
+                self.turbo_state.update_state(self.data)
 
             # calculate optimization bounds
             bounds = self._get_optimization_bounds()
@@ -242,51 +247,20 @@ class BayesianGenerator(Generator, ABC):
         - if max_travel_distances is not None limit max travel distance
 
         """
-        bounds = self._get_bounds()
-
-        # if using turbo, update turbo state and set bounds according to turbo state
-        if self.optimization_options.use_turbo:
-            bounds = self.get_trust_region(bounds)
+        bounds = deepcopy(self._get_bounds())
 
         # if specified modify bounds to limit maximum travel distances
         if self.optimization_options.max_travel_distances is not None:
-            bounds = self.get_max_travel_distances_region(bounds)
+            max_travel_bounds = self.get_max_travel_distances_region(bounds)
+            bounds = rectilinear_domain_union(bounds, max_travel_bounds)
+
+        # if using turbo, update turbo state and set bounds according to turbo state
+        if self.turbo_state is not None:
+            # set the best value
+            turbo_bounds = self.turbo_state.get_trust_region(self.model)
+            bounds = rectilinear_domain_union(bounds, turbo_bounds)
 
         return bounds
-
-    def get_trust_region(self, bounds):
-        """get trust region based on turbo_state and last observation"""
-        if self.optimization_options.use_turbo:
-            objective_data = self.vocs.objective_data(self.data, "")
-
-            # if this is the first time we are updating the state use the best f
-            # instead of the last f
-            if self.optimization_options.first_call:
-                y_last = torch.tensor(objective_data.min().to_numpy(), **self._tkwargs)
-                self.optimization_options.first_call = False
-            else:
-                y_last = torch.tensor(
-                    objective_data.iloc[-1].to_numpy(), **self._tkwargs
-                )
-            self.optimization_options.turbo_state = update_state(
-                self.optimization_options.turbo_state, y_last
-            )
-
-            # calculate trust region and apply to base bounds
-            trust_region = get_trust_region(
-                self.vocs,
-                self.model,
-                bounds,
-                self.data,
-                self.optimization_options.turbo_state,
-                self._tkwargs,
-            )
-
-            return rectilinear_domain_union(bounds, trust_region)
-        else:
-            raise RuntimeError(
-                "cannot get trust region when `use_turbo` option is False"
-            )
 
     def get_max_travel_distances_region(self, bounds):
         """get region based on max travel distances and last observation"""
@@ -306,8 +280,8 @@ class BayesianGenerator(Generator, ABC):
             self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self._tkwargs
         )
 
-        # bound lengths for normalization
-        lengths = bounds[1, :] - bounds[0, :]
+        # bound lengths based on vocs for normalization
+        lengths = self.vocs.bounds[1, :] - self.vocs.bounds[0, :]
 
         # get maximum travel distances
         max_travel_distances = (
@@ -320,7 +294,7 @@ class BayesianGenerator(Generator, ABC):
             (last_point - max_travel_distances, last_point + max_travel_distances)
         )
 
-        return rectilinear_domain_union(bounds, max_travel_bounds)
+        return max_travel_bounds
 
     def _check_options(self, options):
         if options.acq.proximal_lengthscales is not None:
