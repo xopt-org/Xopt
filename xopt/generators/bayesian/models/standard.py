@@ -5,7 +5,6 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
-from gpytorch.constraints import LessThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior

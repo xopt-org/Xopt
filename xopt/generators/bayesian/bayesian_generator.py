@@ -28,7 +28,6 @@ from xopt.generators.bayesian.objectives import (
 from xopt.generators.bayesian.options import AcquisitionOptions, OptimizationOptions
 from xopt.generators.bayesian.turbo import TurboState
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
-from xopt.pydantic import orjson_dumps, orjson_loads
 
 logger = logging.getLogger()
 

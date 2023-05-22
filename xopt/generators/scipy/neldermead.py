@@ -6,7 +6,6 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from numpy import asfarray, shape
-from pydantic import Field
 
 from xopt.generator import Generator
 
