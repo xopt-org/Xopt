@@ -466,23 +466,19 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     options = XoptOptions(**config["xopt"])
     vocs = VOCS(**config["vocs"])
 
+    if "data" in config.keys():
+        data = pd.DataFrame(config["data"])
+    else:
+        data = pd.DataFrame({})
+
     # create generator
     generator_class = get_generator(config["generator"].pop("name"))
-    generator = generator_class(vocs=vocs, **config["generator"])
+    generator = generator_class.parse_raw(
+        json.dumps({**config["generator"], "vocs": vocs.dict()})
+    )
 
     # Create evaluator
     evaluator = Evaluator(**config["evaluator"])
-
-    # OldEvaluator
-    # ev = config["evaluator"]
-    # ev["function"] = get_function(ev["function"])
-    # ev_options = EvaluatorOptions.parse_obj(ev)
-    # evaluator = Evaluator(**ev_options.dict())
-
-    if "data" in config.keys():
-        data = config["data"]
-    else:
-        data = None
 
     # return generator, evaluator, vocs, options, data
     return {
@@ -500,7 +496,7 @@ def state_to_dict(X, include_data=True):
         "xopt": json.loads(X.options.json()),
         "generator": {
             "name": type(X.generator).name,
-            **json.loads(X.generator.json()),
+            **json.loads(X.generator.json(base_key=type(X.generator).name)),
         },
         "evaluator": json.loads(X.evaluator.json()),
         "vocs": json.loads(X.vocs.json()),

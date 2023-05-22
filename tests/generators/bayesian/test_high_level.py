@@ -42,12 +42,11 @@ class TestHighLevel:
         xopt: {}
         generator:
             name: mobo
-            n_initial: 5
             reference_point: {y1: 1.5, y2: 1.5}
-            optim:
+            optimization_options:
                 num_restarts: 1
                 raw_samples: 2
-            acq:
+            acquisition_options:
                 proximal_lengthscales: [1.5, 1.5]
 
         evaluator:
@@ -71,9 +70,8 @@ class TestHighLevel:
             xopt: {}
             generator:
                 name: mobo
-                n_initial: 5
                 reference_point: {y1: 1.5, y2: 1.5}
-                optim:
+                optimization_options:
                     num_restarts: 2
                     raw_samples: 2                    
 
@@ -96,12 +94,11 @@ class TestHighLevel:
                 xopt: {dump_file: dump.yml}
                 generator:
                     name: mobo
-                    n_initial: 5
                     reference_point: {y1: 1.5, y2: 1.5}
-                    optim:
+                    optimization_options:
                         num_restarts: 1
                         raw_samples: 2
-                    acq:
+                    acquisition_options:
                         proximal_lengthscales: [1.5, 1.5]
 
                 evaluator:
@@ -118,10 +115,15 @@ class TestHighLevel:
         X.random_evaluate(3)
         X.step()
 
+        config = yaml.safe_load(open("dump.yml"))
+        assert config["generator"]["model"] == "mobo_model.pt"
+
         # test restart
-        X2 = Xopt(config=yaml.safe_load(open("dump.yml")))
-        X2.step()
+        X2 = Xopt(config=config)
+
+        assert X2.generator.vocs.variable_names == ["x1", "x2"]
+        assert X2.generator.optimization_options.num_restarts == 1
 
         import os
-
+        os.remove("mobo_model.pt")
         os.remove("dump.yml")

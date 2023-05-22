@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
+from gpytorch.constraints import LessThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
@@ -67,7 +68,9 @@ class StandardModelConstructor(ModelConstructor):
     @property
     def likelihood(self):
         if self.use_low_noise_prior:
-            return GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
+            return GaussianLikelihood(
+                noise_prior=GammaPrior(1.0, 100.0),
+            )
         else:
             return GaussianLikelihood()
 

@@ -60,16 +60,10 @@ class BayesianGenerator(Generator, ABC):
         if value["proximal_lengthscales"] is not None:
             if len(value["proximal_lengthscales"]) != n_variables:
                 raise ValueError(
-                    "number of proximal lengthscales must equal number of " "variables"
+                    "number of proximal lengthscales must equal number of variables"
                 )
 
         return value
-
-    class Config:
-        arbitrary_types_allowed = True
-        validate_assignment = True
-        json_dumps = orjson_dumps
-        json_loads = orjson_loads
 
     def __init__(self, **kwargs):
         # process the model constructor keyword arguments
