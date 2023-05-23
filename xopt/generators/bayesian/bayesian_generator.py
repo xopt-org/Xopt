@@ -139,6 +139,9 @@ class BayesianGenerator(Generator, ABC):
         """
         Returns a function that can be used to evaluate the acquisition function
         """
+        if model is None:
+            raise ValueError("model cannot be None")
+
         # get base acquisition function
         acq = self._get_acquisition(model)
 
