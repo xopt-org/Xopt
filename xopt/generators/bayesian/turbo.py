@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Union, Dict
+from typing import Dict, Union
 
 import torch
 from botorch.models import ModelListGP
@@ -43,9 +43,7 @@ class TurboState(BaseModel):
     )
     best_value: float = float("inf")
     best_x: Dict[str, float] = Field(None)
-    tkwargs: Dict[str, Union[torch.dtype, str]] = Field(
-        {"dtype": torch.double}
-    )
+    tkwargs: Dict[str, Union[torch.dtype, str]] = Field({"dtype": torch.double})
 
     class Config:
         validate_assignment = True
@@ -109,10 +107,12 @@ class TurboState(BaseModel):
         # assumes minimization
         best_idx = objective_data.idxmin()
         self.best_value = objective_data.min()[self.vocs.objective_names[0]]
-        self.best_x = variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
+        self.best_x = (
+            variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
+        )
 
     def _get_last_observed_value(self, data):
-        """ return the last objective observed value"""
+        """return the last objective observed value"""
         return data[self.vocs.objective_names[0]].iloc[-1]
 
     def update_state(self, data):
@@ -137,4 +137,3 @@ class TurboState(BaseModel):
         elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
             self.length = max(self.length / 2.0, self.length_min)
             self.failure_counter = 0
-

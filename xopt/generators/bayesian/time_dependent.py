@@ -8,22 +8,15 @@ from botorch.acquisition import FixedFeatureAcquisitionFunction
 from pydantic import Field, PositiveFloat
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.options import AcquisitionOptions
-
-
-class TimeDependentAcquisitionOptions(AcquisitionOptions):
-    added_time: float = Field(
-        0.0,
-        description="time added to current time to get target predcition time",
-    )
 
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     name = "time_dependent_bayesian_generator"
-    acquisition_options: TimeDependentAcquisitionOptions = (
-        TimeDependentAcquisitionOptions()
-    )
     target_prediction_time: PositiveFloat = Field(None)
+    added_time: PositiveFloat = Field(
+        0.0,
+        description="time added to current time to get target predcition time",
+    )
 
     def get_input_data(self, data: pd.DataFrame):
         return torch.tensor(
@@ -31,7 +24,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         )
 
     def generate(self, n_candidates: int) -> pd.DataFrame:
-        self.target_prediction_time = time.time() + self.acquisition_options.added_time
+        self.target_prediction_time = time.time() + self.added_time
         output = super().generate(n_candidates)
 
         if time.time() > self.target_prediction_time:

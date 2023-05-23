@@ -25,7 +25,8 @@ class OptimizationOptions(XoptBaseModel):
     # note: num_restarts has to be AFTER raw_samples to allow the validator to catch
     # the default value
     raw_samples: int = Field(
-        20, description="number of raw samples used to seed optimization",
+        20,
+        description="number of raw samples used to seed optimization",
     )
     num_restarts: int = Field(
         20, description="number of restarts during acquistion function optimization"
@@ -49,8 +50,9 @@ class OptimizationOptions(XoptBaseModel):
     @validator("num_restarts")
     def validate_num_restarts(cls, v: int, values):
         if v > values["raw_samples"]:
-            raise ValueError("num_restarts cannot be greater than number of "
-                             "raw_samples")
+            raise ValueError(
+                "num_restarts cannot be greater than number of " "raw_samples"
+            )
         return v
 
     class Config:

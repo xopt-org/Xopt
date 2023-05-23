@@ -34,16 +34,9 @@ logger = logging.getLogger()
 
 class BayesianGenerator(Generator, ABC):
     name = "base_bayesian_generator"
-    model_constructor: ModelConstructor = Field(
-        description="constructor used to generate model"
-    )
     optimization_options: OptimizationOptions = Field(
         OptimizationOptions(),
         description="options used to customize optimization of the acquisition function",
-    )
-    acquisition_options: AcquisitionOptions = Field(
-        AcquisitionOptions(),
-        description="options used to customize acquisition function computation",
     )
     model: GPyTorchModel = Field(
         None, description="model used by the generator to perform optimization"
@@ -52,22 +45,54 @@ class BayesianGenerator(Generator, ABC):
         default=None, description="turbo state for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
+    model_constructor: ModelConstructor = Field(
+        StandardModelConstructor(), description="constructor used to generate model"
+    )
+    acquisition_options: AcquisitionOptions = Field(
+        AcquisitionOptions(),
+        description="options used to customize acquisition function computation",
+    )
 
-    @validator("acquisition_options", pre=True)
+    @validator("acquisition_options")
     def check_acq_options(cls, value: Dict, values):
-        n_variables = values["vocs"].n_variables
-        if value["proximal_lengthscales"] is not None:
-            if len(value["proximal_lengthscales"]) != n_variables:
+        if isinstance(value, dict):
+            pl = value["prozimal_lengthscales"]
+        elif isinstance(value, AcquisitionOptions):
+            pl = value.proximal_lengthscales
+        else:
+            pl = None
+
+        if pl is not None and "vocs" in values:
+            n_variables = values["vocs"].n_variables
+            if len(pl) != n_variables:
                 raise ValueError(
                     "number of proximal lengthscales must equal number of variables"
                 )
 
         return value
 
-    def __init__(self, **kwargs):
-        # process the model constructor keyword arguments
-        kwargs = _preprocess_generator_arguments(kwargs)
+    @validator("model_constructor", pre=True)
+    def validate_model_constructor(cls, value):
+        constructor_dict = {"standard": StandardModelConstructor}
+        if value is None:
+            value = StandardModelConstructor()
+        elif isinstance(value, ModelConstructor):
+            value = value
+        elif isinstance(value, str):
+            if value in constructor_dict:
+                value = constructor_dict[value]()
+            else:
+                raise ValueError(f"{value} not found")
+        elif isinstance(value, dict):
+            name = value.pop("name")
+            if name in constructor_dict:
+                value = constructor_dict[name](**value)
+            else:
+                raise ValueError(f"{value} not found")
 
+        return value
+
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         # set up turbo if requested
@@ -124,7 +149,7 @@ class BayesianGenerator(Generator, ABC):
         if data.empty:
             raise ValueError("no data available to build model")
 
-        _model = self.model_constructor.build_model(data)
+        _model = self.model_constructor.build_model(self.vocs, data)
 
         if update_internal:
             self.model = _model

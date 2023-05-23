@@ -20,7 +20,8 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 class TestBayesianGenerator(TestCase):
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_init(self):
-        BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.dict()
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):

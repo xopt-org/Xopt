@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class Generator(BaseModel, ABC):
-    name: ClassVar[str] = Field(allow_mutation=False, description="generator name")
+    name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: pd.DataFrame = Field(
         pd.DataFrame(), description="generator data", exclude=True
@@ -33,6 +33,11 @@ class Generator(BaseModel, ABC):
         "problems",
         exclude=True,
     )
+
+    # @validator("vocs", pre=True)
+    # def vocs_validation(cls, v):
+    #     # do vocs first
+    #     return v
 
     class Config:
         validate_assignment = True

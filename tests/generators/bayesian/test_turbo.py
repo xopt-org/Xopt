@@ -6,7 +6,6 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-import torch
 
 from xopt import Evaluator, VOCS, Xopt
 from xopt.generators import UpperConfidenceBoundGenerator
@@ -64,8 +63,9 @@ class TestTurbo(TestCase):
 
         turbo_state = TurboState(test_vocs)
         turbo_state.update_state(TEST_VOCS_DATA)
-        assert turbo_state.best_value == TEST_VOCS_DATA.min()[
-            test_vocs.objective_names[0]]
+        assert (
+            turbo_state.best_value == TEST_VOCS_DATA.min()[test_vocs.objective_names[0]]
+        )
 
     def test_in_generator(self):
         vocs = VOCS(

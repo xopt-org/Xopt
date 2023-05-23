@@ -16,7 +16,7 @@ class TestHighLevel:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {}
         ucb_gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
-        ucb_gen.acquisition_options.beta = 0.0
+        ucb_gen.beta = 0.0
         ucb_gen.acquisition_options.monte_carlo_samples = 512
         # add data
         data = pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0], "y1": [1.0, -10.0]})
@@ -73,11 +73,9 @@ class TestHighLevel:
                 reference_point: {y1: 1.5, y2: 1.5}
                 optimization_options:
                     num_restarts: 2
-                    raw_samples: 2                    
-
+                    raw_samples: 2
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
-
             vocs:
                 variables:
                     x1: [0, 3.14159]
@@ -125,5 +123,6 @@ class TestHighLevel:
         assert X2.generator.optimization_options.num_restarts == 1
 
         import os
+
         os.remove("mobo_model.pt")
         os.remove("dump.yml")

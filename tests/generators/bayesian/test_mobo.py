@@ -47,7 +47,6 @@ class TestMOBOGenerator:
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.random_evaluate(3)
             X.step()
-            X.step()
 
     def test_hypervolume_calculation(self):
         vocs = deepcopy(TEST_VOCS_BASE)

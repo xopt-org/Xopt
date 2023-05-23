@@ -5,24 +5,12 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.options import AcquisitionOptions
-from xopt.generators.bayesian.time_dependent import (
-    TimeDependentAcquisitionOptions,
-    TimeDependentBayesianGenerator,
-)
-
-
-class UpperConfidenceBoundOptions(AcquisitionOptions):
-    beta: float = Field(2.0, description="Beta parameter for UCB optimization")
-
-
-class TDUpperConfidenceBoundOptions(TimeDependentAcquisitionOptions):
-    beta: float = Field(2.0, description="Beta parameter for UCB optimization")
+from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
-    acquisition_options: UpperConfidenceBoundOptions = UpperConfidenceBoundOptions()
+    beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation = True
     __doc__ = """Implements Bayeisan Optimization using the Upper Confidence Bound
     acquisition function"""
@@ -33,7 +21,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
             model,
             sampler=sampler,
             objective=self._get_objective(),
-            beta=self.acquisition_options.beta,
+            beta=self.beta,
         )
 
         cqUCB = ConstrainedMCAcquisitionFunction(
@@ -49,8 +37,5 @@ class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
     name = "time_dependent_upper_confidence_bound"
-    acquisition_options: TimeDependentAcquisitionOptions = (
-        TimeDependentAcquisitionOptions()
-    )
     __doc__ = """Implements Time-Dependent Bayeisan Optimization using the Upper
             Confidence Bound acquisition function"""
