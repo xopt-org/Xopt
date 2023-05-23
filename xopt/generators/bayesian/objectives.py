@@ -3,6 +3,7 @@ from functools import partial
 import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
+from botorch.sampling import get_sampler
 
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     FeasibilityObjective,
@@ -10,9 +11,14 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
-def feasibility(X, model, sampler, vocs, posterior_transform=None):
+def feasibility(X, model, vocs, posterior_transform=None):
     constraints = create_constraint_callables(vocs)
     posterior = model.posterior(X=X, posterior_transform=posterior_transform)
+
+    sampler = get_sampler(
+        model.posterior(X),
+        sample_shape=torch.Size([512]),
+    )
     samples = sampler(posterior)
     objective = FeasibilityObjective(constraints)
     return torch.mean(objective(samples, X), dim=0)

@@ -14,6 +14,7 @@ from torch.nn import Module
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.pydantic import orjson_dumps
+from xopt.vocs import VOCS
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 
@@ -59,12 +60,6 @@ class StandardModelConstructor(ModelConstructor):
         return v
 
     @property
-    def input_transform(self):
-        return Normalize(
-            self.vocs.n_variables, bounds=torch.tensor(self.vocs.bounds)
-        ).to(**self.tkwargs)
-
-    @property
     def likelihood(self):
         if self.use_low_noise_prior:
             return GaussianLikelihood(
@@ -77,22 +72,31 @@ class StandardModelConstructor(ModelConstructor):
     def tkwargs(self):
         return {"dtype": self.dtype, "device": self.device}
 
-    def build_model(self, data: pd.DataFrame) -> ModelListGP:
+    def get_input_transform(self, vocs: VOCS):
+        return Normalize(vocs.n_variables, bounds=torch.tensor(vocs.bounds)).to(
+            **self.tkwargs
+        )
+
+    def build_model(self, vocs: VOCS, data: pd.DataFrame) -> ModelListGP:
         """construct independent model for each objective and constraint"""
 
         # build model
         pd.options.mode.use_inf_as_na = True
         models = []
-        for name in self.vocs.output_names:
+        input_transform = self.get_input_transform(vocs)
+
+        for name in vocs.output_names:
             outcome_transform = Standardize(1)
             covar_module = self._get_module(self.covar_modules, name)
-            mean_module = self.build_mean_module(name, outcome_transform)
-            train_X, train_Y = self._get_training_data(name, data)
+            mean_module = self.build_mean_module(
+                name, input_transform, outcome_transform
+            )
+            train_X, train_Y = self._get_training_data(name, vocs, data)
             models.append(
                 self.build_single_task_gp(
                     train_X,
                     train_Y,
-                    input_transform=self.input_transform,
+                    input_transform=input_transform,
                     outcome_transform=outcome_transform,
                     covar_module=covar_module,
                     mean_module=mean_module,
@@ -101,27 +105,29 @@ class StandardModelConstructor(ModelConstructor):
             )
         return ModelListGP(*models)
 
-    def build_mean_module(self, name, outcome_transform) -> Optional[CustomMean]:
+    def build_mean_module(
+        self, name, input_transform, outcome_transform
+    ) -> Optional[CustomMean]:
         """Builds the mean module for the output specified by name."""
         mean_module = self._get_module(self.mean_modules, name)
         if mean_module is not None:
-            mean_module = CustomMean(
-                mean_module, self.input_transform, outcome_transform
-            )
+            mean_module = CustomMean(mean_module, input_transform, outcome_transform)
         return mean_module
 
-    def _get_training_data(self, name, data) -> (torch.Tensor, torch.Tensor):
+    def _get_training_data(
+        self, name, vocs: VOCS, data
+    ) -> (torch.Tensor, torch.Tensor):
         """Returns (train_X, train_Y) for the output specified by name."""
         # collect data from dataframe
-        input_data, objective_data, constraint_data = self.vocs.extract_data(
+        input_data, objective_data, constraint_data = vocs.extract_data(
             data, return_raw=True
         )
 
         # objective specifics
-        if name in self.vocs.objective_names:
+        if name in vocs.objective_names:
             target_data = objective_data
         # constraint specifics
-        elif name in self.vocs.constraint_names:
+        elif name in vocs.constraint_names:
             target_data = constraint_data
         else:
             raise RuntimeError(

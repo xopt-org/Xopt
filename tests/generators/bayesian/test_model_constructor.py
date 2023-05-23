@@ -21,12 +21,9 @@ class TestModelConstructor:
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        constructor = StandardModelConstructor(vocs=test_vocs)
+        constructor = StandardModelConstructor()
 
-        constructor.build_model(test_data)
-
-        with pytest.raises(ValidationError):
-            StandardModelConstructor()
+        constructor.build_model(test_vocs, test_data)
 
     def test_custom_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -35,18 +32,13 @@ class TestModelConstructor:
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
 
         with pytest.raises(ValidationError):
-            StandardModelConstructor(covar_modules=deepcopy(custom_covar))
-
-        with pytest.raises(ValidationError):
             StandardModelConstructor(
                 vocs=test_vocs, covar_modules=deepcopy(custom_covar)["y1"]
             )
 
         # test custom covar module
-        constructor = StandardModelConstructor(
-            vocs=test_vocs, covar_modules=deepcopy(custom_covar)
-        )
-        model = constructor.build_model(test_data)
+        constructor = StandardModelConstructor(covar_modules=deepcopy(custom_covar))
+        model = constructor.build_model(test_vocs, test_data)
         assert isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
 
         # test prior mean
@@ -55,35 +47,28 @@ class TestModelConstructor:
                 return X[:, 0] ** 2
 
         mean_modules = {"c1": ConstraintPrior()}
-        constructor = StandardModelConstructor(
-            vocs=test_vocs, mean_modules=mean_modules
-        )
-        model = constructor.build_model(test_data)
+        constructor = StandardModelConstructor(mean_modules=mean_modules)
+        model = constructor.build_model(test_vocs, test_data)
         assert isinstance(model.models[1].mean_module.model, ConstraintPrior)
 
     def test_model_w_nans(self):
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        constructor = StandardModelConstructor(vocs=test_vocs)
+        constructor = StandardModelConstructor()
 
         test_data.loc[5, "y1"] = np.nan
         test_data.loc[6, "c1"] = np.nan
         test_data.loc[7, "c1"] = np.nan
 
-        model = constructor.build_model(test_data)
+        model = constructor.build_model(test_vocs, test_data)
 
         assert model.train_inputs[0][0].shape == torch.Size([9, 2])
         assert model.train_inputs[1][0].shape == torch.Size([8, 2])
 
     def test_serialization(self):
-        test_vocs = deepcopy(TEST_VOCS_BASE)
-
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
-        constructor = StandardModelConstructor(
-            vocs=test_vocs, covar_modules=custom_covar
-        )
-
+        constructor = StandardModelConstructor(covar_modules=custom_covar)
         constructor.json()
 
         import os
@@ -99,9 +84,7 @@ class TestModelConstructor:
         # specify a periodic kernel for each output (objectives and constraints)
         covar_modules = {"y": ScaleKernel(PeriodicKernel())}
 
-        model_constructor = StandardModelConstructor(
-            vocs=my_vocs, covar_modules=covar_modules
-        )
+        model_constructor = StandardModelConstructor(covar_modules=covar_modules)
         generator = ExpectedImprovementGenerator(
             vocs=my_vocs, model_constructor=model_constructor
         )
@@ -128,8 +111,10 @@ class TestModelConstructor:
             saved_options_dict = yaml.safe_load(f)
 
         # create generator from dict
-        saved_options_dict["vocs"] = my_vocs
-        loaded_generator = ExpectedImprovementGenerator.parse_obj(saved_options_dict)
+        saved_options_dict["vocs"] = my_vocs.dict()
+        loaded_generator = ExpectedImprovementGenerator.parse_raw(
+            json.dumps(saved_options_dict)
+        )
         assert isinstance(
             loaded_generator.model_constructor.covar_modules["y"], ScaleKernel
         )
@@ -144,9 +129,7 @@ class TestModelConstructor:
             "c": ScaleKernel(PeriodicKernel()),
         }
 
-        model_constructor = StandardModelConstructor(
-            vocs=my_vocs, covar_modules=covar_modules
-        )
+        model_constructor = StandardModelConstructor(covar_modules=covar_modules)
         generator = ExpectedImprovementGenerator(
             vocs=my_vocs, model_constructor=model_constructor
         )
@@ -173,8 +156,10 @@ class TestModelConstructor:
             saved_options = yaml.safe_load(f)
 
         # create generator from file
-        saved_options["vocs"] = my_vocs
-        loaded_generator = ExpectedImprovementGenerator(**saved_options)
+        saved_options["vocs"] = my_vocs.dict()
+        loaded_generator = ExpectedImprovementGenerator.parse_raw(
+            json.dumps(saved_options)
+        )
         for name, val in loaded_generator.model_constructor.covar_modules.items():
             assert isinstance(val, ScaleKernel)
 

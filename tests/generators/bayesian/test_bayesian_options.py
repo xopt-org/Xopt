@@ -10,6 +10,4 @@ class TestBayesianOptions:
 
     def test_num_restarts(self):
         with pytest.raises(ValueError):
-            OptimizationOptions(
-                num_restarts=25
-            )
+            OptimizationOptions(num_restarts=25)

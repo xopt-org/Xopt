@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Callable, Optional, Dict
+from typing import Callable, Dict, Optional
 
 import pandas as pd
 import torch
@@ -42,12 +42,12 @@ class MultiFidelityGenerator(MOBOGenerator):
 
     @validator("vocs", pre=True)
     def validate_vocs(cls, v: VOCS):
-
         v.variables["s"] = [0, 1]
         v.objectives["s"] = ObjectiveEnum("MAXIMIZE")
         if len(v.constraints):
-            raise ValueError("constraints are not currently supported in "
-                             "multi-fidelity BO")
+            raise ValueError(
+                "constraints are not currently supported in multi-fidelity BO"
+            )
 
         return v
 
@@ -55,7 +55,6 @@ class MultiFidelityGenerator(MOBOGenerator):
         super(MultiFidelityGenerator, self).__init__(**kwargs)
 
         # set reference point
-
         if self.reference_point is None:
             self.reference_point = {}
             for name, val in self.vocs.objectives.items():
@@ -74,9 +73,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         f_data = self.get_input_data(data)
 
         # apply callable function to get costs
-        return self.cost_function(
-            f_data[..., self.fidelity_variable_index]
-        ).sum()
+        return self.cost_function(f_data[..., self.fidelity_variable_index]).sum()
 
     def _get_acquisition(self, model):
         """
@@ -101,9 +98,7 @@ class MultiFidelityGenerator(MOBOGenerator):
 
         # wrap the cost function such that it only has to accept the fidelity parameter
         def true_cost_function(X):
-            return self.cost_function(
-                X[..., self.fidelity_variable_index]
-            )
+            return self.cost_function(X[..., self.fidelity_variable_index])
 
         acq_func = NMOMF(
             model=model,
@@ -120,8 +115,10 @@ class MultiFidelityGenerator(MOBOGenerator):
 
     def add_data(self, new_data: pd.DataFrame):
         if self.fidelity_parameter not in new_data:
-            raise ValueError(f"fidelity parameter {self.fidelity_parameter} must be "
-                             f"in added data")
+            raise ValueError(
+                f"fidelity parameter {self.fidelity_parameter} must be "
+                f"in added data"
+            )
 
         # overwrite add data to check for valid fidelity values
         if (new_data[self.fidelity_parameter] > 1.0).any() or (
@@ -171,7 +168,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         fixed_bounds = torch.cat(
             (
                 boundst[: self.fidelity_variable_index],
-                boundst[self.fidelity_variable_index + 1 :],
+                boundst[self.fidelity_variable_index + 1:],
             )
         ).T
 
