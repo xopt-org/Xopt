@@ -72,7 +72,7 @@ class StandardModelConstructor(ModelConstructor):
     def tkwargs(self):
         return {"dtype": self.dtype, "device": self.device}
 
-    def get_input_transform(self, vocs: VOCS):
+    def get_input_transform(self, vocs: VOCS, data: pd.DataFrame):
         return Normalize(vocs.n_variables, bounds=torch.tensor(vocs.bounds)).to(
             **self.tkwargs
         )
@@ -83,7 +83,7 @@ class StandardModelConstructor(ModelConstructor):
         # build model
         pd.options.mode.use_inf_as_na = True
         models = []
-        input_transform = self.get_input_transform(vocs)
+        input_transform = self.get_input_transform(vocs, data)
 
         for name in vocs.output_names:
             outcome_transform = Standardize(1)
