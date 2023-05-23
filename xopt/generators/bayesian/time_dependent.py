@@ -5,9 +5,10 @@ from abc import ABC
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from pydantic import Field, PositiveFloat
+from pydantic import Field, PositiveFloat, validator
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
@@ -17,6 +18,32 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         0.0,
         description="time added to current time to get target predcition time",
     )
+
+    model_constructor: TimeDependentModelConstructor = Field(
+        TimeDependentModelConstructor(),
+        description="constructor used to generate model"
+    )
+
+    @validator("model_constructor", pre=True)
+    def validate_model_constructor(cls, value):
+        constructor_dict = {"time_dependent": TimeDependentModelConstructor}
+        if value is None:
+            value = TimeDependentModelConstructor()
+        elif isinstance(value, TimeDependentModelConstructor):
+            value = value
+        elif isinstance(value, str):
+            if value in constructor_dict:
+                value = constructor_dict[value]()
+            else:
+                raise ValueError(f"{value} not found")
+        elif isinstance(value, dict):
+            name = value.pop("name")
+            if name in constructor_dict:
+                value = constructor_dict[name](**value)
+            else:
+                raise ValueError(f"{value} not found")
+
+        return value
 
     def get_input_data(self, data: pd.DataFrame):
         return torch.tensor(
