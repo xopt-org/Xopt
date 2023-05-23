@@ -23,3 +23,6 @@ site
 
 # vscode config
 .env
+
+# pytorch modules
+*.pt

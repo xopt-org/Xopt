@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 
 import pandas as pd
 import torch
@@ -17,44 +17,54 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.mobo import MOBOGenerator
-from xopt.generators.bayesian.options import AcquisitionOptions
 from xopt.vocs import ObjectiveEnum, VOCS
 
 logger = logging.getLogger()
 
 
-class MultiFidelityAcquisitionOptions(AcquisitionOptions):
+class MultiFidelityGenerator(MOBOGenerator):
+    name = "multi_fidelity"
+    fidelity_parameter: str = Field(
+        "s", description="fidelity parameter name", const=True
+    )
     cost_function: Callable = Field(
         lambda x: x + 1.0,
         description="callable function that describes the cost "
         "of evaluating the objective function",
     )
-
-
-class MultiFidelityGenerator(MOBOGenerator):
-    name = "multi_fidelity"
-    acquisition_options: MultiFidelityAcquisitionOptions = (
-        MultiFidelityAcquisitionOptions()
-    )
-    fidelity_parameter: str = Field(
-        "s", description="fidelity parameter name", const=True
-    )
-    reference_point: Optional[dict] = {"s": -10.0}
+    reference_point: Optional[Dict[str, float]] = None
+    supports_multi_objective = True
+    supports_batch_generation = True
 
     __doc__ = """Implements Multi-fidelity Bayeisan optimizationn
         Assumes a fidelity parameter [0,1]
         """
 
-    class Config:
-        validate_assignment = True
-
     @validator("vocs", pre=True)
     def validate_vocs(cls, v: VOCS):
+
         v.variables["s"] = [0, 1]
         v.objectives["s"] = ObjectiveEnum("MAXIMIZE")
-        assert v.constraints == {}
+        if len(v.constraints):
+            raise ValueError("constraints are not currently supported in "
+                             "multi-fidelity BO")
 
         return v
+
+    def __init__(self, **kwargs):
+        super(MultiFidelityGenerator, self).__init__(**kwargs)
+
+        # set reference point
+
+        if self.reference_point is None:
+            self.reference_point = {}
+            for name, val in self.vocs.objectives.items():
+                if name != self.fidelity_parameter:
+                    if val == "MAXIMIZE":
+                        self.reference_point.update({name: -100.0})
+                    else:
+                        self.reference_point.update({name: 100.0})
+        self.reference_point.update({self.fidelity_parameter: 0.0})
 
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
         """calculate total cost of data samples using the fidelity parameter"""
@@ -64,7 +74,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         f_data = self.get_input_data(data)
 
         # apply callable function to get costs
-        return self.acquisition_options.cost_function(
+        return self.cost_function(
             f_data[..., self.fidelity_variable_index]
         ).sum()
 
@@ -91,7 +101,7 @@ class MultiFidelityGenerator(MOBOGenerator):
 
         # wrap the cost function such that it only has to accept the fidelity parameter
         def true_cost_function(X):
-            return self.acquisition_options.cost_function(
+            return self.cost_function(
                 X[..., self.fidelity_variable_index]
             )
 
@@ -109,6 +119,10 @@ class MultiFidelityGenerator(MOBOGenerator):
         return acq_func
 
     def add_data(self, new_data: pd.DataFrame):
+        if self.fidelity_parameter not in new_data:
+            raise ValueError(f"fidelity parameter {self.fidelity_parameter} must be "
+                             f"in added data")
+
         # overwrite add data to check for valid fidelity values
         if (new_data[self.fidelity_parameter] > 1.0).any() or (
             new_data[self.fidelity_parameter] < 0.0
