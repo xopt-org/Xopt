@@ -23,6 +23,7 @@ nav:
                 - Trust region: examples/single_objective_bayes_opt/turbo_tutorial.ipynb
                 - Multi-Fidelity: examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb
                 - Time dependent upper confidence bound: examples/single_objective_bayes_opt/time_dependent_bo.ipynb
+                - Bayesian Algorithm Execution: examples/single_objective_bayes_opt/bax_tutorial.ipynb
             - Multi-Objective Bayesian Optimization:
                 - Expected hypervolume improvement: examples/multi_objective_bayes_opt/mobo.ipynb
                 - Multi-fidelity expected hypervolume improvement: examples/multi_objective_bayes_opt/multi_fidelity_mobo.ipynb
