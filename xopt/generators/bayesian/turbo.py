@@ -26,6 +26,7 @@ def get_trust_region(vocs, model, bounds, data, turbo_state, tkwargs):
     # get location of best point so far
     variable_data = vocs.variable_data(data, "")
     objective_data = vocs.objective_data(data, "")
+    dim = vocs.n_variables
 
     # note that the trust region will be around the minimum point since Xopt
     # assumes minimization
@@ -39,7 +40,7 @@ def get_trust_region(vocs, model, bounds, data, turbo_state, tkwargs):
     lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
 
     # calculate the ratios of lengthscales for each axis
-    weights = lengthscales / torch.prod(lengthscales)**(1/self.dim)
+    weights = lengthscales / torch.prod(lengthscales)**(1/dim)
 
     # calculate the tr bounding box
     tr_lb = torch.clamp(
