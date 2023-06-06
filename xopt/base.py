@@ -408,11 +408,11 @@ Config as YAML:
 
     # Convenience methods
 
-    def random_inputs(self, n_samples=1, **kwargs):
+    def random_inputs(self, n_samples=1, seed=None, **kwargs):
         """
         Convenence method to call vocs.random_inputs
         """
-        return self.vocs.random_inputs(n_samples, **kwargs)
+        return self.vocs.random_inputs(n_samples, seed=seed, **kwargs)
 
     def evaluate(self, inputs: Dict, **kwargs):
         """
@@ -420,14 +420,14 @@ Config as YAML:
         """
         return self.evaluator.evaluate(inputs, **kwargs)
 
-    def random_evaluate(self, n_samples=1, **kwargs):
+    def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """
         Convenience method to generate random inputs using vocs
         and evaluate them (adding data to Xopt object and generator.
         """
         index = [1] if n_samples == 1 else None
         random_inputs = pd.DataFrame(
-            self.random_inputs(n_samples, **kwargs), index=index
+            self.random_inputs(n_samples, seed=seed, **kwargs), index=index
         )
         result = self.evaluate_data(random_inputs)
         return result

@@ -77,3 +77,29 @@ def get_generator(name: str):
         raise XoptError(
             f"No generator named {name}, available generators are {list(generators.keys())}"
         )
+
+
+#
+# def get_generator_help(name):
+#     generator = get_generator(name)
+#     help_string = f"Generator name: {generator.name}\n"
+#     help_string = recursive_description(generator, help_string)
+#
+#     return help_string
+#
+#
+# def recursive_description(cls, help_string, in_key="", indent_level=0):
+#     help_string += f"{in_key} : {cls}\n"
+#     for key, val in cls.__fields__.items():
+#         try:
+#             if issubclass(val.type_, BaseModel):
+#                 help_string = recursive_description(val.type_, help_string, key,
+#                                                     indent_level+1)
+#             else:
+#                 help_string += "\t"*indent_level + f"{key} ({val.type_}):" \
+#                                                    f" {val.field_info.description}\n"
+#         except TypeError:
+#             help_string += "\t"*indent_level + f"{key} ({val.type_}):" \
+#                                                f" {val.field_info.description}\n"
+#
+#     return help_string

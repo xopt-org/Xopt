@@ -25,7 +25,7 @@ class TurboState(BaseModel):
     dim: PositiveInt
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")
     length: float = Field(
-        0.5, description="base length of trust region", ge=0.0, le=1.0
+        0.25, description="base length of trust region", ge=0.0, le=1.0
     )
     length_min: PositiveFloat = 0.5**7
     length_max: PositiveFloat = Field(
@@ -58,14 +58,18 @@ class TurboState(BaseModel):
         if self.failure_tolerance is None:
             self.failure_tolerance = int(
                 math.ceil(
-                    max([2.0 / self.batch_size, float(self.dim) / self.batch_size])
+                    max(
+                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
+                    )
                 )
             )
 
         if self.success_tolerance is None:
             self.success_tolerance = int(
                 math.ceil(
-                    max([2.0 / self.batch_size, float(self.dim) / self.batch_size])
+                    max(
+                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
+                    )
                 )
             )
 
@@ -87,7 +91,7 @@ class TurboState(BaseModel):
         lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
 
         # calculate the ratios of lengthscales for each axis
-        weights = lengthscales / torch.prod(lengthscales.pow(1.0 / len(lengthscales)))
+        weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
 
         # calculate the tr bounding box
         tr_lb = torch.clamp(
