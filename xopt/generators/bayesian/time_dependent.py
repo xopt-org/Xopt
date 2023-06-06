@@ -21,7 +21,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
     model_constructor: TimeDependentModelConstructor = Field(
         TimeDependentModelConstructor(),
-        description="constructor used to generate model"
+        description="constructor used to generate model",
     )
 
     @validator("model_constructor", pre=True)

@@ -29,13 +29,11 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         )
 
     def _get_training_data(
-            self, name, vocs: VOCS, data
+        self, name, vocs: VOCS, data
     ) -> (torch.Tensor, torch.Tensor):
         train_X, train_Y = super()._get_training_data(name, vocs, data)
 
         # append time data to last X axis
-        time_X = torch.tensor(
-            data["time"].to_numpy(), **self.tkwargs
-        ).unsqueeze(1)
+        time_X = torch.tensor(data["time"].to_numpy(), **self.tkwargs).unsqueeze(1)
         train_X = torch.cat((train_X, time_X), dim=-1)
         return train_X, train_Y

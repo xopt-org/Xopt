@@ -23,7 +23,11 @@ class TestModelConstructor:
 
         constructor = StandardModelConstructor()
 
-        constructor.build_model(test_vocs, test_data)
+        constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+
+        constructor.build_model_from_vocs(test_vocs, test_data)
 
     def test_custom_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -38,7 +42,9 @@ class TestModelConstructor:
 
         # test custom covar module
         constructor = StandardModelConstructor(covar_modules=deepcopy(custom_covar))
-        model = constructor.build_model(test_vocs, test_data)
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
         assert isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
 
         # test prior mean
@@ -48,7 +54,7 @@ class TestModelConstructor:
 
         mean_modules = {"c1": ConstraintPrior()}
         constructor = StandardModelConstructor(mean_modules=mean_modules)
-        model = constructor.build_model(test_vocs, test_data)
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
         assert isinstance(model.models[1].mean_module.model, ConstraintPrior)
 
     def test_model_w_nans(self):
@@ -56,14 +62,31 @@ class TestModelConstructor:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         constructor = StandardModelConstructor()
 
+        # add nans to ouputs
         test_data.loc[5, "y1"] = np.nan
         test_data.loc[6, "c1"] = np.nan
         test_data.loc[7, "c1"] = np.nan
 
-        model = constructor.build_model(test_vocs, test_data)
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
 
         assert model.train_inputs[0][0].shape == torch.Size([9, 2])
         assert model.train_inputs[1][0].shape == torch.Size([8, 2])
+
+        # add nans to inputs
+        test_data2 = deepcopy(TEST_VOCS_DATA)
+        test_data2.loc[5, "x1"] = np.nan
+
+        model2 = constructor.build_model_from_vocs(test_vocs, test_data2)
+        assert model2.train_inputs[0][0].shape == torch.Size([9, 2])
+
+        # add nans to both
+        test_data3 = deepcopy(TEST_VOCS_DATA)
+        test_data3.loc[5, "x1"] = np.nan
+        test_data3.loc[7, "c1"] = np.nan
+
+        model3 = constructor.build_model_from_vocs(test_vocs, test_data3)
+        assert model3.train_inputs[0][0].shape == torch.Size([9, 2])
+        assert model3.train_inputs[1][0].shape == torch.Size([8, 2])
 
     def test_serialization(self):
         # test custom covar module
@@ -72,6 +95,7 @@ class TestModelConstructor:
         constructor.json()
 
         import os
+
         os.remove("covar_modules_y1.pt")
 
     def test_model_saving(self):

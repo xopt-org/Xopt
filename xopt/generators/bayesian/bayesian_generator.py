@@ -39,7 +39,7 @@ class BayesianGenerator(Generator, ABC):
         description="options used to customize optimization of the acquisition function",
     )
     model: GPyTorchModel = Field(
-        None, description="model used by the generator to perform optimization"
+        None, description="mdel used by the generator to perform optimization"
     )
     turbo_state: TurboState = Field(
         default=None, description="turbo state for trust-region BO"
@@ -56,7 +56,7 @@ class BayesianGenerator(Generator, ABC):
     @validator("acquisition_options")
     def check_acq_options(cls, value: Dict, values):
         if isinstance(value, dict):
-            pl = value["prozimal_lengthscales"]
+            pl = value["proximal_lengthscales"]
         elif isinstance(value, AcquisitionOptions):
             pl = value.proximal_lengthscales
         else:
@@ -149,7 +149,7 @@ class BayesianGenerator(Generator, ABC):
         if data.empty:
             raise ValueError("no data available to build model")
 
-        _model = self.model_constructor.build_model(self.vocs, data)
+        _model = self.model_constructor.build_model_from_vocs(self.vocs, data)
 
         if update_internal:
             self.model = _model
