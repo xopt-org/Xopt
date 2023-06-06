@@ -90,8 +90,8 @@ class StandardModelConstructor(ModelConstructor):
         models = []
         for name in self.vocs.output_names:
             outcome_transform = Standardize(1)
-            covar_module = deepcopy(self._get_module(self.options.covar_modules, name))
-            mean_module = deepcopy(self.build_mean_module(name, outcome_transform))
+            covar_module = self._get_module(self.options.covar_modules, name)
+            mean_module = self.build_mean_module(name, outcome_transform)
             train_X, train_Y = self._get_training_data(name)
             models.append(
                 self.build_single_task_gp(
@@ -109,9 +109,9 @@ class StandardModelConstructor(ModelConstructor):
     @staticmethod
     def _get_module(base, name):
         if isinstance(base, Module):
-            return base
+            return deepcopy(base)
         elif isinstance(base, dict):
-            return base.get(name)
+            return deepcopy(base.get(name))
         else:
             return None
 
