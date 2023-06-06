@@ -40,7 +40,7 @@ def get_trust_region(vocs, model, bounds, data, turbo_state, tkwargs):
     lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
 
     # calculate the ratios of lengthscales for each axis
-    weights = lengthscales / torch.prod(lengthscales)**(1/dim)
+    weights = lengthscales / torch.prod(lengthscales) ** (1 / dim)
 
     # calculate the tr bounding box
     tr_lb = torch.clamp(
