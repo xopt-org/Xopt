@@ -3,11 +3,11 @@ import torch
 
 class TransformedModel(torch.nn.Module):
     def __init__(
-            self,
-            model: torch.nn.Module,
-            input_transformer,
-            outcome_transformer,
-            fixed_model: bool = True
+        self,
+        model: torch.nn.Module,
+        input_transformer,
+        outcome_transformer,
+        fixed_model: bool = True,
     ):
         """A model that requires an input and outcome transform to evaluate.
 

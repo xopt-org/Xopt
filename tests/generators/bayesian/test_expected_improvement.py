@@ -1,15 +1,16 @@
-import torch
-import pandas as pd
 from copy import deepcopy
+
+import pandas as pd
 import pytest
+import torch
 from botorch.acquisition import ExpectedImprovement
 
 from xopt.base import Xopt
-from xopt.vocs import VOCS, ObjectiveEnum
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.upper_confidence_bound import UCBOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
+from xopt.vocs import ObjectiveEnum, VOCS
 
 
 class TestExpectedImprovement:
@@ -87,13 +88,13 @@ class TestExpectedImprovement:
     def test_acquisition_accuracy(self):
         train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
         train_y = torch.sin(2 * torch.pi * train_x)
-        train_data = pd.DataFrame(
-            {"x1": train_x.numpy(), "y1": train_y.numpy()})
+        train_data = pd.DataFrame({"x1": train_x.numpy(), "y1": train_y.numpy()})
         test_x = torch.linspace(0.0, 1.0, 1000)
 
         for objective in ObjectiveEnum:
-            vocs = VOCS(**{"variables": {"x1": [0.0, 1.0]},
-                           "objectives": {"y1": objective}})
+            vocs = VOCS(
+                **{"variables": {"x1": [0.0, 1.0]}, "objectives": {"y1": objective}}
+            )
             generator = ExpectedImprovementGenerator(vocs)
             generator.add_data(train_data)
             model = generator.train_model().models[0]
@@ -103,11 +104,11 @@ class TestExpectedImprovement:
 
             # analytical acquisition function
             if objective == "MAXIMIZE":
-                an_acq = ExpectedImprovement(model, best_f=train_y.max(),
-                                             maximize=True)
+                an_acq = ExpectedImprovement(model, best_f=train_y.max(), maximize=True)
             else:
-                an_acq = ExpectedImprovement(model, best_f=train_y.min(),
-                                             maximize=False)
+                an_acq = ExpectedImprovement(
+                    model, best_f=train_y.min(), maximize=False
+                )
 
             # compare candidates (maximum in test data)
             with torch.no_grad():

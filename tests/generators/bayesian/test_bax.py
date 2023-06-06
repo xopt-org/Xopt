@@ -5,11 +5,9 @@ import pytest
 import torch
 
 from xopt.base import Xopt
-
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax_generator import BaxGenerator
-from xopt.generators.bayesian.options import BayesianOptions
-
+from xopt.generators.bayesian.expected_improvement import BayesianOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
