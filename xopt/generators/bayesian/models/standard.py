@@ -1,5 +1,6 @@
 import os.path
 from typing import Dict, List, Optional
+from copy import deepcopy
 
 import pandas as pd
 import torch
@@ -148,8 +149,8 @@ class StandardModelConstructor(ModelConstructor):
     @staticmethod
     def _get_module(base, name):
         if isinstance(base, Module):
-            return base
+            return deepcopy(base)
         elif isinstance(base, dict):
-            return base.get(name)
+            return deepcopy(base.get(name))
         else:
             return None
