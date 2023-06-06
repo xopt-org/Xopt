@@ -1,6 +1,8 @@
+from copy import deepcopy
+from typing import Optional
+
 import pandas as pd
 import torch
-from typing import Optional
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import Module
@@ -57,8 +59,9 @@ class StandardModelConstructor(ModelConstructor):
         """Builds the mean module for the output specified by name."""
         mean_module = self._get_module(self.options.mean_modules, name)
         if mean_module is not None:
-            mean_module = CustomMean(mean_module, self.input_transform,
-                                     outcome_transform)
+            mean_module = CustomMean(
+                mean_module, self.input_transform, outcome_transform
+            )
         return mean_module
 
     def _get_training_data(self, name) -> (torch.Tensor, torch.Tensor):
@@ -75,11 +78,11 @@ class StandardModelConstructor(ModelConstructor):
                 "constraints.".format(name)
             )
         train_X = torch.tensor(
-            self.input_data[~target_data[name].isnull()].to_numpy(),
-            **self.tkwargs)
+            self.input_data[~target_data[name].isnull()].to_numpy(), **self.tkwargs
+        )
         train_Y = torch.tensor(
-            target_data[~target_data[name].isnull()][name].to_numpy(),
-            **self.tkwargs).unsqueeze(-1)
+            target_data[~target_data[name].isnull()][name].to_numpy(), **self.tkwargs
+        ).unsqueeze(-1)
         return train_X, train_Y
 
     def build_standard_model(self, **model_kwargs):
@@ -106,9 +109,9 @@ class StandardModelConstructor(ModelConstructor):
     @staticmethod
     def _get_module(base, name):
         if isinstance(base, Module):
-            return base
+            return deepcopy(base)
         elif isinstance(base, dict):
-            return base.get(name)
+            return deepcopy(base.get(name))
         else:
             return None
 
