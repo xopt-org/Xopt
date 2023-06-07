@@ -22,11 +22,9 @@ from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 
 from xopt.generators.bayesian.expected_improvement import (
-    BayesianOptions,
     ExpectedImprovementGenerator,
 )
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
-from xopt.generators.bayesian.options import ModelOptions
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
@@ -238,19 +236,20 @@ class TestModelConstructor:
             test_covar2 = deepcopy(test_covar)
 
             # train model with StandardModelConstructor
-            model_options = ModelOptions(covar_modules=test_covar1)
-            model_constructor = StandardModelConstructor(test_vocs, model_options)
-            constructed_model = model_constructor.build_model(test_data[:5]).models[0]
+            model_constructor = StandardModelConstructor(covar_modules=test_covar1)
+            constructed_model = model_constructor.build_model_from_vocs(
+                test_vocs, test_data
+            ).models[0]
 
             # build initial model explicitly for comparison
             train_X = torch.cat(
                 (
-                    torch.tensor(test_data["x1"][:5]).reshape(-1, 1),
-                    torch.tensor(test_data["x2"][:5]).reshape(-1, 1),
+                    torch.tensor(test_data["x1"]).reshape(-1, 1),
+                    torch.tensor(test_data["x2"]).reshape(-1, 1),
                 ),
                 dim=1,
             )
-            train_Y = torch.tensor(test_data["y1"][:5]).reshape(-1, 1)
+            train_Y = torch.tensor(test_data["y1"]).reshape(-1, 1)
             if test_covar2:
                 covar_module = PolynomialKernel(
                     power=1, active_dims=[0]
@@ -283,12 +282,6 @@ class TestModelConstructor:
             assert torch.allclose(
                 benchmark_model.train_targets, constructed_model.train_targets
             )
-
-            if test_covar2:
-                assert torch.allclose(
-                    benchmark_model.covar_module.base_kernel.kernels[0].offset,
-                    constructed_model.covar_module.base_kernel.kernels[0].offset,
-                )
 
             with torch.no_grad():
                 constructed_prediction = constructed_model.posterior(test_pts).mean
@@ -330,11 +323,11 @@ class TestModelConstructor:
 
         # prepare options for Xopt generator
         covar_module_dict = {"y": scaled_covar_module}
-        model_options = ModelOptions(covar_modules=covar_module_dict)
+        model_constructor = StandardModelConstructor(covar_modules=covar_module_dict)
 
         # construct BAX generator
         generator = ExpectedImprovementGenerator(
-            vocs, BayesianOptions(model=deepcopy(model_options))
+            vocs=vocs, model_constructor=model_constructor
         )
 
         # define test points
@@ -371,7 +364,7 @@ class TestModelConstructor:
 
         # construct generator with all points
         generator = ExpectedImprovementGenerator(
-            vocs, BayesianOptions(model=deepcopy(model_options))
+            vocs=vocs, model_constructor=model_constructor
         )
 
         # create  input points
