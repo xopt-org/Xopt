@@ -16,23 +16,23 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         >>> eig = EIG(test_X)
     """
 
-    def __init__(self, model: Model, algo: type[Algorithm]) -> None:
-        r"""Single-outcome Expected Improvement (analytic).
+    def __init__(self, model: Model, algorithm: Algorithm, bounds: Tensor) -> None:
+        r"""Single-outcome Expected Information Gain (analytic).
 
         Args:
             model: A fitted single-outcome model.
         """
 
         super().__init__(model=model)
-        self.algo = algo
+        self.algorithm = algorithm
 
         # get sample-wise algorithm execution (BAX) results
-        self.xs_exe, self.ys_exe, self.algo_results = self.algo.get_exe_paths(
-            self.model
+        self.xs_exe, self.ys_exe, self.algorithm_results = self.algorithm.get_execution_paths(
+            self.model, bounds
         )
 
         # Need to call the model on some data before we can condition_on_observations
-        self.model(self.xs_exe[0, 0:1, :])
+        self.model(self.xs_exe[0, :1, :])
 
         # construct a batch of size n_samples fantasy models,
         # where each fantasy model is produced by taking the model
