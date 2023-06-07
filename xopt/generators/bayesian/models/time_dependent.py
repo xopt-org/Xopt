@@ -1,7 +1,8 @@
-import numpy as np
+from copy import deepcopy
+from typing import List
+
 import pandas as pd
 import torch
-from botorch.models.transforms import Normalize
 
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.vocs import VOCS
@@ -10,30 +11,14 @@ from xopt.vocs import VOCS
 class TimeDependentModelConstructor(StandardModelConstructor):
     name = "time_dependent"
 
-    def get_input_transform(self, vocs: VOCS, data: pd.DataFrame):
-        # add bounds for input transformation
-        bounds = np.hstack(
-            [
-                vocs.bounds,
-                np.array(
-                    (
-                        data["time"].to_numpy().min(),
-                        data["time"].to_numpy().max() + 2 * 15.0,
-                    )
-                ).reshape(2, 1),
-            ]
+    def build_model_from_vocs(self, vocs: VOCS, data: pd.DataFrame):
+        # get max/min times
+        min_t = data["time"].min()
+        max_t = data["time"].max() + 15.0
+        variable_dict = deepcopy(vocs.variables)
+        variable_dict["time"] = [min_t, max_t]
+        return self.build_model(
+            vocs.variable_names + ["time"], vocs.output_names, data, variable_dict
         )
 
-        return Normalize(vocs.n_variables + 1, bounds=torch.tensor(bounds)).to(
-            **self.tkwargs
-        )
 
-    def _get_training_data(
-        self, name, vocs: VOCS, data
-    ) -> (torch.Tensor, torch.Tensor):
-        train_X, train_Y = super()._get_training_data(name, vocs, data)
-
-        # append time data to last X axis
-        time_X = torch.tensor(data["time"].to_numpy(), **self.tkwargs).unsqueeze(1)
-        train_X = torch.cat((train_X, time_X), dim=-1)
-        return train_X, train_Y
