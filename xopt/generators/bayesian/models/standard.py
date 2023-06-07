@@ -1,6 +1,6 @@
 import os.path
-from typing import Dict, List, Optional
 from copy import deepcopy
+from typing import Dict, List, Optional
 
 import pandas as pd
 import torch

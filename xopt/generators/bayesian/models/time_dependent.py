@@ -1,8 +1,6 @@
 from copy import deepcopy
-from typing import List
 
 import pandas as pd
-import torch
 
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.vocs import VOCS
@@ -20,5 +18,3 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         return self.build_model(
             vocs.variable_names + ["time"], vocs.output_names, data, variable_dict
         )
-
-

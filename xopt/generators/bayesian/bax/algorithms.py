@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Dict, ClassVar, Tuple
+from typing import ClassVar, Dict, Tuple
 
 import torch
 from botorch.models.model import Model
-from pydantic import BaseModel, Field, PositiveInt, validator
-
+from pydantic import BaseModel, Field, PositiveInt
 from torch import Tensor
 
 
@@ -16,7 +15,7 @@ class Algorithm(BaseModel, ABC):
 
     @abstractmethod
     def get_execution_paths(
-            self, model: Model, bounds: Tensor
+        self, model: Model, bounds: Tensor
     ) -> Tuple[Tensor, Tensor, Dict]:
         pass
 
@@ -28,7 +27,7 @@ class GridScanAlgorithm(Algorithm, ABC):
     )
 
     def create_mesh(self, bounds: Tensor):
-        """ utility function used to create mesh for evaluating posteriors on"""
+        """utility function used to create mesh for evaluating posteriors on"""
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
 
@@ -46,9 +45,9 @@ class GridScanAlgorithm(Algorithm, ABC):
 
 class GridMinimize(GridScanAlgorithm):
     def get_execution_paths(
-            self, model: Model, bounds: Tensor
+        self, model: Model, bounds: Tensor
     ) -> Tuple[Tensor, Tensor, Dict]:
-        """ get execution paths that minimize the objective function """
+        """get execution paths that minimize the objective function"""
 
         # build evaluation mesh
         test_points = self.create_mesh(bounds).to(model.train_targets)
@@ -66,9 +65,9 @@ class GridMinimize(GridScanAlgorithm):
         # collect secondary results in a dict
         results_dict = {
             "test_points": test_points,
-            "posterior_samples": post_samples
+            "posterior_samples": post_samples,
+            "execution_paths": torch.hstack((x_min, y_min))
         }
 
         # return execution paths
         return x_min.unsqueeze(-2), y_min.unsqueeze(-2), results_dict
-
