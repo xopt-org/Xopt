@@ -7,23 +7,16 @@ import pandas as pd
 import pytest
 import torch
 import yaml
-from gpytorch.kernels import PeriodicKernel, ScaleKernel
-from pydantic import ValidationError
-
-from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
-from xopt.generators.bayesian.models.standard import StandardModelConstructor
-import torch
 from botorch import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
-from gpytorch.kernels import PolynomialKernel, ScaleKernel
+from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
+from pydantic import ValidationError
 
-from xopt.generators.bayesian.expected_improvement import (
-    ExpectedImprovementGenerator,
-)
+from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS

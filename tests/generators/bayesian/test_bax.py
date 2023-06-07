@@ -1,18 +1,18 @@
-from copy import deepcopy
 from unittest.mock import patch
 
-import pandas as pd
-import pytest
 import torch
 from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.bax.algorithms import (
+    Algorithm,
+    GridMinimize,
+    GridScanAlgorithm,
+)
 from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
-from xopt.generators.bayesian.bax.algorithms import Algorithm, GridScanAlgorithm, \
-    GridMinimize
 
 
 class TestBaxGenerator:
@@ -20,7 +20,8 @@ class TestBaxGenerator:
     def test_init(self):
         alg = Algorithm()
         bax_gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE, algorithm=alg,
+            vocs=TEST_VOCS_BASE,
+            algorithm=alg,
         )
         bax_gen.dict()
 
@@ -59,9 +60,10 @@ class TestBaxGenerator:
             train_Y = torch.rand(10, 1)
 
             model = SingleTaskGP(
-                train_X, train_Y,
+                train_X,
+                train_Y,
                 input_transform=Normalize(ndim),
-                outcome_transform=Standardize(1)
+                outcome_transform=Standardize(1),
             )
 
             x_exe, y_exe, results = alg.get_execution_paths(model, bounds)
@@ -91,7 +93,8 @@ class TestBaxGenerator:
         alg = GridMinimize()
 
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE, algorithm=alg,
+            vocs=TEST_VOCS_BASE,
+            algorithm=alg,
         )
         gen.optimization_options.raw_samples = 1
         gen.optimization_options.num_restarts = 1
@@ -103,11 +106,11 @@ class TestBaxGenerator:
     def test_cuda(self):
         alg = GridMinimize()
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE, algorithm=alg,
+            vocs=TEST_VOCS_BASE,
+            algorithm=alg,
         )
 
         if torch.cuda.is_available():
-
             gen.optimization_options.raw_samples = 1
             gen.optimization_options.num_restarts = 1
             gen.data = TEST_VOCS_DATA
@@ -120,7 +123,8 @@ class TestBaxGenerator:
         alg = GridMinimize()
 
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE, algorithm=alg,
+            vocs=TEST_VOCS_BASE,
+            algorithm=alg,
         )
         gen.optimization_options.raw_samples = 1
         gen.optimization_options.num_restarts = 1

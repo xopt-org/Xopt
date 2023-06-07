@@ -27,9 +27,11 @@ class ExpectedInformationGain(AnalyticAcquisitionFunction):
         self.algorithm = algorithm
 
         # get sample-wise algorithm execution (BAX) results
-        self.xs_exe, self.ys_exe, self.algorithm_results = self.algorithm.get_execution_paths(
-            self.model, bounds
-        )
+        (
+            self.xs_exe,
+            self.ys_exe,
+            self.algorithm_results,
+        ) = self.algorithm.get_execution_paths(self.model, bounds)
 
         # Need to call the model on some data before we can condition_on_observations
         self.model(self.xs_exe[0, :1, :])

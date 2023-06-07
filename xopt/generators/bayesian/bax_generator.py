@@ -1,7 +1,5 @@
 import logging
-from typing import Union, Dict
-
-from pydantic import Field
+from typing import Dict
 
 from xopt.generators.bayesian.bax.acquisition import ExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm
@@ -22,4 +20,3 @@ class BaxGenerator(BayesianGenerator):
         )
         self.algorithm_results = eig.algorithm_results
         return eig
-
