@@ -43,9 +43,10 @@ class TestHighLevel:
         generator:
             name: mobo
             reference_point: {y1: 1.5, y2: 1.5}
-            optimization_options:
-                num_restarts: 1
-                raw_samples: 2
+            numerical_optimizer:
+                name: LBFGS
+                n_restarts: 1
+                n_raw_samples: 2
 
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -69,9 +70,10 @@ class TestHighLevel:
             generator:
                 name: mobo
                 reference_point: {y1: 1.5, y2: 1.5}
-                optimization_options:
-                    num_restarts: 2
-                    raw_samples: 2
+                numerical_optimizer:
+                    name: LBFGS
+                    n_restarts: 2
+                    n_raw_samples: 2
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
             vocs:
@@ -91,9 +93,10 @@ class TestHighLevel:
                 generator:
                     name: mobo
                     reference_point: {y1: 1.5, y2: 1.5}
-                    optimization_options:
-                        num_restarts: 1
-                        raw_samples: 2
+                    numerical_optimizer:
+                        name: LBFGS
+                        n_restarts: 1
+                        n_raw_samples: 2
 
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -116,7 +119,7 @@ class TestHighLevel:
         X2 = Xopt(config=config)
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
-        assert X2.generator.optimization_options.num_restarts == 1
+        assert X2.generator.numerical_optimizer.n_restarts == 1
 
         import os
 

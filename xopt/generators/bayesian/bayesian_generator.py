@@ -2,13 +2,12 @@ import logging
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List
 
 import pandas as pd
 import torch
 from botorch.acquisition import qUpperConfidenceBound
-from botorch.models.gpytorch import GPyTorchModel
-from botorch.optim import optimize_acqf
+from botorch.models.model import Model
 from botorch.sampling import get_sampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
@@ -19,36 +18,39 @@ from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.custom_botorch.proximal import ProximalAcquisitionFunction
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
 )
-from xopt.generators.bayesian.options import OptimizationOptions
-from xopt.generators.bayesian.turbo import TurboState
+from xopt.generators.bayesian.turbo import TurboController
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
+from xopt.numerical_optimizer import NumericalOptimizer, LBFGSOptimizer, GridOptimizer
 
 logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
     name = "base_bayesian_generator"
-    optimization_options: OptimizationOptions = Field(
-        OptimizationOptions(),
-        description="options used to customize optimization of the acquisition function",
-    )
-    model: GPyTorchModel = Field(
+    model: Model = Field(
         None, description="mdel used by the generator to perform optimization"
     )
     n_monte_carlo_samples = Field(128, description="number of monte carlo samples to "
                                                   "use")
-    turbo_state: TurboState = Field(
-        default=None, description="turbo state for trust-region BO"
+    turbo_controller: TurboController = Field(
+        default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
     model_constructor: ModelConstructor = Field(
         StandardModelConstructor(), description="constructor used to generate model"
+    )
+    numerical_optimizer: NumericalOptimizer = Field(
+        LBFGSOptimizer(), description="optimizer used to optimize the acquisition "
+                                      "function"
+    )
+    max_travel_distances: List[float] = Field(
+        None,
+        description="limits for travel distance between points in normalized space",
     )
 
     @validator("model_constructor", pre=True)
@@ -72,12 +74,44 @@ class BayesianGenerator(Generator, ABC):
 
         return value
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    @validator("numerical_optimizer", pre=True)
+    def validate_numerical_optimizer(cls, value):
+        optimizer_dict = {"grid": GridOptimizer, "LBFGS": LBFGSOptimizer}
+        if value is None:
+            value = LBFGSOptimizer()
+        elif isinstance(value, NumericalOptimizer):
+            pass
+        elif isinstance(value, str):
+            if value in optimizer_dict:
+                value = optimizer_dict[value]()
+            else:
+                raise ValueError(f"{value} not found")
+        elif isinstance(value, dict):
+            name = value.pop("name")
+            if name in optimizer_dict:
+                value = optimizer_dict[name](**value)
+            else:
+                raise ValueError(f"{value} not found")
+        return value
 
-        # set up turbo if requested
-        if self.optimization_options.use_turbo and self.turbo_state is None:
-            self.turbo_state = TurboState(self.vocs)
+    @validator("turbo_controller", pre=True)
+    def validate_turbo_controller(cls, value, values):
+        """ note default behavior is no use of turbo"""
+        optimizer_dict = {"controller": TurboController(values["vocs"])}
+        if isinstance(value, TurboController):
+            pass
+        elif isinstance(value, str):
+            if value in optimizer_dict:
+                value = optimizer_dict[value]
+            else:
+                raise ValueError(f"{value} not found")
+        elif isinstance(value, dict):
+            name = value.pop("name")
+            if name in optimizer_dict:
+                value = optimizer_dict[name](**value)
+            else:
+                raise ValueError(f"{value} not found")
+        return value
 
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
@@ -101,8 +135,8 @@ class BayesianGenerator(Generator, ABC):
             model = self.train_model(self.data)
 
             # update TurBO state if used
-            if self.turbo_state is not None:
-                self.turbo_state.update_state(self.data)
+            if self.turbo_controller is not None:
+                self.turbo_controller.update_state(self.data)
 
             # calculate optimization bounds
             bounds = self._get_optimization_bounds()
@@ -111,7 +145,9 @@ class BayesianGenerator(Generator, ABC):
             acq_funct = self.get_acquisition(model)
 
             # get candidates
-            candidates = self.optimize_acqf(acq_funct, bounds, n_candidates)
+            candidates = self.numerical_optimizer.optimize(
+                acq_funct, bounds, n_candidates
+            )
 
             # post process candidates
             result = self._process_candidates(candidates)
@@ -151,17 +187,6 @@ class BayesianGenerator(Generator, ABC):
         acq = self._get_acquisition(model)
         return acq
 
-    def optimize_acqf(self, acq_funct, bounds, n_candidates):
-        # get candidates in real domain
-        candidates, out = optimize_acqf(
-            acq_function=acq_funct,
-            bounds=bounds,
-            q=n_candidates,
-            raw_samples=self.optimization_options.raw_samples,
-            num_restarts=self.optimization_options.num_restarts,
-        )
-        return candidates
-
     def get_optimum(self):
         """select the best point(s) (for multi-objective generators, given by the
         model using the Posterior mean"""
@@ -173,12 +198,8 @@ class BayesianGenerator(Generator, ABC):
             self._get_constraint_callables(),
         )
 
-        result, out = optimize_acqf(
-            acq_function=c_posterior_mean,
-            bounds=self._get_bounds(),
-            q=1,
-            raw_samples=self.optimization_options.raw_samples * 5,
-            num_restarts=self.optimization_options.num_restarts * 5,
+        result = self.numerical_optimizer.optimize(
+            c_posterior_mean, self._get_bounds(), 1
         )
 
         return self._process_candidates(result)
@@ -239,21 +260,21 @@ class BayesianGenerator(Generator, ABC):
         bounds = deepcopy(self._get_bounds())
 
         # if specified modify bounds to limit maximum travel distances
-        if self.optimization_options.max_travel_distances is not None:
+        if self.max_travel_distances is not None:
             max_travel_bounds = self.get_max_travel_distances_region(bounds)
             bounds = rectilinear_domain_union(bounds, max_travel_bounds)
 
         # if using turbo, update turbo state and set bounds according to turbo state
-        if self.turbo_state is not None:
+        if self.turbo_controller is not None:
             # set the best value
-            turbo_bounds = self.turbo_state.get_trust_region(self.model)
+            turbo_bounds = self.turbo_controller.get_trust_region(self.model)
             bounds = rectilinear_domain_union(bounds, turbo_bounds)
 
         return bounds
 
     def get_max_travel_distances_region(self, bounds):
         """get region based on max travel distances and last observation"""
-        if len(self.optimization_options.max_travel_distances) != bounds.shape[-1]:
+        if len(self.max_travel_distances) != bounds.shape[-1]:
             raise ValueError(
                 f"length of max_travel_distances must match the number of "
                 f"variables {bounds.shape[-1]}"
@@ -275,7 +296,7 @@ class BayesianGenerator(Generator, ABC):
         # get maximum travel distances
         max_travel_distances = (
             torch.tensor(
-                self.optimization_options.max_travel_distances, **self._tkwargs
+                self.max_travel_distances, **self._tkwargs
             )
             * lengths
         )
@@ -284,21 +305,6 @@ class BayesianGenerator(Generator, ABC):
         )
 
         return max_travel_bounds
-
-    def _check_options(self, options):
-        if options.acq.proximal_lengthscales is not None:
-            n_lengthscales = len(options.acq.proximal_lengthscales)
-
-            if n_lengthscales != self.vocs.n_variables:
-                raise ValueError(
-                    f"Number of proximal lengthscales ({n_lengthscales}) must match "
-                    f"number of variables {self.vocs.n_variables}"
-                )
-            if options.optim.num_restarts != 1:
-                raise ValueError(
-                    "`options.optim.num_restarts` must be 1 when proximal biasing is "
-                    "specified"
-                )
 
 
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):

@@ -20,7 +20,7 @@ https://proceedings.neurips.cc/paper/2019/file/6c990b7aca7bc7058f5e98ea909e924b-
 """
 
 
-class TurboState(BaseModel):
+class TurboController(BaseModel):
     vocs: VOCS = Field(exclude=True)
     dim: PositiveInt
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")
@@ -52,7 +52,7 @@ class TurboState(BaseModel):
     def __init__(self, vocs: VOCS, **kwargs):
         dim = vocs.n_variables
 
-        super(TurboState, self).__init__(vocs=vocs, dim=dim, **kwargs)
+        super(TurboController, self).__init__(vocs=vocs, dim=dim, **kwargs)
 
         # initialize tolerances if not specified
         if self.failure_tolerance is None:
