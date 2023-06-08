@@ -17,7 +17,7 @@ class TestHighLevel:
         test_vocs.constraints = {}
         ucb_gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         ucb_gen.beta = 0.0
-        ucb_gen.acquisition_options.monte_carlo_samples = 512
+        ucb_gen.n_monte_carlo_samples = 512
         # add data
         data = pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0], "y1": [1.0, -10.0]})
         ucb_gen.add_data(data)
@@ -46,8 +46,6 @@ class TestHighLevel:
             optimization_options:
                 num_restarts: 1
                 raw_samples: 2
-            acquisition_options:
-                proximal_lengthscales: [1.5, 1.5]
 
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -96,8 +94,6 @@ class TestHighLevel:
                     optimization_options:
                         num_restarts: 1
                         raw_samples: 2
-                    acquisition_options:
-                        proximal_lengthscales: [1.5, 1.5]
 
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
