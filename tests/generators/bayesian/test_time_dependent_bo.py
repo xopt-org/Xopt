@@ -44,7 +44,7 @@ class TestTimeDependentBO:
 
         gen = TDUpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.added_time = 5.0
-        gen.acquisition_options.monte_carlo_samples = 1
+        gen.n_monte_carlo_samples = 1
 
         test_data = deepcopy(TEST_VOCS_DATA)
         time_array = []
@@ -64,7 +64,7 @@ class TestTimeDependentBO:
         if torch.cuda.is_available():
             gen.use_cuda = True
             gen.added_time = 5.0
-            gen.acquisition_options.monte_carlo_samples = 1
+            gen.n_monte_carlo_samples = 1
 
             test_data = deepcopy(TEST_VOCS_DATA)
             time_array = []

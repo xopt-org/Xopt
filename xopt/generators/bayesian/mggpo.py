@@ -4,18 +4,13 @@ from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprove
 from pydantic import Field
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
-from xopt.generators.bayesian.options import AcquisitionOptions
 from xopt.generators.ga.cnsga import CNSGAGenerator
 from .bayesian_generator import MultiObjectiveBayesianGenerator
 
 
-class MGGPOOptions(AcquisitionOptions):
-    population_size: int = Field(64, description="population size for ga")
-
-
 class MGGPOGenerator(MultiObjectiveBayesianGenerator):
     name = "mggpo"
-    acquisition_options: MGGPOOptions = MGGPOOptions()
+    population_size: int = Field(64, description="population size for ga")
     supports_batch_generation = True
 
     ga_generator: CNSGAGenerator = Field(
@@ -28,7 +23,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         # create GA generator
         self.ga_generator = CNSGAGenerator(
             vocs=self.vocs,
-            population_size=self.acquisition_options.population_size,
+            population_size=self.population_size,
         )
 
     def generate(self, n_candidates: int) -> pd.DataFrame:

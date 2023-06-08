@@ -16,7 +16,7 @@ class TestBayesianExplorationGenerator:
         )
         gen.optimization_options.raw_samples = 1
         gen.optimization_options.num_restarts = 1
-        gen.acquisition_options.monte_carlo_samples = 1
+        gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
 
         candidate = gen.generate(1)
@@ -32,7 +32,7 @@ class TestBayesianExplorationGenerator:
         )
         gen.optimization_options.raw_samples = 1
         gen.optimization_options.num_restarts = 1
-        gen.acquisition_options.monte_carlo_samples = 1
+        gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
 
         candidate = gen.generate(1)
@@ -45,23 +45,11 @@ class TestBayesianExplorationGenerator:
         gen = BayesianExplorationGenerator(vocs=TEST_VOCS_BASE)
         gen.optimization_options.raw_samples = 1
         gen.optimization_options.num_restarts = 1
-        gen.acquisition_options.monte_carlo_samples = 1
+        gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
 
         X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
         # now use bayes opt
         X.step()
-        X.step()
-
-    def test_in_xopt_w_proximal(self):
-        evaluator = Evaluator(function=xtest_callable)
-        gen = BayesianExplorationGenerator(vocs=TEST_VOCS_BASE)
-        gen.optimization_options.raw_samples = 1
-        gen.optimization_options.num_restarts = 1
-        gen.acquisition_options.monte_carlo_samples = 1
-        gen.acquisition_options.proximal_lengthscales = [1.0, 1.0]
-        gen.data = TEST_VOCS_DATA
-
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         X.step()

@@ -25,7 +25,7 @@ from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
 )
-from xopt.generators.bayesian.options import AcquisitionOptions, OptimizationOptions
+from xopt.generators.bayesian.options import OptimizationOptions
 from xopt.generators.bayesian.turbo import TurboState
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
 
@@ -41,6 +41,8 @@ class BayesianGenerator(Generator, ABC):
     model: GPyTorchModel = Field(
         None, description="mdel used by the generator to perform optimization"
     )
+    n_monte_carlo_samples = Field(128, description="number of monte carlo samples to "
+                                                  "use")
     turbo_state: TurboState = Field(
         default=None, description="turbo state for trust-region BO"
     )
@@ -48,28 +50,6 @@ class BayesianGenerator(Generator, ABC):
     model_constructor: ModelConstructor = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
-    acquisition_options: AcquisitionOptions = Field(
-        AcquisitionOptions(),
-        description="options used to customize acquisition function computation",
-    )
-
-    @validator("acquisition_options")
-    def check_acq_options(cls, value: Dict, values):
-        if isinstance(value, dict):
-            pl = value["proximal_lengthscales"]
-        elif isinstance(value, AcquisitionOptions):
-            pl = value.proximal_lengthscales
-        else:
-            pl = None
-
-        if pl is not None and "vocs" in values:
-            n_variables = values["vocs"].n_variables
-            if len(pl) != n_variables:
-                raise ValueError(
-                    "number of proximal lengthscales must equal number of variables"
-                )
-
-        return value
 
     @validator("model_constructor", pre=True)
     def validate_model_constructor(cls, value):
@@ -169,18 +149,6 @@ class BayesianGenerator(Generator, ABC):
 
         # get base acquisition function
         acq = self._get_acquisition(model)
-
-        # add proximal biasing if requested
-        if self.acquisition_options.proximal_lengthscales is not None:
-            acq = ProximalAcquisitionFunction(
-                acq,
-                torch.tensor(
-                    self.acquisition_options.proximal_lengthscales, **self._tkwargs
-                ),
-                transformed_weighting=self.acquisition_options.use_transformed_proximal_weights,
-                beta=10.0,
-            )
-
         return acq
 
     def optimize_acqf(self, acq_funct, bounds, n_candidates):
@@ -223,7 +191,7 @@ class BayesianGenerator(Generator, ABC):
         input_data = self.get_input_data(self.data)
         sampler = get_sampler(
             model.posterior(input_data),
-            sample_shape=torch.Size([self.acquisition_options.monte_carlo_samples]),
+            sample_shape=torch.Size([self.n_monte_carlo_samples]),
         )
         return sampler
 
