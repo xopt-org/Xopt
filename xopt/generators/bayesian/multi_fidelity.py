@@ -172,13 +172,10 @@ class MultiFidelityGenerator(MOBOGenerator):
             )
         ).T
 
-        result, out = optimize_acqf(
-            acq_function=max_fidelity_c_posterior_mean,
-            bounds=fixed_bounds,
-            q=1,
-            raw_samples=self.optimization_options.raw_samples * 5,
-            num_restarts=self.optimization_options.num_restarts * 5,
+        result = self.numerical_optimizer.optimize(
+            max_fidelity_c_posterior_mean, fixed_bounds, 1
         )
+
         vnames = deepcopy(self.vocs.variable_names)
         del vnames[self.fidelity_variable_index]
         df = pd.DataFrame(result.detach().cpu().numpy(), columns=vnames)

@@ -22,10 +22,7 @@ class OptimizationOptions(XoptBaseModel):
         description="flag to use sequential optimization for q-batch point "
         "selection",
     )
-    max_travel_distances: List[float] = Field(
-        None,
-        description="limits for travel distance between points in normalized space",
-    )
+
     use_turbo: bool = Field(
         False,
         description="flag to use Trust region Bayesian Optimization (TuRBO) "
@@ -33,13 +30,7 @@ class OptimizationOptions(XoptBaseModel):
     )
     first_call: bool = Field(False, exclude=True)
 
-    @validator("num_restarts")
-    def validate_num_restarts(cls, v: int, values):
-        if v > values["raw_samples"]:
-            raise ValueError(
-                "num_restarts cannot be greater than number of " "raw_samples"
-            )
-        return v
+
 
     class Config:
         validate_assignment = True

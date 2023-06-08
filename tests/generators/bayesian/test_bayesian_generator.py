@@ -162,13 +162,13 @@ class TestBayesianGenerator(TestCase):
 
         # test with max_travel_distances specified but no data
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
-        gen.optimization_options.max_travel_distances = [0.1, 0.2]
+        gen.max_travel_distances = [0.1, 0.2]
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
         # test with max_travel_distances specified and data
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
-        gen.optimization_options.max_travel_distances = [0.1, 0.2]
+        gen.max_travel_distances = [0.1, 0.2]
         gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
         bounds = gen._get_optimization_bounds()
         assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
@@ -178,7 +178,7 @@ class TestBayesianGenerator(TestCase):
         high_d_vocs.variables["x3"] = [0, 1]
 
         gen = BayesianGenerator(vocs=high_d_vocs)
-        gen.optimization_options.max_travel_distances = [0.1, 0.2, 0.1]
+        gen.max_travel_distances = [0.1, 0.2, 0.1]
         gen.add_data(
             pd.DataFrame(
                 {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
@@ -191,7 +191,7 @@ class TestBayesianGenerator(TestCase):
 
         # test with bad max_distances
         gen = BayesianGenerator(vocs=high_d_vocs)
-        gen.optimization_options.max_travel_distances = [0.1, 0.2]
+        gen.max_travel_distances = [0.1, 0.2]
         gen.add_data(
             pd.DataFrame(
                 {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}

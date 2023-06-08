@@ -13,6 +13,9 @@ class Algorithm(BaseModel, ABC):
         default=20, description="number of execution paths to generate"
     )
 
+    class Config:
+        extra = "forbid"
+
     @abstractmethod
     def get_execution_paths(
         self, model: Model, bounds: Tensor
