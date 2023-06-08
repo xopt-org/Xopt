@@ -18,20 +18,16 @@ class Generator(BaseModel, ABC):
         pd.DataFrame(), description="generator data", exclude=True
     )
 
-    supports_batch_generation: bool = Field(
+    supports_batch_generation: ClassVar[bool] = Field(
         default=False,
-        allow_mutation=False,
-        exclude=True,
         description="flag that describes if this "
         "generator can generate "
         "batches of points",
     )
-    supports_multi_objective: bool = Field(
+    supports_multi_objective: ClassVar[bool] = Field(
         default=False,
-        allow_mutation=False,
         description="flag that describes if this generator can solve multi-objective "
         "problems",
-        exclude=True,
     )
 
     # @validator("vocs", pre=True)
