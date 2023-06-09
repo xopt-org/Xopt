@@ -12,7 +12,7 @@ class CustomMean(TransformedModel, Mean):
         model: torch.nn.Module,
         gp_input_transform: InputTransform,
         gp_outcome_transform: OutcomeTransform,
-        fixed_model: bool = False,
+        fixed_model: bool = True,
     ):
         """Custom prior mean for a GP based on an arbitrary model.
 
