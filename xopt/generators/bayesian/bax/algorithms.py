@@ -3,18 +3,17 @@ from typing import ClassVar, Dict, Tuple
 
 import torch
 from botorch.models.model import Model
-from pydantic import BaseModel, Field, PositiveInt
+from pydantic import Field, PositiveInt
 from torch import Tensor
 
+from xopt.pydantic import XoptBaseModel
 
-class Algorithm(BaseModel, ABC):
+
+class Algorithm(XoptBaseModel, ABC):
     name: ClassVar[str] = "base_algorithm"
     n_samples: PositiveInt = Field(
         default=20, description="number of execution paths to generate"
     )
-
-    class Config:
-        extra = "forbid"
 
     @abstractmethod
     def get_execution_paths(

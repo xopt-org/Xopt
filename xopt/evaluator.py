@@ -6,10 +6,10 @@ from typing import Callable, Dict
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, root_validator
+from pydantic import Field, root_validator
 
 from xopt.errors import XoptError
-from xopt.pydantic import JSON_ENCODERS, NormalExecutor
+from xopt.pydantic import NormalExecutor, XoptBaseModel
 from xopt.utils import get_function, get_function_defaults, safe_call
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class ExecutorEnum(str, Enum):
     normal_executor = "NormalExecutor"
 
 
-class Evaluator(BaseModel):
+class Evaluator(XoptBaseModel):
     """
     Xopt Evaluator for handling the parallel execution of an evaluate function.
 
@@ -49,11 +49,7 @@ class Evaluator(BaseModel):
         """config"""
 
         arbitrary_types_allowed = True
-        # validate_assignment = True # Broken in 1.9.0.
-        # Trying to fix in https://github.com/samuelcolvin/pydantic/pull/4194
-        json_encoders = JSON_ENCODERS
-        extra = "forbid"
-        # copy_on_model_validation = False
+
 
     @root_validator(pre=True)
     def validate_all(cls, values):

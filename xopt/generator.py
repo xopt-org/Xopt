@@ -3,15 +3,15 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from xopt.pydantic import orjson_dumps, orjson_loads
+from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
 
 
-class Generator(BaseModel, ABC):
+class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: pd.DataFrame = Field(
@@ -37,10 +37,6 @@ class Generator(BaseModel, ABC):
 
     class Config:
         validate_assignment = True
-        arbitrary_types_allowed = True
-        json_dumps = orjson_dumps
-        json_loads = orjson_loads
-        extra = "forbid"
 
     def __init__(self, **kwargs):
         """

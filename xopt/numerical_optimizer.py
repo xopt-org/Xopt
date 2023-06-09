@@ -2,11 +2,13 @@ from abc import ABC, abstractmethod
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import BaseModel, Field, PositiveInt, validator
+from pydantic import Field, PositiveInt, validator
 from torch import Tensor
 
+from xopt.pydantic import XoptBaseModel
 
-class NumericalOptimizer(BaseModel, ABC):
+
+class NumericalOptimizer(XoptBaseModel, ABC):
     name: str = "base"
 
     class Config:

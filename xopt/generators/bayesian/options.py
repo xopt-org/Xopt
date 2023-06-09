@@ -1,6 +1,4 @@
-from typing import List
-
-from pydantic import Field, validator
+from pydantic import Field
 
 from xopt.pydantic import XoptBaseModel
 
