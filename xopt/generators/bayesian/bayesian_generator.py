@@ -33,7 +33,7 @@ logger = logging.getLogger()
 class BayesianGenerator(Generator, ABC):
     name = "base_bayesian_generator"
     model: Model = Field(
-        None, description="mdel used by the generator to perform optimization"
+        None, description="botorch model used by the generator to perform optimization"
     )
     n_monte_carlo_samples = Field(128, description="number of monte carlo samples to "
                                                   "use")
