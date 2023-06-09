@@ -68,7 +68,7 @@ class GridMinimize(GridScanAlgorithm):
         results_dict = {
             "test_points": test_points,
             "posterior_samples": post_samples,
-            "execution_paths": torch.hstack((x_min, y_min))
+            "execution_paths": torch.hstack((x_min, y_min)),
         }
 
         # return execution paths

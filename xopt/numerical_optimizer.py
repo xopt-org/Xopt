@@ -16,7 +16,7 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
     @abstractmethod
     def optimize(self, function, bounds, n_candidates=1):
-        """ optimize a function to produce a number of candidate points that
+        """optimize a function to produce a number of candidate points that
         minimize the function"""
         pass
 

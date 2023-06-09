@@ -25,7 +25,7 @@ from xopt.generators.bayesian.objectives import (
 )
 from xopt.generators.bayesian.turbo import TurboController
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
-from xopt.numerical_optimizer import NumericalOptimizer, LBFGSOptimizer, GridOptimizer
+from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 
 logger = logging.getLogger()
 
@@ -35,8 +35,9 @@ class BayesianGenerator(Generator, ABC):
     model: Model = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
-    n_monte_carlo_samples = Field(128, description="number of monte carlo samples to "
-                                                  "use")
+    n_monte_carlo_samples = Field(
+        128, description="number of monte carlo samples to " "use"
+    )
     turbo_controller: TurboController = Field(
         default=None, description="turbo controller for trust-region BO"
     )
@@ -45,8 +46,8 @@ class BayesianGenerator(Generator, ABC):
         StandardModelConstructor(), description="constructor used to generate model"
     )
     numerical_optimizer: NumericalOptimizer = Field(
-        LBFGSOptimizer(), description="optimizer used to optimize the acquisition "
-                                      "function"
+        LBFGSOptimizer(),
+        description="optimizer used to optimize the acquisition " "function",
     )
     max_travel_distances: List[float] = Field(
         None,
@@ -96,7 +97,7 @@ class BayesianGenerator(Generator, ABC):
 
     @validator("turbo_controller", pre=True)
     def validate_turbo_controller(cls, value, values):
-        """ note default behavior is no use of turbo"""
+        """note default behavior is no use of turbo"""
         optimizer_dict = {"controller": TurboController(values["vocs"])}
         if isinstance(value, TurboController):
             pass
@@ -295,10 +296,7 @@ class BayesianGenerator(Generator, ABC):
 
         # get maximum travel distances
         max_travel_distances = (
-            torch.tensor(
-                self.max_travel_distances, **self._tkwargs
-            )
-            * lengths
+            torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
         )
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)

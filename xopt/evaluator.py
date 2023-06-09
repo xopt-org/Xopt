@@ -50,7 +50,6 @@ class Evaluator(XoptBaseModel):
 
         arbitrary_types_allowed = True
 
-
     @root_validator(pre=True)
     def validate_all(cls, values):
         f = get_function(values["function"])

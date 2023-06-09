@@ -139,9 +139,7 @@ class VOCS(XoptBaseModel):
         """Returns the number of outputs (objectives and constraints)"""
         return self.n_objectives + self.n_constraints
 
-    def random_inputs(
-        self, n=None, include_constants=True, seed=None
-    ):
+    def random_inputs(self, n=None, include_constants=True, seed=None):
         """
         Uniform sampling of the variables.
 
