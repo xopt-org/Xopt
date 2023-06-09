@@ -2,7 +2,6 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator

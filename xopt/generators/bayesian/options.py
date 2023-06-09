@@ -28,7 +28,5 @@ class OptimizationOptions(XoptBaseModel):
     )
     first_call: bool = Field(False, exclude=True)
 
-
-
     class Config:
         validate_assignment = True

@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import torch
 
-from xopt.numerical_optimizer import NumericalOptimizer, LBFGSOptimizer, GridOptimizer
+from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 
 
 def f(X):
@@ -29,4 +29,3 @@ class TestNumericalOptimizers:
             for ncandidate in [1, 3]:
                 candidates = optimizer.optimize(f, bounds, ncandidate)
                 assert candidates.shape == torch.Size([ncandidate, ndim])
-

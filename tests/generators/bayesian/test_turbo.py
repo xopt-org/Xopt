@@ -10,7 +10,6 @@ import pytest
 from xopt import Evaluator, VOCS, Xopt
 from xopt.generators import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.options import OptimizationOptions
 from xopt.generators.bayesian.turbo import TurboController
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
@@ -80,8 +79,9 @@ class TestTurbo(TestCase):
             return {"f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x)}
 
         evaluator = Evaluator(function=sin_function)
-        generator = UpperConfidenceBoundGenerator(vocs=vocs,
-                                                  turbo_controller="controller")
+        generator = UpperConfidenceBoundGenerator(
+            vocs=vocs, turbo_controller="controller"
+        )
         X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
 
         X.evaluate_data(pd.DataFrame({"x": [3.0, 1.75, 2.0]}))
