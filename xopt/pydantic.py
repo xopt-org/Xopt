@@ -102,13 +102,13 @@ def process_torch_module(module, name):
     return module_name
 
 
-def get_descriptions_defaults(model: BaseModel):
+def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
     description_dict = {}
     for name, val in model.__fields__.items():
         try:
-            if issubclass(val.type_, BaseModel):
+            if issubclass(val.type_, XoptBaseModel):
                 description_dict[name] = get_descriptions_defaults(getattr(model, name))
             else:
                 description_dict[name] = [
@@ -127,6 +127,8 @@ class XoptBaseModel(BaseModel):
     class Config:
         extra = "forbid"
         json_dumps = orjson_dumps
+        json_loads = orjson_loads
+        arbitrary_types_allowed = True
 
 
 class CallableModel(BaseModel):

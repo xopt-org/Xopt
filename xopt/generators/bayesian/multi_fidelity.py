@@ -9,7 +9,6 @@ from botorch.acquisition import (
     GenericMCObjective,
     qUpperConfidenceBound,
 )
-from botorch.optim import optimize_acqf
 from pydantic import Field, validator
 
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (

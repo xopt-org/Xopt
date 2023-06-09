@@ -4,8 +4,9 @@ from typing import Dict, Union
 
 import torch
 from botorch.models import ModelListGP
-from pydantic import BaseModel, Field, PositiveFloat, PositiveInt
+from pydantic import Field, PositiveFloat, PositiveInt
 
+from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -20,7 +21,7 @@ https://proceedings.neurips.cc/paper/2019/file/6c990b7aca7bc7058f5e98ea909e924b-
 """
 
 
-class TurboController(BaseModel):
+class TurboController(XoptBaseModel):
     vocs: VOCS = Field(exclude=True)
     dim: PositiveInt
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")

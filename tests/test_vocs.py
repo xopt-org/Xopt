@@ -20,6 +20,11 @@ class TestVOCS(object):
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
 
+    def test_empty_objectives(self):
+        VOCS(
+            variables={"x": [0, 1]},
+        )
+
     def test_from_yaml(self):
         Y = """
         variables:

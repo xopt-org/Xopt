@@ -46,7 +46,6 @@ class VOCS(XoptBaseModel):
     ] = {}
     objectives: Dict[str, ObjectiveEnum] = {}
     constants: Dict[str, Any] = {}
-    linked_variables: Dict[str, str] = {}
 
     class Config:
         validate_assignment = True  # Not sure this helps in this case
@@ -141,7 +140,7 @@ class VOCS(XoptBaseModel):
         return self.n_objectives + self.n_constraints
 
     def random_inputs(
-        self, n=None, include_constants=True, include_linked_variables=True, seed=None
+        self, n=None, include_constants=True, seed=None
     ):
         """
         Uniform sampling of the variables.
@@ -170,12 +169,6 @@ class VOCS(XoptBaseModel):
         if include_constants and self.constants is not None:
             inputs.update(self.constants)
 
-        # Handle linked variables
-        if include_linked_variables and self.linked_variables is not None:
-            for k, v in self.linked_variables.items():
-                inputs[k] = inputs[v]
-
-        # return pd.DataFrame(inputs, index=range(n))
         return inputs
 
     def convert_dataframe_to_inputs(self, data: pd.DataFrame) -> pd.DataFrame:
