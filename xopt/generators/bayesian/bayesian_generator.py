@@ -35,7 +35,7 @@ class BayesianGenerator(Generator, ABC):
         self,
         vocs: VOCS,
         options: BayesianOptions = None,
-        supports_batch_generation=False,
+        supports_batch_generation: bool = False,
     ):
         options = options or BayesianOptions()
         if not isinstance(options, BayesianOptions):
