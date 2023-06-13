@@ -1,3 +1,4 @@
+from xopt.generators.bayesian.models.contextual_model import ContextualModelConstructor
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 from xopt.generators.bayesian.models.trainable_mean import TrainableMeanModelConstructor
@@ -14,6 +15,8 @@ def get_model_constructor(model_options):
             constructor = TimeDependentModelConstructor
         elif name == "trainable_mean_standard":
             constructor = TrainableMeanModelConstructor
+        elif name == "contextual_standard":
+            constructor = ContextualModelConstructor
         else:
             raise ValueError(f"{name} is not a vaild model name")
 
