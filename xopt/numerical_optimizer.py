@@ -69,8 +69,12 @@ class GridOptimizer(NumericalOptimizer):
             raise ValueError("bounds must have the shape [2, ndim]")
 
         dim = len(bounds[0])
+        # add in a machine eps
+        eps = 1e-5
         linspace_list = [
-            torch.linspace(bounds.T[i][0], bounds.T[i][1], self.n_grid_points)
+            torch.linspace(
+                bounds.T[i][0] + eps, bounds.T[i][1] - eps, self.n_grid_points
+            )
             for i in range(dim)
         ]
 
@@ -78,9 +82,9 @@ class GridOptimizer(NumericalOptimizer):
         mesh_pts = torch.stack(xx).flatten(start_dim=1).T
 
         # evaluate the function on grid points
-        f_values = function(mesh_pts)
+        f_values = function(mesh_pts.unsqueeze(1))
 
         # get the best n_candidates
         _, indicies = torch.sort(f_values)
-        x_min = mesh_pts[indicies.squeeze()]
+        x_min = mesh_pts[indicies.squeeze().flipud()]
         return x_min[:n_candidates]

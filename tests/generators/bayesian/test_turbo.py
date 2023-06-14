@@ -10,7 +10,10 @@ import pytest
 from xopt import Evaluator, VOCS, Xopt
 from xopt.generators import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.turbo import TurboController
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
@@ -19,7 +22,7 @@ class TestTurbo(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.variables = {"x1": [0, 1]}
 
-        state = TurboController(test_vocs)
+        state = OptimizeTurboController(test_vocs)
         assert state.dim == 1
         assert state.failure_tolerance == 2
         assert state.success_tolerance == 2
@@ -34,7 +37,7 @@ class TestTurbo(TestCase):
         gen.add_data(TEST_VOCS_DATA)
         model = gen.train_model()
 
-        turbo_state = TurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen.data)
         tr = turbo_state.get_trust_region(model)
         assert tr[0].numpy() >= test_vocs.bounds[0]
@@ -46,7 +49,7 @@ class TestTurbo(TestCase):
         gen.add_data(TEST_VOCS_DATA)
         model = gen.train_model()
 
-        turbo_state = TurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen.data)
         tr = turbo_state.get_trust_region(model)
 
@@ -54,13 +57,13 @@ class TestTurbo(TestCase):
         assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
 
         with pytest.raises(RuntimeError):
-            turbo_state = TurboController(gen.vocs)
+            turbo_state = OptimizeTurboController(gen.vocs)
             turbo_state.get_trust_region(model)
 
     def test_set_best_point(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        turbo_state = TurboController(test_vocs)
+        turbo_state = OptimizeTurboController(test_vocs)
         turbo_state.update_state(TEST_VOCS_DATA)
         assert (
             turbo_state.best_value == TEST_VOCS_DATA.min()[test_vocs.objective_names[0]]
@@ -72,15 +75,13 @@ class TestTurbo(TestCase):
             objectives={"f": "MINIMIZE"},
         )
 
-        import numpy as np
-
         def sin_function(input_dict):
             x = input_dict["x"]
             return {"f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x)}
 
         evaluator = Evaluator(function=sin_function)
         generator = UpperConfidenceBoundGenerator(
-            vocs=vocs, turbo_controller="controller"
+            vocs=vocs, turbo_controller="optimize"
         )
         X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
 
@@ -90,3 +91,19 @@ class TestTurbo(TestCase):
         generator.train_model()
         generator.turbo_controller.update_state(generator.data)
         generator.turbo_controller.get_trust_region(generator.model)
+
+    def test_safety(self):
+        test_vocs = VOCS(
+            variables={"x": [0, 2 * math.pi]},
+            objectives={"f": "MINIMIZE"},
+            constraints={"c": ["LESS_THAN", 0]},
+        )
+
+        test_data = pd.DataFrame(
+            {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, -1.0, 1.0]}
+        )
+        sturbo = SafetyTurboController(vocs=test_vocs)
+        sturbo.update_state(test_data)
+
+        assert sturbo.center_x == {"x": 0.75}
+        assert sturbo.failure_counter == 1

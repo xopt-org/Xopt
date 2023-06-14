@@ -23,7 +23,11 @@ from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
 )
-from xopt.generators.bayesian.turbo import TurboController
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+    TurboController,
+)
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 
@@ -98,7 +102,10 @@ class BayesianGenerator(Generator, ABC):
     @validator("turbo_controller", pre=True)
     def validate_turbo_controller(cls, value, values):
         """note default behavior is no use of turbo"""
-        optimizer_dict = {"controller": TurboController(values["vocs"])}
+        optimizer_dict = {
+            "optimize": OptimizeTurboController(values["vocs"]),
+            "safety": SafetyTurboController(values["vocs"]),
+        }
         if isinstance(value, TurboController):
             pass
         elif isinstance(value, str):
