@@ -41,7 +41,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
 
         if vocs.n_objectives != 1:
             raise ValueError("vocs must have one objective for exploration")
-        super().__init__(vocs, options, supports_batch_generation=True)
+        super().__init__(vocs, options)
 
     @staticmethod
     def default_options() -> BayesianOptions:
