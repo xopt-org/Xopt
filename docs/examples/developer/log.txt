@@ -1,0 +1,9 @@
+2023-06-14T13:02:40-0500 - __main__ - INFO - some info message
+2023-06-14T13:02:40-0500 - __main__ - DEBUG - another debug message
+2023-06-14T13:02:40-0500 - __main__ - INFO - another info message
+2023-06-14T13:15:31-0500 - __main__ - INFO - some info message
+2023-06-14T13:15:31-0500 - __main__ - DEBUG - another debug message
+2023-06-14T13:15:31-0500 - __main__ - INFO - another info message
+2023-06-14T13:27:20-0500 - __main__ - INFO - some info message
+2023-06-14T13:27:20-0500 - __main__ - DEBUG - another debug message
+2023-06-14T13:27:20-0500 - __main__ - INFO - another info message
