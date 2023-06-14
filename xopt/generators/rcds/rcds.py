@@ -421,30 +421,36 @@ class RCDSGenerator(Generator):
     step: PositiveFloat = 1e-2
     tol: PositiveFloat = 1e-5
 
+    _ub = 0
+    _lb = 0
+    _rcds: RCDS = None
+    _generator = None
+
     class Config:
         arbitrary_types_allowed = True
         validate_assignment = True
+        underscore_attrs_are_private = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         bound_low, bound_up = self.vocs.bounds
-        self.ub = bound_up
-        self.lb = bound_low
+        self._ub = bound_up
+        self._lb = bound_low
         x_ave = (bound_up + bound_low) / 2
         if self.x0 is None:
             x0 = x_ave
         else:
             x0 = self.x0
 
-        self.rcds = RCDS(
+        self._rcds = RCDS(
             x0=x0,
             init_mat=self.init_mat,
             noise=self.noise,
             step=self.step,
             tol=self.tol,
         )
-        self.generator = self.rcds.powellmain()
+        self._generator = self._rcds.powellmain()
 
     def add_data(self, new_data: pd.DataFrame):
         assert (
@@ -453,20 +459,20 @@ class RCDSGenerator(Generator):
         res = self.vocs.objective_data(new_data).to_numpy()
         assert res.shape == (1, 1)
         obj = res[0, 0]
-        self.rcds.update_obj(obj)
+        self._rcds.update_obj(obj)
 
     def generate(self, n_candidates) -> pd.DataFrame:
         if n_candidates != 1:
             raise NotImplementedError("rcds can only produce one candidate at a time")
 
-        x_next = np.array(next(self.generator))  # note that x_next is a np.matrix!
+        x_next = np.array(next(self._generator))  # note that x_next is a np.matrix!
 
         # Verify the candidate here
-        while np.any(x_next > self.ub) or np.any(x_next < self.lb):
-            self.rcds.update_obj(
+        while np.any(x_next > self._ub) or np.any(x_next < self._lb):
+            self._rcds.update_obj(
                 np.nan
             )  # notify RCDS that the search reached the bound
-            x_next = np.array(next(self.generator))  # request next candidate
+            x_next = np.array(next(self._generator))  # request next candidate
 
         # Return the next value
         try:
