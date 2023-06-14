@@ -1,15 +1,15 @@
 from unittest import TestCase
 
 import pandas as pd
+import pytest
 import torch
 from gpytorch.means import ConstantMean
 from gpytorch.kernels import PeriodicKernel, ScaleKernel
 
 from xopt.generators.bayesian.expected_improvement import (
-    BayesianOptions,
     ExpectedImprovementGenerator,
 )
-from xopt.generators.bayesian.options import ModelOptions
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.vocs import VOCS
 
 
@@ -24,9 +24,10 @@ class TestCustomConstructor(TestCase):
         # specify a periodic kernel for each output (objectives and constraints)
         covar_module = ScaleKernel(PeriodicKernel())
 
-        model_options = ModelOptions(covar_modules=covar_module)
-        generator_options = BayesianOptions(model=model_options)
-        generator = ExpectedImprovementGenerator(my_vocs, options=generator_options)
+        model_constructor = StandardModelConstructor(covar_modules=covar_module)
+        generator = ExpectedImprovementGenerator(
+            vocs=my_vocs, model_constructor=model_constructor
+        )
 
         # define training data to pass to the generator
         train_x = torch.tensor((0.2, 0.5, 0.6))
@@ -50,9 +51,10 @@ class TestCustomConstructor(TestCase):
         # specify a periodic kernel for each output (objectives and constraints)
         covar_module = {"y1": ScaleKernel(PeriodicKernel())}
 
-        model_options = ModelOptions(covar_modules=covar_module)
-        generator_options = BayesianOptions(model=model_options)
-        generator = ExpectedImprovementGenerator(my_vocs, options=generator_options)
+        model_constructor = StandardModelConstructor(covar_modules=covar_module)
+        generator = ExpectedImprovementGenerator(
+            vocs=my_vocs, model_constructor=model_constructor
+        )
 
         # define training data to pass to the generator
         train_x = torch.tensor((0.2, 0.5, 0.6))
@@ -77,9 +79,12 @@ class TestCustomConstructor(TestCase):
             def forward(self, X):
                 return X.squeeze(dim=-1) ** 2
 
-        model_options = ModelOptions(mean_modules={"c": ConstraintPrior()})
-        generator_options = BayesianOptions(model=model_options)
-        generator = ExpectedImprovementGenerator(my_vocs, options=generator_options)
+        model_constructor = StandardModelConstructor(
+            mean_modules={"c": ConstraintPrior()}
+        )
+        generator = ExpectedImprovementGenerator(
+            vocs=my_vocs, model_constructor=model_constructor
+        )
 
         # define training data to pass to the generator
         train_x = torch.tensor((0.2, 0.5))
@@ -99,14 +104,26 @@ class TestCustomConstructor(TestCase):
             objectives={"y": "MAXIMIZE"},
         )
 
+        # test bad trainable_mean_keys
+        with pytest.raises(ValueError):
+            StandardModelConstructor(
+                mean_modules={"y": ConstantMean()},
+                trainable_mean_keys=["f"],
+            )
+
         for trainable in [True, False]:
             if trainable:
-                model_options = ModelOptions(name="trainable_mean_standard",
-                                             mean_modules={"y": ConstantMean()})
+                trainable_mean_keys = ["y"]
             else:
-                model_options = ModelOptions(mean_modules={"y": ConstantMean()})
-            generator_options = BayesianOptions(model=model_options)
-            generator = ExpectedImprovementGenerator(my_vocs, options=generator_options)
+                trainable_mean_keys = []
+            model_constructor = StandardModelConstructor(
+                mean_modules={"y": ConstantMean()},
+                trainable_mean_keys=trainable_mean_keys,
+            )
+            generator = ExpectedImprovementGenerator(
+                vocs=my_vocs,
+                model_constructor=model_constructor
+            )
 
             # define training data to pass to the generator
             train_x = torch.tensor((0.2, 0.5))
