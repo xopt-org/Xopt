@@ -97,7 +97,7 @@ class Xopt:
         # add data to xopt object and generator
         self._new_data = pd.DataFrame()
         self._data = pd.DataFrame()
-        if data is not None:
+        if (data is not None) and (not data.empty):
             self.add_data(data)
 
         self._futures = {}  # unfinished futures
