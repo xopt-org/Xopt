@@ -1,8 +1,15 @@
+import math
+from copy import deepcopy
 from unittest.mock import patch
 
+import numpy as np
+import pandas as pd
 import torch
 
+from xopt import Evaluator, Xopt
+from xopt.generators import BayesianExplorationGenerator
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
+from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 
 
 def f(X):
@@ -29,3 +36,25 @@ class TestNumericalOptimizers:
             for ncandidate in [1, 3]:
                 candidates = optimizer.optimize(f, bounds, ncandidate)
                 assert candidates.shape == torch.Size([ncandidate, ndim])
+
+    def test_in_xopt(self):
+        vocs = deepcopy(tnk_vocs)
+
+        # can only explore one objective
+        del vocs.objectives["y2"]
+
+        generator = BayesianExplorationGenerator(
+            vocs=vocs, numerical_optimizer=GridOptimizer(n_grid_points=100)
+        )
+
+        evaluator = Evaluator(function=evaluate_TNK)
+
+        X = Xopt(generator=generator, evaluator=evaluator, vocs=vocs)
+
+        X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.7, 0.95]}))
+
+        X.step()
+        assert np.allclose(
+            X.data.iloc[-1][X.vocs.variable_names].to_numpy().astype(float),
+            np.ones(2) * math.pi,
+        )
