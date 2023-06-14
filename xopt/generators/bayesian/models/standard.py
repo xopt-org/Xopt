@@ -30,6 +30,9 @@ class StandardModelConstructor(ModelConstructor):
     mean_modules: Dict[str, Module] = Field(
         {}, description="prior mean modules for GP models"
     )
+    trainable_mean_keys: List[str] = Field(
+        [], description="list of prior mean modules that can be trained"
+    )
     dtype: torch.dtype = Field(torch.double)
     device: str = Field("cpu")
 
@@ -57,6 +60,12 @@ class StandardModelConstructor(ModelConstructor):
                 return DECODERS[v]
             except KeyError:
                 raise ValueError(f"cannot convert {v}")
+        return v
+
+    @validator("trainable_mean_keys")
+    def validate_trainable_mean_keys(cls, v, values):
+        for name in v:
+            assert name in values["mean_modules"]
         return v
 
     @property
@@ -123,7 +132,11 @@ class StandardModelConstructor(ModelConstructor):
         """Builds the mean module for the output specified by name."""
         mean_module = self._get_module(self.mean_modules, name)
         if mean_module is not None:
-            mean_module = CustomMean(mean_module, input_transform, outcome_transform)
+            fixed_model = False if name in self.trainable_mean_keys else True
+            mean_module = CustomMean(
+                mean_module, input_transform, outcome_transform,
+                fixed_model=fixed_model
+            )
         return mean_module
 
     def _get_training_data(
