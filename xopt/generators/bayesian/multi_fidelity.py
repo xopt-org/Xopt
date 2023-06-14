@@ -74,6 +74,17 @@ class MultiFidelityGenerator(MOBOGenerator):
         # apply callable function to get costs
         return self.cost_function(f_data[..., self.fidelity_variable_index]).sum()
 
+    def get_acquisition(self, model):
+        """
+        Returns a function that can be used to evaluate the acquisition function
+        """
+        if model is None:
+            raise ValueError("model cannot be None")
+
+        # get base acquisition function
+        acq = self._get_acquisition(model)
+        return acq
+
     def _get_acquisition(self, model):
         """
         Creates the Multi-Fidelity Knowledge Gradient acquistion function

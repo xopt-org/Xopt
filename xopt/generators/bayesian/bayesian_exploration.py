@@ -8,9 +8,6 @@ from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_tr
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
-    ConstrainedMCAcquisitionFunction,
-)
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
@@ -25,13 +22,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
             objective=self._get_objective(),
         )
 
-        cqPV = ConstrainedMCAcquisitionFunction(
-            model,
-            qPV,
-            self._get_constraint_callables(),
-        )
-
-        return cqPV
+        return qPV
 
 
 class qPosteriorVariance(MCAcquisitionFunction):

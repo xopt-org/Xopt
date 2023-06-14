@@ -1,3 +1,4 @@
+from copy import deepcopy
 from unittest.mock import patch
 
 import torch
@@ -20,7 +21,7 @@ class TestBaxGenerator:
     def test_init(self):
         alg = Algorithm()
         bax_gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE,
+            vocs=deepcopy(TEST_VOCS_BASE),
             algorithm=alg,
         )
         bax_gen.dict()
@@ -92,8 +93,24 @@ class TestBaxGenerator:
     def test_generate(self):
         alg = GridMinimize()
 
+        # test w/o constraints
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE,
+            vocs=test_vocs,
+            algorithm=alg,
+        )
+        gen.numerical_optimizer.n_raw_samples = 1
+        gen.numerical_optimizer.n_restarts = 1
+        gen.data = TEST_VOCS_DATA
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+
+        # test w/ constraints
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        gen = BaxGenerator(
+            vocs=test_vocs,
             algorithm=alg,
         )
         gen.numerical_optimizer.n_raw_samples = 1

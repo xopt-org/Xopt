@@ -59,6 +59,17 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         super().add_data(new_data)
         self.ga_generator.add_data(self.data)
 
+    def get_acquisition(self, model):
+        """
+        Returns a function that can be used to evaluate the acquisition function
+        """
+        if model is None:
+            raise ValueError("model cannot be None")
+
+        # get base acquisition function
+        acq = self._get_acquisition(model)
+        return acq
+
     def _get_objective(self):
         return create_mobo_objective(self.vocs, self._tkwargs)
 

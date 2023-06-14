@@ -2,9 +2,6 @@ import torch
 from botorch.acquisition import qExpectedImprovement
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
-    ConstrainedMCAcquisitionFunction,
-)
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
@@ -25,10 +22,4 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             objective=self._get_objective(),
         )
 
-        cqEI = ConstrainedMCAcquisitionFunction(
-            model,
-            qEI,
-            self._get_constraint_callables(),
-        )
-
-        return cqEI
+        return qEI
