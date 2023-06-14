@@ -59,7 +59,7 @@ class ExtremumSeekingGenerator(Generator):
 
     def add_data(self, new_data: pd.DataFrame):
         assert (
-            len(new_data) == 1
+            len(new_data) <= 1
         ), f"length of new_data must be 1, found: {len(new_data)}"
 
         self.data = new_data.iloc[-1:]
