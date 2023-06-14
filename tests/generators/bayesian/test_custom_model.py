@@ -3,8 +3,8 @@ from unittest import TestCase
 import pandas as pd
 import pytest
 import torch
-from gpytorch.means import ConstantMean
 from gpytorch.kernels import PeriodicKernel, ScaleKernel
+from gpytorch.means import ConstantMean
 
 from xopt.generators.bayesian.expected_improvement import (
     ExpectedImprovementGenerator,

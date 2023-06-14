@@ -2,9 +2,6 @@ from botorch.acquisition import qUpperConfidenceBound
 from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
-    ConstrainedMCAcquisitionFunction,
-)
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 
 
@@ -24,13 +21,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
             beta=self.beta,
         )
 
-        cqUCB = ConstrainedMCAcquisitionFunction(
-            model,
-            qUCB,
-            self._get_constraint_callables(),
-        )
-
-        return cqUCB
+        return qUCB
 
 
 class TDUpperConfidenceBoundGenerator(

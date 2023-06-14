@@ -1,6 +1,7 @@
+from xopt.generators.bayesian.models.trainable_mean import TrainableMeanModelConstructor
+
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
-from xopt.generators.bayesian.models.trainable_mean import TrainableMeanModelConstructor
 
 
 def get_model_constructor(model_options):

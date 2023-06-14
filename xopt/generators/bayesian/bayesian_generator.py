@@ -193,6 +193,15 @@ class BayesianGenerator(Generator, ABC):
 
         # get base acquisition function
         acq = self._get_acquisition(model)
+
+        # apply constraints if specified in vocs
+        if len(self.vocs.constraints):
+            acq = ConstrainedMCAcquisitionFunction(
+                model,
+                acq,
+                self._get_constraint_callables(),
+            )
+
         return acq
 
     def get_optimum(self):
