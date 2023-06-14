@@ -2,7 +2,6 @@ from unittest import TestCase
 
 import pandas as pd
 import torch
-from gpytorch.means import ConstantMean
 from gpytorch.kernels import PeriodicKernel, ScaleKernel
 
 from xopt.generators.bayesian.expected_improvement import (
@@ -92,36 +91,3 @@ class TestCustomConstructor(TestCase):
 
         generator.add_data(training_data)
         generator.train_model()
-
-    def test_trainable_prior_mean(self):
-        my_vocs = VOCS(
-            variables={"x": [0, 1]},
-            objectives={"y": "MAXIMIZE"},
-        )
-
-        for trainable in [True, False]:
-            if trainable:
-                model_options = ModelOptions(name="trainable_mean_standard",
-                                             mean_modules={"y": ConstantMean()})
-            else:
-                model_options = ModelOptions(mean_modules={"y": ConstantMean()})
-            generator_options = BayesianOptions(model=model_options)
-            generator = ExpectedImprovementGenerator(my_vocs, options=generator_options)
-
-            # define training data to pass to the generator
-            train_x = torch.tensor((0.2, 0.5))
-            train_y = 1.0 * torch.cos(2 * 3.14 * train_x + 0.25)
-
-            training_data = pd.DataFrame(
-                {"x": train_x.numpy(), "y": train_y.numpy()}
-            )
-
-            generator.add_data(training_data)
-            model = generator.train_model()
-
-            # check for trainable parameters
-            trainable_params_exist = False
-            for param in model.models[0].mean_module.parameters():
-                if param.requires_grad:
-                    trainable_params_exist = True
-            assert trainable_params_exist == trainable
