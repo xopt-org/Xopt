@@ -30,6 +30,7 @@ class LBFGSOptimizer(NumericalOptimizer):
     n_restarts: PositiveInt = Field(
         20, description="number of restarts during acquistion function optimization"
     )
+    max_iter: PositiveInt = Field(2000)
 
     class Config:
         validate_assignment = True
@@ -52,6 +53,7 @@ class LBFGSOptimizer(NumericalOptimizer):
             q=n_candidates,
             raw_samples=self.n_raw_samples,
             num_restarts=self.n_restarts,
+            options={"maxiter": self.max_iter},
         )
         return candidates
 
