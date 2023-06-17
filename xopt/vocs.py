@@ -139,7 +139,13 @@ class VOCS(XoptBaseModel):
         """Returns the number of outputs (objectives and constraints)"""
         return self.n_objectives + self.n_constraints
 
-    def random_inputs(self, n=None, include_constants=True, seed=None):
+    def random_inputs(
+            self,
+            n: int = None,
+            custom_bounds: dict = None,
+            include_constants: bool = True,
+            seed: int = None
+    ):
         """
         Uniform sampling of the variables.
 
@@ -158,7 +164,25 @@ class VOCS(XoptBaseModel):
         else:
             rng = np.random.default_rng(seed=seed)
             rng_sample_function = rng.random
-        for key, val in self.variables.items():  # No need to sort here
+
+        # get bounds
+        # if custom_bounds is specified then they will be clipped inside
+        # vocs variable bounds
+        if custom_bounds is None:
+            bounds = self.variables
+        else:
+            variable_bounds = pd.DataFrame(self.variables)
+            custom_bounds = pd.DataFrame(custom_bounds)
+            custom_bounds = custom_bounds.clip(
+                variable_bounds.iloc[0],
+                variable_bounds.iloc[1],
+                axis=1
+            )
+            bounds = custom_bounds.to_dict()
+            for k in bounds.keys():
+                bounds[k] = [bounds[k][i] for i in range(2)]
+
+        for key, val in bounds.items():  # No need to sort here
             a, b = val
             x = rng_sample_function(n)
             inputs[key] = x * a + (1 - x) * b
