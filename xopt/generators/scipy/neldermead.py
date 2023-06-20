@@ -1,7 +1,7 @@
 import logging
 import warnings
 from abc import abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -13,38 +13,59 @@ logger = logging.getLogger(__name__)
 
 
 class ScipyOptimizeGenerator(Generator):
-    name = "scipy_optimize"
-    initial_point: Dict[str, float] = None  # replaces x0 argument
     """
     Base class for scipy.optimize routines that have been converted to generator form.
 
     These algorithms must be stepped serially.
     """
 
+    name = "scipy_optimize"
+    initial_point: Dict[str, float] = None  # replaces x0 argument
+    initial_simplex: Dict[
+        str, Union[List[float], np.ndarray]
+    ] = None  # This overrides the use of initial_point
+    # Same as scipy.optimize._optimize._minimize_neldermead
+    adaptive: bool = True
+    xatol: float = 1e-4
+    fatol: float = 1e-4
+
+    # Internal data structures
+    _x = None
+    _y = None  # Used to coordinate with func
+    _lock = False  # mechanism to lock function calls
+    _algorithm = None  # Will initialize on first generate
+    _state = None
+    _inputs = None
+
+    _is_done = True
+    _saved_options: Dict = None
+
     class Config:
-        extra = "allow"
+        underscore_attrs_are_private = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # Initialize the first candidate if not given
         if self.initial_point is None:
             self.initial_point = self.vocs.random_inputs()
-
-        # Internal data structures
-        self.y = None  # Used to coordinate with func
-        self._lock = False  # mechanism to lock function calls
-        self._algorithm = None  # Will initialize on first generate
-
-        self._saved_options = self.copy()  # Used to keep track of changed options
+        self._saved_options = self.dict().copy()  # Used to keep track of changed options
 
     # Wrapper to refer to internal data
     def func(self, x):
-        assert np.array_equal(x, self.x), f"{x} should equal {self.x}"
-        return self.y
+        assert np.array_equal(x, self._x), f"{x} should equal {self._x}"
+        return self._y
 
     @property
     def x0(self):
         """Raw internal initial point for convenience"""
-        return np.array([self.initial_point[k] for k in self.vocs.variable_names])
+        return np.array(
+            [self.initial_point[k] for k in self.vocs.variable_names]
+        )
+
+    @property
+    def is_done(self):
+        return self._is_done
 
     @abstractmethod
     def _init_algorithm(self):
@@ -63,22 +84,23 @@ class ScipyOptimizeGenerator(Generator):
         assert (
             len(new_data) == 1
         ), f"length of new_data must be 1, found: {len(new_data)}"
-        res = self.vocs.objective_data(new_data).to_numpy()
+        new_data_df = self.vocs.objective_data(new_data)
+        res = new_data_df.to_numpy()
         assert shape(res) == (1, 1)
         y = res[0, 0]
         if np.isinf(y) or np.isnan(y):
             self._is_done = True
             return
 
-        self.y = y  # generator_function accesses this
-        self.data = new_data
+        self._y = y  # generator_function accesses this
+        self.data = new_data_df
         self._lock = False  # unlock
 
     def generate(self, n_candidates) -> List[Dict]:
         # Check if any options were changed from init. If so, reset the algorithm
-        if self.options != self._saved_options:
+        if self.dict() != self._saved_options:
             self._algorithm = None
-            self._saved_options = self.copy()
+            self._saved_options = self.dict().copy()
 
         # Actually start the algorithm.
         if self._algorithm is None:
@@ -100,20 +122,20 @@ class ScipyOptimizeGenerator(Generator):
             )
 
         try:
-            self.x, self.state = next(
+            self._x, self._state = next(
                 self._algorithm
             )  # raw x point and any state to be passed back
             self._lock = True
 
-            inputs = dict(zip(self.vocs.variable_names, self.x))
+            inputs = dict(zip(self.vocs.variable_names, self._x))
             if self.vocs.constants is not None:
                 inputs.update(self.vocs.constants)
-            self.inputs = [inputs]
+            self._inputs = [inputs]
 
         except StopIteration:
             self._is_done = True
 
-        return self.inputs
+        return self._inputs
 
 
 class NelderMeadGenerator(ScipyOptimizeGenerator):
@@ -122,18 +144,12 @@ class NelderMeadGenerator(ScipyOptimizeGenerator):
     """
 
     name = "neldermead"
-    initial_simplex: Dict[
-        str, List[float]
-    ] = None  # This overrides the use of initial_point
-    # Same as scipy.optimize._optimize._minimize_neldermead
-    adaptive: bool = True
-    xatol: float = 1e-4
-    fatol: float = 1e-4
 
     def _init_algorithm(self):
         """
         sets self._algorithm to the generator function (initializing it).
         """
+
         if self.initial_simplex:
             sim = np.array(
                 [self.initial_simplex[k] for k in self.vocs.variable_names]
@@ -156,7 +172,7 @@ class NelderMeadGenerator(ScipyOptimizeGenerator):
         """
         Returns the simplex in the current state.
         """
-        sim = self.state
+        sim = self._state
         return dict(zip(self.vocs.variable_names, sim.T))
 
 

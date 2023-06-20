@@ -221,6 +221,7 @@ class Xopt:
         if len(new_samples) == 0:
             logger.debug("Generator returned 0 samples => optimization is done.")
             assert self.generator.is_done
+            self._is_done = self.generator.is_done  # terminate the run
             return
 
         #  Blocking submission/evaluation
