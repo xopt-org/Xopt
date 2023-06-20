@@ -22,7 +22,10 @@ class TestCustomConstructor(TestCase):
         )
 
         # specify a periodic kernel for each output (objectives and constraints)
-        covar_module = ScaleKernel(PeriodicKernel())
+        covar_module = {
+            "y": ScaleKernel(PeriodicKernel()),
+            "c": ScaleKernel(PeriodicKernel()),
+        }
 
         model_constructor = StandardModelConstructor(covar_modules=covar_module)
         generator = ExpectedImprovementGenerator(

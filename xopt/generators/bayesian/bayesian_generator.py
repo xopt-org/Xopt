@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from botorch.acquisition import qUpperConfidenceBound
 from botorch.models.model import Model
-from botorch.sampling import get_sampler
+from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import Field, validator
@@ -194,12 +194,20 @@ class BayesianGenerator(Generator, ABC):
         # get base acquisition function
         acq = self._get_acquisition(model)
 
+        try:
+            sampler = acq.sampler
+        except AttributeError:
+            sampler = SobolQMCNormalSampler(
+                sample_shape=torch.Size([self.n_monte_carlo_samples])
+            )
+
         # apply constraints if specified in vocs
         if len(self.vocs.constraints):
             acq = ConstrainedMCAcquisitionFunction(
                 model,
                 acq,
                 self._get_constraint_callables(),
+                sampler=sampler
             )
 
         return acq

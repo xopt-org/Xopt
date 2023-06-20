@@ -62,6 +62,8 @@ class TestVOCS(object):
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
+        TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.json()
