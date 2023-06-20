@@ -80,7 +80,6 @@ vocs:
     constraints:
         c1: [GREATER_THAN, 0]
         c2: [LESS_THAN, 0.5]
-    linked_variables: {x9: x1}
     constants: {a: dummy_constant}
 ```
 
@@ -107,7 +106,7 @@ following form:
 evaluate(inputs: dict) -> dict
 ```
 Evaluate functions must accept a dictionary object that **at least** has the keys 
-specified in `variables, constants, linked_variables` and returns a dictionary 
+specified in `variables, constants` and returns a dictionary 
 containing **at least** the 
 keys contained in `objectives, constraints`. Extra dictionary keys are tracked and 
 used in the evaluate function but are not modified by xopt.
