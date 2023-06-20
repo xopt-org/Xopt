@@ -104,4 +104,3 @@ class TestVOCS(object):
         assert all(random_input_data["x1"] > 0.5)
         assert all(random_input_data["x2"] > 7.5)
         assert all(random_input_data["x2"] < 10.0)
-
