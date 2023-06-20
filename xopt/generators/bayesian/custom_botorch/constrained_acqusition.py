@@ -4,7 +4,7 @@ import torch
 from botorch.acquisition import MCAcquisitionFunction
 from botorch.acquisition.objective import GenericMCObjective, PosteriorTransform
 from botorch.models.model import Model
-from botorch.sampling import SobolQMCNormalSampler, MCSampler
+from botorch.sampling import MCSampler
 from botorch.utils import apply_constraints
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
