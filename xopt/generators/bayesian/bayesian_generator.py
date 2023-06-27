@@ -40,7 +40,7 @@ class BayesianGenerator(Generator, ABC):
         None, description="botorch model used by the generator to perform optimization"
     )
     n_monte_carlo_samples = Field(
-        128, description="number of monte carlo samples to " "use"
+        128, description="number of monte carlo samples to use"
     )
     turbo_controller: TurboController = Field(
         default=None, description="turbo controller for trust-region BO"
@@ -204,10 +204,7 @@ class BayesianGenerator(Generator, ABC):
         # apply constraints if specified in vocs
         if len(self.vocs.constraints):
             acq = ConstrainedMCAcquisitionFunction(
-                model,
-                acq,
-                self._get_constraint_callables(),
-                sampler=sampler
+                model, acq, self._get_constraint_callables(), sampler=sampler
             )
 
         return acq

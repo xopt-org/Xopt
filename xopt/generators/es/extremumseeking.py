@@ -105,13 +105,11 @@ class ExtremumSeekingGenerator(Generator):
             jw = int(np.floor(j / 2))
             if not j % 2:
                 p_next_n[j] = p_n[j] + self._amplitude * self._dtES * np.cos(
-                    self._dtES * self._i * self._wES[jw]
-                    + self.k * self._last_outcome
+                    self._dtES * self._i * self._wES[jw] + self.k * self._last_outcome
                 ) * np.sqrt(self._aES[j] * self._wES[jw])
             else:
                 p_next_n[j] = p_n[j] + self._amplitude * self._dtES * np.sin(
-                    self._dtES * self._i * self._wES[jw]
-                    + self.k * self._last_outcome
+                    self._dtES * self._i * self._wES[jw] + self.k * self._last_outcome
                 ) * np.sqrt(self._aES[j] * self._wES[jw])
 
             # For each new ES value, check that we stay within min/max constraints

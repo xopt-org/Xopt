@@ -92,14 +92,9 @@ class TestVOCS(object):
     def test_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)
 
-        custom_bounds = {
-            "x1": [0.5, 0.75],
-            "x2": [7.5, 15.0]
-        }
+        custom_bounds = {"x1": [0.5, 0.75], "x2": [7.5, 15.0]}
 
-        random_input_data = vocs.random_inputs(
-            100, custom_bounds=custom_bounds
-        )
+        random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
         assert all(random_input_data["x1"] < 0.75)
         assert all(random_input_data["x1"] > 0.5)
         assert all(random_input_data["x2"] > 7.5)

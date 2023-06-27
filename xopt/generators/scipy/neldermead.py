@@ -49,7 +49,9 @@ class ScipyOptimizeGenerator(Generator):
         # Initialize the first candidate if not given
         if self.initial_point is None:
             self.initial_point = self.vocs.random_inputs()
-        self._saved_options = self.dict().copy()  # Used to keep track of changed options
+        self._saved_options = (
+            self.dict().copy()
+        )  # Used to keep track of changed options
 
     # Wrapper to refer to internal data
     def func(self, x):
@@ -59,9 +61,7 @@ class ScipyOptimizeGenerator(Generator):
     @property
     def x0(self):
         """Raw internal initial point for convenience"""
-        return np.array(
-            [self.initial_point[k] for k in self.vocs.variable_names]
-        )
+        return np.array([self.initial_point[k] for k in self.vocs.variable_names])
 
     @property
     def is_done(self):

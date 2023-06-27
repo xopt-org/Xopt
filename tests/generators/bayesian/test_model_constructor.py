@@ -206,8 +206,8 @@ class TestModelConstructor:
         test_data = deepcopy(TEST_VOCS_DATA)
 
         test_pts = torch.tensor(
-            pd.DataFrame(TEST_VOCS_BASE.random_inputs(
-                5, include_constants=False)
+            pd.DataFrame(
+                TEST_VOCS_BASE.random_inputs(5, include_constants=False)
             ).to_numpy()
         )
 

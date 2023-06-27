@@ -68,13 +68,7 @@ def recursive_deserialize(v: dict):
             v[key] = recursive_deserialize(value)
 
         elif isinstance(value, str):
-            # process files
-            if os.path.exists(value):
-                if value.split(".")[-1] == "pt":
-                    v[key] = torch.load(value)
-
-            # process torch dtypes
-            elif value in DECODERS:
+            if value in DECODERS:
                 v[key] = DECODERS[value]
 
     return v
@@ -108,6 +102,17 @@ class XoptBaseModel(BaseModel):
         json_dumps = orjson_dumps
         json_loads = orjson_loads
         arbitrary_types_allowed = True
+
+    # root validator to process files
+    @validator("*", pre=True)
+    def validate_files(cls, value):
+        if isinstance(value, str):
+            if os.path.exists(value):
+                extension = value.split(".")[-1]
+                if extension == "pt":
+                    value = torch.load(value)
+
+        return value
 
 
 def get_descriptions_defaults(model: XoptBaseModel):

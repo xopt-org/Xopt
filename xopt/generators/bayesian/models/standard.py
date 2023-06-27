@@ -134,8 +134,7 @@ class StandardModelConstructor(ModelConstructor):
         if mean_module is not None:
             fixed_model = False if name in self.trainable_mean_keys else True
             mean_module = CustomMean(
-                mean_module, input_transform, outcome_transform,
-                fixed_model=fixed_model
+                mean_module, input_transform, outcome_transform, fixed_model=fixed_model
             )
         return mean_module
 
