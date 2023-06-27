@@ -8,8 +8,9 @@ import pytest
 import torch
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
-from xopt.base import Xopt
+from gpytorch.kernels import PeriodicKernel
 
+from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
@@ -19,28 +20,50 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 class TestBayesianGenerator(TestCase):
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_init(self):
-        BayesianGenerator(TEST_VOCS_BASE)
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.dict()
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
-        gen = BayesianGenerator(TEST_VOCS_BASE)
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+
         model = gen.train_model(test_data)
         assert isinstance(model, GPyTorchModel)
 
         # test evaluating the model
         test_pts = torch.tensor(
-            pd.DataFrame(TEST_VOCS_BASE.random_inputs(5, False, False)).to_numpy()
+            pd.DataFrame(
+                TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+            ).to_numpy()
         )
 
         with torch.no_grad():
             model.posterior(test_pts)
 
+        # test with prior model
+        constructor = deepcopy(gen.model_constructor)
+        constructor.covar_modules = {"y1": PeriodicKernel()}
+
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE, model_constructor=constructor)
+        model = gen.train_model(test_data)
+        assert isinstance(model.models[0].covar_module, PeriodicKernel)
+
+        # test with dict arguments
+        gen = deepcopy(gen)
+        gen.model_constructor.covar_modules = {"y1": PeriodicKernel()}
+
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE, **gen.dict())
+        model = gen.train_model(test_data)
+        assert isinstance(model.models[0].covar_module, PeriodicKernel)
+
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_get_model_w_conditions(self):
         # test with maximize and minimize
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives["y1"] = "MINIMIZE"
         test_data = deepcopy(TEST_VOCS_DATA)
-        gen = BayesianGenerator(test_vocs)
+        gen = BayesianGenerator(vocs=test_vocs)
         model = gen.train_model(test_data)
         assert torch.allclose(
             model.models[0].outcome_transform(torch.tensor(test_data["y1"].to_numpy()))[
@@ -52,7 +75,7 @@ class TestBayesianGenerator(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives["y1"] = "MAXIMIZE"
         test_data = deepcopy(TEST_VOCS_DATA)
-        gen = BayesianGenerator(test_vocs)
+        gen = BayesianGenerator(vocs=test_vocs)
         model = gen.train_model(test_data)
         assert torch.allclose(
             model.models[0].outcome_transform(torch.tensor(test_data["y1"].to_numpy()))[
@@ -77,7 +100,7 @@ class TestBayesianGenerator(TestCase):
         # test with the same objective and constraint keys
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
-        gen2 = BayesianGenerator(test_vocs)
+        gen2 = BayesianGenerator(vocs=test_vocs)
         test_data = deepcopy(TEST_VOCS_DATA)
         gen2.train_model(test_data)
 
@@ -85,15 +108,15 @@ class TestBayesianGenerator(TestCase):
         if torch.cuda.is_available():
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
-            gen3 = BayesianGenerator(test_vocs)
-            gen3.options.use_cuda = True
+            gen3 = BayesianGenerator(vocs=test_vocs)
+            gen3.use_cuda = True
             test_data = deepcopy(TEST_VOCS_DATA)
             model = gen3.train_model(test_data)
             assert model.models[0].train_targets.is_cuda
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
-        gen = BayesianGenerator(sinusoid_vocs)
+        gen = BayesianGenerator(vocs=sinusoid_vocs)
         evaluator = Evaluator(function=evaluate_sinusoid)
         X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
 
@@ -135,19 +158,19 @@ class TestBayesianGenerator(TestCase):
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_bounds(self):
-        gen = BayesianGenerator(TEST_VOCS_BASE)
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
         bounds = gen._get_optimization_bounds()
         assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds))
 
         # test with max_travel_distances specified but no data
-        defaults = BayesianGenerator.default_options()
-        defaults.optim.max_travel_distances = [0.1, 0.2]
-        gen = BayesianGenerator(TEST_VOCS_BASE, defaults)
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.max_travel_distances = [0.1, 0.2]
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
         # test with max_travel_distances specified and data
-        gen = BayesianGenerator(TEST_VOCS_BASE, defaults)
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.max_travel_distances = [0.1, 0.2]
         gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
         bounds = gen._get_optimization_bounds()
         assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
@@ -156,10 +179,8 @@ class TestBayesianGenerator(TestCase):
         high_d_vocs = deepcopy(TEST_VOCS_BASE)
         high_d_vocs.variables["x3"] = [0, 1]
 
-        defaults = BayesianGenerator.default_options()
-        defaults.optim.max_travel_distances = [0.1, 0.2, 0.1]
-
-        gen = BayesianGenerator(high_d_vocs, defaults)
+        gen = BayesianGenerator(vocs=high_d_vocs)
+        gen.max_travel_distances = [0.1, 0.2, 0.1]
         gen.add_data(
             pd.DataFrame(
                 {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
@@ -171,10 +192,8 @@ class TestBayesianGenerator(TestCase):
         )
 
         # test with bad max_distances
-        defaults = BayesianGenerator.default_options()
-        defaults.optim.max_travel_distances = [0.1, 0.2]
-
-        gen = BayesianGenerator(high_d_vocs, defaults)
+        gen = BayesianGenerator(vocs=high_d_vocs)
+        gen.max_travel_distances = [0.1, 0.2]
         gen.add_data(
             pd.DataFrame(
                 {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}

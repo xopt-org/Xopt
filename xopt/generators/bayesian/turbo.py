@@ -1,8 +1,14 @@
 import logging
 import math
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from typing import Dict, Union
 
 import torch
+from botorch.models import ModelListGP
+from pydantic import Field, PositiveFloat, PositiveInt
+
+from xopt.pydantic import XoptBaseModel
+from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 
@@ -16,87 +22,166 @@ https://proceedings.neurips.cc/paper/2019/file/6c990b7aca7bc7058f5e98ea909e924b-
 """
 
 
-def get_trust_region(vocs, model, bounds, data, turbo_state, tkwargs):
-    if model is None:
-        raise RuntimeError("getting trust region requires a GP model to be trained")
-
-    # get bounds width
-    bound_widths = bounds[1] - bounds[0]
-
-    # get location of best point so far
-    variable_data = vocs.variable_data(data, "")
-    objective_data = vocs.objective_data(data, "")
-    dim = vocs.n_variables
-
-    # note that the trust region will be around the minimum point since Xopt
-    # assumes minimization
-    best_idx = objective_data.idxmin()
-    best_x = torch.tensor(
-        variable_data.loc[best_idx][vocs.variable_names].to_numpy(), **tkwargs
+class TurboController(XoptBaseModel, ABC):
+    vocs: VOCS = Field(exclude=True)
+    dim: PositiveInt
+    batch_size: PositiveInt = Field(1, description="number of trust regions to use")
+    length: float = Field(
+        0.25,
+        description="base length of trust region",
+        ge=0.0,
+    )
+    length_min: PositiveFloat = 0.5**7
+    length_max: PositiveFloat = Field(
+        2.0,
+        description="maximum base length of trust region",
+    )
+    failure_counter: int = Field(0, description="number of failures since reset", ge=0)
+    failure_tolerance: PositiveInt = Field(
+        None, description="number of failures to trigger a trust region expansion"
+    )
+    success_counter: int = Field(0, description="number of successes since reset", ge=0)
+    success_tolerance: PositiveInt = Field(
+        None,
+        description="number of successes to trigger a trust region contraction",
+    )
+    center_x: Dict[str, float] = Field(None)
+    scale_factor: float = Field(
+        2.0, description="multiplier to increase or decrease trust region", gt=1.0
     )
 
-    # Scale the TR to be proportional to the lengthscales of the objective model
-    x_center = best_x.clone()
-    lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
+    tkwargs: Dict[str, Union[torch.dtype, str]] = Field({"dtype": torch.double})
 
-    # calculate the ratios of lengthscales for each axis
-    weights = lengthscales / torch.prod(lengthscales) ** (1 / dim)
+    class Config:
+        validate_assignment = True
+        arbitrary_types_allowed = True
 
-    # calculate the tr bounding box
-    tr_lb = torch.clamp(
-        x_center - weights * turbo_state.length * bound_widths / 2.0, *bounds
+    def __init__(self, vocs: VOCS, **kwargs):
+        dim = vocs.n_variables
+
+        super(TurboController, self).__init__(vocs=vocs, dim=dim, **kwargs)
+
+        # initialize tolerances if not specified
+        if self.failure_tolerance is None:
+            self.failure_tolerance = int(
+                math.ceil(
+                    max(
+                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
+                    )
+                )
+            )
+
+        if self.success_tolerance is None:
+            self.success_tolerance = int(
+                math.ceil(
+                    max(
+                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
+                    )
+                )
+            )
+
+    def get_trust_region(self, model: ModelListGP):
+        if not isinstance(model, ModelListGP):
+            raise RuntimeError("getting trust region requires a ModelListGP")
+
+        if self.center_x is None:
+            raise RuntimeError("need to set best point first, call `update_state`")
+
+        # get bounds width
+        bounds = torch.tensor(self.vocs.bounds, **self.tkwargs)
+        bound_widths = bounds[1] - bounds[0]
+
+        # Scale the TR to be proportional to the lengthscales of the objective model
+        x_center = torch.tensor(
+            [self.center_x[ele] for ele in self.vocs.variable_names], **self.tkwargs
+        )
+        lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
+
+        # calculate the ratios of lengthscales for each axis
+        weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+
+        # calculate the tr bounding box
+        tr_lb = torch.clamp(
+            x_center - weights * self.length * bound_widths / 2.0, *bounds
+        )
+        tr_ub = torch.clamp(
+            x_center + weights * self.length * bound_widths / 2.0, *bounds
+        )
+        return torch.cat((tr_lb, tr_ub), dim=0)
+
+    @abstractmethod
+    def update_state(self, data):
+        pass
+
+
+class OptimizeTurboController(TurboController):
+    minimize: bool = Field(
+        default=True, description="flag to specifiy minimization " "or maximization"
     )
-    tr_ub = torch.clamp(
-        x_center + weights * turbo_state.length * bound_widths / 2.0, *bounds
-    )
-    return torch.cat((tr_lb, tr_ub), dim=0)
+    best_value: float = None
 
+    def set_center_point(self, data):
+        # get location of best point so far
+        variable_data = self.vocs.variable_data(data, "")
+        objective_data = self.vocs.objective_data(data, "")
 
-@dataclass
-class TurboState:
-    dim: int
-    batch_size: int
-    length: float = 0.5  # normalized between zero and one
-    length_min: float = 0.5**7
-    length_max: float = 2
-    failure_counter: int = 0
-    failure_tolerance: int = float("nan")  # Note: Post-initialized
-    success_counter: int = 0
-    success_tolerance: int = 10  # Note: The original paper uses 3
-    best_value: float = float("inf")
-    restart_triggered: bool = False
+        # note that the trust region will be around the minimum point since Xopt
+        # assumes minimization
+        best_idx = objective_data.idxmin()
 
-    def __post_init__(self):
-        self.failure_tolerance = math.ceil(
-            max([2.0 / self.batch_size, float(self.dim) / (self.batch_size)])
+        if self.minimize:
+            self.best_value = objective_data.min()[self.vocs.objective_names[0]]
+        else:
+            self.best_value = objective_data.max()[self.vocs.objective_names[0]]
+
+        self.center_x = (
+            variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
         )
 
-        self.success_tolerance = math.ceil(
-            max([2.0 / self.batch_size, float(self.dim) / (self.batch_size)])
-        )
+    def update_state(self, data):
+        """
+        update turbo state class
+        NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
+        minimization
+        """
+        self.set_center_point(data)
+        Y_last = data[self.vocs.objective_names[0]].iloc[-1]
+
+        if Y_last < self.best_value + 1e-3 * math.fabs(self.best_value):
+            self.success_counter += 1
+            self.failure_counter = 0
+        else:
+            self.success_counter = 0
+            self.failure_counter += 1
+
+        if self.success_counter == self.success_tolerance:  # Expand trust region
+            self.length = min(self.scale_factor * self.length, self.length_max)
+            self.success_counter = 0
+        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
+            self.length = max(self.length / self.scale_factor, self.length_min)
+            self.failure_counter = 0
 
 
-def update_state(state, Y_next):
-    """
-    update turbo state class
-    NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
-    minimization
-    """
-    if min(Y_next) < state.best_value + 1e-3 * math.fabs(state.best_value):
-        state.success_counter += 1
-        state.failure_counter = 0
-    else:
-        state.success_counter = 0
-        state.failure_counter += 1
+class SafetyTurboController(TurboController):
+    scale_factor: float = float(1.25)
 
-    if state.success_counter == state.success_tolerance:  # Expand trust region
-        state.length = min(2.0 * state.length, state.length_max)
-        state.success_counter = 0
-    elif state.failure_counter == state.failure_tolerance:  # Shrink trust region
-        state.length /= 2.0
-        state.failure_counter = 0
+    def update_state(self, data):
+        # set center point to be mean of valid data points
+        feas = data[self.vocs.feasibility_data(data)["feasible"]]
+        self.center_x = feas[self.vocs.variable_names].mean().to_dict()
 
-    state.best_value = min(state.best_value, min(Y_next).item())
-    if state.length < state.length_min:
-        state.restart_triggered = True
-    return state
+        # get the feasibility of the last observation
+        last_is_feasible = self.vocs.feasibility_data(data).iloc[-1]["feasible"]
+        if last_is_feasible:
+            self.success_counter += 1
+            self.failure_counter = 0
+        else:
+            self.success_counter = 0
+            self.failure_counter += 1
+
+        if self.success_counter == self.success_tolerance:  # expand trust region
+            self.length = min(self.scale_factor * self.length, self.length_max)
+            self.success_counter = 0
+        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
+            self.length = max(self.length / self.scale_factor, self.length_min)
+            self.failure_counter = 0

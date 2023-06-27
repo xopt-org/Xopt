@@ -7,7 +7,7 @@ from xopt.resources.testing import TEST_YAML
 
 def test_cnsga():
     X = Xopt(
-        generator=CNSGAGenerator(tnk_vocs),
+        generator=CNSGAGenerator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
         vocs=tnk_vocs,
     )
@@ -18,7 +18,7 @@ def test_cnsga():
 def test_cnsga_from_yaml():
     X = Xopt(TEST_YAML)
     # Patch in generator
-    X._generator = CNSGAGenerator(X.vocs)
+    X._generator = CNSGAGenerator(vocs=X.vocs)
     X.options.max_evaluations = 5
     X.run()
     assert len(X.data) == 5

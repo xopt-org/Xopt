@@ -20,6 +20,11 @@ class TestVOCS(object):
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
 
+    def test_empty_objectives(self):
+        VOCS(
+            variables={"x": [0, 1]},
+        )
+
     def test_from_yaml(self):
         Y = """
         variables:
@@ -57,6 +62,8 @@ class TestVOCS(object):
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
+        TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.json()
@@ -81,3 +88,14 @@ class TestVOCS(object):
         assert vocs.n_inputs == 2
         assert vocs.n_outputs == 2
         assert vocs.variable_names == ["x1"]
+
+    def test_custom_bounds(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+
+        custom_bounds = {"x1": [0.5, 0.75], "x2": [7.5, 15.0]}
+
+        random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+        assert all(random_input_data["x1"] < 0.75)
+        assert all(random_input_data["x1"] > 0.5)
+        assert all(random_input_data["x2"] > 7.5)
+        assert all(random_input_data["x2"] < 10.0)

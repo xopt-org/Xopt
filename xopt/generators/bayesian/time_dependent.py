@@ -1,52 +1,57 @@
 import time
 import warnings
 from abc import ABC
-from typing import Dict, List
 
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from pydantic import Field
+from pydantic import Field, PositiveFloat, validator
 
-from xopt.errors import XoptError
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.models.time_dependent import TimeDependentModelOptions
-from xopt.generators.bayesian.options import AcqOptions, BayesianOptions
-from xopt.vocs import VOCS
+from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 
 
-class TimeDependentAcqOptions(AcqOptions):
-    added_time: float = Field(
+class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
+    name = "time_dependent_bayesian_generator"
+    target_prediction_time: PositiveFloat = Field(None)
+    added_time: PositiveFloat = Field(
         0.0,
         description="time added to current time to get target predcition time",
     )
 
+    model_constructor: TimeDependentModelConstructor = Field(
+        TimeDependentModelConstructor(),
+        description="constructor used to generate model",
+    )
 
-class TimeDependentOptions(BayesianOptions):
-    acq = TimeDependentAcqOptions()
-    model = TimeDependentModelOptions()
+    @validator("model_constructor", pre=True)
+    def validate_model_constructor(cls, value):
+        constructor_dict = {"time_dependent": TimeDependentModelConstructor}
+        if value is None:
+            value = TimeDependentModelConstructor()
+        elif isinstance(value, TimeDependentModelConstructor):
+            value = value
+        elif isinstance(value, str):
+            if value in constructor_dict:
+                value = constructor_dict[value]()
+            else:
+                raise ValueError(f"{value} not found")
+        elif isinstance(value, dict):
+            name = value.pop("name")
+            if name in constructor_dict:
+                value = constructor_dict[name](**value)
+            else:
+                raise ValueError(f"{value} not found")
 
-
-class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
-    def __init__(self, vocs: VOCS, options: TimeDependentOptions = None):
-        options = options or TimeDependentOptions()
-        if not isinstance(options, TimeDependentOptions):
-            raise ValueError("options must be a TDOptions object")
-
-        super().__init__(vocs, options)
-        self.target_prediction_time = None
-
-    @staticmethod
-    def default_options() -> TimeDependentOptions:
-        return TimeDependentOptions()
+        return value
 
     def get_input_data(self, data: pd.DataFrame):
         return torch.tensor(
             data[self.vocs.variable_names + ["time"]].to_numpy(), **self._tkwargs
         )
 
-    def generate(self, n_candidates: int) -> List[Dict]:
-        self.target_prediction_time = time.time() + self.options.acq.added_time
+    def generate(self, n_candidates: int) -> pd.DataFrame:
+        self.target_prediction_time = time.time() + self.added_time
         output = super().generate(n_candidates)
 
         if time.time() > self.target_prediction_time:
@@ -71,14 +76,3 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         )
 
         return fixed_acq
-
-    def _get_initial_batch_points(self, bounds):
-        if self.options.optim.use_nearby_initial_points:
-            raise XoptError(
-                "nearby initial points not implemented for "
-                "time dependent optimization"
-            )
-        else:
-            batch_initial_points = None
-            raw_samples = self.options.optim.raw_samples
-        return batch_initial_points, raw_samples

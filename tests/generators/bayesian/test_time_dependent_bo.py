@@ -15,11 +15,11 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 class TestTimeDependentBO:
     @patch.multiple(TimeDependentBayesianGenerator, __abstractmethods__=set())
     def test_init(self):
-        TimeDependentBayesianGenerator(TEST_VOCS_BASE)
+        TimeDependentBayesianGenerator(vocs=TEST_VOCS_BASE)
 
     @patch.multiple(TimeDependentBayesianGenerator, __abstractmethods__=set())
     def test_model_generation(self):
-        gen = TimeDependentBayesianGenerator(TEST_VOCS_BASE)
+        gen = TimeDependentBayesianGenerator(vocs=TEST_VOCS_BASE)
         test_data = deepcopy(TEST_VOCS_DATA)
 
         time_array = []
@@ -40,12 +40,11 @@ class TestTimeDependentBO:
         )
 
     def test_td_ucb(self):
-        options = TDUpperConfidenceBoundGenerator.default_options()
-        options.acq.added_time = 5.0
-        options.acq.monte_carlo_samples = 1
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        gen = TDUpperConfidenceBoundGenerator(test_vocs, options)
+        gen = TDUpperConfidenceBoundGenerator(vocs=test_vocs)
+        gen.added_time = 5.0
+        gen.n_monte_carlo_samples = 1
 
         test_data = deepcopy(TEST_VOCS_DATA)
         time_array = []
@@ -59,14 +58,13 @@ class TestTimeDependentBO:
         gen.generate(1)
 
     def test_cuda_td_ucb(self):
-        options = TDUpperConfidenceBoundGenerator.default_options()
-        if torch.cuda.is_available():
-            options.use_cuda = True
-            options.acq.added_time = 5.0
-            options.acq.monte_carlo_samples = 1
-            test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
 
-            gen = TDUpperConfidenceBoundGenerator(test_vocs, options)
+        gen = TDUpperConfidenceBoundGenerator(vocs=test_vocs)
+        if torch.cuda.is_available():
+            gen.use_cuda = True
+            gen.added_time = 5.0
+            gen.n_monte_carlo_samples = 1
 
             test_data = deepcopy(TEST_VOCS_DATA)
             time_array = []

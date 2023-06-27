@@ -1,103 +1,123 @@
+import os.path
 from copy import deepcopy
-from typing import Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
-from gpytorch import Module
+from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
+from pydantic import Field, validator
+from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.vocs import VOCS
+from xopt.pydantic import orjson_dumps
+
+DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 
 
 class StandardModelConstructor(ModelConstructor):
-    def __init__(self, vocs: VOCS, options):
-        super().__init__(vocs, options)
-        # get input transform
-        self.input_transform = Normalize(
-            self.vocs.n_variables, bounds=torch.tensor(self.vocs.bounds)
-        )
+    name = "standard"
+    use_low_noise_prior: bool = Field(
+        True, description="specify if model should assume a low noise environment"
+    )
+    covar_modules: Dict[str, Kernel] = Field(
+        {}, description="covariance modules for GP models"
+    )
+    mean_modules: Dict[str, Module] = Field(
+        {}, description="prior mean modules for GP models"
+    )
+    trainable_mean_keys: List[str] = Field(
+        [], description="list of prior mean modules that can be trained"
+    )
+    dtype: torch.dtype = Field(torch.double)
+    device: str = Field("cpu")
 
-        # get likelihood
-        self.likelihood = None
-        if self.options.use_low_noise_prior:
-            self.likelihood = GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0))
+    class Config:
+        arbitrary_types_allowed = True
+        json_dumps = orjson_dumps
+        validate_assignment = True
 
-        self.input_data = None
-        self.objective_data = None
-        self.constraint_data = None
-        self.tkwargs = {"dtype": torch.double, "device": "cpu"}
+    @validator("covar_modules", "mean_modules", pre=True)
+    def validate_torch_modules(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError("must be dict")
+        else:
+            for key, val in v.items():
+                if isinstance(val, str):
+                    if os.path.exists(val):
+                        v[key] = torch.load(val)
 
-    def collect_data(self, data: pd.DataFrame):
-        # get data
-        (
-            self.input_data,
-            self.objective_data,
-            self.constraint_data,
-        ) = self.vocs.extract_data(data, return_raw=True)
+        return v
 
-        self.input_transform.to(**self.tkwargs)
-        if self.likelihood is not None:
-            self.likelihood.to(**self.tkwargs)
+    @validator("dtype", pre=True)
+    def validate_dtype(cls, v):
+        if isinstance(v, str):
+            try:
+                return DECODERS[v]
+            except KeyError:
+                raise ValueError(f"cannot convert {v}")
+        return v
 
-    def build_model(self, data: pd.DataFrame, tkwargs: dict = None) -> ModelListGP:
+    @validator("trainable_mean_keys")
+    def validate_trainable_mean_keys(cls, v, values):
+        for name in v:
+            assert name in values["mean_modules"]
+        return v
+
+    @property
+    def likelihood(self):
+        if self.use_low_noise_prior:
+            return GaussianLikelihood(
+                noise_prior=GammaPrior(1.0, 100.0),
+            )
+        else:
+            return GaussianLikelihood()
+
+    @property
+    def tkwargs(self):
+        return {"dtype": self.dtype, "device": self.device}
+
+    def get_input_transform(
+        self, input_names: List, input_bounds: Dict[str, List] = None
+    ):
+        if input_bounds is None:
+            bounds = None
+        else:
+            bounds = torch.vstack(
+                [torch.tensor(input_bounds[name]) for name in input_names]
+            ).T
+        return Normalize(len(input_names), bounds=bounds).to(**self.tkwargs)
+
+    def build_model(
+        self,
+        input_names: List[str],
+        outcome_names: List[str],
+        data: pd.DataFrame,
+        input_bounds: Dict[str, List] = None,
+    ) -> ModelListGP:
         """construct independent model for each objective and constraint"""
-        # overwrite tkwargs if specified
-        self.tkwargs = tkwargs or self.tkwargs
-
-        # collect data from dataframe
-        self.collect_data(data)
 
         # build model
-        return self.build_standard_model()
-
-    def build_mean_module(self, name, outcome_transform) -> Optional[CustomMean]:
-        """Builds the mean module for the output specified by name."""
-        mean_module = self._get_module(self.options.mean_modules, name)
-        if mean_module is not None:
-            mean_module = CustomMean(
-                mean_module, self.input_transform, outcome_transform
-            )
-        return mean_module
-
-    def _get_training_data(self, name) -> (torch.Tensor, torch.Tensor):
-        """Returns (train_X, train_Y) for the output specified by name."""
-        # objective specifics
-        if name in self.vocs.objective_names:
-            target_data = self.objective_data
-        # constraint specifics
-        elif name in self.vocs.constraint_names:
-            target_data = self.constraint_data
-        else:
-            raise RuntimeError(
-                "Output '{}' is not found in either objectives or "
-                "constraints.".format(name)
-            )
-        train_X = torch.tensor(
-            self.input_data[~target_data[name].isnull()].to_numpy(), **self.tkwargs
-        )
-        train_Y = torch.tensor(
-            target_data[~target_data[name].isnull()][name].to_numpy(), **self.tkwargs
-        ).unsqueeze(-1)
-        return train_X, train_Y
-
-    def build_standard_model(self, **model_kwargs):
         pd.options.mode.use_inf_as_na = True
         models = []
-        for name in self.vocs.output_names:
+        input_transform = self.get_input_transform(input_names, input_bounds)
+
+        for name in outcome_names:
             outcome_transform = Standardize(1)
-            covar_module = self._get_module(self.options.covar_modules, name)
-            mean_module = self.build_mean_module(name, outcome_transform)
-            train_X, train_Y = self._get_training_data(name)
+            covar_module = self._get_module(self.covar_modules, name)
+            mean_module = self.build_mean_module(
+                name, input_transform, outcome_transform
+            )
+            train_X, train_Y = self._get_training_data(input_names, name, data)
             models.append(
                 self.build_single_task_gp(
                     train_X,
                     train_Y,
-                    input_transform=self.input_transform,
+                    input_transform=input_transform,
                     outcome_transform=outcome_transform,
                     covar_module=covar_module,
                     mean_module=mean_module,
@@ -105,6 +125,38 @@ class StandardModelConstructor(ModelConstructor):
                 )
             )
         return ModelListGP(*models)
+
+    def build_mean_module(
+        self, name, input_transform, outcome_transform
+    ) -> Optional[CustomMean]:
+        """Builds the mean module for the output specified by name."""
+        mean_module = self._get_module(self.mean_modules, name)
+        if mean_module is not None:
+            fixed_model = False if name in self.trainable_mean_keys else True
+            mean_module = CustomMean(
+                mean_module, input_transform, outcome_transform, fixed_model=fixed_model
+            )
+        return mean_module
+
+    def _get_training_data(
+        self, input_names: List[str], outcome_name: str, data: pd.DataFrame
+    ) -> (torch.Tensor, torch.Tensor):
+        """Returns (train_X, train_Y) for the output specified by name."""
+        input_data = data[input_names]
+        outcome_data = data[outcome_name]
+
+        # cannot use any rows where any variable values are nans
+        non_nans = ~input_data.isnull().T.any()
+        input_data = input_data[non_nans]
+        outcome_data = outcome_data[non_nans]
+
+        train_X = torch.tensor(
+            input_data[~outcome_data.isnull()].to_numpy(), **self.tkwargs
+        )
+        train_Y = torch.tensor(
+            outcome_data[~outcome_data.isnull()].to_numpy(), **self.tkwargs
+        ).unsqueeze(-1)
+        return train_X, train_Y
 
     @staticmethod
     def _get_module(base, name):
@@ -114,12 +166,3 @@ class StandardModelConstructor(ModelConstructor):
             return deepcopy(base.get(name))
         else:
             return None
-
-
-class _NegativeModule(Module):
-    def __init__(self, base):
-        super().__init__()
-        self.base = base
-
-    def forward(self, X):
-        return -self.base(X)

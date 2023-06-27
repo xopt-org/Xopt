@@ -55,7 +55,8 @@ Current release info
 
 Configuring an Xopt run
 ===============
-Xopt runs are specified via a dictionary that can be directly imported from a YAML file.
+Xopt runs can be specified via a dictionary that can be directly imported from a YAML 
+file.
 
 ```yaml
 xopt:
@@ -80,7 +81,6 @@ vocs:
     constraints:
         c1: [GREATER_THAN, 0]
         c2: [LESS_THAN, 0.5]
-    linked_variables: {x9: x1}
     constants: {a: dummy_constant}
 ```
 
@@ -91,8 +91,6 @@ Example MPI run, with `xopt.yaml` as the only user-defined file:
 ```b
 mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 ```
-
-The complete configuration of a simulation optimization is given by a proper YAML file:
 
 
 
@@ -107,7 +105,7 @@ following form:
 evaluate(inputs: dict) -> dict
 ```
 Evaluate functions must accept a dictionary object that **at least** has the keys 
-specified in `variables, constants, linked_variables` and returns a dictionary 
+specified in `variables, constants` and returns a dictionary 
 containing **at least** the 
 keys contained in `objectives, constraints`. Extra dictionary keys are tracked and 
 used in the evaluate function but are not modified by xopt.
@@ -137,7 +135,14 @@ conda search xopt --channel conda-forge
 ```
 
 
-
+Citing Xopt
+==========
+If you use ```Xopt``` for your research, please consider adding the following 
+citation to your publications.
+```
+R. Roussel., et al., "Xopt: A simplified framework for optimization of accelerator problems using advanced algorithms", 
+in Proc. IPAC'23, Venezia.doi:https://doi.org/10.18429/JACoW-14th International Particle Accelerator Conference-THPL164
+```
 Developers
 ==========
 

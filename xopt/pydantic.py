@@ -2,6 +2,7 @@ import copy
 import inspect
 import json
 import logging
+import os.path
 from concurrent.futures import Future
 from importlib import import_module
 from types import FunctionType, MethodType
@@ -39,6 +40,8 @@ def recursive_serialize(v, base_key=""):
             v[key] = recursive_serialize(value, key)
         elif isinstance(value, torch.nn.Module):
             v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
+        elif isinstance(value, torch.dtype):
+            v[key] = str(value)
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(value, _type):
@@ -54,11 +57,34 @@ def recursive_serialize(v, base_key=""):
     return v
 
 
+DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
+
+
+def recursive_deserialize(v: dict):
+    """deserialize strings from xopt outputs"""
+    for key, value in v.items():
+        # process dicts
+        if isinstance(value, dict):
+            v[key] = recursive_deserialize(value)
+
+        elif isinstance(value, str):
+            if value in DECODERS:
+                v[key] = DECODERS[value]
+
+    return v
+
+
 # define custom json_dumps using orjson
-def orjson_dumps(v, *, default):
-    v = recursive_serialize(v)
+def orjson_dumps(v, *, default, base_key=""):
+    v = recursive_serialize(v, base_key=base_key)
     # orjson.dumps returns bytes, to match standard json.dumps we need to decode
     return orjson.dumps(v, default=default).decode()
+
+
+def orjson_loads(v, default=None):
+    v = orjson.loads(v)
+    v = recursive_deserialize(v)
+    return v
 
 
 def process_torch_module(module, name):
@@ -70,13 +96,32 @@ def process_torch_module(module, name):
     return module_name
 
 
-def get_descriptions_defaults(model: BaseModel):
+class XoptBaseModel(BaseModel):
+    class Config:
+        extra = "forbid"
+        json_dumps = orjson_dumps
+        json_loads = orjson_loads
+        arbitrary_types_allowed = True
+
+    # root validator to process files
+    @validator("*", pre=True)
+    def validate_files(cls, value):
+        if isinstance(value, str):
+            if os.path.exists(value):
+                extension = value.split(".")[-1]
+                if extension == "pt":
+                    value = torch.load(value)
+
+        return value
+
+
+def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
     description_dict = {}
     for name, val in model.__fields__.items():
         try:
-            if issubclass(val.type_, BaseModel):
+            if issubclass(val.type_, XoptBaseModel):
                 description_dict[name] = get_descriptions_defaults(getattr(model, name))
             else:
                 description_dict[name] = [
@@ -89,12 +134,6 @@ def get_descriptions_defaults(model: BaseModel):
             description_dict[name] = val.field_info.description
 
     return description_dict
-
-
-class XoptBaseModel(BaseModel):
-    class Config:
-        extra = "forbid"
-        json_dumps = orjson_dumps
 
 
 class CallableModel(BaseModel):
