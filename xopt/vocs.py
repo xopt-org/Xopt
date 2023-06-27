@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import conlist
+from pydantic import conlist, Field
 
 from xopt.pydantic import XoptBaseModel
 
@@ -40,13 +40,26 @@ class VOCS(XoptBaseModel):
     to describe optimization problems.
     """
 
-    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {}
+    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = Field(
+        default={},
+        description="input variable names with a list of minimum and maximum values",
+    )
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
-    ] = {}
-    objectives: Dict[str, ObjectiveEnum] = {}
-    constants: Dict[str, Any] = {}
-    linked_variables: Dict[str, str] = {}
+    ] = Field(
+        default={},
+        description="constraint names with a list of constraint type and value",
+    )
+    objectives: Dict[str, ObjectiveEnum] = Field(
+        default={}, description="objective names with type of objective"
+    )
+    constants: Dict[str, Any] = Field(
+        default={}, description="constant names and values passed to evaluate function"
+    )
+    observables: List[str] = Field(
+        default=[],
+        description="observation names tracked alongside objectives and constraints",
+    )
 
     class Config:
         validate_assignment = True  # Not sure this helps in this case
@@ -86,12 +99,16 @@ class VOCS(XoptBaseModel):
         return list(sorted(self.constraints.keys()))
 
     @property
+    def observable_names(self):
+        return sorted(self.observables)
+
+    @property
     def output_names(self):
         """
         Returns a sorted list of objective and constraint names (objectives first
         then constraints)
         """
-        return self.objective_names + self.constraint_names
+        return self.objective_names + self.constraint_names + self.observable_names
 
     @property
     def constant_names(self):
@@ -108,6 +125,7 @@ class VOCS(XoptBaseModel):
             + self.constant_names
             + self.objective_names
             + self.constraint_names
+            + self.observable_names
         )
 
     @property
@@ -136,12 +154,21 @@ class VOCS(XoptBaseModel):
         return len(self.constraints)
 
     @property
+    def n_observables(self):
+        """Returns the number of constraints"""
+        return len(self.observables)
+
+    @property
     def n_outputs(self):
         """Returns the number of outputs (objectives and constraints)"""
-        return self.n_objectives + self.n_constraints
+        return self.n_objectives + self.n_constraints + self.n_observables
 
     def random_inputs(
-        self, n=None, include_constants=True, include_linked_variables=True, seed=None
+        self,
+        n: int = None,
+        custom_bounds: dict = None,
+        include_constants: bool = True,
+        seed: int = None,
     ):
         """
         Uniform sampling of the variables.
@@ -161,7 +188,23 @@ class VOCS(XoptBaseModel):
         else:
             rng = np.random.default_rng(seed=seed)
             rng_sample_function = rng.random
-        for key, val in self.variables.items():  # No need to sort here
+
+        # get bounds
+        # if custom_bounds is specified then they will be clipped inside
+        # vocs variable bounds
+        if custom_bounds is None:
+            bounds = self.variables
+        else:
+            variable_bounds = pd.DataFrame(self.variables)
+            custom_bounds = pd.DataFrame(custom_bounds)
+            custom_bounds = custom_bounds.clip(
+                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
+            )
+            bounds = custom_bounds.to_dict()
+            for k in bounds.keys():
+                bounds[k] = [bounds[k][i] for i in range(2)]
+
+        for key, val in bounds.items():  # No need to sort here
             a, b = val
             x = rng_sample_function(n)
             inputs[key] = x * a + (1 - x) * b
@@ -170,12 +213,6 @@ class VOCS(XoptBaseModel):
         if include_constants and self.constants is not None:
             inputs.update(self.constants)
 
-        # Handle linked variables
-        if include_linked_variables and self.linked_variables is not None:
-            for k, v in self.linked_variables.items():
-                inputs[k] = inputs[v]
-
-        # return pd.DataFrame(inputs, index=range(n))
         return inputs
 
     def convert_dataframe_to_inputs(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -265,6 +302,23 @@ class VOCS(XoptBaseModel):
             result: processed Dataframe
         """
         return form_constraint_data(self.constraints, data, prefix)
+
+    def observable_data(
+        self,
+        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        prefix: str = "observable_",
+    ) -> pd.DataFrame:
+        """
+        Returns a dataframe containing observable data
+
+        Args:
+            data: data to be processed.
+            prefix: prefix added to column names.
+
+        Returns:
+            result: processed Dataframe
+        """
+        return form_observable_data(self.observable_names, data, prefix)
 
     def feasibility_data(
         self,
@@ -420,6 +474,39 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
             raise ValueError(f"Unknown constraint operator: {op}")
 
         cdata[prefix + k] = cvalues.fillna(np.inf)  # Protect against nans
+    return cdata
+
+
+def form_observable_data(observables: List, data: pd.DataFrame, prefix="observable_"):
+    """
+    Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
+    constraint is satisfied if the evaluation is < 0.
+
+    Args:
+        observables: Dictonary of constraints
+        data: Dataframe with the data to be evaluated
+        prefix: Prefix to use for the transformed data in the dataframe
+
+    Returns a dataframe with the constraint data.
+
+    Missing or nan values will be filled with: np.inf
+
+    """
+    if not observables:
+        return pd.DataFrame([])
+
+    data = pd.DataFrame(data)  # cast to dataframe
+
+    cdata = pd.DataFrame(index=data.index)
+
+    for k in observables:
+        # Protect against missing data
+        if k not in data:
+            cdata[prefix + k] = np.inf
+            continue
+
+        ovalues = data[k]
+        cdata[prefix + k] = ovalues.fillna(np.inf)  # Protect against nans
     return cdata
 
 

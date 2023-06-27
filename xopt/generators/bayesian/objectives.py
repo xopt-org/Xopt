@@ -3,6 +3,7 @@ from functools import partial
 import torch
 from botorch.acquisition import GenericMCObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
+from botorch.sampling import get_sampler
 
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     FeasibilityObjective,
@@ -10,44 +11,45 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
-def feasibility(X, model, sampler, vocs, posterior_transform=None):
+def feasibility(X, model, vocs, posterior_transform=None):
     constraints = create_constraint_callables(vocs)
     posterior = model.posterior(X=X, posterior_transform=posterior_transform)
+
+    sampler = get_sampler(
+        model.posterior(X),
+        sample_shape=torch.Size([512]),
+    )
     samples = sampler(posterior)
     objective = FeasibilityObjective(constraints)
     return torch.mean(objective(samples, X), dim=0)
 
 
-def constraint_function(Z, vocs, index, quantile_cutoff=0.0):
+def constraint_function(Z, vocs, name, index):
     """
     create constraint function
-    - if a distribution of samples has a quantile level, given by `quantile_cutoff`,
-    that is infeasiable penalize the entire set of samples to make all infeasible
+    - constraint functions should return negative values for feasible values and
+    positive values for infeasible values
     """
     n_objectives = len(vocs.objectives)
+    constraint = vocs.constraints[name]
 
-    # quantile test
-    output = Z[..., n_objectives + index] + 5.0 * (
-        torch.quantile(
-            Z[..., n_objectives + index], quantile_cutoff, dim=0, keepdim=True
-        )
-        > 0
-    )
-    return output
+    if constraint[0] == "LESS_THAN":
+        return Z[..., n_objectives + index] - constraint[1]
+    elif constraint[0] == "GREATER_THAN":
+        return -(Z[..., n_objectives + index] - constraint[1])
 
 
-def create_constraint_callables(vocs, quantile_cutoff=0.5):
+def create_constraint_callables(vocs):
     if vocs.constraints is not None:
         constraint_names = list(vocs.constraints.keys())
-        n_constraints = len(constraint_names)
         constraint_callables = []
-        for i in range(n_constraints):
+        for i, name in enumerate(constraint_names):
             constraint_callables += [
                 partial(
                     constraint_function,
                     vocs=vocs,
+                    name=name,
                     index=i,
-                    quantile_cutoff=quantile_cutoff,
                 )
             ]
         return constraint_callables

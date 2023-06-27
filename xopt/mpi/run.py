@@ -8,7 +8,6 @@ from mpi4py.futures import MPICommExecutor
 
 # from mpi4py.futures import MPIPoolExecutor
 from xopt.base import Xopt
-
 from xopt.log import set_handler_with_logger
 
 comm = MPI.COMM_WORLD

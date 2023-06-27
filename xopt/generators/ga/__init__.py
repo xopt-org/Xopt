@@ -1,3 +1,3 @@
-from .cnsga import CNSGAGenerator, CNSGAOptions
+from .cnsga import CNSGAGenerator
 
-registry = {"CNSGA": (CNSGAGenerator, CNSGAOptions)}
+registry = {"CNSGA": CNSGAGenerator}

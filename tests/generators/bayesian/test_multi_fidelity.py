@@ -13,16 +13,35 @@ class TestMultiFidelityGenerator:
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
 
-        fidelity_parameter = "s"
-
-        options = MultiFidelityGenerator.default_options()
-        options.model.fidelity_parameter = fidelity_parameter
-
-        gen = MultiFidelityGenerator(vocs, options)
+        gen = MultiFidelityGenerator(vocs=vocs)
 
         # test reference point
         pt = gen.reference_point
-        assert torch.allclose(pt, torch.tensor((0.0, -10.0)).to(pt))
+        assert pt == {"s": 0.0, "y1": 100.0}
+        assert gen.vocs.objective_names == ["s", "y1"]
+
+    def test_add_data(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.constraints = {}
+
+        gen = MultiFidelityGenerator(vocs=vocs)
+
+        # add a fidelity parameter to data
+        data = deepcopy(TEST_VOCS_DATA)
+        fidelity_parameter = "s"
+        data[fidelity_parameter] = Series([1.0] * 10)
+
+        gen.add_data(data)
+
+        # try with bad data
+        bad_data = deepcopy(data)
+        bad_data[fidelity_parameter] = 10.0 * bad_data[fidelity_parameter]
+        with pytest.raises(ValueError):
+            gen.add_data(bad_data)
+
+        # try with data missing fidelity parameter
+        with pytest.raises(ValueError):
+            gen.add_data(TEST_VOCS_DATA)
 
     def test_model_creation(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -34,26 +53,12 @@ class TestMultiFidelityGenerator:
         fidelity_parameter = "s"
         data[fidelity_parameter] = Series([1.0] * 10)
 
-        options = MultiFidelityGenerator.default_options()
-        options.model.fidelity_parameter = fidelity_parameter
-
-        generator = MultiFidelityGenerator(vocs, options)
+        generator = MultiFidelityGenerator(
+            vocs=vocs, fidelity_parameter=fidelity_parameter
+        )
         generator.add_data(data)
 
         generator.train_model(generator.data)
-
-        # try to add bad data
-        bad_data = deepcopy(TEST_VOCS_DATA)
-        bad_data[fidelity_parameter] = Series([10.0] * 10)
-        generator = MultiFidelityGenerator(vocs, options)
-        with pytest.raises(ValueError):
-            generator.add_data(bad_data)
-
-        bad_data = deepcopy(TEST_VOCS_DATA)
-        bad_data[fidelity_parameter] = Series([-1.0] * 10)
-        generator = MultiFidelityGenerator(vocs, options)
-        with pytest.raises(ValueError):
-            generator.add_data(bad_data)
 
     def test_acq(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -65,11 +70,9 @@ class TestMultiFidelityGenerator:
         fidelity_parameter = "s"
         data[fidelity_parameter] = Series([1.0] * 10)
 
-        options = MultiFidelityGenerator.default_options()
-        options.model.fidelity_parameter = fidelity_parameter
-
-        generator = MultiFidelityGenerator(vocs, options)
+        generator = MultiFidelityGenerator(vocs=vocs)
         generator.add_data(data)
+        generator.train_model()
 
         acq = generator.get_acquisition(generator.model)
 
@@ -93,12 +96,10 @@ class TestMultiFidelityGenerator:
         fidelity_parameter = "s"
         data[fidelity_parameter] = Series([1.0] * 10)
 
-        options = MultiFidelityGenerator.default_options()
-        options.model.fidelity_parameter = fidelity_parameter
-        options.optim.num_restarts = 1
-        options.optim.raw_samples = 1
+        generator = MultiFidelityGenerator(vocs=vocs)
+        generator.numerical_optimizer.n_restarts = 1
+        generator.numerical_optimizer.n_raw_samples = 1
 
-        generator = MultiFidelityGenerator(vocs, options)
         generator.add_data(data)
 
         # test getting the objective

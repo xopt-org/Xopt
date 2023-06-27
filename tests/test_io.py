@@ -1,10 +1,10 @@
 from copy import copy
 
 import yaml
-from xopt.base import parse_config, state_to_dict, Xopt
 
+from xopt.base import parse_config, state_to_dict, Xopt
 from xopt.evaluator import Evaluator
-from xopt.generators import RandomGenerator
+from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML
 
 
@@ -15,11 +15,11 @@ def dummy():
 class Test_IO:
     def test_state_to_dict(self):
         evaluator = Evaluator(function=dummy)
-        generator = RandomGenerator(TEST_VOCS_BASE)
+        generator = RandomGenerator(vocs=TEST_VOCS_BASE)
 
         X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         state_dict = state_to_dict(X)
-        assert state_dict["generator"]["name"] == generator.alias
+        assert state_dict["generator"]["name"] == generator.name
 
         # read from dict
         config = parse_config(state_dict)
