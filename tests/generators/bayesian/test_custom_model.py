@@ -6,9 +6,7 @@ import torch
 from gpytorch.kernels import PeriodicKernel, ScaleKernel
 from gpytorch.means import ConstantMean
 
-from xopt.generators.bayesian.expected_improvement import (
-    ExpectedImprovementGenerator,
-)
+from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.vocs import VOCS
 
@@ -124,17 +122,14 @@ class TestCustomConstructor(TestCase):
                 trainable_mean_keys=trainable_mean_keys,
             )
             generator = ExpectedImprovementGenerator(
-                vocs=my_vocs,
-                model_constructor=model_constructor
+                vocs=my_vocs, model_constructor=model_constructor
             )
 
             # define training data to pass to the generator
             train_x = torch.tensor((0.2, 0.5))
             train_y = 1.0 * torch.cos(2 * 3.14 * train_x + 0.25)
 
-            training_data = pd.DataFrame(
-                {"x": train_x.numpy(), "y": train_y.numpy()}
-            )
+            training_data = pd.DataFrame({"x": train_x.numpy(), "y": train_y.numpy()})
 
             generator.add_data(training_data)
             model = generator.train_model()

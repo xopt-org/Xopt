@@ -1,11 +1,11 @@
-from scipy.optimize import fmin
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
+from scipy.optimize import fmin
 
 from xopt import Xopt
 from xopt.generators.scipy.neldermead import NelderMeadGenerator
-from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.resources.test_functions.rosenbrock import rosenbrock
+from xopt.resources.testing import TEST_VOCS_BASE
 
 
 class TestNelderMeadGenerator:

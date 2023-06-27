@@ -41,13 +41,15 @@ class VOCS(XoptBaseModel):
     """
 
     variables: Dict[str, conlist(float, min_items=2, max_items=2)] = Field(
-        default={}, description="input variable names with a list of minimum and "
-                                "maximum values"
+        default={},
+        description="input variable names with a list of minimum and maximum values",
     )
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
-    ] = Field(default={}, description="constraint names with a list of "
-                                      "constraint type and value")
+    ] = Field(
+        default={},
+        description="constraint names with a list of constraint type and value",
+    )
     objectives: Dict[str, ObjectiveEnum] = Field(
         default={}, description="objective names with type of objective"
     )
@@ -55,8 +57,8 @@ class VOCS(XoptBaseModel):
         default={}, description="constant names and values passed to evaluate function"
     )
     observables: List[str] = Field(
-        default=[], description="observation names tracked alongside objectives and "
-                                "constraints"
+        default=[],
+        description="observation names tracked alongside objectives and constraints",
     )
 
     class Config:
@@ -162,11 +164,11 @@ class VOCS(XoptBaseModel):
         return self.n_objectives + self.n_constraints + self.n_observables
 
     def random_inputs(
-            self,
-            n: int = None,
-            custom_bounds: dict = None,
-            include_constants: bool = True,
-            seed: int = None
+        self,
+        n: int = None,
+        custom_bounds: dict = None,
+        include_constants: bool = True,
+        seed: int = None,
     ):
         """
         Uniform sampling of the variables.
@@ -196,9 +198,7 @@ class VOCS(XoptBaseModel):
             variable_bounds = pd.DataFrame(self.variables)
             custom_bounds = pd.DataFrame(custom_bounds)
             custom_bounds = custom_bounds.clip(
-                variable_bounds.iloc[0],
-                variable_bounds.iloc[1],
-                axis=1
+                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
             )
             bounds = custom_bounds.to_dict()
             for k in bounds.keys():

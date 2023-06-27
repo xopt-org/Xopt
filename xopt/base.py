@@ -8,6 +8,7 @@ from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
+
 # from xopt.generators import get_generator_and_defaults
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -473,9 +474,7 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
 
     # create generator
     generator_class = get_generator(config["generator"].pop("name"))
-    generator = generator_class.parse_raw(
-        json.dumps({**config["generator"], "vocs": vocs.dict()})
-    )
+    generator = generator_class.parse_obj({**config["generator"], "vocs": vocs.dict()})
 
     # Create evaluator
     evaluator = Evaluator(**config["evaluator"])

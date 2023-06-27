@@ -10,3 +10,6 @@
 2023-06-20T13:55:21-0500 - __main__ - INFO - some info message
 2023-06-20T13:55:21-0500 - __main__ - DEBUG - another debug message
 2023-06-20T13:55:21-0500 - __main__ - INFO - another info message
+2023-06-27T13:20:59-0500 - __main__ - INFO - some info message
+2023-06-27T13:20:59-0500 - __main__ - DEBUG - another debug message
+2023-06-27T13:20:59-0500 - __main__ - INFO - another info message
