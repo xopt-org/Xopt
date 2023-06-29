@@ -1,6 +1,6 @@
 import os.path
 from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
@@ -33,8 +33,6 @@ class StandardModelConstructor(ModelConstructor):
     trainable_mean_keys: List[str] = Field(
         [], description="list of prior mean modules that can be trained"
     )
-    dtype: torch.dtype = Field(torch.double)
-    device: str = Field("cpu")
 
     class Config:
         arbitrary_types_allowed = True
@@ -53,15 +51,6 @@ class StandardModelConstructor(ModelConstructor):
 
         return v
 
-    @validator("dtype", pre=True)
-    def validate_dtype(cls, v):
-        if isinstance(v, str):
-            try:
-                return DECODERS[v]
-            except KeyError:
-                raise ValueError(f"cannot convert {v}")
-        return v
-
     @validator("trainable_mean_keys")
     def validate_trainable_mean_keys(cls, v, values):
         for name in v:
@@ -77,10 +66,6 @@ class StandardModelConstructor(ModelConstructor):
         else:
             return GaussianLikelihood()
 
-    @property
-    def tkwargs(self):
-        return {"dtype": self.dtype, "device": self.device}
-
     def get_input_transform(
         self, input_names: List, input_bounds: Dict[str, List] = None
     ):
@@ -90,7 +75,7 @@ class StandardModelConstructor(ModelConstructor):
             bounds = torch.vstack(
                 [torch.tensor(input_bounds[name]) for name in input_names]
             ).T
-        return Normalize(len(input_names), bounds=bounds).to(**self.tkwargs)
+        return Normalize(len(input_names), bounds=bounds)
 
     def build_model(
         self,
@@ -98,13 +83,16 @@ class StandardModelConstructor(ModelConstructor):
         outcome_names: List[str],
         data: pd.DataFrame,
         input_bounds: Dict[str, List] = None,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
         """construct independent model for each objective and constraint"""
 
         # build model
+        tkwargs = {"dtype": dtype, "device": device}
         pd.options.mode.use_inf_as_na = True
         models = []
-        input_transform = self.get_input_transform(input_names, input_bounds)
+        input_transform = self.get_input_transform(input_names, input_bounds).to(**tkwargs)
 
         for name in outcome_names:
             outcome_transform = Standardize(1)
@@ -115,8 +103,8 @@ class StandardModelConstructor(ModelConstructor):
             train_X, train_Y = self._get_training_data(input_names, name, data)
             models.append(
                 self.build_single_task_gp(
-                    train_X,
-                    train_Y,
+                    train_X.to(**tkwargs),
+                    train_Y.to(**tkwargs),
                     input_transform=input_transform,
                     outcome_transform=outcome_transform,
                     covar_module=covar_module,
@@ -150,12 +138,8 @@ class StandardModelConstructor(ModelConstructor):
         input_data = input_data[non_nans]
         outcome_data = outcome_data[non_nans]
 
-        train_X = torch.tensor(
-            input_data[~outcome_data.isnull()].to_numpy(), **self.tkwargs
-        )
-        train_Y = torch.tensor(
-            outcome_data[~outcome_data.isnull()].to_numpy(), **self.tkwargs
-        ).unsqueeze(-1)
+        train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy())
+        train_Y = torch.tensor(outcome_data[~outcome_data.isnull()].to_numpy()).unsqueeze(-1)
         return train_X, train_Y
 
     @staticmethod
