@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pandas as pd
+import torch
 from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.model import Model
@@ -34,14 +35,22 @@ class ModelConstructor(XoptBaseModel, ABC):
         outcome_names: List[str],
         data: pd.DataFrame,
         input_bounds: Dict[str, List] = None,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
         """return a trained botorch model for objectives and constraints"""
         pass
 
-    def build_model_from_vocs(self, vocs: VOCS, data: pd.DataFrame):
-        """convience wrapper around build model for use in xopt w vocs"""
+    def build_model_from_vocs(
+            self,
+            vocs: VOCS,
+            data: pd.DataFrame,
+            dtype: torch.dtype = torch.double,
+            device: Union[torch.device, str] = "cpu",
+    ):
+        """convenience wrapper around build model for use in xopt w vocs"""
         return self.build_model(
-            vocs.variable_names, vocs.output_names, data, vocs.variables
+            vocs.variable_names, vocs.output_names, data, vocs.variables, dtype, device
         )
 
     @staticmethod
