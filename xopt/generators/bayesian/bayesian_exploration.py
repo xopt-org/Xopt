@@ -8,6 +8,7 @@ from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_tr
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.objectives import create_exploration_objective
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
@@ -23,6 +24,12 @@ class BayesianExplorationGenerator(BayesianGenerator):
         )
 
         return qPV
+
+    def _get_objective(self):
+        """return exploration objective, which only captures the output of the first
+        model output"""
+
+        return create_exploration_objective(self.vocs, self._tkwargs)
 
 
 class qPosteriorVariance(MCAcquisitionFunction):
