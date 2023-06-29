@@ -33,7 +33,7 @@ class XoptOptions(XoptBaseModel):
         False, description="flag to evaluate and submit evaluations asynchronously"
     )
     strict: bool = Field(
-        False,
+        True,
         description="flag to indicate if exceptions raised during evaluation "
         "should stop Xopt",
     )
