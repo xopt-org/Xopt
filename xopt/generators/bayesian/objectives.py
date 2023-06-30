@@ -74,6 +74,17 @@ def create_mc_objective(vocs, tkwargs):
     return GenericMCObjective(obj_callable)
 
 
+def create_exploration_objective(vocs, tkwargs):
+    n_outputs = vocs.n_outputs
+    weights = torch.zeros(n_outputs).to(**tkwargs)
+    weights[0] = 1.0
+
+    def obj_callable(Z):
+        return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
+
+    return GenericMCObjective(obj_callable)
+
+
 def create_mobo_objective(vocs, tkwargs):
     """
     botorch assumes maximization so we need to negate any objectives that have
