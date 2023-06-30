@@ -59,6 +59,17 @@ class LBFGSOptimizer(NumericalOptimizer):
 
 
 class GridOptimizer(NumericalOptimizer):
+    """
+    Numerical optimizer that uses a brute-force grid search to find the optimium.
+
+    Parameters
+    ----------
+    n_grid_points: PositiveInt, optional
+        Number of mesh points per axis to sample. Algorithm time scales as
+        `n_grd_points`^`input_dimension`
+
+    """
+
     name = "grid"
     n_grid_points: PositiveInt = Field(
         10, description="number of grid points per axis used for optimization"
