@@ -1,8 +1,9 @@
-from typing import Union
 from copy import deepcopy
+from typing import Union
+
+import pandas as pd
 
 import torch
-import pandas as pd
 
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.vocs import VOCS
@@ -12,11 +13,11 @@ class TimeDependentModelConstructor(StandardModelConstructor):
     name = "time_dependent"
 
     def build_model_from_vocs(
-            self,
-            vocs: VOCS,
-            data: pd.DataFrame,
-            dtype: torch.dtype = torch.double,
-            device: Union[torch.device, str] = "cpu",
+        self,
+        vocs: VOCS,
+        data: pd.DataFrame,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ):
         # get max/min times
         min_t = data["time"].min()
@@ -24,5 +25,10 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         variable_dict = deepcopy(vocs.variables)
         variable_dict["time"] = [min_t, max_t]
         return self.build_model(
-            vocs.variable_names + ["time"], vocs.output_names, data, variable_dict, dtype, device
+            vocs.variable_names + ["time"],
+            vocs.output_names,
+            data,
+            variable_dict,
+            dtype,
+            device,
         )

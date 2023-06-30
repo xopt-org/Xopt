@@ -268,7 +268,7 @@ class Xopt:
             if self.options.strict:
                 if future.exception() is not None:
                     raise future.exception()
-                validate_outputs(outputs)
+                validate_outputs(pd.DataFrame(outputs, index=[1]))
             output_data.append(outputs)
 
         # Special handling of a vectorized futures.

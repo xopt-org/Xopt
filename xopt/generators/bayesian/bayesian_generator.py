@@ -173,7 +173,9 @@ class BayesianGenerator(Generator, ABC):
         if data.empty:
             raise ValueError("no data available to build model")
 
-        _model = self.model_constructor.build_model_from_vocs(self.vocs, data, **self._tkwargs)
+        _model = self.model_constructor.build_model_from_vocs(
+            self.vocs, data, **self._tkwargs
+        )
 
         if update_internal:
             self.model = _model
