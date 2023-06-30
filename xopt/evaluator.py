@@ -6,6 +6,7 @@ from typing import Callable, Dict
 
 import numpy as np
 import pandas as pd
+from pandas import DataFrame
 from pydantic import Field, root_validator
 
 from xopt.errors import XoptError
@@ -196,7 +197,7 @@ def process_safe_outputs(outputs: Dict):
     return o
 
 
-def validate_outputs(outputs):
+def validate_outputs(outputs: DataFrame):
     """
     Looks for Xopt errors in the outputs and raises XoptError if found.
     """

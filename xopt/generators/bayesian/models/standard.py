@@ -92,7 +92,9 @@ class StandardModelConstructor(ModelConstructor):
         tkwargs = {"dtype": dtype, "device": device}
         pd.options.mode.use_inf_as_na = True
         models = []
-        input_transform = self.get_input_transform(input_names, input_bounds).to(**tkwargs)
+        input_transform = self.get_input_transform(input_names, input_bounds).to(
+            **tkwargs
+        )
 
         for name in outcome_names:
             outcome_transform = Standardize(1)
@@ -139,7 +141,9 @@ class StandardModelConstructor(ModelConstructor):
         outcome_data = outcome_data[non_nans]
 
         train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy())
-        train_Y = torch.tensor(outcome_data[~outcome_data.isnull()].to_numpy()).unsqueeze(-1)
+        train_Y = torch.tensor(
+            outcome_data[~outcome_data.isnull()].to_numpy()
+        ).unsqueeze(-1)
         return train_X, train_Y
 
     @staticmethod
