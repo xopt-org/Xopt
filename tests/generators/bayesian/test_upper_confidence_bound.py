@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -92,3 +93,14 @@ class TestUpperConfidenceBoundGenerator:
         acqf = ucb_gen.get_acquisition(ucb_gen.model)
         with torch.no_grad():
             assert acqf(torch.tensor((-1.0, -1.0)).reshape(1, 1, 2)) >= 0.0
+
+    def test_fixed_feature(self):
+        gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
+        gen.fixed_features = {"p": 3.0}
+        gen.n_monte_carlo_samples = 1
+        gen.numerical_optimizer.n_restarts = 1
+        data = deepcopy(TEST_VOCS_DATA)
+        data["p"] = np.random.rand(len(data))
+
+        gen.add_data(data)
+        gen.generate(1)
