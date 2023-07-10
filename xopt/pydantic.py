@@ -13,10 +13,8 @@ import numpy as np
 import orjson
 import pandas as pd
 import torch.nn
-from pydantic import BaseModel, ConfigDict, create_model, Extra, Field, field_validator, \
-    model_serializer, \
-    model_validator, \
-    validator
+from pydantic import BaseModel, ConfigDict, create_model, Field, field_validator, \
+    model_serializer, model_validator, validator
 from pydantic_core.core_schema import FieldValidationInfo
 
 ObjType = TypeVar("ObjType")
@@ -405,8 +403,8 @@ class BaseExecutor(
 ):
     model_config = {'arbitrary_types_allowed': True,
                     # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
+                    # TODO: check in v2
                     'copy_on_model_validation': 'none',
-                    #'json_dumps': orjson_dumps
                     }
 
     # executor_type must comply with https://peps.python.org/pep-3148/ standard
@@ -438,7 +436,7 @@ class BaseExecutor(
         # VALIDATE SUBMIT CALLABLE AGAINST EXECUTOR TYPE
         if "submit_callable" not in values:
             # use default
-            submit_callable = cls.__fields__["submit_callable"].default
+            submit_callable = cls.model_fields["submit_callable"].default
         else:
             submit_callable = values.pop("submit_callable")
 
@@ -454,7 +452,7 @@ class BaseExecutor(
         # VALIDATE MAP CALLABLE AGAINST EXECUTOR TYPE
         if not values.get("map_callable"):
             # use default
-            map_callable = cls.__fields__["map_callable"].default
+            map_callable = cls.model_fields["map_callable"].default
         else:
             map_callable = values.pop("map_callable")
 
@@ -470,7 +468,7 @@ class BaseExecutor(
         # VALIDATE SHUTDOWN CALLABLE AGAINST EXECUTOR TYPE
         if not values.get("shutdown_callable"):
             # use default
-            shutdown_callable = cls.__fields__["shutdown_callable"].default
+            shutdown_callable = cls.model_fields["shutdown_callable"].default
         else:
             shutdown_callable = values.pop("shutdown_callable")
 
@@ -532,7 +530,7 @@ class NormalExecutor(
     def serialize(self):
         return orjson_dumps_v2(self)
 
-    # Need to verify if new style works same as 'always'
+    # TODO: verify if new style works same as 'always'
     @validator("executor", always=True)
     def validate_executor(cls, v, values):
         if v is None:

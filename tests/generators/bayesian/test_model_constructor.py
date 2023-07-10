@@ -127,10 +127,8 @@ class TestModelConstructor:
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
         constructor = StandardModelConstructor(covar_modules=custom_covar)
-        constructor.json(serialize_torch=True)
-
+        constructor.model_dump_json(serialize_torch=True)
         import os
-
         os.remove("covar_modules_y1.pt")
 
     def test_model_saving(self):
@@ -160,7 +158,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.json(serialize_torch=True))
+        options = json.loads(generator.model_dump_json(serialize_torch=True))
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -170,8 +168,8 @@ class TestModelConstructor:
             saved_options_dict = yaml.safe_load(f)
 
         # create generator from dict
-        saved_options_dict["vocs"] = my_vocs.dict()
-        loaded_generator = ExpectedImprovementGenerator.parse_raw(
+        saved_options_dict["vocs"] = my_vocs.model_dump()
+        loaded_generator = ExpectedImprovementGenerator.model_validate_json(
             json.dumps(saved_options_dict)
         )
         assert isinstance(
@@ -205,7 +203,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.json(serialize_torch=True))
+        options = json.loads(generator.model_dump_json(serialize_torch=True))
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -215,8 +213,8 @@ class TestModelConstructor:
             saved_options = yaml.safe_load(f)
 
         # create generator from file
-        saved_options["vocs"] = my_vocs.dict()
-        loaded_generator = ExpectedImprovementGenerator.parse_raw(
+        saved_options["vocs"] = my_vocs.model_dump()
+        loaded_generator = ExpectedImprovementGenerator.model_validate_json(
             json.dumps(saved_options)
         )
         for name, val in loaded_generator.model_constructor.covar_modules.items():

@@ -26,7 +26,7 @@ class TestBaxGenerator:
             vocs=deepcopy(TEST_VOCS_BASE),
             algorithm=alg,
         )
-        bax_gen.dict()
+        bax_gen.model_dump()
 
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_base_algorithm(self):
