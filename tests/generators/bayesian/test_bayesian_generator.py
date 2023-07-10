@@ -21,7 +21,7 @@ class TestBayesianGenerator(TestCase):
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_init(self):
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
-        gen.dict()
+        gen.model_dump()
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
@@ -53,7 +53,7 @@ class TestBayesianGenerator(TestCase):
         gen = deepcopy(gen)
         gen.model_constructor.covar_modules = {"y1": PeriodicKernel()}
 
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE, **gen.dict())
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
 

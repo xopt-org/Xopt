@@ -316,8 +316,9 @@ class TestObjLoader:
 
         json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
         serialized = json.dumps(loader, default=json_encoder)
+        # This works fine
         m1 = self.misc_class_loader_type.parse_raw(serialized)
-        #TODO: determine why this fails...
+        # TODO: determine why this fails...
         m2 = self.misc_class_loader_type.model_validate_json(serialized)
 
 

@@ -10,7 +10,7 @@ from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-from pydantic import Field, field_validator, validator
+from pydantic import Field, field_validator
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor

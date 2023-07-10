@@ -27,7 +27,7 @@ class TestMOBOGenerator:
         gen.n_monte_carlo_samples = 20
 
         for ele in [gen]:
-            generator = MOBOGenerator(vocs=tnk_vocs, **ele.dict())
+            generator = MOBOGenerator(vocs=tnk_vocs, **ele.model_dump())
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.random_evaluate(3)
             X.step()
