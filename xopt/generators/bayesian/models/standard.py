@@ -10,7 +10,7 @@ from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-from pydantic import Field, validator
+from pydantic import Field, field_validator, validator
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -23,7 +23,7 @@ MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
-    name = "standard"
+    name: str = "standard"
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
     )
@@ -42,7 +42,7 @@ class StandardModelConstructor(ModelConstructor):
         json_dumps = orjson_dumps
         validate_assignment = True
 
-    @validator("covar_modules", "mean_modules", pre=True)
+    @field_validator("covar_modules", "mean_modules", mode='before')
     def validate_torch_modules(cls, v):
         if not isinstance(v, dict):
             raise ValueError("must be dict")
@@ -54,7 +54,7 @@ class StandardModelConstructor(ModelConstructor):
 
         return v
 
-    @validator("trainable_mean_keys")
+    @field_validator("trainable_mean_keys")
     def validate_trainable_mean_keys(cls, v, values):
         for name in v:
             assert name in values["mean_modules"]

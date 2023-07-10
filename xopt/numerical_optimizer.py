@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import Field, PositiveInt, validator
+from pydantic import Field, PositiveInt, field_validator, validator
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -22,7 +22,7 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
 
 class LBFGSOptimizer(NumericalOptimizer):
-    name = "LBFGS"
+    name: str = "LBFGS"
     n_raw_samples: PositiveInt = Field(
         20,
         description="number of raw samples used to seed optimization",
@@ -35,7 +35,7 @@ class LBFGSOptimizer(NumericalOptimizer):
     class Config:
         validate_assignment = True
 
-    @validator("n_restarts")
+    @field_validator("n_restarts")
     def validate_num_restarts(cls, v: int, values):
         if v > values["n_raw_samples"]:
             raise ValueError(
@@ -70,7 +70,7 @@ class GridOptimizer(NumericalOptimizer):
 
     """
 
-    name = "grid"
+    name: str = "grid"
     n_grid_points: PositiveInt = Field(
         10, description="number of grid points per axis used for optimization"
     )

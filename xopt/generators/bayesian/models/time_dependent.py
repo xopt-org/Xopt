@@ -10,7 +10,7 @@ from xopt.vocs import VOCS
 
 
 class TimeDependentModelConstructor(StandardModelConstructor):
-    name = "time_dependent"
+    name: str = "time_dependent"
 
     def build_model(
         self,

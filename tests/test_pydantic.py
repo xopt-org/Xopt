@@ -1,13 +1,15 @@
 import json
+import typing
 from functools import partial
 from types import FunctionType, MethodType
 
 import pytest
+from pydantic import model_validator
 from pydantic.json import custom_pydantic_encoder
 
 from xopt.pydantic import (
     CallableModel,
-    get_callable_from_string,
+    ObjLoaderMinimal, get_callable_from_string,
     JSON_ENCODERS,
     ObjLoader,
     validate_and_compose_signature,
@@ -314,4 +316,21 @@ class TestObjLoader:
 
         json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
         serialized = json.dumps(loader, default=json_encoder)
-        self.misc_class_loader_type.parse_raw(serialized)
+        m1 = self.misc_class_loader_type.parse_raw(serialized)
+        #TODO: determine why this fails...
+        m2 = self.misc_class_loader_type.model_validate_json(serialized)
+
+
+
+
+class TestObjLoaderMinimal:
+    misc_class_loader_type = ObjLoaderMinimal[MiscClass]
+
+    def test_serialize_loader(self):
+        import pydantic
+        print(pydantic.version.version_info())
+        loader = self.misc_class_loader_type()
+        json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
+        serialized = json.dumps(loader, default=json_encoder)
+        print(serialized)
+        self.misc_class_loader_type.model_validate_json(serialized)

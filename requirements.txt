@@ -5,7 +5,7 @@ torch
 botorch
 gpytorch
 pandas
-pydantic==1.10.9
+pydantic>=2.0.2
 ipywidgets
 tqdm
 orjson

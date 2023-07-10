@@ -94,7 +94,7 @@ class Xopt:
         logger.debug(f"Xopt initialized with evaluator: {self._evaluator}")
 
         self.options = options or XoptOptions()
-        logger.debug(f"Xopt initialized with options: {self.options.dict()}")
+        logger.debug(f"Xopt initialized with options: {self.options.model_dump()}")
 
         # add data to xopt object and generator
         self._new_data = pd.DataFrame()
@@ -478,7 +478,7 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
 
     # create generator
     generator_class = get_generator(config["generator"].pop("name"))
-    generator = generator_class.parse_obj({**config["generator"], "vocs": vocs.dict()})
+    generator = generator_class.parse_obj({**config["generator"], "vocs": vocs.model_dump()})
 
     # Create evaluator
     evaluator = Evaluator(**config["evaluator"])
@@ -493,7 +493,7 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     }
 
 
-def state_to_dict(X, include_data=True, serialize_torch=False):
+def state_to_dict(X: Xopt, include_data=True, serialize_torch=False):
     # dump data to dict with config metadata
     output = {
         "xopt": json.loads(X.options.json()),
