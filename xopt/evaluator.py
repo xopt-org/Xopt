@@ -7,7 +7,7 @@ from typing import Callable, Dict
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from pydantic import Field, root_validator
+from pydantic import Field, model_validator, root_validator
 
 from xopt.errors import XoptError
 from xopt.pydantic import NormalExecutor, XoptBaseModel
@@ -51,7 +51,7 @@ class Evaluator(XoptBaseModel):
 
         arbitrary_types_allowed = True
 
-    @root_validator(pre=True)
+    @model_validator(mode='before')
     def validate_all(cls, values):
         f = get_function(values["function"])
         kwargs = values.get("function_kwargs", {})

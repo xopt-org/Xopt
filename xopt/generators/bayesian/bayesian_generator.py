@@ -3,7 +3,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List
+from typing import ClassVar, Dict, List
 
 import pandas as pd
 import torch
@@ -12,9 +12,8 @@ from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, validator
+from pydantic import Field, field_validator, validator
 from torch import Tensor
-
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
@@ -37,11 +36,11 @@ logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
-    name = "base_bayesian_generator"
+    name: ClassVar[str] = "base_bayesian_generator"
     model: Model = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
-    n_monte_carlo_samples = Field(
+    n_monte_carlo_samples: int = Field(
         128, description="number of monte carlo samples to use"
     )
     turbo_controller: TurboController = Field(
@@ -68,7 +67,7 @@ class BayesianGenerator(Generator, ABC):
     )
     n_candidates: int = 1
 
-    @validator("model_constructor", pre=True)
+    @field_validator("model_constructor", mode='before')
     def validate_model_constructor(cls, value):
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
@@ -89,7 +88,7 @@ class BayesianGenerator(Generator, ABC):
 
         return value
 
-    @validator("numerical_optimizer", pre=True)
+    @field_validator("numerical_optimizer", mode='before')
     def validate_numerical_optimizer(cls, value):
         optimizer_dict = {"grid": GridOptimizer, "LBFGS": LBFGSOptimizer}
         if value is None:
@@ -109,7 +108,7 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError(f"{value} not found")
         return value
 
-    @validator("turbo_controller", pre=True)
+    @field_validator("turbo_controller", mode='before')
     def validate_turbo_controller(cls, value, values):
         """note default behavior is no use of turbo"""
         optimizer_dict = {

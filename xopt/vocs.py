@@ -29,8 +29,8 @@ class ConstraintEnum(str, Enum):
     # Allow any case
     @classmethod
     def _missing_(cls, name):
-        for member in cls:
-            if member.name.lower() == name.lower():
+        for member in cls.__members__:
+            if member.lower() == name.lower():
                 return member
 
 
@@ -40,12 +40,12 @@ class VOCS(XoptBaseModel):
     to describe optimization problems.
     """
 
-    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = Field(
+    variables: Dict[str, conlist(float, min_length=2, max_length=2)] = Field(
         default={},
         description="input variable names with a list of minimum and maximum values",
     )
     constraints: Dict[
-        str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
+        str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
     ] = Field(
         default={},
         description="constraint names with a list of constraint type and value",
@@ -67,10 +67,10 @@ class VOCS(XoptBaseModel):
 
     @classmethod
     def from_yaml(cls, yaml_text):
-        return cls.parse_obj(yaml.safe_load(yaml_text))
+        return cls.model_validate(yaml.safe_load(yaml_text), strict=True)
 
     def as_yaml(self):
-        return yaml.dump(self.dict(), default_flow_style=None, sort_keys=False)
+        return yaml.dump(self.model_dump(), default_flow_style=None, sort_keys=False)
 
     @property
     def bounds(self):
