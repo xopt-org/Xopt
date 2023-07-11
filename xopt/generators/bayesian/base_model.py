@@ -7,6 +7,7 @@ from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.model import Model
 from gpytorch import ExactMarginalLogLikelihood
+from pydantic import ConfigDict
 from torch import Tensor
 
 from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
@@ -25,8 +26,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
     name: ClassVar[str] = None
 
-    class Config:
-        validate_assignment = True
+    model_config = ConfigDict(validate_assignment=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

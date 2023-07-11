@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from xopt.pydantic import XoptBaseModel
 
@@ -28,5 +28,5 @@ class OptimizationOptions(XoptBaseModel):
     )
     first_call: bool = Field(False, exclude=True)
 
-    class Config:
-        validate_assignment = True
+    model_config = ConfigDict(validate_assignment=True)
+

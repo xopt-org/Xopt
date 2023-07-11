@@ -13,6 +13,13 @@ def dummy():
 
 
 class Test_IO:
+    def test_options_to_dict(self):
+        evaluator = Evaluator(function=dummy)
+        generator = RandomGenerator(vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        print(X.options.serialize_json())
+        print(X.options.serialize_json(base_key='bk'))
+
     def test_state_to_dict(self):
         evaluator = Evaluator(function=dummy)
         generator = RandomGenerator(vocs=TEST_VOCS_BASE)
@@ -20,6 +27,7 @@ class Test_IO:
         X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         state_dict = state_to_dict(X)
         assert state_dict["generator"]["name"] == generator.name
+        print(state_dict)
 
         # read from dict
         config = parse_config(state_dict)

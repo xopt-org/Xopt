@@ -3,7 +3,8 @@ from typing import ClassVar
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import Field, PositiveInt, field_validator, validator
+from pydantic import ConfigDict, Field, PositiveInt, field_validator
+from pydantic_core.core_schema import FieldValidationInfo
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -12,8 +13,7 @@ from xopt.pydantic import XoptBaseModel
 class NumericalOptimizer(XoptBaseModel, ABC):
     name: ClassVar[str] = "base"
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
     def optimize(self, function, bounds, n_candidates=1):
@@ -33,12 +33,11 @@ class LBFGSOptimizer(NumericalOptimizer):
     )
     max_iter: PositiveInt = Field(2000)
 
-    class Config:
-        validate_assignment = True
+    model_config = ConfigDict(validate_assignment=True)
 
     @field_validator("n_restarts")
-    def validate_num_restarts(cls, v: int, values):
-        if v > values["n_raw_samples"]:
+    def validate_num_restarts(cls, v: int, info: FieldValidationInfo):
+        if v > info.data["n_raw_samples"]:
             raise ValueError(
                 "num_restarts cannot be greater than number of " "raw_samples"
             )
