@@ -13,7 +13,7 @@ import numpy as np
 import orjson
 import pandas as pd
 import torch.nn
-from pydantic import BaseModel, ConfigDict, create_model, Field, field_validator, \
+from pydantic import BaseModel, ConfigDict, create_model, Field, field_serializer, field_validator, \
     model_serializer, model_validator, validator
 from pydantic_core.core_schema import FieldValidationInfo
 
@@ -162,11 +162,7 @@ def process_torch_module(module, name):
 
 
 class XoptBaseModel(BaseModel):
-    model_config = {'extra': 'forbid',
-                    'json_dumps': orjson_dumps,
-                    'json_loads': orjson_loads,
-                    'arbitrary_types_allowed': True
-                    }
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
     @field_validator("*", mode='before')
     def validate_files(cls, value, info: FieldValidationInfo):
@@ -177,6 +173,12 @@ class XoptBaseModel(BaseModel):
                     value = torch.load(value)
 
         return value
+
+    @model_serializer(mode='plain', when_used='json', return_type='str')
+    def serialize(self):
+        return orjson_dumps_v2(self)
+
+    #TODO: implement json load parsing on main object (json_loads is gone)
 
     # @model_validator(mode='before')
     # def validate_files(cls, values):
@@ -216,10 +218,7 @@ class CallableModel(BaseModel):
     callable: Callable
     signature: BaseModel
 
-    model_config = {
-        'arbitrary_types_allowed': True,
-        'extra': 'forbid'
-    }
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
     def serialize(self):
@@ -291,11 +290,10 @@ class ObjLoader(
         BaseModel,
         Generic[ObjType],
 ):
-    model_config = {'arbitrary_types_allowed': True,
-                    }
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     object: Optional[ObjType] = None
     loader: CallableModel = None
-    object_type: type#Optional[type] = None
+    object_type: Optional[type] = None
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
     def serialize(self):
@@ -368,31 +366,35 @@ class ObjLoader(
             return self.loader()
 
 
+# For testing
 class ObjLoaderMinimal(
         BaseModel,
         Generic[ObjType],
 ):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     object: Optional[ObjType] = None
-    #object_type: Optional[type] = None
-    object_type: type
-
-    # @model_serializer(mode='plain', when_used='json', return_type='str')
-    # def serialize(self):
-    #     return orjson_dumps_v2(self)
+    object_type: Optional[type] = None
 
     @model_validator(mode='before')
     def validate_all(cls, values):
+        print('model validator before: ', values)
         annotation = cls.model_fields["object"].annotation
         inner_types = typing.get_args(annotation)
         obj_type = inner_types[0]
-        print(obj_type)
+        print(f'{obj_type=}')
         return {"object_type": obj_type}
 
     @model_validator(mode='after')
     def validate_print(cls, values):
-        print(values)
+        print('model validator after: ', values)
         return values
+
+    @field_serializer('object_type', when_used='json')
+    def serialize_object_type(self, x):
+        print('object_type serializer', x)
+        if x is None:
+            return x
+        return f"{x.__module__}.{x.__name__}"
 
 
 # COMMON BASE FOR EXECUTORS
