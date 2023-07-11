@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import ClassVar, Dict, List, Union
 
 import pandas as pd
 import torch
@@ -23,7 +23,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
     """
 
-    name: str = None
+    name: ClassVar[str] = None
 
     class Config:
         validate_assignment = True

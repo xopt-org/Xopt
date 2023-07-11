@@ -1,6 +1,6 @@
 import os.path
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Union
 
 import pandas as pd
 import torch
@@ -23,7 +23,7 @@ MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
-    name: str = "standard"
+    name: ClassVar[str] = "standard"
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
     )
