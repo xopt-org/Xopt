@@ -4,10 +4,15 @@ import inspect
 import sys
 import time
 import traceback
+from copy import deepcopy
+
+from typing import Type
 
 import pandas as pd
 import torch
 import yaml
+
+from xopt.generator import Generator
 
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
@@ -149,6 +154,38 @@ def safe_call(func, *args, **kwargs):
 def format_option_descriptions(options_object):
     options_dict = get_descriptions_defaults(options_object)
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
+
+
+def copy_generator(generator: Type[Generator]) -> Type[Generator]:
+    """
+    Create a deep copy of a given generator.
+    Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
+
+    Parameters
+    ----------
+    generator : Generator
+
+    Returns
+    -------
+    generator_copy : Generator
+    list_of_fields_on_gpu : list[str]
+    """
+
+    generator_copy = deepcopy(generator)
+    generator_copy_dict = generator_copy.dict()
+    list_of_fields_on_gpu = []
+
+    for field_name, field_value in generator_copy_dict.items():
+        if isinstance(field_value, torch.Tensor):
+            if field_value.device.type == "cuda":
+                generator_copy_dict[field_name] = field_value.cpu()
+                list_of_fields_on_gpu.append(field_name)
+        elif isinstance(field_value, torch.nn.Module):
+            if field_value.device.type == "cuda":
+                generator_copy_dict[field_name] = field_value.cpu()
+                list_of_fields_on_gpu.append(field_name)
+
+    return generator_copy, list_of_fields_on_gpu
 
 
 def read_xopt_csv(*files):
