@@ -170,7 +170,6 @@ def copy_generator(generator: Type[Generator]) -> Type[Generator]:
     generator_copy : Generator
     list_of_fields_on_gpu : list[str]
     """
-
     generator_copy = deepcopy(generator)
     generator_copy_dict = generator_copy.dict()
     list_of_fields_on_gpu = []
