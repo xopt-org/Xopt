@@ -1,10 +1,9 @@
 import json
-import typing
 from functools import partial
 from types import FunctionType, MethodType
 
 import pytest
-from pydantic import ValidationError, model_validator
+from pydantic import ValidationError
 from pydantic.json import custom_pydantic_encoder
 
 from xopt.pydantic import (

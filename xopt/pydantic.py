@@ -85,7 +85,7 @@ def recursive_serialize_v2(v, base_key=""):
 
     # This will iterate model fields
     for key, value in dict(v).items():
-        #print(f'{v=} {key=} {value=}')
+        # print(f'{v=} {key=} {value=}')
         if isinstance(value, dict):
             v[key] = recursive_serialize(value, base_key=key)
         elif isinstance(value, torch.nn.Module):
@@ -93,7 +93,7 @@ def recursive_serialize_v2(v, base_key=""):
         elif isinstance(value, torch.dtype):
             v[key] = str(value)
         elif isinstance(value, BaseModel):
-            #v[key] = value.model_dump_json()
+            # v[key] = value.model_dump_json()
             v[key] = recursive_serialize(value, base_key=key)
         else:
             for _type, func in JSON_ENCODERS.items():
@@ -127,21 +127,6 @@ def recursive_deserialize(v: dict):
 
     return v
 
-def recursive_deserialize_v2(v: dict):
-    """deserialize strings from xopt outputs"""
-    for key, value in v.items():
-        # process dicts
-        if isinstance(value, dict):
-            v[key] = recursive_deserialize(value)
-
-        elif isinstance(value, str):
-            if value in DECODERS:
-                v[key] = DECODERS[value]
-
-    return v
-
-
-# define custom json_dumps using orjson
 
 def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False):
     # from main v1 deprecated section
@@ -152,6 +137,7 @@ def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False):
 def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False):
     v = recursive_serialize(v.model_dump(), base_key=base_key, serialize_torch=serialize_torch)
     return orjson.dumps(v, default=default).decode()
+
 
 def orjson_loads(v, default=None):
     v = orjson.loads(v)
@@ -191,7 +177,7 @@ class XoptBaseModel(BaseModel):
     def serialize_json(self, base_key=""):
         return orjson_dumps(self, base_key=base_key)
 
-    #TODO: implement json load parsing on main object (json_loads is gone)
+    # TODO: implement json load parsing on main object (json_loads is gone)
 
     # @model_validator(mode='before')
     # def validate_files(cls, values):
@@ -205,6 +191,7 @@ class XoptBaseModel(BaseModel):
     #                 if extension == "pt":
     #                     values[field_name] = torch.load(value)
     #     return values
+
 
 def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
@@ -315,9 +302,9 @@ class ObjLoader(
     @model_validator(mode='before')
     def validate_all(cls, values):
         # inspect class init signature
-        #obj_type = cls.__fields__["object"].type_
+        # obj_type = cls.__fields__["object"].type_
         # In v1, could access type_ to get resolved inner type
-        # See https://stackoverflow.com/questions/75165745/cannot-determine-if-type-of-field-in-a-pydantic-model-is-of-type-list
+        # See https://stackoverflow.com/questions/75165745
 
         # In v2, how to do this is unclear - internals have changed
         # TODO: redo this hack
@@ -439,7 +426,7 @@ class BaseExecutor(
 
     @model_validator(mode='before')
     def validate_all(cls, values):
-        #TODO: better solution
+        # TODO: better solution
         executor_type = typing.get_args(cls.model_fields["executor"].annotation)[0]
 
         # executor_type = cls.__fields__[
@@ -541,7 +528,7 @@ class NormalExecutor(
         Generic[ObjType],
 ):
     model_config = {'arbitrary_types_allowed': True,
-                    #'json_dumps': orjson_dumps,
+                    # 'json_dumps': orjson_dumps,
                     }
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
