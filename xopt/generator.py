@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 import pandas as pd
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -35,8 +35,7 @@ class Generator(XoptBaseModel, ABC):
     #     # do vocs first
     #     return v
 
-    class Config:
-        validate_assignment = True
+    model_config = ConfigDict(validate_assignment=True)
 
     def __init__(self, **kwargs):
         """

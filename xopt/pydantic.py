@@ -5,6 +5,7 @@ import logging
 import os.path
 import typing
 from concurrent.futures import Future
+from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
@@ -15,6 +16,7 @@ import pandas as pd
 import torch.nn
 from pydantic import BaseModel, ConfigDict, create_model, Field, field_serializer, field_validator, \
     model_serializer, model_validator, validator
+from pydantic.v1.json import custom_pydantic_encoder
 from pydantic_core.core_schema import FieldValidationInfo
 
 ObjType = TypeVar("ObjType")
@@ -36,6 +38,14 @@ JSON_ENCODERS = {
     # torch.Tensor: lambda x: x.detach().cpu().numpy().tolist(),
 }
 
+# The problem with v2 serialization is that model_serialize_json() does not accept kwargs
+# meaning whichever model method is decorated with @model_serializer cant adjust for 'base_key'
+# and other similar options - it renders whole v2 scheme quite useless. We can still try
+# to use @field_serializer, but there is a lack of documentation on how to call these
+# handlers from a custom function.
+
+# Pydantic v2 will by default serialize submodels as annotated types, dropping subclass attributes
+# TODO: modify nested models to use SerializeAsAny when we get there
 
 def recursive_serialize(v, base_key="", serialize_torch=False):
     for key in list(v):
@@ -74,15 +84,17 @@ def recursive_serialize_v2(v, base_key=""):
     #We don't want that, so need to modify things to SerializeAsAny later
 
     # This will iterate model fields
-    for key, value in v.items():
+    for key, value in dict(v).items():
+        #print(f'{v=} {key=} {value=}')
         if isinstance(value, dict):
-            v[key] = recursive_serialize(value, key)
+            v[key] = recursive_serialize(value, base_key=key)
         elif isinstance(value, torch.nn.Module):
             v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
         elif isinstance(value, torch.dtype):
             v[key] = str(value)
         elif isinstance(value, BaseModel):
-            recursive_serialize_v2(value, key)
+            #v[key] = value.model_dump_json()
+            v[key] = recursive_serialize(value, base_key=key)
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(value, _type):
@@ -92,7 +104,8 @@ def recursive_serialize_v2(v, base_key=""):
         # if not use a generic serializer
         try:
             json.dumps(v[key])
-        except (TypeError, OverflowError):
+        except (TypeError, OverflowError) as ex:
+            print(ex)
             v[key] = f"{v[key].__module__}.{v[key].__class__.__qualname__}"
 
     return v
@@ -129,16 +142,16 @@ def recursive_deserialize_v2(v: dict):
 
 
 # define custom json_dumps using orjson
-def orjson_dumps(v, *, default, base_key="", serialize_torch=False):
-    v = recursive_serialize(v, base_key=base_key, serialize_torch=serialize_torch)
-    # orjson.dumps returns bytes, to match standard json.dumps we need to decode
+
+def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False):
+    # from main v1 deprecated section
+    # TODO: replace with custom rules, or maybe orjson supports enough?
+    json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
+    return orjson_dumps_custom(v, default=json_encoder, base_key=base_key, serialize_torch=serialize_torch)
+
+def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False):
+    v = recursive_serialize(v.model_dump(), base_key=base_key, serialize_torch=serialize_torch)
     return orjson.dumps(v, default=default).decode()
-
-
-def orjson_dumps_v2(v: BaseModel, base_key=""):
-    v = recursive_serialize_v2(v, base_key=base_key)
-    return orjson.dumps(v).decode()
-
 
 def orjson_loads(v, default=None):
     v = orjson.loads(v)
@@ -175,8 +188,8 @@ class XoptBaseModel(BaseModel):
         return value
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
-    def serialize(self):
-        return orjson_dumps_v2(self)
+    def serialize_json(self, base_key=""):
+        return orjson_dumps(self, base_key=base_key)
 
     #TODO: implement json load parsing on main object (json_loads is gone)
 
@@ -222,7 +235,7 @@ class CallableModel(BaseModel):
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
     def serialize(self):
-        return orjson_dumps_v2(self)
+        return orjson_dumps(self)
 
     @model_validator(mode='before')
     def validate_all(cls, values):
@@ -296,8 +309,8 @@ class ObjLoader(
     object_type: Optional[type] = None
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
-    def serialize(self):
-        return orjson_dumps_v2(self)
+    def serialize(self) -> str:
+        return orjson_dumps(self)
 
     @model_validator(mode='before')
     def validate_all(cls, values):
@@ -350,10 +363,10 @@ class ObjLoader(
         #    )
         return {"object_type": obj_type, "loader": loader}
 
-    @model_validator(mode='after')
-    def validate_print(cls, values):
-        print(values)
-        return values
+    # @model_validator(mode='after')
+    # def validate_print(cls, values):
+    #     print(values)
+    #     return values
 
     def load(self, store: bool = False):
         # store object reference on loader
@@ -415,20 +428,23 @@ class BaseExecutor(
     # This is a utility field not included in reps. The typing lib has opened
     # issues on access of generic type within class.
     # This tracks for if-necessary future use.
-    executor_type: type = Field(None, exclude=True)
+    executor_type: Optional[type] = Field(None, exclude=True)
     submit_callable: str = "submit"
     map_callable: str = "map"
     shutdown_callable: str = "shutdown"
 
-    # executor will not be explicitely serialized, but loaded using loader with class
+    # executor will not be explicitly serialized, but loaded using loader with class
     # and kwargs
     executor: Optional[ObjType] = None
 
     @model_validator(mode='before')
     def validate_all(cls, values):
-        executor_type = cls.__fields__[
-            "executor"
-        ].type_  # introspect fields to get type
+        #TODO: better solution
+        executor_type = typing.get_args(cls.model_fields["executor"].annotation)[0]
+
+        # executor_type = cls.__fields__[
+        #     "executor"
+        # ].type_  # introspect fields to get type
 
         # check if executor provided
         executor = values.get("executor")
@@ -530,7 +546,7 @@ class NormalExecutor(
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
     def serialize(self):
-        return orjson_dumps_v2(self)
+        return orjson_dumps(self)
 
     # TODO: verify if new style works same as 'always'
     @validator("executor", always=True)

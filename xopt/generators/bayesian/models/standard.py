@@ -10,7 +10,7 @@ from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_serializer
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -37,10 +37,11 @@ class StandardModelConstructor(ModelConstructor):
         [], description="list of prior mean modules that can be trained"
     )
 
-    class Config:
-        arbitrary_types_allowed = True
-        json_dumps = orjson_dumps
-        validate_assignment = True
+    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
+
+    @model_serializer(mode='plain', when_used='json', return_type='str')
+    def serialize(self) -> str:
+        return orjson_dumps(self)
 
     @field_validator("covar_modules", "mean_modules", mode='before')
     def validate_torch_modules(cls, v):

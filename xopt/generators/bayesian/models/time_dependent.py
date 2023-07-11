@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict, List, Union
+from typing import ClassVar, Union
 
 import pandas as pd
 import torch
@@ -10,7 +10,7 @@ from xopt.vocs import VOCS
 
 
 class TimeDependentModelConstructor(StandardModelConstructor):
-    name: str = "time_dependent"
+    name: ClassVar[str] = "time_dependent"
 
     def build_model(
         self,
