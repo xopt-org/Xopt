@@ -138,6 +138,12 @@ class Xopt:
             validate_outputs(output_data)
         new_data = pd.concat([input_data, output_data], axis=1)
 
+        # explode any list like results if all of the output names exist
+        try:
+            new_data = new_data.explode(self.vocs.output_names)
+        except KeyError:
+            pass
+
         self.add_data(new_data)
         return new_data
 
@@ -287,6 +293,12 @@ class Xopt:
 
         # Form completed evaluation
         new_data = pd.concat([input_data_done, output_data], axis=1)
+
+        # explode any list like results if all of the output names exist
+        try:
+            new_data = new_data.explode(self.vocs.output_names)
+        except KeyError:
+            pass
 
         # Add to internal dataframes
         self.add_data(new_data)
