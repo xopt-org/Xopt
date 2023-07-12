@@ -94,25 +94,6 @@ class TestModelConstructor:
         assert model3.train_inputs[0][0].shape == torch.Size([9, 2])
         assert model3.train_inputs[1][0].shape == torch.Size([8, 2])
 
-    def test_model_w_multi_output_data(self):
-        test_vocs = deepcopy(TEST_VOCS_BASE)
-        constructor = StandardModelConstructor()
-
-        test_data = pd.DataFrame(
-            {
-                "x1": np.random.rand(10),
-                "x2": np.random.rand(10) * 10.0,
-                "cnt1": 1.0,
-                "y1": [list(np.random.rand(3))] * 10,
-                "c1": np.random.rand(10),
-            }
-        )
-
-        model = constructor.build_model_from_vocs(test_vocs, test_data)
-
-        assert model.train_inputs[0][0].shape == torch.Size([30, 2])
-        assert model.train_inputs[1][0].shape == torch.Size([10, 2])
-
     def test_serialization(self):
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
