@@ -1,9 +1,10 @@
 import json
 from functools import partial
 from types import FunctionType, MethodType
+from typing import Optional, Union
 
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, ValidationError, field_validator
 from pydantic.json import custom_pydantic_encoder
 
 from xopt.pydantic import (
@@ -351,8 +352,39 @@ class Dummy(BaseModel):
         assert isinstance(value, DummyObj)
         return value
 
+
+# Test subclass model resolution order
+
+class Parent(BaseModel):
+    a1: str = 'a1'
+
+
+class Child1(Parent):
+    name: str = 'child1'
+
+
+class Child2(Parent):
+    name: str = 'child2'
+
+
+class Container(BaseModel):
+    obj: SerializeAsAny[Optional[Parent]] = Field(None)
+    obj2: SerializeAsAny[Optional[Union[Child1,Child2,Parent]]] = Field(None)
+
+
 class TestPydanticInitialization:
     def test_object_init(self):
         d = Dummy()
         assert isinstance(d.default_obj, DummyObj)
 
+    def test_subclass_init(self):
+        c1 = Container()
+        print('c1', c1.model_dump())
+        c2 = Container(obj=Child2())
+        print('c2', c2.model_dump())
+        # doesn't resolve child1
+        c3 = Container(**{'obj': {'a1': 'a1', 'name': 'child1'}})
+        print(type(c3.obj), type(c3.obj2), c3)
+        # works
+        c4 = Container(**{'obj2': {'a1': 'a1', 'name': 'child1'}})
+        print(type(c4.obj), type(c4.obj2), c4)

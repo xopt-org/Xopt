@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import torch
 from botorch.optim import optimize_acqf
@@ -11,8 +11,7 @@ from xopt.pydantic import XoptBaseModel
 
 
 class NumericalOptimizer(XoptBaseModel, ABC):
-    name: ClassVar[str] = "base"
-
+    name: str
     model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
@@ -23,7 +22,8 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
 
 class LBFGSOptimizer(NumericalOptimizer):
-    name: ClassVar[str] = "LBFGS"
+    name: str = Field("LBFGS", frozen=True)
+    name2: Literal['test'] = 'test2'
     n_raw_samples: PositiveInt = Field(
         20,
         description="number of raw samples used to seed optimization",
@@ -70,7 +70,8 @@ class GridOptimizer(NumericalOptimizer):
 
     """
 
-    name: ClassVar[str] = "grid"
+    name: str = Field("grid", frozen=True)
+    name3: Literal['test'] = "test"
     n_grid_points: PositiveInt = Field(
         10, description="number of grid points per axis used for optimization"
     )

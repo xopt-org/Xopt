@@ -4,13 +4,14 @@ from typing import Union
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
+from pydantic import Field
 
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.vocs import VOCS
 
 
 class TimeDependentModelConstructor(StandardModelConstructor):
-    name = "time_dependent"
+    name: str = Field("time_dependent", frozen=True)
 
     def build_model(
         self,
