@@ -23,11 +23,14 @@ class TestMOBOGenerator:
         reference_point = {"y1": 1.5, "y2": 1.5}
 
         gen = MOBOGenerator(vocs=tnk_vocs, reference_point=reference_point)
+        print(gen.model_dump())
         gen = deepcopy(gen)
         gen.n_monte_carlo_samples = 20
 
         for ele in [gen]:
-            generator = MOBOGenerator(vocs=tnk_vocs, **ele.model_dump())
+            dump = ele.model_dump()
+            print(dump)
+            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.random_evaluate(3)
             X.step()

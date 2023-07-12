@@ -40,9 +40,6 @@ class ExtremumSeekingGenerator(Generator):
     _last_input: np.array = None  # 1d numpy array
     _last_outcome: float = None
 
-    class Config:
-        underscore_attrs_are_private = True
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

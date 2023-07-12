@@ -23,7 +23,7 @@ MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
-    name: ClassVar[str] = "standard"
+    name = "standard"
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
     )
@@ -39,9 +39,9 @@ class StandardModelConstructor(ModelConstructor):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    @model_serializer(mode='plain', when_used='json', return_type='str')
-    def serialize(self) -> str:
-        return orjson_dumps(self)
+    # @model_serializer(mode='plain', when_used='json', return_type='str')
+    # def serialize(self) -> str:
+    #     return orjson_dumps(self)
 
     @field_validator("covar_modules", "mean_modules", mode='before')
     def validate_torch_modules(cls, v):

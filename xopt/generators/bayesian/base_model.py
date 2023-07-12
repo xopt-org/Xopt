@@ -24,7 +24,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
     """
 
-    name: ClassVar[str] = None
+    name: ClassVar[str]
 
     model_config = ConfigDict(validate_assignment=True)
 

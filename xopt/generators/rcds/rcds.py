@@ -3,6 +3,7 @@ import math
 
 import numpy as np
 import pandas as pd
+from pydantic import ConfigDict
 from pydantic.types import PositiveFloat
 
 from xopt.generator import Generator
@@ -426,10 +427,8 @@ class RCDSGenerator(Generator):
     _rcds: RCDS = None
     _generator = None
 
-    class Config:
-        arbitrary_types_allowed = True
-        validate_assignment = True
-        underscore_attrs_are_private = True
+    model_config = ConfigDict(arbitrary_types_allowed=True,
+                              validate_assignment=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
