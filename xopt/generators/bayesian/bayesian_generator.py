@@ -3,7 +3,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
@@ -35,27 +35,32 @@ from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOpt
 
 logger = logging.getLogger()
 
+# It seems pydantic v2 does not auto-register models anymore
+# So one option is to have explicit unions for model subclasses, like here
+# The other is to define a descriminated union with name as key, but that stops name field from
+# getting exported, and we want to keep it for readability
+T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
 
 class BayesianGenerator(Generator, ABC):
     name = "base_bayesian_generator"
-    model: Model = Field(
+    model: Optional[Model] = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
     n_monte_carlo_samples: int = Field(
         128, description="number of monte carlo samples to use"
     )
-    turbo_controller: SerializeAsAny[TurboController] = Field(
+    turbo_controller: SerializeAsAny[Optional[TurboController]] = Field(
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
     model_constructor: SerializeAsAny[ModelConstructor] = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
-    numerical_optimizer: SerializeAsAny[NumericalOptimizer] = Field(
+    numerical_optimizer: SerializeAsAny[T_NumericalOptimizer] = Field(
         LBFGSOptimizer(),
         description="optimizer used to optimize the acquisition " "function",
     )
-    max_travel_distances: List[float] = Field(
+    max_travel_distances: Optional[List[float]] = Field(
         None,
         description="limits for travel distance between points in normalized space",
     )
@@ -81,7 +86,9 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name = value.pop("name")
+            #name = value.pop("name")
+            # name is ClassVar, not instance field
+            name = cls.name
             if name in constructor_dict:
                 value = constructor_dict[name](**value)
             else:
@@ -102,7 +109,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name = value.pop("name")
+            name = cls.name
             if name in optimizer_dict:
                 value = optimizer_dict[name](**value)
             else:

@@ -23,7 +23,7 @@ MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
-    name = "standard"
+    name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
     )
