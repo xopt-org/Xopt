@@ -354,7 +354,7 @@ class Dummy(BaseModel):
 
 
 # Test subclass model resolution order
-
+# we want behavior like v1 had https://github.com/pydantic/pydantic/issues/1932
 class Parent(BaseModel):
     a1: str = 'a1'
 

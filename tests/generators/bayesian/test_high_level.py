@@ -1,6 +1,8 @@
+import os
 from copy import deepcopy
 
 import pandas as pd
+import pytest
 import torch
 import yaml
 
@@ -121,8 +123,6 @@ class TestHighLevel:
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
 
-        import os
-
         os.remove("mobo_model.pt")
         os.remove("dump.yml")
 
@@ -162,3 +162,15 @@ class TestHighLevel:
         import os
 
         os.remove("dump.yml")
+        
+    @pytest.fixture(autouse=True)
+    def clean_up(self):
+        yield
+
+        # this runs after all tests, if some fail midway through
+        if os.path.exists("dump.yml"):
+            os.remove("dump.yml")
+
+        # this runs after all tests, if some fail midway through
+        if os.path.exists("mobo_model.pt"):
+            os.remove("mobo_model.pt")
