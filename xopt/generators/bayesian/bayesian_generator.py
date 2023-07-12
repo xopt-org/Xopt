@@ -3,7 +3,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import ClassVar, Dict, List
+from typing import Dict, List
 
 import pandas as pd
 import torch
@@ -12,7 +12,8 @@ from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, field_validator, validator
+from pydantic import Field, SerializeAsAny, field_validator
+from pydantic_core.core_schema import FieldValidationInfo
 from torch import Tensor
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -36,21 +37,21 @@ logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
-    name: ClassVar[str] = "base_bayesian_generator"
+    name = "base_bayesian_generator"
     model: Model = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
     n_monte_carlo_samples: int = Field(
         128, description="number of monte carlo samples to use"
     )
-    turbo_controller: TurboController = Field(
+    turbo_controller: SerializeAsAny[TurboController] = Field(
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
-    model_constructor: ModelConstructor = Field(
+    model_constructor: SerializeAsAny[ModelConstructor] = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
-    numerical_optimizer: NumericalOptimizer = Field(
+    numerical_optimizer: SerializeAsAny[NumericalOptimizer] = Field(
         LBFGSOptimizer(),
         description="optimizer used to optimize the acquisition " "function",
     )
@@ -109,11 +110,11 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("turbo_controller", mode='before')
-    def validate_turbo_controller(cls, value, values):
+    def validate_turbo_controller(cls, value, info: FieldValidationInfo):
         """note default behavior is no use of turbo"""
         optimizer_dict = {
-            "optimize": OptimizeTurboController(values["vocs"]),
-            "safety": SafetyTurboController(values["vocs"]),
+            "optimize": OptimizeTurboController(info.data["vocs"]),
+            "safety": SafetyTurboController(info.data["vocs"]),
         }
         if isinstance(value, TurboController):
             pass

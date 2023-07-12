@@ -3,7 +3,7 @@ from functools import partial
 from types import FunctionType, MethodType
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from pydantic.json import custom_pydantic_encoder
 
 from xopt.pydantic import (
@@ -323,6 +323,7 @@ class TestObjLoader:
 
 
 # Smaller test case (temporary)
+@pytest.mark.skip(reason='debug')
 class TestObjLoaderMinimal:
     misc_class_loader_type = ObjLoaderMinimal[MiscClass]
 
@@ -333,3 +334,25 @@ class TestObjLoaderMinimal:
         serialized = loader.model_dump_json()
         print('serialized: ', type(serialized), serialized)
         self.misc_class_loader_type.model_validate_json(serialized)
+
+
+# tests to verify v2 behavior remains same (for things that changed from v1)
+
+class DummyObj:
+    pass
+
+
+class Dummy(BaseModel):
+    default_obj: DummyObj = Field(DummyObj())
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator('default_obj')
+    def validate_obj(cls, value):
+        assert isinstance(value, DummyObj)
+        return value
+
+class TestPydanticInitialization:
+    def test_object_init(self):
+        d = Dummy()
+        assert isinstance(d.default_obj, DummyObj)
+

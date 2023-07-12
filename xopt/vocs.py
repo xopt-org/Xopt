@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import conlist, Field
+from pydantic import ConfigDict, conlist, Field
 
 from xopt.pydantic import XoptBaseModel
 
@@ -61,9 +61,7 @@ class VOCS(XoptBaseModel):
         description="observation names tracked alongside objectives and constraints",
     )
 
-    class Config:
-        validate_assignment = True  # Not sure this helps in this case
-        use_enum_values = True
+    model_config = ConfigDict(validate_assignment=True, use_enum_values=True)
 
     @classmethod
     def from_yaml(cls, yaml_text):

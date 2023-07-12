@@ -40,9 +40,6 @@ class ScipyOptimizeGenerator(Generator):
     _is_done = True
     _saved_options: Dict = None
 
-    class Config:
-        underscore_attrs_are_private = True
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

@@ -654,8 +654,7 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
 
 
 class SignatureModel(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def build(self, *args, **kwargs):
         stored_kwargs = self.model_dump()
@@ -736,7 +735,9 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
                 pydantic_fields[key] = (inspect.Parameter.empty, Field(None))
 
             else:
-                pydantic_fields[key] = value
+                # Pydantic v2 requires type spec on all fields
+                # TODO: maybe raise error on non-primitive types
+                pydantic_fields[key] = (type(value), value)
 
     model = create_model(
             f"Kwargs_{callable.__qualname__}", __base__=SignatureModel, **pydantic_fields
