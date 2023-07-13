@@ -56,9 +56,9 @@ class StandardModelConstructor(ModelConstructor):
         return v
 
     @field_validator("trainable_mean_keys")
-    def validate_trainable_mean_keys(cls, v, values):
+    def validate_trainable_mean_keys(cls, v, info: FieldValidationInfo):
         for name in v:
-            assert name in values["mean_modules"]
+            assert name in info.data["mean_modules"]
         return v
 
     @property
