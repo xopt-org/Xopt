@@ -10,7 +10,7 @@ from typing import Type
 import pandas as pd
 import torch
 import yaml
-from pydantic import ModelMetaclass
+from pydantic.main import ModelMetaclass
 
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
@@ -180,11 +180,22 @@ def copy_generator(generator: ModelMetaclass) -> Type[ModelMetaclass]:
                 generator_copy_dict[field_name] = field_value.cpu()
                 list_of_fields_on_gpu.append(field_name)
         elif isinstance(field_value, torch.nn.Module):
-            if field_value.device.type == "cuda":
-                generator_copy_dict[field_name] = field_value.cpu()
-                list_of_fields_on_gpu.append(field_name)
+            if has_device_field(field_value, torch.device("cuda")):
+                if field_value.device.type == "cuda":
+                    generator_copy_dict[field_name] = field_value.cpu()
+                    list_of_fields_on_gpu.append(field_name)
 
     return generator_copy, list_of_fields_on_gpu
+
+
+def has_device_field(module: torch.nn.Module, device: torch.device) -> bool:
+    for parameter in module.parameters():
+        if parameter.device == device:
+            return True
+    for buffer in module.buffers():
+        if buffer.device == device:
+            return True
+    return False
 
 
 def read_xopt_csv(*files):
