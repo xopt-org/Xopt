@@ -181,9 +181,8 @@ def copy_generator(generator: ModelMetaclass) -> Type[ModelMetaclass]:
                 list_of_fields_on_gpu.append(field_name)
         elif isinstance(field_value, torch.nn.Module):
             if has_device_field(field_value, torch.device("cuda")):
-                if field_value.device.type == "cuda":
-                    generator_copy_dict[field_name] = field_value.cpu()
-                    list_of_fields_on_gpu.append(field_name)
+                generator_copy_dict[field_name] = field_value.cpu()
+                list_of_fields_on_gpu.append(field_name)
 
     return generator_copy, list_of_fields_on_gpu
 
