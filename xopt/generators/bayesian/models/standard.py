@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
+from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
@@ -14,9 +15,11 @@ from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
+from xopt.generators.bayesian.utils import get_training_data
 from xopt.pydantic import orjson_dumps
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
+MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
@@ -64,7 +67,17 @@ class StandardModelConstructor(ModelConstructor):
                 noise_prior=GammaPrior(1.0, 100.0),
             )
         else:
-            return GaussianLikelihood()
+            noise_prior = GammaPrior(1.1, 0.05)
+            noise_prior_mode = (noise_prior.concentration - 1) / noise_prior.rate
+            likelihood = GaussianLikelihood(
+                noise_prior=noise_prior,
+                noise_constraint=GreaterThan(
+                    MIN_INFERRED_NOISE_LEVEL,
+                    transform=None,
+                    initial_value=noise_prior_mode,
+                ),
+            )
+            return likelihood
 
     def get_input_transform(
         self, input_names: List, input_bounds: Dict[str, List] = None
@@ -102,7 +115,7 @@ class StandardModelConstructor(ModelConstructor):
             mean_module = self.build_mean_module(
                 name, input_transform, outcome_transform
             )
-            train_X, train_Y = self._get_training_data(input_names, name, data)
+            train_X, train_Y = get_training_data(input_names, name, data)
             models.append(
                 self.build_single_task_gp(
                     train_X.to(**tkwargs),
@@ -127,24 +140,6 @@ class StandardModelConstructor(ModelConstructor):
                 mean_module, input_transform, outcome_transform, fixed_model=fixed_model
             )
         return mean_module
-
-    def _get_training_data(
-        self, input_names: List[str], outcome_name: str, data: pd.DataFrame
-    ) -> (torch.Tensor, torch.Tensor):
-        """Returns (train_X, train_Y) for the output specified by name."""
-        input_data = data[input_names]
-        outcome_data = data[outcome_name]
-
-        # cannot use any rows where any variable values are nans
-        non_nans = ~input_data.isnull().T.any()
-        input_data = input_data[non_nans]
-        outcome_data = outcome_data[non_nans]
-
-        train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy())
-        train_Y = torch.tensor(
-            outcome_data[~outcome_data.isnull()].to_numpy()
-        ).unsqueeze(-1)
-        return train_X, train_Y
 
     @staticmethod
     def _get_module(base, name):
