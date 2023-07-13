@@ -5,14 +5,12 @@ import sys
 import time
 import traceback
 from copy import deepcopy
-
 from typing import Type
 
 import pandas as pd
 import torch
 import yaml
-
-from xopt.generator import Generator
+from pydantic import ModelMetaclass
 
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
@@ -156,7 +154,7 @@ def format_option_descriptions(options_object):
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
-def copy_generator(generator: Type[Generator]) -> Type[Generator]:
+def copy_generator(generator: ModelMetaclass) -> Type[ModelMetaclass]:
     """
     Create a deep copy of a given generator.
     Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
@@ -175,6 +173,8 @@ def copy_generator(generator: Type[Generator]) -> Type[Generator]:
     list_of_fields_on_gpu = []
 
     for field_name, field_value in generator_copy_dict.items():
+        if isinstance(field_value, ModelMetaclass):
+            generator_copy_dict[field_name] = copy_generator(field_value)
         if isinstance(field_value, torch.Tensor):
             if field_value.device.type == "cuda":
                 generator_copy_dict[field_name] = field_value.cpu()
