@@ -21,6 +21,7 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
@@ -39,6 +40,8 @@ logger = logging.getLogger()
 # So one option is to have explicit unions for model subclasses, like here
 # The other is to define a descriminated union with name as key, but that stops name field from
 # getting exported, and we want to keep it for readability
+# See https://github.com/pydantic/pydantic/discussions/5785
+T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
 T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
 
 class BayesianGenerator(Generator, ABC):
@@ -53,7 +56,7 @@ class BayesianGenerator(Generator, ABC):
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
-    model_constructor: SerializeAsAny[ModelConstructor] = Field(
+    model_constructor: SerializeAsAny[T_ModelConstructor] = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
     numerical_optimizer: SerializeAsAny[T_NumericalOptimizer] = Field(
