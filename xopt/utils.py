@@ -5,12 +5,11 @@ import sys
 import time
 import traceback
 from copy import deepcopy
-from typing import Type
 
 import pandas as pd
 import torch
 import yaml
-from pydantic.main import ModelMetaclass
+from pydantic import BaseModel
 
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
@@ -154,7 +153,7 @@ def format_option_descriptions(options_object):
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
-def copy_generator(generator: ModelMetaclass) -> Type[ModelMetaclass]:
+def copy_generator(generator: BaseModel) -> BaseModel:
     """
     Create a deep copy of a given generator.
     Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
@@ -170,11 +169,13 @@ def copy_generator(generator: ModelMetaclass) -> Type[ModelMetaclass]:
     """
     generator_copy = deepcopy(generator)
     generator_copy_dict = generator_copy.dict()
-    list_of_fields_on_gpu = []
+    list_of_fields_on_gpu = [generator.__class__.__name__]
 
     for field_name, field_value in generator_copy_dict.items():
-        if isinstance(field_value, ModelMetaclass):
-            generator_copy_dict[field_name] = copy_generator(field_value)
+        if isinstance(field_value, BaseModel):
+            result = copy_generator(field_value)
+            generator_copy_dict[field_name] = result[0]
+            list_of_fields_on_gpu.append(result[1])
         if isinstance(field_value, torch.Tensor):
             if field_value.device.type == "cuda":
                 generator_copy_dict[field_name] = field_value.cpu()
@@ -188,6 +189,18 @@ def copy_generator(generator: ModelMetaclass) -> Type[ModelMetaclass]:
 
 
 def has_device_field(module: torch.nn.Module, device: torch.device) -> bool:
+    """
+    Checks if given module has a given device.
+
+    Parameters
+    ----------
+    module : torch.nn.Module
+    device : torch.device
+
+    Returns
+    -------
+    True/False : bool
+    """
     for parameter in module.parameters():
         if parameter.device == device:
             return True
