@@ -11,7 +11,7 @@ from xopt.pydantic import XoptBaseModel
 
 
 class NumericalOptimizer(XoptBaseModel, ABC):
-    name: str
+    name: str = Field("base_numerical_optimizer", frozen=True)
     model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
