@@ -17,6 +17,7 @@ from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
 from xopt.pydantic import orjson_dumps
+from pydantic_core.core_schema import FieldValidationInfo
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
