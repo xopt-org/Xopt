@@ -1,6 +1,29 @@
+from typing import List
+
+import pandas as pd
 import torch
 
 from xopt.vocs import VOCS
+
+
+def get_training_data(
+    input_names: List[str], outcome_name: str, data: pd.DataFrame
+) -> (torch.Tensor, torch.Tensor):
+    """Returns (train_X, train_Y) for the output specified by name."""
+
+    input_data = data[input_names]
+    outcome_data = data[outcome_name]
+
+    # cannot use any rows where any variable values are nans
+    non_nans = ~input_data.isnull().T.any()
+    input_data = input_data[non_nans]
+    outcome_data = outcome_data[non_nans]
+
+    train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy(dtype="double"))
+    train_Y = torch.tensor(
+        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double")
+    ).unsqueeze(-1)
+    return train_X, train_Y
 
 
 def set_botorch_weights(weights, vocs: VOCS):

@@ -33,7 +33,7 @@ class TestXopt:
     def test_init(self):
         # init with no arguments
         with pytest.raises(XoptError):
-            X = Xopt()
+            Xopt()
 
         # init with YAML
         X = Xopt(config=yaml.safe_load(copy(TEST_YAML)))
@@ -154,14 +154,39 @@ class TestXopt:
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
-        # should be able to run with strict=False (default)
-        X.step()
+        # should raise an error (default)
+        with pytest.raises(XoptError):
+            X.step()
 
         X2 = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
-        X2.options.strict = True
+        X2.options.strict = False
 
-        with pytest.raises(XoptError):
-            X2.step()
+        X2.random_evaluate(10)
+        # should run fine
+        X2.step()
+        assert "xopt_error_str" in X2.data.columns
+
+    def test_process_futures(self):
+        ss = 0
+
+        def bad_function_sometimes(inval):
+            if ss:
+                raise ValueError
+            else:
+                return {"y1": 0.0, "c1": 0.0}
+
+        evaluator = Evaluator(function=bad_function_sometimes)
+        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+        X.options.strict = False
+
+        # Submit to the evaluator some new inputs
+        X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
+        X.process_futures()
+
+        ss = 1
+        X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
+        X.process_futures()
 
     def test_random(self):
         evaluator = Evaluator(function=xtest_callable)

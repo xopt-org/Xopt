@@ -33,7 +33,7 @@ class XoptOptions(XoptBaseModel):
         False, description="flag to evaluate and submit evaluations asynchronously"
     )
     strict: bool = Field(
-        False,
+        True,
         description="flag to indicate if exceptions raised during evaluation "
         "should stop Xopt",
     )
@@ -137,6 +137,12 @@ class Xopt:
         if self.options.strict:
             validate_outputs(output_data)
         new_data = pd.concat([input_data, output_data], axis=1)
+
+        # explode any list like results if all of the output names exist
+        try:
+            new_data = new_data.explode(self.vocs.output_names)
+        except KeyError:
+            pass
 
         self.add_data(new_data)
         return new_data
@@ -268,7 +274,7 @@ class Xopt:
             if self.options.strict:
                 if future.exception() is not None:
                     raise future.exception()
-                validate_outputs(outputs)
+                validate_outputs(pd.DataFrame(outputs, index=[1]))
             output_data.append(outputs)
 
         # Special handling of a vectorized futures.
@@ -287,6 +293,12 @@ class Xopt:
 
         # Form completed evaluation
         new_data = pd.concat([input_data_done, output_data], axis=1)
+
+        # explode any list like results if all of the output names exist
+        try:
+            new_data = new_data.explode(self.vocs.output_names)
+        except KeyError:
+            pass
 
         # Add to internal dataframes
         self.add_data(new_data)

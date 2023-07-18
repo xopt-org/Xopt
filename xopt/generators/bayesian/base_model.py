@@ -42,11 +42,11 @@ class ModelConstructor(XoptBaseModel, ABC):
         pass
 
     def build_model_from_vocs(
-            self,
-            vocs: VOCS,
-            data: pd.DataFrame,
-            dtype: torch.dtype = torch.double,
-            device: Union[torch.device, str] = "cpu",
+        self,
+        vocs: VOCS,
+        data: pd.DataFrame,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ):
         """convenience wrapper around build model for use in xopt w vocs"""
         return self.build_model(

@@ -11,34 +11,38 @@ class TestBayesianExplorationGenerator:
         BayesianExplorationGenerator(vocs=TEST_VOCS_BASE)
 
     def test_generate(self):
-        gen = BayesianExplorationGenerator(
-            vocs=TEST_VOCS_BASE,
-        )
-        gen.numerical_optimizer.n_raw_samples = 1
-        gen.numerical_optimizer.n_restarts = 1
-        gen.n_monte_carlo_samples = 1
-        gen.data = TEST_VOCS_DATA
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs2 = deepcopy(test_vocs)
+        test_vocs2.objectives = {}
+        test_vocs2.observables = ["y1"]
 
-        candidate = gen.generate(1)
-        assert len(candidate) == 1
-        candidate = gen.generate(5)
-        assert len(candidate) == 5
+        for ele in [test_vocs, test_vocs2]:
+            gen = BayesianExplorationGenerator(
+                vocs=ele,
+            )
+            gen.numerical_optimizer.n_raw_samples = 1
+            gen.numerical_optimizer.n_restarts = 1
+            gen.n_monte_carlo_samples = 1
+            gen.data = TEST_VOCS_DATA
 
-        # test without constraints
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = {}
-        gen = BayesianExplorationGenerator(
-            vocs=vocs,
-        )
-        gen.numerical_optimizer.n_raw_samples = 1
-        gen.numerical_optimizer.n_restarts = 1
-        gen.n_monte_carlo_samples = 1
-        gen.data = TEST_VOCS_DATA
+            candidate = gen.generate(1)
+            assert len(candidate) == 1
+            candidate = gen.generate(5)
+            assert len(candidate) == 5
 
-        candidate = gen.generate(1)
-        assert len(candidate) == 1
-        candidate = gen.generate(5)
-        assert len(candidate) == 5
+            # test without constraints
+            gen = BayesianExplorationGenerator(
+                vocs=ele,
+            )
+            gen.numerical_optimizer.n_raw_samples = 1
+            gen.numerical_optimizer.n_restarts = 1
+            gen.n_monte_carlo_samples = 1
+            gen.data = TEST_VOCS_DATA
+
+            candidate = gen.generate(1)
+            assert len(candidate) == 1
+            candidate = gen.generate(5)
+            assert len(candidate) == 5
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)
