@@ -6,7 +6,7 @@ from typing import Dict, List
 
 import pandas as pd
 import torch
-from botorch.acquisition import qUpperConfidenceBound, FixedFeatureAcquisitionFunction
+from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound
 from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
@@ -58,8 +58,7 @@ class BayesianGenerator(Generator, ABC):
         description="limits for travel distance between points in normalized space",
     )
     fixed_features: Dict[str, float] = Field(
-        None,
-        description="fixed features used in Bayesian optimization"
+        None, description="fixed features used in Bayesian optimization"
     )
 
     @validator("model_constructor", pre=True)
@@ -127,9 +126,12 @@ class BayesianGenerator(Generator, ABC):
 
     @validator("fixed_features")
     def validate_fixed_features(cls, value, values):
-        for name in value:
-            if name in values["vocs"].variable_names:
-                raise ValueError(f"fixed feature {name} cannot be in vocs.variables")
+        if value is not None:
+            for name in value:
+                if name in values["vocs"].variable_names:
+                    raise ValueError(
+                        f"fixed feature {name} cannot be in vocs.variables"
+                    )
         return value
 
     def add_data(self, new_data: pd.DataFrame):
@@ -197,13 +199,12 @@ class BayesianGenerator(Generator, ABC):
                     bounds[1] = bounds[0] + 1e-8
                 variable_bounds[key] = bounds
 
-
         _model = self.model_constructor.build_model(
             list(variable_bounds.keys()),
             self.vocs.output_names,
             data,
             variable_bounds,
-            **self._tkwargs
+            **self._tkwargs,
         )
 
         if update_internal:
@@ -215,9 +216,7 @@ class BayesianGenerator(Generator, ABC):
         if self.fixed_features is not None:
             variable_names += list(self.fixed_features.keys())
 
-        return torch.tensor(
-            data[variable_names].to_numpy(), **self._tkwargs
-        )
+        return torch.tensor(data[variable_names].to_numpy(), **self._tkwargs)
 
     def get_acquisition(self, model):
         """
@@ -254,10 +253,7 @@ class BayesianGenerator(Generator, ABC):
                 values += [value]
 
             acq = FixedFeatureAcquisitionFunction(
-                acq_function=acq,
-                d=dim,
-                columns=columns,
-                values=values
+                acq_function=acq, d=dim, columns=columns, values=values
             )
 
         return acq

@@ -214,12 +214,10 @@ class TestBayesianGenerator(TestCase):
         model = gen.train_model()
         assert torch.allclose(
             model.models[0].input_transform.bounds,
-            torch.tensor(((0, 0, 5), (1, 10, 5))).double()
+            torch.tensor(((0, 0, 5), (1, 10, 5))).double(),
         )
 
         # test fixed_feature in vocs
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
         with pytest.raises(ValueError):
             gen.fixed_features = {"x1": 3.0}
-
-
