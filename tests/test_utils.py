@@ -1,10 +1,8 @@
 from unittest import TestCase
-from unittest.mock import patch
 
 import torch
 from pydantic import BaseModel, Extra
 from torch import nn
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.utils import add_constraint_information, copy_generator, has_device_field
 
@@ -45,8 +43,8 @@ class TestUtils(TestCase):
     def test_has_device_field(self):
         module = MockModule()
 
-        # Check if has_device_field returns True for device "cpu" (which exists in the module)
+        # Check if has_device_field returns True for device "cpu" (which is in the module)
         assert has_device_field(module, torch.device("cpu")) is True
 
-        # Check if has_device_field returns False for device "cuda" (which does not exist in the module)
+        # Check if has_device_field returns False for device "cuda" (which is not in the module)
         assert has_device_field(module, torch.device("cuda")) is False
