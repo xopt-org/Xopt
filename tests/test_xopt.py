@@ -7,11 +7,13 @@ import pandas as pd
 import pytest
 import yaml
 
-from xopt.base import Xopt, XoptOptions
+from xopt.asynch import AsynchXopt
+from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
+from xopt.io import load_xopt_from_file
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
 from xopt.vocs import VOCS
 
@@ -31,14 +33,6 @@ class DummyGenerator(Generator, ABC):
 
 class TestXopt:
     def test_init(self):
-        # init with no arguments
-        with pytest.raises(XoptError):
-            Xopt()
-
-        # init with YAML
-        X = Xopt(config=yaml.safe_load(copy(TEST_YAML)))
-        assert X.evaluator.function == xtest_callable
-        assert isinstance(X.generator, RandomGenerator)
 
         # init with generator and evaluator
         def dummy(x):
@@ -70,7 +64,7 @@ class TestXopt:
             generator=generator,
             evaluator=evaluator,
             vocs=vocs,
-            options=XoptOptions(strict=True),
+            strict=True,
         )
         with pytest.raises(XoptError):
             X.step()
@@ -82,7 +76,7 @@ class TestXopt:
             generator=generator,
             evaluator=evaluator,
             vocs=vocs,
-            options=XoptOptions(strict=True),
+            strict=True,
         )
         with pytest.raises(XoptError):
             X2.step()
@@ -116,11 +110,10 @@ class TestXopt:
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = Xopt(
+        X = AsynchXopt(
             generator=generator,
             evaluator=evaluator,
             vocs=deepcopy(TEST_VOCS_BASE),
-            options=XoptOptions(asynch=True),
         )
         n_steps = 5
         for i in range(n_steps):
@@ -132,11 +125,10 @@ class TestXopt:
             evaluator = Evaluator(
                 function=xtest_callable, executor=ThreadPoolExecutor(), max_workers=mw
             )
-            X2 = Xopt(
+            X2 = AsynchXopt(
                 generator=generator,
                 evaluator=evaluator,
                 vocs=deepcopy(TEST_VOCS_BASE),
-                options=XoptOptions(asynch=True),
             )
 
             n_steps = 5
@@ -159,7 +151,7 @@ class TestXopt:
             X.step()
 
         X2 = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
-        X2.options.strict = False
+        X2.strict = False
 
         X2.random_evaluate(10)
         # should run fine
@@ -177,8 +169,9 @@ class TestXopt:
 
         evaluator = Evaluator(function=bad_function_sometimes)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
-        X.options.strict = False
+        X = AsynchXopt(generator=gen, evaluator=evaluator, vocs=deepcopy(
+            TEST_VOCS_BASE))
+        X.strict = False
 
         # Submit to the evaluator some new inputs
         X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
@@ -209,24 +202,25 @@ class TestXopt:
         X = Xopt(
             generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
-        X.options.dump_file = "test_checkpointing.yaml"
+        X.dump_file = "test_checkpointing.yaml"
 
-        try:
+        X.step()
+
+        for _ in range(5):
             X.step()
 
-            for _ in range(5):
-                X.step()
-
+        try:
             # try to load the state from nothing
-            with open(X.options.dump_file, "r") as f:
-                config = yaml.safe_load(f)
-            X2 = Xopt(config=config)
+            X2 = load_xopt_from_file(X.dump_file)
 
             for _ in range(5):
                 X2.step()
 
+            assert isinstance(X2.generator, RandomGenerator)
+            assert isinstance(X2.evaluator, Evaluator)
+            assert X.vocs == X2.vocs
+
             assert len(X2.data) == 11
-            assert X2._ix_last == 11
 
         except Exception as e:
             raise e
@@ -234,7 +228,7 @@ class TestXopt:
             # clean up
             import os
 
-            os.remove(X.options.dump_file)
+            os.remove(X.dump_file)
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
