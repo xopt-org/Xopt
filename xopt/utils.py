@@ -5,7 +5,7 @@ import sys
 import time
 import traceback
 from copy import deepcopy
-from typing import Type
+from typing import List, Tuple, Type
 
 import pandas as pd
 import torch
@@ -155,7 +155,7 @@ def format_option_descriptions(options_object):
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
-def copy_generator(generator: Type[Generator]) -> Type[Generator]:
+def copy_generator(generator: Type[Generator]) -> Tuple[Type[Generator], List[str]]:
     """
     Create a deep copy of a given generator.
     Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
