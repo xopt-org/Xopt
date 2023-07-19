@@ -5,12 +5,14 @@ import sys
 import time
 import traceback
 from copy import deepcopy
+from typing import Type
 
 import pandas as pd
 import torch
 import yaml
 from pydantic import BaseModel
 
+from xopt.generator import Generator
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
@@ -153,7 +155,7 @@ def format_option_descriptions(options_object):
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
-def copy_generator(generator: BaseModel) -> BaseModel:
+def copy_generator(generator: Type[Generator]) -> Type[Generator]:
     """
     Create a deep copy of a given generator.
     Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
