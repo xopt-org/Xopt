@@ -204,8 +204,12 @@ class TestBayesianGenerator(TestCase):
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_fixed_feature(self):
+
+        # test with a fixed feature not contained in vocs
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"p": 3.0}
+
+        assert gen.model_input_names == [*TEST_VOCS_BASE.variable_names, "p"]
 
         data = deepcopy(TEST_VOCS_DATA)
         data["p"] = 5.0
@@ -219,5 +223,20 @@ class TestBayesianGenerator(TestCase):
 
         # test fixed_feature in vocs
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
-        with pytest.raises(ValueError):
-            gen.fixed_features = {"x1": 3.0}
+        gen.fixed_features = {"x1": 3.0}
+
+        # test naming
+        assert gen.model_input_names == TEST_VOCS_BASE.variable_names
+        assert gen._candidate_names == ["x2"]
+
+        # test get bounds
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor((0.0, 10.0)).reshape(2, 1).double())
+
+        data = deepcopy(TEST_VOCS_DATA)
+        gen.add_data(data)
+        model = gen.train_model()
+        assert torch.allclose(
+            model.models[0].input_transform.bounds,
+            torch.tensor(((0, 0), (1, 10))).double(),
+        )
