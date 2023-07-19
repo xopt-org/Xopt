@@ -95,6 +95,7 @@ class TestUpperConfidenceBoundGenerator:
             assert acqf(torch.tensor((-1.0, -1.0)).reshape(1, 1, 2)) >= 0.0
 
     def test_fixed_feature(self):
+        # test with fixed feature not in vocs
         gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"p": 3.0}
         gen.n_monte_carlo_samples = 1
@@ -103,4 +104,15 @@ class TestUpperConfidenceBoundGenerator:
         data["p"] = np.random.rand(len(data))
 
         gen.add_data(data)
-        gen.generate(1)
+        candidate = gen.generate(1)
+        assert all(candidate["p"] == 3)
+
+        # test with fixed feature in vocs
+        gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
+        gen.fixed_features = {"x1": 3.0}
+        gen.n_monte_carlo_samples = 1
+        gen.numerical_optimizer.n_restarts = 1
+
+        gen.add_data(data)
+        candidate = gen.generate(1)
+        assert all(candidate["x1"] == 3)

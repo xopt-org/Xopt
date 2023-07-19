@@ -12,6 +12,7 @@ from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import Field, validator
+from torch import Tensor
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -124,16 +125,6 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError(f"{value} not found")
         return value
 
-    @validator("fixed_features")
-    def validate_fixed_features(cls, value, values):
-        if value is not None:
-            for name in value:
-                if name in values["vocs"].variable_names:
-                    raise ValueError(
-                        f"fixed feature {name} cannot be in vocs.variables"
-                    )
-        return value
-
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
@@ -191,19 +182,20 @@ class BayesianGenerator(Generator, ABC):
 
         # add fixed feature bounds if requested
         if self.fixed_features is not None:
-            # get bounds for each fixed_feature (if not already in variables
+            # get bounds for each fixed_feature (vocs bounds take precedent)
             for key in self.fixed_features:
-                f_data = data[key]
-                bounds = [f_data.min(), f_data.max()]
-                if bounds[1] - bounds[0] < 1e-8:
-                    bounds[1] = bounds[0] + 1e-8
-                variable_bounds[key] = bounds
+                if key not in variable_bounds:
+                    f_data = data[key]
+                    bounds = [f_data.min(), f_data.max()]
+                    if bounds[1] - bounds[0] < 1e-8:
+                        bounds[1] = bounds[0] + 1e-8
+                    variable_bounds[key] = bounds
 
         _model = self.model_constructor.build_model(
-            list(variable_bounds.keys()),
+            self.model_input_names,
             self.vocs.output_names,
             data,
-            variable_bounds,
+            {name: variable_bounds[name] for name in self.model_input_names},
             **self._tkwargs,
         )
 
@@ -212,11 +204,7 @@ class BayesianGenerator(Generator, ABC):
         return _model
 
     def get_input_data(self, data):
-        variable_names = self.vocs.variable_names
-        if self.fixed_features is not None:
-            variable_names += list(self.fixed_features.keys())
-
-        return torch.tensor(data[variable_names].to_numpy(), **self._tkwargs)
+        return torch.tensor(data[self.model_input_names].to_numpy(), **self._tkwargs)
 
     def get_acquisition(self, model):
         """
@@ -244,12 +232,11 @@ class BayesianGenerator(Generator, ABC):
         # apply fixed features if specified in the generator
         if self.fixed_features is not None:
             # get input dim
-            dim = self.vocs.n_variables
+            dim = len(self.model_input_names)
             columns = []
             values = []
-            for key, value in self.fixed_features.items():
-                dim += 1
-                columns += [dim]
+            for name, value in self.fixed_features.items():
+                columns += [self.model_input_names.index(name)]
                 values += [value]
 
             acq = FixedFeatureAcquisitionFunction(
@@ -275,9 +262,22 @@ class BayesianGenerator(Generator, ABC):
 
         return self._process_candidates(result)
 
-    def _process_candidates(self, candidates):
+    def _process_candidates(self, candidates: Tensor):
+        """ process pytorch candidates from optimizing the acquisition function"""
         logger.debug("Best candidate from optimize", candidates)
-        return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
+
+        if self.fixed_features is not None:
+            results = pd.DataFrame(
+                candidates.detach().cpu().numpy(), columns=self._candidate_names
+            )
+            for name, val in self.fixed_features.items():
+                results[name] = val
+
+        else:
+            results = self.vocs.convert_numpy_to_inputs(
+                candidates.detach().cpu().numpy())
+
+        return results
 
     def _get_sampler(self, model):
         input_data = self.get_input_data(self.data)
@@ -317,6 +317,26 @@ class BayesianGenerator(Generator, ABC):
 
         return {"dtype": torch.double, "device": device}
 
+    @property
+    def model_input_names(self):
+        """ variable names corresponding to trained model"""
+        variable_names = self.vocs.variable_names
+        if self.fixed_features is not None:
+            for name, val in self.fixed_features.items():
+                if name not in variable_names:
+                    variable_names += [name]
+        return variable_names
+
+    @property
+    def _candidate_names(self):
+        """ variable names corresponding to generated candidates"""
+        variable_names = self.vocs.variable_names
+        if self.fixed_features is not None:
+            for name in self.fixed_features:
+                if name in variable_names:
+                    variable_names.remove(name)
+        return variable_names
+
     def _get_bounds(self):
         """convert bounds from vocs to torch tensors"""
         return torch.tensor(self.vocs.bounds, **self._tkwargs)
@@ -340,6 +360,18 @@ class BayesianGenerator(Generator, ABC):
             # set the best value
             turbo_bounds = self.turbo_controller.get_trust_region(self.model)
             bounds = rectilinear_domain_union(bounds, turbo_bounds)
+
+        # if fixed features key is in vocs then we need to remove the bounds
+        # associated with that key
+        if self.fixed_features is not None:
+            # grab variable name indices that are NOT in fixed features
+            indicies = []
+            for idx, name in enumerate(self.vocs.variable_names):
+                if name not in self.fixed_features:
+                    indicies += [idx]
+
+            # grab indexed bounds
+            bounds = bounds.T[indicies].T
 
         return bounds
 
