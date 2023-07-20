@@ -94,6 +94,17 @@ class TestModelConstructor:
         assert model3.train_inputs[0][0].shape == torch.Size([9, 2])
         assert model3.train_inputs[1][0].shape == torch.Size([8, 2])
 
+    def test_model_w_same_data(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables["x1"] = [5.0, 6.0]
+        constructor = StandardModelConstructor()
+
+        # set all of the elements of a given input variable to the same value
+        test_data["x1"] = 5.0
+
+        constructor.build_model_from_vocs(test_vocs, test_data)
+
     def test_serialization(self):
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}

@@ -6,12 +6,13 @@ from typing import Dict, List
 
 import pandas as pd
 import torch
-from botorch.acquisition import qUpperConfidenceBound
+from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound
 from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import Field, validator
+from torch import Tensor
 
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -56,6 +57,9 @@ class BayesianGenerator(Generator, ABC):
     max_travel_distances: List[float] = Field(
         None,
         description="limits for travel distance between points in normalized space",
+    )
+    fixed_features: Dict[str, float] = Field(
+        None, description="fixed features used in Bayesian optimization"
     )
 
     @validator("model_constructor", pre=True)
@@ -173,8 +177,26 @@ class BayesianGenerator(Generator, ABC):
         if data.empty:
             raise ValueError("no data available to build model")
 
-        _model = self.model_constructor.build_model_from_vocs(
-            self.vocs, data, **self._tkwargs
+        # get input bounds
+        variable_bounds = deepcopy(self.vocs.variables)
+
+        # add fixed feature bounds if requested
+        if self.fixed_features is not None:
+            # get bounds for each fixed_feature (vocs bounds take precedent)
+            for key in self.fixed_features:
+                if key not in variable_bounds:
+                    f_data = data[key]
+                    bounds = [f_data.min(), f_data.max()]
+                    if bounds[1] - bounds[0] < 1e-8:
+                        bounds[1] = bounds[0] + 1e-8
+                    variable_bounds[key] = bounds
+
+        _model = self.model_constructor.build_model(
+            self.model_input_names,
+            self.vocs.output_names,
+            data,
+            {name: variable_bounds[name] for name in self.model_input_names},
+            **self._tkwargs,
         )
 
         if update_internal:
@@ -182,9 +204,7 @@ class BayesianGenerator(Generator, ABC):
         return _model
 
     def get_input_data(self, data):
-        return torch.tensor(
-            self.vocs.variable_data(data, "").to_numpy(), **self._tkwargs
-        )
+        return torch.tensor(data[self.model_input_names].to_numpy(), **self._tkwargs)
 
     def get_acquisition(self, model):
         """
@@ -209,6 +229,20 @@ class BayesianGenerator(Generator, ABC):
                 model, acq, self._get_constraint_callables(), sampler=sampler
             )
 
+        # apply fixed features if specified in the generator
+        if self.fixed_features is not None:
+            # get input dim
+            dim = len(self.model_input_names)
+            columns = []
+            values = []
+            for name, value in self.fixed_features.items():
+                columns += [self.model_input_names.index(name)]
+                values += [value]
+
+            acq = FixedFeatureAcquisitionFunction(
+                acq_function=acq, d=dim, columns=columns, values=values
+            )
+
         return acq
 
     def get_optimum(self):
@@ -228,9 +262,22 @@ class BayesianGenerator(Generator, ABC):
 
         return self._process_candidates(result)
 
-    def _process_candidates(self, candidates):
+    def _process_candidates(self, candidates: Tensor):
+        """ process pytorch candidates from optimizing the acquisition function"""
         logger.debug("Best candidate from optimize", candidates)
-        return self.vocs.convert_numpy_to_inputs(candidates.detach().cpu().numpy())
+
+        if self.fixed_features is not None:
+            results = pd.DataFrame(
+                candidates.detach().cpu().numpy(), columns=self._candidate_names
+            )
+            for name, val in self.fixed_features.items():
+                results[name] = val
+
+        else:
+            results = self.vocs.convert_numpy_to_inputs(
+                candidates.detach().cpu().numpy())
+
+        return results
 
     def _get_sampler(self, model):
         input_data = self.get_input_data(self.data)
@@ -270,6 +317,26 @@ class BayesianGenerator(Generator, ABC):
 
         return {"dtype": torch.double, "device": device}
 
+    @property
+    def model_input_names(self):
+        """ variable names corresponding to trained model"""
+        variable_names = self.vocs.variable_names
+        if self.fixed_features is not None:
+            for name, val in self.fixed_features.items():
+                if name not in variable_names:
+                    variable_names += [name]
+        return variable_names
+
+    @property
+    def _candidate_names(self):
+        """ variable names corresponding to generated candidates"""
+        variable_names = self.vocs.variable_names
+        if self.fixed_features is not None:
+            for name in self.fixed_features:
+                if name in variable_names:
+                    variable_names.remove(name)
+        return variable_names
+
     def _get_bounds(self):
         """convert bounds from vocs to torch tensors"""
         return torch.tensor(self.vocs.bounds, **self._tkwargs)
@@ -285,7 +352,7 @@ class BayesianGenerator(Generator, ABC):
 
         # if specified modify bounds to limit maximum travel distances
         if self.max_travel_distances is not None:
-            max_travel_bounds = self.get_max_travel_distances_region(bounds)
+            max_travel_bounds = self._get_max_travel_distances_region(bounds)
             bounds = rectilinear_domain_union(bounds, max_travel_bounds)
 
         # if using turbo, update turbo state and set bounds according to turbo state
@@ -294,9 +361,21 @@ class BayesianGenerator(Generator, ABC):
             turbo_bounds = self.turbo_controller.get_trust_region(self.model)
             bounds = rectilinear_domain_union(bounds, turbo_bounds)
 
+        # if fixed features key is in vocs then we need to remove the bounds
+        # associated with that key
+        if self.fixed_features is not None:
+            # grab variable name indices that are NOT in fixed features
+            indicies = []
+            for idx, name in enumerate(self.vocs.variable_names):
+                if name not in self.fixed_features:
+                    indicies += [idx]
+
+            # grab indexed bounds
+            bounds = bounds.T[indicies].T
+
         return bounds
 
-    def get_max_travel_distances_region(self, bounds):
+    def _get_max_travel_distances_region(self, bounds):
         """get region based on max travel distances and last observation"""
         if len(self.max_travel_distances) != bounds.shape[-1]:
             raise ValueError(
