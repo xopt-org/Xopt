@@ -327,7 +327,7 @@ class VOCS(XoptBaseModel):
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
-        not. Returned dataframe also contains a column `feasibility` which denotes if
+        not. Returned dataframe also contains a column `feasible` which denotes if
         all constraints are satisfied.
 
         Args:
@@ -514,7 +514,7 @@ def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     """
     Use constraint dict and data to identify feasible points in the the dataset.
 
-    Returns a dataframe with the feasibility data.
+    Returns a dataframe with the feasible data.
     """
     if not constraints:
         df = pd.DataFrame(index=data.index)

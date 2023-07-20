@@ -60,6 +60,76 @@ class TestTurbo(TestCase):
             turbo_state = OptimizeTurboController(gen.vocs)
             turbo_state.get_trust_region(model)
 
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_with_constraints(self):
+        # test in 1D
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables = {"x1": [0, 1]}
+        test_vocs.constraints = {"c1": ["LESS_THAN", 0.0]}
+
+        # test with valid data
+        data = deepcopy(TEST_VOCS_DATA)
+        data["c1"] = -10.0
+        y_data = np.ones(10)
+        y_data[5] = -1
+        data["y1"] = y_data
+        best_x = data["x1"].iloc[5]
+
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(data)
+        model = gen.train_model()
+
+        turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
+        turbo_state.update_state(gen.data)
+        assert turbo_state.center_x == {"x1": best_x}
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        tr = turbo_state.get_trust_region(model)
+        assert tr[0].numpy() >= test_vocs.bounds[0]
+        assert tr[1].numpy() <= test_vocs.bounds[1]
+
+        # test a case where the last point is invalid
+        new_data = deepcopy(gen.data)
+        n_c = new_data["c1"].to_numpy()
+        n_c[-1] = 1.0
+        new_data["c1"] = n_c
+        turbo_state.update_state(new_data)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 2
+
+        # test will all invalid data
+        data = deepcopy(TEST_VOCS_DATA)
+        data["c1"] = 10.0
+        y_data = np.ones(10)
+        y_data[5] = -1
+        data["y1"] = y_data
+
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(data)
+
+        turbo_state = OptimizeTurboController(gen.vocs)
+        with pytest.raises(RuntimeError):
+            turbo_state.update_state(gen.data)
+
+        # test best y value violates the constraint
+        data = deepcopy(TEST_VOCS_DATA)
+        c_data = -10.0*np.ones(10)
+        c_data[5] = 5.0
+        data["c1"] = c_data
+        y_data = np.ones(10)
+        y_data[5] = -1
+        y_data[6] = -0.8
+        data["y1"] = y_data
+        best_x = data["x1"].iloc[6]
+
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(data)
+
+        turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
+        turbo_state.update_state(gen.data)
+        assert turbo_state.center_x == {"x1": best_x}
+
     def test_set_best_point(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
