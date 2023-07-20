@@ -5,6 +5,7 @@ from typing import Dict, Union
 
 import torch
 from botorch.models import ModelListGP
+from pandas import DataFrame
 from pydantic import Field, PositiveFloat, PositiveInt
 
 from xopt.pydantic import XoptBaseModel
@@ -110,7 +111,7 @@ class TurboController(XoptBaseModel, ABC):
         return torch.cat((tr_lb, tr_ub), dim=0)
 
     @abstractmethod
-    def update_state(self, data):
+    def update_state(self, data, previous_batch_size: int = 1) -> None:
         pass
 
 
@@ -120,7 +121,7 @@ class OptimizeTurboController(TurboController):
     )
     best_value: float = None
 
-    def set_center_point(self, data):
+    def _set_best_point(self, data):
         # get location of best point so far
         variable_data = self.vocs.variable_data(data, "")
         objective_data = self.vocs.objective_data(data, "")
@@ -138,21 +139,58 @@ class OptimizeTurboController(TurboController):
             variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
         )
 
-    def update_state(self, data):
+    def update_state(self, data: DataFrame, previous_batch_size: int = 1) -> None:
         """
-        update turbo state class
+        Update turbo state class using min of data points that are feasible.
+        Otherwise raise an error
+
         NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
         minimization
-        """
-        self.set_center_point(data)
-        Y_last = data[self.vocs.objective_names[0]].iloc[-1]
 
-        if Y_last < self.best_value + 1e-3 * math.fabs(self.best_value):
-            self.success_counter += 1
-            self.failure_counter = 0
+        Parameters
+        ----------
+        data : DataFrame
+            Entire data set containing previous measurements. Requires at least one
+            valid point.
+
+        previous_batch_size : int, default = 1
+            Number of candidates in previous batch evaluation
+
+        Returns
+        -------
+            None
+
+        """
+        # get locations of valid data samples
+        feas_data = self.vocs.feasibility_data(data)
+
+        if len(data[feas_data["feasible"]]) == 0:
+            raise RuntimeError("turbo requires at least one valid point in training "
+                               "dataset")
         else:
+            self._set_best_point(data[feas_data["feasible"]])
+
+        # get feasibility of last `n_candidates`
+        recent_data = data.iloc[-previous_batch_size:]
+        f_data = self.vocs.feasibility_data(recent_data)
+        recent_f_data = recent_data[f_data["feasible"]]
+
+        # if none of the candidates are valid count this as a failure
+        if len(recent_f_data) == 0:
             self.success_counter = 0
             self.failure_counter += 1
+
+        else:
+            # if we had previous feasible points we need to compare with previous
+            # best values
+            Y_last = recent_f_data[self.vocs.objective_names[0]].min()
+
+            if Y_last < self.best_value + 1e-3 * math.fabs(self.best_value):
+                self.success_counter += 1
+                self.failure_counter = 0
+            else:
+                self.success_counter = 0
+                self.failure_counter += 1
 
         if self.success_counter == self.success_tolerance:  # Expand trust region
             self.length = min(self.scale_factor * self.length, self.length_max)
@@ -164,15 +202,18 @@ class OptimizeTurboController(TurboController):
 
 class SafetyTurboController(TurboController):
     scale_factor: float = float(1.25)
+    min_feasible_fraction: float = 0.75
 
-    def update_state(self, data):
+    def update_state(self, data, previous_batch_size: int = 1):
         # set center point to be mean of valid data points
         feas = data[self.vocs.feasibility_data(data)["feasible"]]
         self.center_x = feas[self.vocs.variable_names].mean().to_dict()
 
-        # get the feasibility of the last observation
-        last_is_feasible = self.vocs.feasibility_data(data).iloc[-1]["feasible"]
-        if last_is_feasible:
+        # get the feasibility fractions of the last batch
+        last_batch = self.vocs.feasibility_data(data).iloc[-previous_batch_size:]
+        feas_fraction = last_batch["feasible"].sum() / len(last_batch)
+
+        if feas_fraction > self.min_feasible_fraction:
             self.success_counter += 1
             self.failure_counter = 0
         else:
