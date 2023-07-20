@@ -182,7 +182,8 @@ class OptimizeTurboController(TurboController):
 
         else:
             # if we had previous feasible points we need to compare with previous
-            # best values
+            # best values, NOTE: this is the opposite of botorch which assumes
+            # maximization, xopt assumes minimization
             Y_last = recent_f_data[self.vocs.objective_names[0]].min()
 
             if Y_last < self.best_value + 1e-3 * math.fabs(self.best_value):

@@ -135,8 +135,11 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(test_vocs)
         turbo_state.update_state(TEST_VOCS_DATA)
+        best_value = TEST_VOCS_DATA[
+            test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
+        ].min()[test_vocs.objective_names[0]]
         assert (
-            turbo_state.best_value == TEST_VOCS_DATA.min()[test_vocs.objective_names[0]]
+            turbo_state.best_value == best_value
         )
 
     def test_in_generator(self):
