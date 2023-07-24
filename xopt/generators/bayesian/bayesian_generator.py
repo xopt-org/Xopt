@@ -62,9 +62,6 @@ class BayesianGenerator(Generator, ABC):
         None, description="fixed features used in Bayesian optimization"
     )
 
-    class Config:
-        underscore_attrs_are_private = True
-
     @validator("model_constructor", pre=True)
     def validate_model_constructor(cls, value):
         constructor_dict = {"standard": StandardModelConstructor}
@@ -149,7 +146,7 @@ class BayesianGenerator(Generator, ABC):
             # update internal model with internal data
             model = self.train_model(self.data)
 
-            # update TurBO state if used w the last `n_candidates` points
+            # update TurBO state if used with the last `n_candidates` points
             if self.turbo_controller is not None:
                 self.turbo_controller.update_state(self.data, n_candidates)
 
