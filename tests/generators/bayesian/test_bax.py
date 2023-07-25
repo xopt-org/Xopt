@@ -183,4 +183,3 @@ class TestBaxGenerator:
         import os
         os.remove("test_1.pkl")
         os.remove("test_2.pkl")
-
