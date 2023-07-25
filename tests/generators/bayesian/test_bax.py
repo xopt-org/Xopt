@@ -1,3 +1,4 @@
+import pickle
 from copy import deepcopy
 from unittest.mock import patch
 
@@ -151,3 +152,35 @@ class TestBaxGenerator:
         # initialize with single initial candidate
         xopt.random_evaluate(3)
         xopt.step()
+
+    def test_file_saving(self):
+        evaluator = Evaluator(function=xtest_callable)
+        alg = GridMinimize()
+
+        gen = BaxGenerator(
+            vocs=TEST_VOCS_BASE,
+            algorithm=alg,
+            algorithm_results_file="test"
+        )
+        gen.numerical_optimizer.n_raw_samples = 1
+        gen.numerical_optimizer.n_restarts = 1
+
+        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+
+        # initialize with single initial candidate
+        xopt.random_evaluate(3)
+        xopt.step()
+        xopt.step()
+
+        # test loading saved info
+        with open('test_2.pkl', 'rb') as handle:
+            result = pickle.load(handle)
+
+        assert isinstance(result["test_points"], torch.Tensor)
+        assert isinstance(result["posterior_samples"], torch.Tensor)
+        assert isinstance(result["execution_paths"], torch.Tensor)
+
+        import os
+        os.remove("test_1.pkl")
+        os.remove("test_2.pkl")
+
