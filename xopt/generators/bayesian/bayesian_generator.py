@@ -1,4 +1,5 @@
 import logging
+import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -60,6 +61,9 @@ class BayesianGenerator(Generator, ABC):
     )
     fixed_features: Dict[str, float] = Field(
         None, description="fixed features used in Bayesian optimization"
+    )
+    computation_time: pd.DataFrame = Field(
+        pd.DataFrame([]), description="data frame tracking computation time in seconds"
     )
 
     @validator("model_constructor", pre=True)
@@ -143,8 +147,13 @@ class BayesianGenerator(Generator, ABC):
             )
 
         else:
+            # dict to track runtimes
+            timing_results = {}
+
             # update internal model with internal data
+            start = time.time()
             model = self.train_model(self.data)
+            timing_results["training"] = time.time() - start
 
             # update TurBO state if used
             if self.turbo_controller is not None:
@@ -157,12 +166,19 @@ class BayesianGenerator(Generator, ABC):
             acq_funct = self.get_acquisition(model)
 
             # get candidates
+            start = time.time()
             candidates = self.numerical_optimizer.optimize(
                 acq_funct, bounds, n_candidates
             )
+            timing_results["acquisition_optimization"] = time.time() - start
 
             # post process candidates
             result = self._process_candidates(candidates)
+
+            # append timing results to dataframe
+            self.computation_time = pd.concat((
+                self.computation_time, pd.DataFrame(timing_results, index=[0]),
+            ), ignore_index=True)
 
             return result
 
@@ -398,7 +414,7 @@ class BayesianGenerator(Generator, ABC):
 
         # get maximum travel distances
         max_travel_distances = (
-            torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
+                torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
         )
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
