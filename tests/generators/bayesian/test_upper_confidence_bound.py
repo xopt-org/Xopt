@@ -32,6 +32,10 @@ class TestUpperConfidenceBoundGenerator:
         candidate = gen.generate(2)
         assert len(candidate) == 2
 
+        # test time tracking
+        assert isinstance(gen.computation_time, pd.DataFrame)
+        assert len(gen.computation_time)
+
     def test_cuda(self):
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
