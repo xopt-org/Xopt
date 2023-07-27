@@ -99,3 +99,13 @@ class TestVOCS(object):
         assert all(random_input_data["x1"] > 0.5)
         assert all(random_input_data["x2"] > 7.5)
         assert all(random_input_data["x2"] < 10.0)
+
+    def test_duplicate_outputs(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        assert vocs.output_names == ["y1", "c1"]
+
+        vocs.objectives = {"y1": "MAXIMIZE", "d1": "MINIMIZE"}
+        vocs.observables = ["y1", "c1"]
+
+        assert vocs.output_names == ["d1", "y1", "c1"]
+        assert vocs.n_outputs == 3
