@@ -7,8 +7,12 @@ import torch
 from pydantic import BaseModel, Extra
 from torch import nn
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.utils import add_constraint_information, copy_generator, has_device_field, \
-    explode_all_columns
+from xopt.utils import (
+    add_constraint_information,
+    copy_generator,
+    explode_all_columns,
+    has_device_field,
+)
 
 BaseModel.Config.arbitrary_types_allowed = True
 BaseModel.Config.extra = Extra.forbid
@@ -53,7 +57,7 @@ class TestUtils(TestCase):
         )
         with pytest.raises(ValueError):
             explode_all_columns(data)
-            
+
     def test_copy_generator(self):
         generator = MockBaseModel(device=torch.device("cuda"))
         generator_copy, list_of_fields_on_gpu = copy_generator(generator)
@@ -70,8 +74,10 @@ class TestUtils(TestCase):
     def test_has_device_field(self):
         module = MockModule()
 
-        # Check if has_device_field returns True for device "cpu" (which is in the module)
+        # Check if has_device_field returns True for device "cpu" (which is in the
+        # module)
         assert has_device_field(module, torch.device("cpu")) is True
 
-        # Check if has_device_field returns False for device "cuda" (which is not in the module)
+        # Check if has_device_field returns False for device "cuda" (which is not in
+        # the module)
         assert has_device_field(module, torch.device("cuda")) is False
