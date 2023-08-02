@@ -23,7 +23,6 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
 class LBFGSOptimizer(NumericalOptimizer):
     name: str = Field("LBFGS", frozen=True)
-    name2: Literal['test'] = 'test2'
     n_raw_samples: PositiveInt = Field(
         20,
         description="number of raw samples used to seed optimization",
@@ -71,7 +70,6 @@ class GridOptimizer(NumericalOptimizer):
     """
 
     name: str = Field("grid", frozen=True)
-    name3: Literal['test'] = "test"
     n_grid_points: PositiveInt = Field(
         10, description="number of grid points per axis used for optimization"
     )

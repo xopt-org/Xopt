@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Union
+from typing import Dict, List, Union
 
 import pandas as pd
 import torch
