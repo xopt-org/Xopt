@@ -129,11 +129,7 @@ class VOCS(XoptBaseModel):
     @property
     def all_names(self):
         """Returns all vocs names (variables, constants, objectives, constraints"""
-        return (
-            self.variable_names
-            + self.constant_names
-            + self.output_names
-        )
+        return self.variable_names + self.constant_names + self.output_names
 
     @property
     def n_variables(self):
@@ -222,29 +218,34 @@ class VOCS(XoptBaseModel):
 
         return inputs
 
-    def convert_dataframe_to_inputs(self, data: pd.DataFrame) -> pd.DataFrame:
+    def convert_dataframe_to_inputs(
+        self, data: pd.DataFrame, include_constants=True
+    ) -> pd.DataFrame:
         """
         Extracts only inputs from a dataframe.
-        This will add constants.
+        This will add constants if `include_constants` is true.
         """
-        # make sure that the df keys contain the vocs variables
-        if not set(self.variable_names).issubset(set(data.keys())):
-            raise RuntimeError(
-                "input dataframe must at least contain the vocs variables"
+        # make sure that the df keys only contain vocs variables
+        if not set(self.variable_names) == set(data.keys()):
+            raise ValueError(
+                "input dataframe column set must equal set of vocs variables"
             )
 
         # only keep the variables
-        in_copy = data[self.variable_names].copy()
+        inner_copy = data.copy()
 
-        # append constants
-        constants = self.constants
-        if constants is not None:
-            for name, val in constants.items():
-                in_copy[name] = val
+        # append constants if requested
+        if include_constants:
+            constants = self.constants
+            if constants is not None:
+                for name, val in constants.items():
+                    inner_copy[name] = val
 
-        return in_copy
+        return inner_copy
 
-    def convert_numpy_to_inputs(self, inputs: np.ndarray) -> pd.DataFrame:
+    def convert_numpy_to_inputs(
+        self, inputs: np.ndarray, include_constants=True
+    ) -> pd.DataFrame:
         """
         convert 2D numpy array to list of dicts (inputs) for evaluation
         Assumes that the columns of the array match correspond to
@@ -252,7 +253,7 @@ class VOCS(XoptBaseModel):
 
         """
         df = pd.DataFrame(inputs, columns=self.variable_names)
-        return self.convert_dataframe_to_inputs(df)
+        return self.convert_dataframe_to_inputs(df, include_constants)
 
     # Extract optimization data (in correct column order)
     def variable_data(

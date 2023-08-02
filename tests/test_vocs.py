@@ -2,8 +2,9 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import ObjectiveEnum, VOCS
 
 
@@ -109,3 +110,13 @@ class TestVOCS(object):
 
         assert vocs.output_names == ["d1", "y1", "c1"]
         assert vocs.n_outputs == 3
+
+    def test_convert_dataframe_to_inputs(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = TEST_VOCS_DATA
+
+        with pytest.raises(ValueError):
+            vocs.convert_dataframe_to_inputs(test_data)
+
+        res = vocs.convert_dataframe_to_inputs(test_data[vocs.variable_names])
+        assert "cnt1" in res

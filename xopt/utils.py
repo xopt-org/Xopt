@@ -219,7 +219,7 @@ def visualize_model(generator, data, axes=None):
 
 
 def explode_all_columns(data: pd.DataFrame):
-    """ explode all data columns in dataframes that are lists or np.arrays """
+    """explode all data columns in dataframes that are lists or np.arrays"""
     list_types = []
     for name, val in data.iloc[0].items():
         if isinstance(val, list) or isinstance(val, np.ndarray):
@@ -232,4 +232,3 @@ def explode_all_columns(data: pd.DataFrame):
             raise ValueError("evaluator outputs that are lists must match in size")
     else:
         return data
-

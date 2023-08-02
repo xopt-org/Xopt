@@ -94,7 +94,10 @@ class CNSGAGenerator(Generator):
         if self.population is None:
             # Special case when pop is loaded from file
             if self._loaded_population is None:
-                return [self.vocs.random_inputs() for _ in range(self.n_pop)]
+                return [
+                    self.vocs.random_inputs(include_constants=False)
+                    for _ in range(self.n_pop)
+                ]
             else:
                 pop = self._loaded_population
         else:
@@ -179,9 +182,9 @@ class CNSGAGenerator(Generator):
         pop = pd.read_csv(filename, index_col="xopt_index")
         self._loaded_population = pop
         # This is a list of dicts
-        self.children = self.vocs.convert_dataframe_to_inputs(pop).to_dict(
-            orient="records"
-        )
+        self.children = self.vocs.convert_dataframe_to_inputs(
+            pop[self.vocs.variable_names], include_constants=False
+        ).to_dict(orient="records")
         logger.info(f"Loaded population of len {len(pop)} from file: {filename}")
 
     @property
@@ -365,5 +368,5 @@ def cnsga_variation(
     vecs = [[float(x) for x in child] for child in children]
 
     return vocs.convert_dataframe_to_inputs(
-        pd.DataFrame(vecs, columns=vocs.variable_names)
+        pd.DataFrame(vecs, columns=vocs.variable_names), include_constants=False
     )
