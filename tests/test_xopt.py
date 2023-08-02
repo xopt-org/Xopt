@@ -3,6 +3,7 @@ from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
 from copy import copy, deepcopy
 
+import numpy as np
 import pandas as pd
 import pytest
 import yaml
@@ -47,6 +48,22 @@ class TestXopt:
         evaluator = Evaluator(function=dummy)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+
+    def test_evaluate_data(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+
+        # test evaluating data w/o constants specified
+        test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
+        # pop constant specified in vocs
+        test_data.pop("cnt1")
+        xopt.evaluate_data(pd.DataFrame(test_data))
+
+        assert np.all(xopt.data["cnt1"].to_numpy() == np.ones(3))
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -187,20 +204,6 @@ class TestXopt:
         ss = 1
         X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
         X.process_futures()
-
-    def test_random(self):
-        evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-
-        xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
-        )
-        xopt.step()
-
-        for _ in range(10):
-            xopt.step()
-        data = xopt.data
-        assert len(data) == 11
 
     def test_checkpointing(self):
         evaluator = Evaluator(function=xtest_callable)

@@ -165,8 +165,9 @@ class OptimizeTurboController(TurboController):
         feas_data = self.vocs.feasibility_data(data)
 
         if len(data[feas_data["feasible"]]) == 0:
-            raise RuntimeError("turbo requires at least one valid point in training "
-                               "dataset")
+            raise RuntimeError(
+                "turbo requires at least one valid point in training " "dataset"
+            )
         else:
             self._set_best_point(data[feas_data["feasible"]])
 

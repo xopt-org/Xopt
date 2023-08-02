@@ -204,7 +204,6 @@ class TestBayesianGenerator(TestCase):
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_fixed_feature(self):
-
         # test with a fixed feature not contained in vocs
         gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"p": 3.0}
