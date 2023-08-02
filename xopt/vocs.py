@@ -105,8 +105,9 @@ class VOCS(XoptBaseModel):
     @property
     def output_names(self):
         """
-        Returns a sorted list of objective and constraint names (objectives first
-        then constraints)
+        Returns a list of expected output keys:
+            (objectives + constraints + observables)
+        Each sub-list is sorted.
         """
         full_list = self.objective_names
         for ele in self.constraint_names:
@@ -128,7 +129,7 @@ class VOCS(XoptBaseModel):
 
     @property
     def all_names(self):
-        """Returns all vocs names (variables, constants, objectives, constraints"""
+        """Returns all vocs names (variables, constants, objectives, constraints)"""
         return self.variable_names + self.constant_names + self.output_names
 
     @property
@@ -163,7 +164,10 @@ class VOCS(XoptBaseModel):
 
     @property
     def n_outputs(self):
-        """Returns the number of outputs (objectives and constraints)"""
+        """
+        Returns the number of outputs
+            len(objectives + constraints + observables)
+        """
         return len(self.output_names)
 
     def random_inputs(
