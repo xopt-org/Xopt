@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+import pandas as pd
 import torch
 from pydantic import BaseModel, Extra
 from torch import nn
