@@ -11,6 +11,7 @@ from xopt.generators import get_generator
 
 # from xopt.generators import get_generator_and_defaults
 from xopt.pydantic import XoptBaseModel
+from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
@@ -139,10 +140,7 @@ class Xopt:
         new_data = pd.concat([input_data, output_data], axis=1)
 
         # explode any list like results if all of the output names exist
-        try:
-            new_data = new_data.explode(self.vocs.output_names)
-        except KeyError:
-            pass
+        new_data = explode_all_columns(new_data)
 
         self.add_data(new_data)
         return new_data
@@ -295,10 +293,7 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # explode any list like results if all of the output names exist
-        try:
-            new_data = new_data.explode(self.vocs.output_names)
-        except KeyError:
-            pass
+        new_data = explode_all_columns(new_data)
 
         # Add to internal dataframes
         self.add_data(new_data)
