@@ -1,11 +1,14 @@
 from unittest import TestCase
 
+import numpy as np
 import pandas as pd
+import pytest
 import torch
 from pydantic import BaseModel, Extra
 from torch import nn
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.utils import add_constraint_information, copy_generator, has_device_field
+from xopt.utils import add_constraint_information, copy_generator, has_device_field, \
+    explode_all_columns
 
 BaseModel.Config.arbitrary_types_allowed = True
 BaseModel.Config.extra = Extra.forbid
