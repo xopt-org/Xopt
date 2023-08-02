@@ -67,7 +67,7 @@ class BayesianGenerator(Generator, ABC):
         None,
         description="limits for travel distance between points in normalized space",
     )
-    fixed_features: Dict[str, float] = Field(
+    fixed_features: Optional[Dict[str, float]] = Field(
         None, description="fixed features used in Bayesian optimization"
     )
     computation_time: pd.DataFrame = Field(
@@ -78,6 +78,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("model_constructor", mode='before')
     def validate_model_constructor(cls, value):
+        print(f'Verifying model {value}')
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
@@ -89,9 +90,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            #name = value.pop("name")
-            # name is ClassVar, not instance field
-            name = cls.name
+            name = value.pop("name")
             if name in constructor_dict:
                 value = constructor_dict[name](**value)
             else:
@@ -112,7 +111,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name = cls.name
+            name = value.pop("name")
             if name in optimizer_dict:
                 value = optimizer_dict[name](**value)
             else:

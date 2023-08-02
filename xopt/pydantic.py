@@ -85,7 +85,7 @@ def recursive_serialize_v2(v, base_key=""):
 
     # This will iterate model fields
     for key, value in dict(v).items():
-        # print(f'{v=} {key=} {value=}')
+        print(f'{v=} {key=} {value=}')
         if isinstance(value, dict):
             v[key] = recursive_serialize(value, base_key=key)
         elif isinstance(value, torch.nn.Module):
@@ -134,9 +134,21 @@ def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False):
     json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
     return orjson_dumps_custom(v, default=json_encoder, base_key=base_key, serialize_torch=serialize_torch)
 
+
 def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False):
     v = recursive_serialize(v.model_dump(), base_key=base_key, serialize_torch=serialize_torch)
     return orjson.dumps(v, default=default).decode()
+
+
+def orjson_dumps_except_root(v: BaseModel, *, base_key=""):
+    # to ensure pydantic custom serializer works, needs to return dict and not string
+    # so, serialize subfields instead of base model
+    json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
+    v2 = recursive_serialize(v.model_dump(), base_key=base_key)
+    data = {}
+    for field, fv in dict(v2).items():
+        data[field] = orjson.dumps(fv, default=json_encoder).decode()
+    return data
 
 
 def orjson_loads(v, default=None):
@@ -173,9 +185,9 @@ class XoptBaseModel(BaseModel):
 
         return value
 
-    @model_serializer(mode='plain', when_used='json', return_type='str')
+    @model_serializer(mode='plain', when_used='json')
     def serialize_json(self, base_key=""):
-        return orjson_dumps(self, base_key=base_key)
+        return orjson_dumps_except_root(self, base_key=base_key)
 
     # TODO: implement json load parsing on main object (json_loads is gone)
 
