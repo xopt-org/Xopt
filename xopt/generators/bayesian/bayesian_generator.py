@@ -63,7 +63,8 @@ class BayesianGenerator(Generator, ABC):
         None, description="fixed features used in Bayesian optimization"
     )
     computation_time: pd.DataFrame = Field(
-        pd.DataFrame([]), description="data frame tracking computation time in seconds"
+        pd.DataFrame([]),
+        description="data frame tracking computation time in seconds", exclude=True
     )
 
     @validator("model_constructor", pre=True)
