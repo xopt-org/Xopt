@@ -10,6 +10,7 @@ from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
 import orjson
+import pandas as pd
 import torch.nn
 from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
@@ -42,6 +43,8 @@ def recursive_serialize(v, base_key=""):
             v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
         elif isinstance(value, torch.dtype):
             v[key] = str(value)
+        elif isinstance(value, pd.DataFrame):
+            v[key] = json.loads(value.to_json())
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(value, _type):
