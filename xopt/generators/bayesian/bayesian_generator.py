@@ -176,9 +176,13 @@ class BayesianGenerator(Generator, ABC):
             result = self._process_candidates(candidates)
 
             # append timing results to dataframe
-            self.computation_time = pd.concat((
-                self.computation_time, pd.DataFrame(timing_results, index=[0]),
-            ), ignore_index=True)
+            self.computation_time = pd.concat(
+                (
+                    self.computation_time,
+                    pd.DataFrame(timing_results, index=[0]),
+                ),
+                ignore_index=True,
+            )
 
             return result
 
@@ -415,7 +419,7 @@ class BayesianGenerator(Generator, ABC):
 
         # get maximum travel distances
         max_travel_distances = (
-                torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
+            torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
         )
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
