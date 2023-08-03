@@ -23,6 +23,21 @@ class TestEvaluator:
     def identity(x, a=True):
         return {k + "_out": v for k, v in x.items()}
 
+    def test_evaluate(self):
+        # test in serial
+        evaluator = Evaluator(function=self.f)
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
+        results = evaluator.evaluate_data(candidates)
+        assert len(results) == 10
+
+        # test in parallel
+        evaluator = Evaluator(
+            function=self.f, executor=ProcessPoolExecutor(), max_workers=2
+        )
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
+        results = evaluator.evaluate_data(candidates)
+        assert len(results) == 10
+
     def test_submit(self):
         evaluator = Evaluator(function=self.f)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])

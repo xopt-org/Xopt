@@ -24,32 +24,31 @@ def feasibility(X, model, vocs, posterior_transform=None):
     return torch.mean(objective(samples, X), dim=0)
 
 
-def constraint_function(Z, vocs, name, index):
+def constraint_function(Z, vocs, name):
     """
     create constraint function
     - constraint functions should return negative values for feasible values and
     positive values for infeasible values
     """
-    n_objectives = len(vocs.objectives)
+    output_names = vocs.output_names
     constraint = vocs.constraints[name]
 
     if constraint[0] == "LESS_THAN":
-        return Z[..., n_objectives + index] - constraint[1]
+        return Z[..., output_names.index(name)] - constraint[1]
     elif constraint[0] == "GREATER_THAN":
-        return -(Z[..., n_objectives + index] - constraint[1])
+        return -(Z[..., output_names.index(name)] - constraint[1])
 
 
 def create_constraint_callables(vocs):
     if vocs.constraints is not None:
         constraint_names = list(vocs.constraints.keys())
         constraint_callables = []
-        for i, name in enumerate(constraint_names):
+        for name in constraint_names:
             constraint_callables += [
                 partial(
                     constraint_function,
                     vocs=vocs,
                     name=name,
-                    index=i,
                 )
             ]
         return constraint_callables

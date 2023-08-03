@@ -155,9 +155,9 @@ class BayesianGenerator(Generator, ABC):
             model = self.train_model(self.data)
             timing_results["training"] = time.time() - start
 
-            # update TurBO state if used
+            # update TurBO state if used with the last `n_candidates` points
             if self.turbo_controller is not None:
-                self.turbo_controller.update_state(self.data)
+                self.turbo_controller.update_state(self.data, n_candidates)
 
             # calculate optimization bounds
             bounds = self._get_optimization_bounds()
@@ -279,7 +279,7 @@ class BayesianGenerator(Generator, ABC):
         return self._process_candidates(result)
 
     def _process_candidates(self, candidates: Tensor):
-        """ process pytorch candidates from optimizing the acquisition function"""
+        """process pytorch candidates from optimizing the acquisition function"""
         logger.debug("Best candidate from optimize", candidates)
 
         if self.fixed_features is not None:
@@ -291,7 +291,8 @@ class BayesianGenerator(Generator, ABC):
 
         else:
             results = self.vocs.convert_numpy_to_inputs(
-                candidates.detach().cpu().numpy())
+                candidates.detach().cpu().numpy(), include_constants=False
+            )
 
         return results
 
@@ -335,7 +336,7 @@ class BayesianGenerator(Generator, ABC):
 
     @property
     def model_input_names(self):
-        """ variable names corresponding to trained model"""
+        """variable names corresponding to trained model"""
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
             for name, val in self.fixed_features.items():
@@ -345,7 +346,7 @@ class BayesianGenerator(Generator, ABC):
 
     @property
     def _candidate_names(self):
-        """ variable names corresponding to generated candidates"""
+        """variable names corresponding to generated candidates"""
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
             for name in self.fixed_features:
