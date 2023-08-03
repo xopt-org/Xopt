@@ -158,9 +158,7 @@ class TestBaxGenerator:
         alg = GridMinimize()
 
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE,
-            algorithm=alg,
-            algorithm_results_file="test"
+            vocs=TEST_VOCS_BASE, algorithm=alg, algorithm_results_file="test"
         )
         gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
@@ -173,7 +171,7 @@ class TestBaxGenerator:
         xopt.step()
 
         # test loading saved info
-        with open('test_2.pkl', 'rb') as handle:
+        with open("test_2.pkl", "rb") as handle:
             result = pickle.load(handle)
 
         assert isinstance(result["test_points"], torch.Tensor)
@@ -181,5 +179,6 @@ class TestBaxGenerator:
         assert isinstance(result["execution_paths"], torch.Tensor)
 
         import os
+
         os.remove("test_1.pkl")
         os.remove("test_2.pkl")

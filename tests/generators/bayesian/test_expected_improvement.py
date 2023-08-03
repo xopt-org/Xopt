@@ -34,6 +34,7 @@ class TestExpectedImprovement:
     def test_generate_w_overlapping_objectives_constraints(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {"y1": ["GREATER_THAN", 0.0]}
+        test_vocs.observables = ["y1"]
         gen = ExpectedImprovementGenerator(
             vocs=test_vocs,
         )

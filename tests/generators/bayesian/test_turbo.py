@@ -114,7 +114,7 @@ class TestTurbo(TestCase):
 
         # test best y value violates the constraint
         data = deepcopy(TEST_VOCS_DATA)
-        c_data = -10.0*np.ones(10)
+        c_data = -10.0 * np.ones(10)
         c_data[5] = 5.0
         data["c1"] = c_data
         y_data = np.ones(10)
@@ -132,7 +132,7 @@ class TestTurbo(TestCase):
 
         # test case where constraint violations give nan values for y
         data = deepcopy(TEST_VOCS_DATA)
-        c_data = -10.0*np.ones(10)
+        c_data = -10.0 * np.ones(10)
         c_data[5] = 5.0  # this point violates the constraint
         data["c1"] = c_data
         y_data = np.ones(10)
@@ -156,9 +156,7 @@ class TestTurbo(TestCase):
         best_value = TEST_VOCS_DATA[
             test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
         ].min()[test_vocs.objective_names[0]]
-        assert (
-            turbo_state.best_value == best_value
-        )
+        assert turbo_state.best_value == best_value
 
     def test_batch_turbo(self):
         # test in 1D

@@ -31,8 +31,9 @@ class TestEvaluator:
         assert len(results) == 10
 
         # test in parallel
-        evaluator = Evaluator(function=self.f, executor=ProcessPoolExecutor(),
-                              max_workers=2)
+        evaluator = Evaluator(
+            function=self.f, executor=ProcessPoolExecutor(), max_workers=2
+        )
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
         results = evaluator.evaluate_data(candidates)
         assert len(results) == 10
