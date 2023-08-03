@@ -42,7 +42,7 @@ class BaxGenerator(BayesianGenerator):
             results = deepcopy(self.algorithm_results)
 
             with open(
-                    f"{self.algorithm_results_file}_{self._n_calls}.pkl", "wb"
+                f"{self.algorithm_results_file}_{self._n_calls}.pkl", "wb"
             ) as outfile:
                 pickle.dump(results, outfile, protocol=pickle.HIGHEST_PROTOCOL)
 

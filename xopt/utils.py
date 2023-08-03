@@ -7,6 +7,7 @@ import traceback
 from copy import deepcopy
 from typing import List, Tuple
 
+import numpy as np
 import pandas as pd
 import torch
 import yaml
@@ -299,3 +300,19 @@ def visualize_model(generator, data, axes=None):
 
         ax[1].plot(test_x, acq, label="Acquisition Function")
         ax[1].legend()
+
+
+def explode_all_columns(data: pd.DataFrame):
+    """explode all data columns in dataframes that are lists or np.arrays"""
+    list_types = []
+    for name, val in data.iloc[0].items():
+        if isinstance(val, list) or isinstance(val, np.ndarray):
+            list_types += [name]
+
+    if len(list_types):
+        try:
+            return data.explode(list_types)
+        except ValueError:
+            raise ValueError("evaluator outputs that are lists must match in size")
+    else:
+        return data

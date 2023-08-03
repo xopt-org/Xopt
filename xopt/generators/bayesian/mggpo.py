@@ -52,7 +52,8 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
 
             candidates = ga_candidates[best_idxs]
             return self.vocs.convert_numpy_to_inputs(
-                candidates.reshape(n_candidates, self.vocs.n_variables).numpy()
+                candidates.reshape(n_candidates, self.vocs.n_variables).numpy(),
+                include_constants=False,
             )
 
     def add_data(self, new_data: pd.DataFrame):
