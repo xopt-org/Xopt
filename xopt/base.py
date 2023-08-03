@@ -8,9 +8,8 @@ from xopt.errors import XoptError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
-
-# from xopt.generators import get_generator_and_defaults
 from xopt.pydantic import XoptBaseModel
+from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
@@ -18,8 +17,6 @@ __version__ = _version.get_versions()["version"]
 import concurrent
 import logging
 import os
-
-from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -127,11 +124,19 @@ class Xopt:
 
     def evaluate_data(self, input_data: pd.DataFrame):
         """
-        Evaluate data using the evaluator.
+        Evaluate data using the evaluator. Data should only contain values
+        corresponding to `vocs.variable_names`
         Adds to the internal dataframe.
         """
         logger.debug(f"Evaluating {len(input_data)} inputs")
+
+        # add constants from vocs to input data
+        input_data = self.vocs.convert_dataframe_to_inputs(input_data)
+
+        # validate inputs and reindex
         input_data = self.prepare_input_data(input_data)
+
+        # evaluate data
         output_data = self.evaluator.evaluate_data(input_data)
 
         if self.options.strict:
@@ -139,10 +144,7 @@ class Xopt:
         new_data = pd.concat([input_data, output_data], axis=1)
 
         # explode any list like results if all of the output names exist
-        try:
-            new_data = new_data.explode(self.vocs.output_names)
-        except KeyError:
-            pass
+        new_data = explode_all_columns(new_data)
 
         self.add_data(new_data)
         return new_data
@@ -295,10 +297,7 @@ class Xopt:
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
         # explode any list like results if all of the output names exist
-        try:
-            new_data = new_data.explode(self.vocs.output_names)
-        except KeyError:
-            pass
+        new_data = explode_all_columns(new_data)
 
         # Add to internal dataframes
         self.add_data(new_data)
@@ -422,18 +421,6 @@ Config as YAML:
 
     # Convenience methods
 
-    def random_inputs(self, n_samples=1, seed=None, **kwargs):
-        """
-        Convenence method to call vocs.random_inputs
-        """
-        return self.vocs.random_inputs(n_samples, seed=seed, **kwargs)
-
-    def evaluate(self, inputs: Dict, **kwargs):
-        """
-        Convenience method to call evaluator.evaluate
-        """
-        return self.evaluator.evaluate(inputs, **kwargs)
-
     def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """
         Convenience method to generate random inputs using vocs
@@ -441,9 +428,9 @@ Config as YAML:
         """
         index = [1] if n_samples == 1 else None
         random_inputs = pd.DataFrame(
-            self.random_inputs(n_samples, seed=seed, **kwargs), index=index
+            self.vocs.random_inputs(n_samples, seed=seed, **kwargs), index=index
         )
-        result = self.evaluate_data(random_inputs)
+        result = self.evaluate_data(random_inputs[self.vocs.variable_names])
         return result
 
 
@@ -482,7 +469,7 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     if "data" in config.keys():
         data = pd.DataFrame(config["data"])
     else:
-        data = pd.DataFrame({})
+        data = None
 
     # create generator
     generator_class = get_generator(config["generator"].pop("name"))

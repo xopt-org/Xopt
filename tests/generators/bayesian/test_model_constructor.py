@@ -35,6 +35,20 @@ class TestModelConstructor:
 
         constructor.build_model_from_vocs(test_vocs, test_data)
 
+    def test_duplicate_keys(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.observables = ["y1"]
+
+        constructor = StandardModelConstructor()
+
+        constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert model.num_outputs == 2
+
     def test_custom_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)

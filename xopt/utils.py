@@ -4,11 +4,16 @@ import inspect
 import sys
 import time
 import traceback
+from copy import deepcopy
+from typing import List, Tuple
 
+import numpy as np
 import pandas as pd
 import torch
 import yaml
+from pydantic import BaseModel
 
+from xopt.generator import Generator
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
@@ -151,6 +156,86 @@ def format_option_descriptions(options_object):
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
+def copy_generator(generator: Generator) -> Tuple[Generator, List[str]]:
+    """
+    Create a deep copy of a given generator.
+    Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
+
+    Parameters
+    ----------
+    generator : Generator
+
+    Returns
+    -------
+    generator_copy : Generator
+    list_of_fields_on_gpu : list[str]
+    """
+    generator_copy = deepcopy(generator)
+    generator_copy, list_of_fields_on_gpu = recursive_move_data_gpu_to_cpu(
+        generator_copy
+    )
+    return generator_copy, list_of_fields_on_gpu
+
+
+def recursive_move_data_gpu_to_cpu(
+    pydantic_object: BaseModel,
+) -> Tuple[BaseModel, List[str]]:
+    """
+    A recersive method to find all the data of a pydantic object
+    which is stored on the gpu and then move that data to the cpu.
+
+    Parameters
+    ----------
+    pydantic_object : BaseModel
+
+    Returns
+    -------
+    pydantic_object : BaseModel
+    list_of_fields_on_gpu : list[str]
+
+    """
+    pydantic_object_dict = pydantic_object.dict()
+    list_of_fields_on_gpu = [pydantic_object.__class__.__name__]
+
+    for field_name, field_value in pydantic_object_dict.items():
+        if isinstance(field_value, BaseModel):
+            result = recursive_move_data_gpu_to_cpu(field_value)
+            pydantic_object_dict[field_name] = result[0]
+            list_of_fields_on_gpu.append(result[1])
+        if isinstance(field_value, torch.Tensor):
+            if field_value.device.type == "cuda":
+                pydantic_object_dict[field_name] = field_value.cpu()
+                list_of_fields_on_gpu.append(field_name)
+        elif isinstance(field_value, torch.nn.Module):
+            if has_device_field(field_value, torch.device("cuda")):
+                pydantic_object_dict[field_name] = field_value.cpu()
+                list_of_fields_on_gpu.append(field_name)
+
+    return pydantic_object, list_of_fields_on_gpu
+
+
+def has_device_field(module: torch.nn.Module, device: torch.device) -> bool:
+    """
+    Checks if given module has a given device.
+
+    Parameters
+    ----------
+    module : torch.nn.Module
+    device : torch.device
+
+    Returns
+    -------
+    True/False : bool
+    """
+    for parameter in module.parameters():
+        if parameter.device == device:
+            return True
+    for buffer in module.buffers():
+        if buffer.device == device:
+            return True
+    return False
+
+
 def read_xopt_csv(*files):
     """
     Read several Xopt-style CSV files into data
@@ -215,3 +300,19 @@ def visualize_model(generator, data, axes=None):
 
         ax[1].plot(test_x, acq, label="Acquisition Function")
         ax[1].legend()
+
+
+def explode_all_columns(data: pd.DataFrame):
+    """explode all data columns in dataframes that are lists or np.arrays"""
+    list_types = []
+    for name, val in data.iloc[0].items():
+        if isinstance(val, list) or isinstance(val, np.ndarray):
+            list_types += [name]
+
+    if len(list_types):
+        try:
+            return data.explode(list_types)
+        except ValueError:
+            raise ValueError("evaluator outputs that are lists must match in size")
+    else:
+        return data

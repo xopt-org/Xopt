@@ -26,7 +26,7 @@ class TestMGPO:
         X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
         samples = X.generator.generate(10)
-        assert samples.to_numpy().shape == (10, 3)
+        assert samples.to_numpy().shape == (10, 2)
 
         X.step()
 
