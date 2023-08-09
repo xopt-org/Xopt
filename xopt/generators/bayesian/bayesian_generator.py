@@ -165,12 +165,10 @@ class BayesianGenerator(Generator, ABC):
 
             # propose candidates given model
             start_time = time.perf_counter()
-            candidates = self.propose_candidates(
-                model, n_candidates=n_candidates
+            candidates = self.propose_candidates(model, n_candidates=n_candidates)
+            timing_results["acquisition_optimization"] = (
+                time.perf_counter() - start_time
             )
-            timing_results[
-                "acquisition_optimization"
-            ] = time.perf_counter() - start_time
 
             # post process candidates
             result = self._process_candidates(candidates)
@@ -240,9 +238,7 @@ class BayesianGenerator(Generator, ABC):
         acq_funct = self.get_acquisition(model)
 
         # get candidates
-        candidates = self.numerical_optimizer.optimize(
-            acq_funct, bounds, n_candidates
-        )
+        candidates = self.numerical_optimizer.optimize(acq_funct, bounds, n_candidates)
         return candidates
 
     def get_input_data(self, data):
