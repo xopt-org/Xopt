@@ -28,9 +28,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
 
     def propose_candidates(self, model, n_candidates=1):
         ga_candidates = self.ga_generator.generate(n_candidates * 10)
-        ga_candidates = pd.DataFrame(ga_candidates)[
-            self.vocs.variable_names
-        ].to_numpy()
+        ga_candidates = pd.DataFrame(ga_candidates)[self.vocs.variable_names].to_numpy()
         ga_candidates = torch.unique(
             torch.tensor(ga_candidates, **self._tkwargs), dim=0
         ).reshape(-1, 1, self.vocs.n_variables)

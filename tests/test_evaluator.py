@@ -67,13 +67,16 @@ class TestEvaluator:
                 "_leading": [2.0, 3.0, 4.0],
                 "has:colon": [1, 2.0, 3],
                 ":colon:leading": [2.0, 3.0, 4.0],
-                'strings': ['a', 'b', 'c'],
-                'booleans': [True, False, True],
-                'lists': [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
-                'dicts': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}, {'e': 5, 'f': 6}],
-                'dicts_compund': [{'a': 1, 'b': True}, {'c': 3, 'd': "4"}, {'e': 5,
-                                                                            'f': 6}],
-                'tuples': [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
+                "strings": ["a", "b", "c"],
+                "booleans": [True, False, True],
+                "lists": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+                "dicts": [{"a": 1, "b": 2}, {"c": 3, "d": 4}, {"e": 5, "f": 6}],
+                "dicts_compund": [
+                    {"a": 1, "b": True},
+                    {"c": 3, "d": "4"},
+                    {"e": 5, "f": 6},
+                ],
+                "tuples": [(1, 2, 3), (4, 5, 6), (7, 8, 9)],
             },
             index=[7, 8, 9],
         )
