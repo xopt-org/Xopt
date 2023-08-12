@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import torch
 from botorch.models import SingleTaskGP
+from botorch.models.model import ModelList
 from botorch.models.transforms import Normalize, Standardize
 
 from xopt.base import Xopt
@@ -57,15 +58,17 @@ class TestBaxGenerator:
             bounds = torch.stack([torch.zeros(ndim), torch.ones(ndim)])
             alg = GridMinimize()
 
-            # create a model
+            # create a ModelList with a single output
             train_X = torch.rand(10, ndim)
             train_Y = torch.rand(10, 1)
 
-            model = SingleTaskGP(
-                train_X,
-                train_Y,
-                input_transform=Normalize(ndim),
-                outcome_transform=Standardize(1),
+            model = ModelList(
+                SingleTaskGP(
+                    train_X,
+                    train_Y,
+                    input_transform=Normalize(ndim),
+                    outcome_transform=Standardize(1),
+                )
             )
 
             x_exe, y_exe, results = alg.get_execution_paths(model, bounds)
@@ -75,21 +78,32 @@ class TestBaxGenerator:
             assert x_exe.shape == torch.Size([alg.n_samples, 1, ndim])
             assert y_exe.shape == torch.Size([alg.n_samples, 1, 1])
 
-            # need to call model on some data before conditioning
-            model(x_exe)
+            # need to call each sub-model on some data before conditioning
+            [m(x_exe) for m in model.models]
 
-            xs_exe_transformed = model.input_transform(x_exe)
-            ys_exe_transformed = model.outcome_transform(y_exe)[0]
-            fantasy_models = model.condition_on_observations(
-                xs_exe_transformed, ys_exe_transformed
-            )
+            x_exe_t = [
+                model.models[i].input_transform(x_exe) for i in range(len(model.models))
+            ]
+            y_exe_t = [
+                model.models[i].outcome_transform(
+                    torch.index_select(y_exe, dim=-1, index=torch.tensor([i]))
+                )[0]
+                for i in range(len(model.models))
+            ]
+            fantasy_models = [
+                m.condition_on_observations(x, y)
+                for m, x, y in zip(model.models, x_exe_t, y_exe_t)
+            ]
 
-            # validate fantasy model
-            assert fantasy_models.batch_shape == torch.Size([alg.n_samples])
-            assert fantasy_models.train_inputs[0].shape == torch.Size(
-                [alg.n_samples, 11, ndim]
-            )
-            assert fantasy_models.train_targets.shape == torch.Size([alg.n_samples, 11])
+            # validate fantasy models
+            for fantasy_model in fantasy_models:
+                assert fantasy_model.batch_shape == torch.Size([alg.n_samples])
+                assert fantasy_model.train_inputs[0].shape == torch.Size(
+                    [alg.n_samples, 11, ndim]
+                )
+                assert fantasy_model.train_targets.shape == torch.Size(
+                    [alg.n_samples, 11]
+                )
 
     def test_generate(self):
         alg = GridMinimize()
@@ -158,9 +172,7 @@ class TestBaxGenerator:
         alg = GridMinimize()
 
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE,
-            algorithm=alg,
-            algorithm_results_file="test"
+            vocs=TEST_VOCS_BASE, algorithm=alg, algorithm_results_file="test"
         )
         gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
@@ -173,7 +185,7 @@ class TestBaxGenerator:
         xopt.step()
 
         # test loading saved info
-        with open('test_2.pkl', 'rb') as handle:
+        with open("test_2.pkl", "rb") as handle:
             result = pickle.load(handle)
 
         assert isinstance(result["test_points"], torch.Tensor)
@@ -181,5 +193,6 @@ class TestBaxGenerator:
         assert isinstance(result["execution_paths"], torch.Tensor)
 
         import os
+
         os.remove("test_1.pkl")
         os.remove("test_2.pkl")
