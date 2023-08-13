@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, Tuple
+from typing import ClassVar, Dict, List, Tuple
 
 import torch
 from botorch.models.model import Model
@@ -46,13 +46,18 @@ class GridScanAlgorithm(Algorithm, ABC):
 
 
 class GridMinimize(GridScanAlgorithm):
+    model_names_ordered: List[str] = Field(
+        default=["y1"],
+        description="names of observable/objective models used in this algorithm",
+    )
+
     def get_execution_paths(
         self, model: Model, bounds: Tensor
     ) -> Tuple[Tensor, Tensor, Dict]:
         """get execution paths that minimize the objective function"""
 
         # build evaluation mesh
-        test_points = self.create_mesh(bounds).to(model.train_targets)
+        test_points = self.create_mesh(bounds).to(model.models[0].train_targets)
 
         # get samples of the model posterior at mesh points
         with torch.no_grad():
