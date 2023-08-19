@@ -1,8 +1,10 @@
-from botorch.acquisition import qUpperConfidenceBound
+import torch
+from botorch.acquisition import qUpperConfidenceBound, UpperConfidenceBound, ScalarizedPosteriorTransform
 from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
+from xopt.generators.bayesian.utils import set_botorch_weights
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
@@ -13,15 +15,23 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     acquisition function"""
 
     def _get_acquisition(self, model):
-        sampler = self._get_sampler(model)
-        qUCB = qUpperConfidenceBound(
-            model,
-            sampler=sampler,
-            objective=self._get_objective(),
-            beta=self.beta,
-        )
+        if self.n_candidates > 1:
+            # MC sampling for generating multiple candidate points
+            sampler = self._get_sampler(model)
+            acq = qUpperConfidenceBound(
+                model,
+                sampler=sampler,
+                objective=self._get_objective(),
+                beta=self.beta,
+            )
+        else:
+            # analytic acquisition function for single candidate generation
+            weights = torch.zeros(self.vocs.n_outputs).to(**self._tkwargs)
+            weights = set_botorch_weights(weights, self.vocs)
+            posterior_transform = ScalarizedPosteriorTransform(weights)
+            acq = UpperConfidenceBound(model, beta=self.beta, posterior_transform=posterior_transform)
 
-        return qUCB
+        return acq
 
 
 class TDUpperConfidenceBoundGenerator(

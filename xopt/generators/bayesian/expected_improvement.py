@@ -1,7 +1,8 @@
 import torch
-from botorch.acquisition import qExpectedImprovement
+from botorch.acquisition import qExpectedImprovement, ScalarizedPosteriorTransform, ExpectedImprovement
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.utils import set_botorch_weights
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
@@ -13,13 +14,21 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         objective_data = self.vocs.objective_data(self.data, "").dropna()
         best_f = -torch.tensor(objective_data.min(), **self._tkwargs)
-        sampler = self._get_sampler(model)
 
-        qEI = qExpectedImprovement(
-            model,
-            best_f=best_f,
-            sampler=sampler,
-            objective=self._get_objective(),
-        )
+        if self.n_candidates > 1:
+            # MC sampling for generating multiple candidate points
+            sampler = self._get_sampler(model)
+            acq = qExpectedImprovement(
+                model,
+                best_f=best_f,
+                sampler=sampler,
+                objective=self._get_objective(),
+            )
+        else:
+            # analytic acquisition function for single candidate generation
+            weights = torch.zeros(self.vocs.n_outputs).to(**self._tkwargs)
+            weights = set_botorch_weights(weights, self.vocs)
+            posterior_transform = ScalarizedPosteriorTransform(weights)
+            acq = ExpectedImprovement(model, best_f=best_f, posterior_transform=posterior_transform)
 
-        return qEI
+        return acq
