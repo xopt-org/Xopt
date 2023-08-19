@@ -1,5 +1,9 @@
 import torch
-from botorch.acquisition import qUpperConfidenceBound, UpperConfidenceBound, ScalarizedPosteriorTransform
+from botorch.acquisition import (
+    qUpperConfidenceBound,
+    ScalarizedPosteriorTransform,
+    UpperConfidenceBound,
+)
 from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
@@ -29,7 +33,9 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
             weights = torch.zeros(self.vocs.n_outputs).to(**self._tkwargs)
             weights = set_botorch_weights(weights, self.vocs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
-            acq = UpperConfidenceBound(model, beta=self.beta, posterior_transform=posterior_transform)
+            acq = UpperConfidenceBound(
+                model, beta=self.beta, posterior_transform=posterior_transform
+            )
 
         return acq
 
