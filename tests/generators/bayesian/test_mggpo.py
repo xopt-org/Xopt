@@ -9,7 +9,7 @@ from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
-class TestMGPO:
+class TestMGGPO:
     def test_init(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.objectives.update({"y2": "MINIMIZE"})
@@ -44,4 +44,3 @@ class TestMGPO:
 
         for _ in [0, 1]:
             X.step()
-        print(X.data)
