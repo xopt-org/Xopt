@@ -1,4 +1,5 @@
 import logging
+import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -60,6 +61,10 @@ class BayesianGenerator(Generator, ABC):
     )
     fixed_features: Dict[str, float] = Field(
         None, description="fixed features used in Bayesian optimization"
+    )
+    computation_time: pd.DataFrame = Field(
+        pd.DataFrame([]),
+        description="data frame tracking computation time in seconds",
     )
 
     @validator("model_constructor", pre=True)
@@ -125,6 +130,13 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError(f"{value} not found")
         return value
 
+    @validator("computation_time", pre=True)
+    def validate_computation_time(cls, value):
+        if isinstance(value, dict):
+            value = pd.DataFrame(value)
+
+        return value
+
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
@@ -143,26 +155,32 @@ class BayesianGenerator(Generator, ABC):
             )
 
         else:
+            # dict to track runtimes
+            timing_results = {}
+
             # update internal model with internal data
+            start_time = time.perf_counter()
             model = self.train_model(self.data)
+            timing_results["training"] = time.perf_counter() - start_time
 
-            # update TurBO state if used with the last `n_candidates` points
-            if self.turbo_controller is not None:
-                self.turbo_controller.update_state(self.data, n_candidates)
-
-            # calculate optimization bounds
-            bounds = self._get_optimization_bounds()
-
-            # get acquisition function
-            acq_funct = self.get_acquisition(model)
-
-            # get candidates
-            candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates
+            # propose candidates given model
+            start_time = time.perf_counter()
+            candidates = self.propose_candidates(model, n_candidates=n_candidates)
+            timing_results["acquisition_optimization"] = (
+                time.perf_counter() - start_time
             )
 
             # post process candidates
             result = self._process_candidates(candidates)
+
+            # append timing results to dataframe
+            self.computation_time = pd.concat(
+                (
+                    self.computation_time,
+                    pd.DataFrame(timing_results, index=[0]),
+                ),
+                ignore_index=True,
+            )
 
             return result
 
@@ -202,6 +220,26 @@ class BayesianGenerator(Generator, ABC):
         if update_internal:
             self.model = _model
         return _model
+
+    def propose_candidates(self, model, n_candidates=1):
+        """
+        given a GP model, propose candidates by numerically optimizing the
+        acquisition function
+
+        """
+        # update TurBO state if used with the last `n_candidates` points
+        if self.turbo_controller is not None:
+            self.turbo_controller.update_state(self.data, n_candidates)
+
+        # calculate optimization bounds
+        bounds = self._get_optimization_bounds()
+
+        # get acquisition function
+        acq_funct = self.get_acquisition(model)
+
+        # get candidates
+        candidates = self.numerical_optimizer.optimize(acq_funct, bounds, n_candidates)
+        return candidates
 
     def get_input_data(self, data):
         return torch.tensor(data[self.model_input_names].to_numpy(), **self._tkwargs)
@@ -246,7 +284,7 @@ class BayesianGenerator(Generator, ABC):
         return acq
 
     def get_optimum(self):
-        """select the best point(s) (for multi-objective generators, given by the
+        """select the best point(s) given by the
         model using the Posterior mean"""
         c_posterior_mean = ConstrainedMCAcquisitionFunction(
             self.model,
@@ -457,22 +495,3 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         volume = bd.compute_hypervolume().item()
 
         return volume
-
-
-def _preprocess_generator_arguments(kwargs):
-    vocs = kwargs.get("vocs")
-    model_constructor = kwargs.pop("model_constructor", None)
-
-    if model_constructor is None:
-        model_constructor = StandardModelConstructor(vocs=vocs)
-    elif isinstance(model_constructor, ModelConstructor):
-        model_constructor = model_constructor
-    else:
-        # replace model_constructor dict with object
-        name = model_constructor.pop("name")
-        if name == "standard":
-            model_constructor = StandardModelConstructor(vocs=vocs, **model_constructor)
-
-    kwargs["model_constructor"] = model_constructor
-
-    return kwargs
