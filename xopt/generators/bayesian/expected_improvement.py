@@ -1,5 +1,9 @@
 import torch
-from botorch.acquisition import qExpectedImprovement, ScalarizedPosteriorTransform, ExpectedImprovement
+from botorch.acquisition import (
+    ExpectedImprovement,
+    qExpectedImprovement,
+    ScalarizedPosteriorTransform,
+)
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.utils import set_botorch_weights
@@ -29,6 +33,8 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             weights = torch.zeros(self.vocs.n_outputs).to(**self._tkwargs)
             weights = set_botorch_weights(weights, self.vocs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
-            acq = ExpectedImprovement(model, best_f=best_f, posterior_transform=posterior_transform)
+            acq = ExpectedImprovement(
+                model, best_f=best_f, posterior_transform=posterior_transform
+            )
 
         return acq
