@@ -66,6 +66,7 @@ class BayesianGenerator(Generator, ABC):
         pd.DataFrame([]),
         description="data frame tracking computation time in seconds",
     )
+    n_candidates: int = 1
 
     @validator("model_constructor", pre=True)
     def validate_model_constructor(cls, value):
@@ -141,6 +142,7 @@ class BayesianGenerator(Generator, ABC):
         self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> pd.DataFrame:
+        self.n_candidates = n_candidates
         if n_candidates > 1 and not self.supports_batch_generation:
             raise NotImplementedError(
                 "This Bayesian algorithm does not currently support parallel candidate "
