@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
-from botorch.models.transforms import Normalize, Standardize
+from botorch.models.transforms import Standardize
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
@@ -15,7 +15,7 @@ from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.generators.bayesian.utils import get_training_data
+from xopt.generators.bayesian.utils import get_input_transform, get_training_data
 from xopt.pydantic import orjson_dumps
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
@@ -79,17 +79,6 @@ class StandardModelConstructor(ModelConstructor):
             )
             return likelihood
 
-    def get_input_transform(
-        self, input_names: List, input_bounds: Dict[str, List] = None
-    ):
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name]) for name in input_names]
-            ).T
-        return Normalize(len(input_names), bounds=bounds)
-
     def build_model(
         self,
         input_names: List[str],
@@ -105,9 +94,7 @@ class StandardModelConstructor(ModelConstructor):
         tkwargs = {"dtype": dtype, "device": device}
         pd.options.mode.use_inf_as_na = True
         models = []
-        input_transform = self.get_input_transform(input_names, input_bounds).to(
-            **tkwargs
-        )
+        input_transform = get_input_transform(input_names, input_bounds).to(**tkwargs)
 
         for name in outcome_names:
             outcome_transform = Standardize(1)
@@ -115,18 +102,37 @@ class StandardModelConstructor(ModelConstructor):
             mean_module = self.build_mean_module(
                 name, input_transform, outcome_transform
             )
-            train_X, train_Y = get_training_data(input_names, name, data)
-            models.append(
-                self.build_single_task_gp(
-                    train_X.to(**tkwargs),
-                    train_Y.to(**tkwargs),
-                    input_transform=input_transform,
-                    outcome_transform=outcome_transform,
-                    covar_module=covar_module,
-                    mean_module=mean_module,
-                    likelihood=self.likelihood,
+
+            train_X, train_Y, train_Yvar = get_training_data(input_names, name, data)
+            kwargs = {
+                "input_transform": input_transform,
+                "outcome_transform": outcome_transform,
+                "covar_module": covar_module,
+                "mean_module": mean_module,
+            }
+
+            if train_Yvar is None:
+                # train basic single-task-gp model
+                models.append(
+                    self.build_single_task_gp(
+                        train_X.to(**tkwargs),
+                        train_Y.to(**tkwargs),
+                        likelihood=self.likelihood,
+                        **kwargs
+                    )
                 )
-            )
+            else:
+                # train heteroskedastic single-task-gp model
+                # turn off warnings
+                models.append(
+                    self.build_heteroskedastic_gp(
+                        train_X.to(**tkwargs),
+                        train_Y.to(**tkwargs),
+                        train_Yvar.to(**tkwargs),
+                        **kwargs
+                    )
+                )
+
         return ModelListGP(*models)
 
     def build_mean_module(
