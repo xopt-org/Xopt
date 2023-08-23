@@ -120,3 +120,20 @@ class TestVOCS(object):
 
         res = vocs.convert_dataframe_to_inputs(test_data[vocs.variable_names])
         assert "cnt1" in res
+
+    def test_validate_input_data(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        # test good data
+        test_vocs.validate_input_data(pd.DataFrame({"x1": 0.5, "x2": 1.0}, index=[0]))
+
+        # test bad data
+        with pytest.raises(ValueError):
+            test_vocs.validate_input_data(
+                pd.DataFrame({"x1": 0.5, "x2": 11.0}, index=[0])
+            )
+
+        with pytest.raises(ValueError):
+            test_vocs.validate_input_data(
+                pd.DataFrame({"x1": [-0.5, 2.5], "x2": [1.0, 11.0]})
+            )
