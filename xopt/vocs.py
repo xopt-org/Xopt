@@ -549,6 +549,13 @@ def validate_input_data(vocs, data):
         lower = vocs.variables[name][0]
         upper = vocs.variables[name][1]
 
-        d = data[name].to_numpy()
-        if np.any(d > upper) or np.any(d < lower):
-            raise ValueError("input points are not valid for VOCS!")
+        d = data[name]
+
+        # see if points violate limits
+        is_out_of_bounds = pd.DataFrame((d < lower, d > upper)).any(axis=0)
+        is_out_of_bounds_idx = list(is_out_of_bounds[is_out_of_bounds].index)
+
+        if len(is_out_of_bounds_idx):
+            raise ValueError(
+                f"input points at indices {is_out_of_bounds_idx} are not valid for {name} range in VOCS!"
+            )
