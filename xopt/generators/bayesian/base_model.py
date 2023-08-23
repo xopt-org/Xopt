@@ -76,6 +76,7 @@ class ModelConstructor(XoptBaseModel, ABC):
         # heteroskedastic modeling incurs a number of warnings from botorch,
         # we suppress those here.
         import warnings
+
         warnings.filterwarnings("ignore")
 
         if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
