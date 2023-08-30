@@ -8,7 +8,7 @@ from concurrent.futures import Future
 from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
 import orjson
@@ -80,12 +80,11 @@ def recursive_serialize(v, base_key="", serialize_torch=False):
 
 
 def recursive_serialize_v2(v: dict, base_key: str = ""):
-    #Pydantic v2 will by default serialize submodels as annotated, dropping subclass attributes
-    #We don't want that, so need to modify things to SerializeAsAny later
+    # Pydantic v2 will by default serialize submodels as annotated, dropping subclass attributes
+    # We don't want that, so need to modify things to SerializeAsAny later
 
     # This will iterate model fields
     for key, value in v.items():
-        #print(f'{v=} {key=} {value=}')
         if isinstance(value, dict):
             v[key] = recursive_serialize_v2(value, base_key=key)
         elif isinstance(value, torch.nn.Module):
@@ -142,8 +141,8 @@ def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=F
     return orjson.dumps(v, default=default).decode()
 
 
+
 def orjson_dumps_except_root(v: BaseModel, *, base_key="") -> dict:
-    json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
     dump = v.model_dump()
     encoded_dump = recursive_serialize_v2(dump, base_key=base_key)
     return encoded_dump
@@ -183,9 +182,7 @@ class XoptBaseModel(BaseModel):
 
         return value
 
-
-
-    #Note that this function still returns a dict, NOT a string. Pydantic will handle
+    # Note that this function still returns a dict, NOT a string. Pydantic will handle
     # final serialization of basic types in Rust. We cannot override this...
     @model_serializer(mode='plain', when_used='json')
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
@@ -195,7 +192,7 @@ class XoptBaseModel(BaseModel):
     def serialize_json_str_custom(self, base_key="") -> str:
         return orjson_dumps(self, base_key=base_key)
 
-    # # TODO: implement json load parsing on main object (json_loads is gone)
+    # TODO: implement json load parsing on main object (json_loads is gone)
     # def deserialize_json(v, default=None):
     #     v = orjson.loads(v)
     #     v = recursive_deserialize(v)
@@ -527,10 +524,6 @@ class NormalExecutor(
         Generic[ObjType],
 ):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @model_serializer(mode='plain', when_used='json', return_type='str')
-    def serialize_json(self) -> str:
-        return orjson_dumps(self)
 
     # TODO: verify if new style works same as 'always'
     @validator("executor", always=True)

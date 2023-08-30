@@ -18,14 +18,13 @@ jobs:
         python-version: [3.9]
     steps:
       - uses: actions/checkout@v3
+
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
           miniforge-variant: Mambaforge
-          miniforge-version: latest
           channels: conda-forge
           activate-environment: xopt-dev
-          use-mamba: true
           environment-file: environment.yml
 
       - name: Install Xopt

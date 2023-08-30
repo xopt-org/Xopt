@@ -30,7 +30,7 @@ class ConstraintEnum(str, Enum):
     @classmethod
     def _missing_(cls, name):
         for member in cls:
-            if member.value.lower() == name.lower():
+            if member.name.lower() == name.lower():
                 return member
 
 
@@ -66,7 +66,6 @@ class VOCS(XoptBaseModel):
     @classmethod
     def from_yaml(cls, yaml_text):
         loaded = yaml.safe_load(yaml_text)
-        #return cls.model_validate(loaded, strict=True)
         return cls(**loaded)
 
     def as_yaml(self):

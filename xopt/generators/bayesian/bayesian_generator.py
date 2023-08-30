@@ -44,6 +44,7 @@ logger = logging.getLogger()
 T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
 T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
 
+
 class BayesianGenerator(Generator, ABC):
     name = "base_bayesian_generator"
     model: Optional[Model] = Field(

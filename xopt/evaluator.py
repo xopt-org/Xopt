@@ -7,7 +7,7 @@ from typing import Callable, Dict
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from pydantic import ConfigDict, Field, model_validator, root_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from xopt.errors import XoptError
 from xopt.pydantic import NormalExecutor, XoptBaseModel

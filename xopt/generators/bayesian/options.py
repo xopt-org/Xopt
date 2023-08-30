@@ -29,4 +29,3 @@ class OptimizationOptions(XoptBaseModel):
     first_call: bool = Field(False, exclude=True)
 
     model_config = ConfigDict(validate_assignment=True)
-
