@@ -29,8 +29,8 @@ class ConstraintEnum(str, Enum):
     # Allow any case
     @classmethod
     def _missing_(cls, name):
-        for member in cls.__members__:
-            if member.lower() == name.lower():
+        for member in cls:
+            if member.value.lower() == name.lower():
                 return member
 
 
