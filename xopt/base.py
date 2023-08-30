@@ -500,13 +500,14 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
 
 def state_to_dict(X: Xopt, include_data=True, serialize_torch=False):
     # dump data to dict with config metadata
+    gen_str = X.generator.serialize_json_str_custom(base_key=type(X.generator).name, serialize_torch=serialize_torch)
     output = {
         "xopt": X.options.model_dump(),
         "generator": {
             "name": type(X.generator).name,
-            **json.loads(X.generator.model_dump_json(base_key=type(X.generator).name, serialize_torch=serialize_torch)),
+            **json.loads(gen_str),
         },
-        "evaluator": X.evaluator.model_dump(),
+        "evaluator": json.loads(X.evaluator.model_dump_json()),
         "vocs": X.vocs.model_dump(),
     }
     if include_data:

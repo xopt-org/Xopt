@@ -85,7 +85,7 @@ def recursive_serialize_v2(v: dict, base_key: str = ""):
 
     # This will iterate model fields
     for key, value in v.items():
-        print(f'{v=} {key=} {value=}')
+        #print(f'{v=} {key=} {value=}')
         if isinstance(value, dict):
             v[key] = recursive_serialize_v2(value, base_key=key)
         elif isinstance(value, torch.nn.Module):
@@ -189,7 +189,7 @@ class XoptBaseModel(BaseModel):
     # final serialization of basic types in Rust. We cannot override this...
     @model_serializer(mode='plain', when_used='json')
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
-        return orjson_dumps_except_root(self, base_key=" ")
+        return orjson_dumps_except_root(self, base_key="")
 
     # TODO: determine how to pass in non-default base_key, not supported by pydantic
     def serialize_json_str_custom(self, base_key="") -> str:

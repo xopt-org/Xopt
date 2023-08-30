@@ -99,10 +99,8 @@ class TestHighLevel:
                         name: LBFGS
                         n_restarts: 1
                         n_raw_samples: 2
-
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
-
                 vocs:
                     variables:
                         x1: [0, 3.14159]
@@ -122,6 +120,8 @@ class TestHighLevel:
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
+
+        X2.step()
 
         os.remove("mobo_model.pt")
         os.remove("dump.yml")
@@ -163,12 +163,12 @@ class TestHighLevel:
 
         os.remove("dump.yml")
         
-    # @pytest.fixture(scope='module', autouse=True)
-    # def clean_up(self):
-    #     yield
-    #     files = ['dump.yml', 'mobo_model.pt']
-    #     for f in files:
-    #         if os.path.exists(f):
-    #             os.remove(f)
+    @pytest.fixture(scope='module', autouse=True)
+    def clean_up(self):
+        yield
+        files = ['dump.yml', 'mobo_model.pt']
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)
 
 
