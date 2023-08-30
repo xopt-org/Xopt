@@ -4,12 +4,12 @@ from types import FunctionType, MethodType
 from typing import Optional, Union
 
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, field_validator
 from pydantic.json import custom_pydantic_encoder
 
 from xopt.pydantic import (
     CallableModel,
-    ObjLoaderMinimal, get_callable_from_string,
+    get_callable_from_string,
     JSON_ENCODERS,
     ObjLoader,
     validate_and_compose_signature,
@@ -317,9 +317,7 @@ class TestObjLoader:
         json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
         serialized = json.dumps(loader, default=json_encoder)
 
-        # This works fine
-        self.misc_class_loader_type.parse_raw(serialized)
-
+        # self.misc_class_loader_type.parse_raw(serialized)
         # This works in 2.2+ as it should
         self.misc_class_loader_type.model_validate_json(serialized)
 

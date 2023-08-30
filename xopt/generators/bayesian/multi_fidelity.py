@@ -9,7 +9,7 @@ from botorch.acquisition import (
     GenericMCObjective,
     qUpperConfidenceBound,
 )
-from pydantic import Field, field_validator, validator
+from pydantic import Field, field_validator
 
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,

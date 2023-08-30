@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Literal
 
 import torch
 from botorch.optim import optimize_acqf

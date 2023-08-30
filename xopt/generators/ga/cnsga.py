@@ -2,7 +2,7 @@ import array
 import logging
 import os
 import random
-from typing import ClassVar, Dict, List
+from typing import Dict, List
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools

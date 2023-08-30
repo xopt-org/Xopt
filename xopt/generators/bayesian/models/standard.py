@@ -1,6 +1,6 @@
 import os.path
 from copy import deepcopy
-from typing import ClassVar, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
@@ -10,13 +10,12 @@ from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-from pydantic import ConfigDict, Field, field_validator, model_serializer
+from pydantic import ConfigDict, Field, field_validator
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
-from xopt.pydantic import orjson_dumps
 from pydantic_core.core_schema import FieldValidationInfo
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
@@ -39,10 +38,6 @@ class StandardModelConstructor(ModelConstructor):
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
-
-    # @model_serializer(mode='plain', when_used='json', return_type='str')
-    # def serialize(self) -> str:
-    #     return orjson_dumps(self)
 
     @field_validator("covar_modules", "mean_modules", mode='before')
     def validate_torch_modules(cls, v):

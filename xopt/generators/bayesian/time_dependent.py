@@ -5,7 +5,7 @@ from abc import ABC
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from pydantic import Field, PositiveFloat, field_validator, validator
+from pydantic import Field, PositiveFloat, field_validator
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor

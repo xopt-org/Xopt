@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Union
+from typing import Dict, List, Union
 
 import pandas as pd
 import torch
