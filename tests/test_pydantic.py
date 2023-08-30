@@ -323,19 +323,6 @@ class TestObjLoader:
         # This works in 2.2+ as it should
         m2 = self.misc_class_loader_type.model_validate_json(serialized)
 
-# Smaller test case (temporary)
-@pytest.mark.skip(reason='debug')
-class TestObjLoaderMinimal:
-    misc_class_loader_type = ObjLoaderMinimal[MiscClass]
-
-    def test_serialize_loader(self):
-        import pydantic
-        print(pydantic.version.version_info())
-        loader = self.misc_class_loader_type()
-        serialized = loader.model_dump_json()
-        print('serialized: ', type(serialized), serialized)
-        self.misc_class_loader_type.model_validate_json(serialized)
-
 
 # tests to verify v2 behavior remains same (for things that changed from v1)
 
