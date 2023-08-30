@@ -453,3 +453,11 @@ class TestModelConstructor:
         assert torch.allclose(
             posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
         )
+
+    @pytest.fixture(autouse=True)
+    def clean_up(self):
+        yield
+        files = ['test.yml', 'covar_modules_y.pt', 'covar_modules_c.pt']
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)
