@@ -2,10 +2,10 @@ deap
 numpy
 pyyaml
 torch
-botorch
+botorch>=0.8
 gpytorch
 pandas
-pydantic>=2.0.2
+pydantic>=2.3
 ipywidgets
 tqdm
 orjson
