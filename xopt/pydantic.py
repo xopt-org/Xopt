@@ -308,18 +308,17 @@ class ObjLoader(
     object_type: Optional[type] = None
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
-    def serialize(self) -> str:
+    def serialize_json(self) -> str:
         return orjson_dumps(self)
 
     @model_validator(mode='before')
     def validate_all(cls, values):
-        # inspect class init signature
-        # obj_type = cls.__fields__["object"].type_
         # In v1, could access type_ to get resolved inner type
         # See https://stackoverflow.com/questions/75165745
+        # obj_type = cls.__fields__["object"].type_
 
         # In v2, how to do this is unclear - internals have changed
-        # TODO: redo this hack
+        # For now, use hacky way with annotations
         annotation = cls.model_fields["object"].annotation
         # inner_types are (ObjType,NoneType)
         inner_types = typing.get_args(annotation)
@@ -361,11 +360,6 @@ class ObjLoader(
         #        ObjType
         #    )
         return {"object_type": obj_type, "loader": loader}
-
-    # @model_validator(mode='after')
-    # def validate_print(cls, values):
-    #     print(values)
-    #     return values
 
     def load(self, store: bool = False):
         # store object reference on loader
@@ -415,11 +409,7 @@ class BaseExecutor(
         Generic[ObjType],
 
 ):
-    model_config = {'arbitrary_types_allowed': True,
-                    # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
-                    # TODO: check in v2
-                    'copy_on_model_validation': 'none',
-                    }
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # executor_type must comply with https://peps.python.org/pep-3148/ standard
     loader: Optional[ObjLoader[ObjType]] = None  # loader of executor type
@@ -436,14 +426,14 @@ class BaseExecutor(
     # and kwargs
     executor: Optional[ObjType] = None
 
+    @model_serializer(mode='plain', when_used='json', return_type='str')
+    def serialize_json(self) -> str:
+        return orjson_dumps(self)
+
     @model_validator(mode='before')
     def validate_all(cls, values):
-        # TODO: better solution
+        # TODO: better solution, since type_ is no longer available
         executor_type = typing.get_args(cls.model_fields["executor"].annotation)[0]
-
-        # executor_type = cls.__fields__[
-        #     "executor"
-        # ].type_  # introspect fields to get type
 
         # check if executor provided
         executor = values.get("executor")
@@ -539,12 +529,10 @@ class NormalExecutor(
         BaseExecutor[ObjType],
         Generic[ObjType],
 ):
-    model_config = {'arbitrary_types_allowed': True,
-                    # 'json_dumps': orjson_dumps,
-                    }
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_serializer(mode='plain', when_used='json', return_type='str')
-    def serialize(self):
+    def serialize_json(self) -> str:
         return orjson_dumps(self)
 
     # TODO: verify if new style works same as 'always'
