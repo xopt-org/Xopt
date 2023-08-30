@@ -65,7 +65,9 @@ class VOCS(XoptBaseModel):
 
     @classmethod
     def from_yaml(cls, yaml_text):
-        return cls.model_validate(yaml.safe_load(yaml_text), strict=True)
+        loaded = yaml.safe_load(yaml_text)
+        #return cls.model_validate(loaded, strict=True)
+        return cls(**loaded)
 
     def as_yaml(self):
         return yaml.dump(self.model_dump(), default_flow_style=None, sort_keys=False)

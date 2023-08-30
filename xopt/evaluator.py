@@ -41,10 +41,10 @@ class Evaluator(XoptBaseModel):
     """
 
     function: Callable
-    max_workers: int = 1
+    max_workers: int = Field(1, ge=1)
     executor: NormalExecutor = Field(exclude=True)  # Do not serialize
     function_kwargs: dict = {}
-    vectorized: bool = False
+    vectorized: bool = Field(False)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
