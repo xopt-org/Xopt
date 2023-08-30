@@ -316,12 +316,12 @@ class TestObjLoader:
 
         json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
         serialized = json.dumps(loader, default=json_encoder)
+
         # This works fine
         m1 = self.misc_class_loader_type.parse_raw(serialized)
-        # TODO: determine why this fails...
-        with pytest.raises(ValidationError):
-            m2 = self.misc_class_loader_type.model_validate_json(serialized)
 
+        # This works in 2.2+ as it should
+        m2 = self.misc_class_loader_type.model_validate_json(serialized)
 
 # Smaller test case (temporary)
 @pytest.mark.skip(reason='debug')
