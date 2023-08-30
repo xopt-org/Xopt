@@ -22,7 +22,6 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
-from xopt.pydantic import orjson_loads_v2
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 

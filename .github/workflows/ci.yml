@@ -22,8 +22,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: conda-forge
           activate-environment: xopt-dev
+          use-mamba: true
           environment-file: environment.yml
 
       - name: Install Xopt

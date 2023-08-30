@@ -6,7 +6,7 @@ dependencies:
   - python=3.9
   - deap
   - numpy
-  - pydantic==1.10.9
+  - pydantic>=2.3
   - pyyaml
   - botorch>=0.8.2
   - pandas
