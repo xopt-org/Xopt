@@ -22,6 +22,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
+from xopt.pydantic import orjson_loads_v2
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
@@ -34,7 +35,7 @@ class TestModelConstructor:
         constructor = StandardModelConstructor()
 
         constructor.build_model(
-            test_vocs.variable_names, test_vocs.output_names, test_data
+                test_vocs.variable_names, test_vocs.output_names, test_data
         )
 
         constructor.build_model_from_vocs(test_vocs, test_data)
@@ -47,7 +48,7 @@ class TestModelConstructor:
         constructor = StandardModelConstructor()
 
         constructor.build_model(
-            test_vocs.variable_names, test_vocs.output_names, test_data
+                test_vocs.variable_names, test_vocs.output_names, test_data
         )
 
         model = constructor.build_model_from_vocs(test_vocs, test_data)
@@ -61,13 +62,13 @@ class TestModelConstructor:
 
         with pytest.raises(ValidationError):
             StandardModelConstructor(
-                vocs=test_vocs, covar_modules=deepcopy(custom_covar)["y1"]
+                    vocs=test_vocs, covar_modules=deepcopy(custom_covar)["y1"]
             )
 
         # test custom covar module
         constructor = StandardModelConstructor(covar_modules=deepcopy(custom_covar))
         model = constructor.build_model(
-            test_vocs.variable_names, test_vocs.output_names, test_data
+                test_vocs.variable_names, test_vocs.output_names, test_data
         )
         assert isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
 
@@ -133,9 +134,9 @@ class TestModelConstructor:
 
     def test_model_saving(self):
         my_vocs = VOCS(
-            variables={"x": [0, 1]},
-            objectives={"y": "MAXIMIZE"},
-            constraints={"c": ["LESS_THAN", 0]},
+                variables={"x": [0, 1]},
+                objectives={"y": "MAXIMIZE"},
+                constraints={"c": ["LESS_THAN", 0]},
         )
 
         # specify a periodic kernel for each output (objectives and constraints)
@@ -143,7 +144,7 @@ class TestModelConstructor:
 
         model_constructor = StandardModelConstructor(covar_modules=covar_modules)
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+                vocs=my_vocs, model_constructor=model_constructor
         )
 
         # define training data to pass to the generator
@@ -152,13 +153,14 @@ class TestModelConstructor:
         train_c = 2.0 * torch.sin(2 * 3.14 * train_x + 0.25)
 
         training_data = pd.DataFrame(
-            {"x": train_x.numpy(), "y": train_y.numpy(), "c": train_c}
+                {"x": train_x.numpy(), "y": train_y.numpy(), "c": train_c}
         )
 
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.model_dump_json(serialize_torch=True))
+        gen_dump = generator.model_dump_json(serialize_torch=True)
+        options = json.loads(gen_dump)
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -169,11 +171,10 @@ class TestModelConstructor:
 
         # create generator from dict
         saved_options_dict["vocs"] = my_vocs.model_dump()
-        loaded_generator = ExpectedImprovementGenerator.model_validate_json(
-            json.dumps(saved_options_dict)
-        )
+        dump = json.dumps(saved_options_dict)
+        loaded_generator = ExpectedImprovementGenerator.model_validate_json(dump)
         assert isinstance(
-            loaded_generator.model_constructor.covar_modules["y"], ScaleKernel
+                loaded_generator.model_constructor.covar_modules["y"], ScaleKernel
         )
 
         # clean up
@@ -188,7 +189,7 @@ class TestModelConstructor:
 
         model_constructor = StandardModelConstructor(covar_modules=covar_modules)
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+                vocs=my_vocs, model_constructor=model_constructor
         )
 
         # define training data to pass to the generator
@@ -197,7 +198,7 @@ class TestModelConstructor:
         train_c = 2.0 * torch.sin(2 * 3.14 * train_x + 0.25)
 
         training_data = pd.DataFrame(
-            {"x": train_x.numpy(), "y": train_y.numpy(), "c": train_c}
+                {"x": train_x.numpy(), "y": train_y.numpy(), "c": train_c}
         )
 
         generator.add_data(training_data)
@@ -215,7 +216,7 @@ class TestModelConstructor:
         # create generator from file
         saved_options["vocs"] = my_vocs.model_dump()
         loaded_generator = ExpectedImprovementGenerator.model_validate_json(
-            json.dumps(saved_options)
+                json.dumps(saved_options)
         )
         for name, val in loaded_generator.model_constructor.covar_modules.items():
             assert isinstance(val, ScaleKernel)
@@ -233,9 +234,9 @@ class TestModelConstructor:
         test_data = deepcopy(TEST_VOCS_DATA)
 
         test_pts = torch.tensor(
-            pd.DataFrame(
-                TEST_VOCS_BASE.random_inputs(5, include_constants=False)
-            ).to_numpy()
+                pd.DataFrame(
+                        TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+                ).to_numpy()
         )
 
         test_covar_modules = []
@@ -245,7 +246,7 @@ class TestModelConstructor:
 
         # prepare custom covariance module
         covar_module = PolynomialKernel(power=1, active_dims=[0]) * PolynomialKernel(
-            power=1, active_dims=[1]
+                power=1, active_dims=[1]
         )
 
         scaled_covar_module = ScaleKernel(covar_module)
@@ -260,21 +261,21 @@ class TestModelConstructor:
             # train model with StandardModelConstructor
             model_constructor = StandardModelConstructor(covar_modules=test_covar1)
             constructed_model = model_constructor.build_model_from_vocs(
-                test_vocs, test_data
+                    test_vocs, test_data
             ).models[0]
 
             # build initial model explicitly for comparison
             train_X = torch.cat(
-                (
-                    torch.tensor(test_data["x1"]).reshape(-1, 1),
-                    torch.tensor(test_data["x2"]).reshape(-1, 1),
-                ),
-                dim=1,
+                    (
+                        torch.tensor(test_data["x1"]).reshape(-1, 1),
+                        torch.tensor(test_data["x2"]).reshape(-1, 1),
+                    ),
+                    dim=1,
             )
             train_Y = torch.tensor(test_data["y1"]).reshape(-1, 1)
             if test_covar2:
                 covar_module = PolynomialKernel(
-                    power=1, active_dims=[0]
+                        power=1, active_dims=[0]
                 ) * PolynomialKernel(power=1, active_dims=[1])
                 scaled_covar_module = ScaleKernel(covar_module)
                 covar2 = scaled_covar_module
@@ -282,27 +283,27 @@ class TestModelConstructor:
                 covar2 = None
 
             input_transform = Normalize(
-                test_vocs.n_variables, bounds=torch.tensor(test_vocs.bounds)
+                    test_vocs.n_variables, bounds=torch.tensor(test_vocs.bounds)
             )
             benchmark_model = SingleTaskGP(
-                train_X,
-                train_Y,
-                input_transform=input_transform,
-                outcome_transform=Standardize(1),
-                covar_module=covar2,
-                likelihood=GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0)),
+                    train_X,
+                    train_Y,
+                    input_transform=input_transform,
+                    outcome_transform=Standardize(1),
+                    covar_module=covar2,
+                    likelihood=GaussianLikelihood(noise_prior=GammaPrior(1.0, 10.0)),
             )
 
             init_mll = ExactMarginalLogLikelihood(
-                benchmark_model.likelihood, benchmark_model
+                    benchmark_model.likelihood, benchmark_model
             )
             fit_gpytorch_mll(init_mll)
 
             assert torch.allclose(
-                benchmark_model.train_inputs[0], constructed_model.train_inputs[0]
+                    benchmark_model.train_inputs[0], constructed_model.train_inputs[0]
             )
             assert torch.allclose(
-                benchmark_model.train_targets, constructed_model.train_targets
+                    benchmark_model.train_targets, constructed_model.train_targets
             )
 
             with torch.no_grad():
@@ -310,7 +311,7 @@ class TestModelConstructor:
                 benchmark_prediction = benchmark_model.posterior(test_pts).mean
 
             assert torch.allclose(
-                constructed_prediction, benchmark_prediction, rtol=1e-3
+                    constructed_prediction, benchmark_prediction, rtol=1e-3
             )
 
     def test_train_from_scratch(self):
@@ -339,7 +340,7 @@ class TestModelConstructor:
 
         # prepare custom covariance module
         covar_module = PolynomialKernel(power=1, active_dims=[0]) * PolynomialKernel(
-            power=1, active_dims=[1]
+                power=1, active_dims=[1]
         )
         scaled_covar_module = ScaleKernel(covar_module)
 
@@ -349,7 +350,7 @@ class TestModelConstructor:
 
         # construct BAX generator
         generator = ExpectedImprovementGenerator(
-            vocs=vocs, model_constructor=model_constructor
+                vocs=vocs, model_constructor=model_constructor
         )
 
         # define test points
@@ -386,7 +387,7 @@ class TestModelConstructor:
 
         # construct generator with all points
         generator = ExpectedImprovementGenerator(
-            vocs=vocs, model_constructor=model_constructor
+                vocs=vocs, model_constructor=model_constructor
         )
 
         # create  input points
@@ -399,12 +400,12 @@ class TestModelConstructor:
 
         # make sure models have exactly the same data points
         assert torch.allclose(
-            benchmark_model.models[0].train_inputs[0],
-            generated_model.models[0].train_inputs[0],
+                benchmark_model.models[0].train_inputs[0],
+                generated_model.models[0].train_inputs[0],
         )
         assert torch.allclose(
-            benchmark_model.models[0].train_targets,
-            generated_model.models[0].train_targets,
+                benchmark_model.models[0].train_targets,
+                generated_model.models[0].train_targets,
         )
 
         with torch.no_grad():
@@ -428,16 +429,16 @@ class TestModelConstructor:
 
         # validate against botorch HeteroskedasticSingleTaskGP
         train_x, train_y, train_yvar = get_training_data(
-            test_vocs.variable_names, "y1", test_data
+                test_vocs.variable_names, "y1", test_data
         )
         bmodel = HeteroskedasticSingleTaskGP(
-            train_x,
-            train_y,
-            train_yvar,
-            input_transform=get_input_transform(
-                test_vocs.variable_names, test_vocs.variables
-            ),
-            outcome_transform=Standardize(1),
+                train_x,
+                train_y,
+                train_yvar,
+                input_transform=get_input_transform(
+                        test_vocs.variable_names, test_vocs.variables
+                ),
+                outcome_transform=Standardize(1),
         )
         mll = ExactMarginalLogLikelihood(bmodel.likelihood, bmodel)
         fit_gpytorch_mll(mll)
@@ -448,10 +449,10 @@ class TestModelConstructor:
             posterior = model.posterior(test_x.unsqueeze(1))
             bposterior = bmodel.posterior(test_x.unsqueeze(1))
         assert torch.allclose(
-            posterior.mean[..., 0].flatten(), bposterior.mean.flatten()
+                posterior.mean[..., 0].flatten(), bposterior.mean.flatten()
         )
         assert torch.allclose(
-            posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
+                posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
         )
 
     @pytest.fixture(autouse=True)
