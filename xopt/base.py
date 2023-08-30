@@ -10,9 +10,6 @@ from xopt.generator import Generator
 from xopt.generators import get_generator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
-
-# from xopt.generators import get_generator_and_defaults
-from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
