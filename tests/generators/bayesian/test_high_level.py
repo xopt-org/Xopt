@@ -163,14 +163,12 @@ class TestHighLevel:
 
         os.remove("dump.yml")
         
-    @pytest.fixture(autouse=True)
-    def clean_up(self):
-        yield
+    # @pytest.fixture(scope='module', autouse=True)
+    # def clean_up(self):
+    #     yield
+    #     files = ['dump.yml', 'mobo_model.pt']
+    #     for f in files:
+    #         if os.path.exists(f):
+    #             os.remove(f)
 
-        # this runs after all tests, if some fail midway through
-        if os.path.exists("dump.yml"):
-            os.remove("dump.yml")
 
-        # this runs after all tests, if some fail midway through
-        if os.path.exists("mobo_model.pt"):
-            os.remove("mobo_model.pt")

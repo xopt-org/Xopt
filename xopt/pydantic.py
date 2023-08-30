@@ -8,7 +8,7 @@ from concurrent.futures import Future
 from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar, Union
 
 import numpy as np
 import orjson
@@ -17,7 +17,7 @@ import torch.nn
 from pydantic import BaseModel, ConfigDict, create_model, Field, field_serializer, field_validator, \
     model_serializer, model_validator, validator
 from pydantic.v1.json import custom_pydantic_encoder
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic_core.core_schema import FieldValidationInfo, SerializationInfo
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
@@ -79,22 +79,24 @@ def recursive_serialize(v, base_key="", serialize_torch=False):
     return v
 
 
-def recursive_serialize_v2(v, base_key=""):
+def recursive_serialize_v2(v: dict, base_key: str = ""):
     #Pydantic v2 will by default serialize submodels as annotated, dropping subclass attributes
     #We don't want that, so need to modify things to SerializeAsAny later
 
     # This will iterate model fields
-    for key, value in dict(v).items():
+    for key, value in v.items():
         print(f'{v=} {key=} {value=}')
         if isinstance(value, dict):
-            v[key] = recursive_serialize(value, base_key=key)
+            v[key] = recursive_serialize_v2(value, base_key=key)
         elif isinstance(value, torch.nn.Module):
             v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
         elif isinstance(value, torch.dtype):
             v[key] = str(value)
+        elif isinstance(value, pd.DataFrame):
+            v[key] = json.loads(value.to_json())
         elif isinstance(value, BaseModel):
             # v[key] = value.model_dump_json()
-            v[key] = recursive_serialize(value, base_key=key)
+            v[key] = recursive_serialize_v2(value, base_key=key)
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(value, _type):
@@ -140,15 +142,11 @@ def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=F
     return orjson.dumps(v, default=default).decode()
 
 
-def orjson_dumps_except_root(v: BaseModel, *, base_key=""):
-    # to ensure pydantic custom serializer works, needs to return dict and not string
-    # so, serialize subfields instead of base model
+def orjson_dumps_except_root(v: BaseModel, *, base_key="") -> dict:
     json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
-    v2 = recursive_serialize(v.model_dump(), base_key=base_key)
-    data = {}
-    for field, fv in dict(v2).items():
-        data[field] = orjson.dumps(fv, default=json_encoder).decode()
-    return data
+    dump = v.model_dump()
+    encoded_dump = recursive_serialize_v2(dump, base_key=base_key)
+    return encoded_dump
 
 
 def orjson_loads(v, default=None):
@@ -185,24 +183,23 @@ class XoptBaseModel(BaseModel):
 
         return value
 
+
+
+    #Note that this function still returns a dict, NOT a string. Pydantic will handle
+    # final serialization of basic types in Rust. We cannot override this...
     @model_serializer(mode='plain', when_used='json')
-    def serialize_json(self, base_key=""):
-        return orjson_dumps_except_root(self, base_key=base_key)
+    def serialize_json(self, sinfo: SerializationInfo) -> dict:
+        return orjson_dumps_except_root(self, base_key=" ")
 
-    # TODO: implement json load parsing on main object (json_loads is gone)
+    # TODO: determine how to pass in non-default base_key, not supported by pydantic
+    def serialize_json_str_custom(self, base_key="") -> str:
+        return orjson_dumps(self, base_key=base_key)
 
-    # @model_validator(mode='before')
-    # def validate_files(cls, values):
-    #     if isinstance(values, BaseModel):
-    #         raise ValueError(f'This pydantic mode is poorly documented?')
-    #     for field_name in values.keys():
-    #         value = values[field_name]
-    #         if isinstance(value, str):
-    #             if os.path.exists(value):
-    #                 extension = value.split(".")[-1]
-    #                 if extension == "pt":
-    #                     values[field_name] = torch.load(value)
-    #     return values
+    # # TODO: implement json load parsing on main object (json_loads is gone)
+    # def deserialize_json(v, default=None):
+    #     v = orjson.loads(v)
+    #     v = recursive_deserialize(v)
+    #     return v
 
 
 def get_descriptions_defaults(model: XoptBaseModel):
