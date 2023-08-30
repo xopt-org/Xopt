@@ -140,7 +140,7 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError(f"{value} not found")
         return value
 
-    @validator("computation_time", pre=True)
+    @field_validator("computation_time", mode='before')
     def validate_computation_time(cls, value):
         if isinstance(value, dict):
             value = pd.DataFrame(value)
