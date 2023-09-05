@@ -63,7 +63,7 @@ class BayesianGenerator(Generator, ABC):
         None, description="fixed features used in Bayesian optimization"
     )
     computation_time: pd.DataFrame = Field(
-        pd.DataFrame([]),
+        None,
         description="data frame tracking computation time in seconds",
     )
     n_candidates: int = 1
@@ -175,14 +175,17 @@ class BayesianGenerator(Generator, ABC):
             # post process candidates
             result = self._process_candidates(candidates)
 
-            # append timing results to dataframe
-            self.computation_time = pd.concat(
-                (
-                    self.computation_time,
-                    pd.DataFrame(timing_results, index=[0]),
-                ),
-                ignore_index=True,
-            )
+            # append timing results to dataframe (if it exists)
+            if self.computation_time is not None:
+                self.computation_time = pd.concat(
+                    (
+                        self.computation_time,
+                        pd.DataFrame(timing_results, index=[0]),
+                    ),
+                    ignore_index=True,
+                )
+            else:
+                self.computation_time = pd.DataFrame(timing_results, index=[0])
 
             return result
 
