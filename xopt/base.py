@@ -9,11 +9,13 @@ from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
 from xopt.pydantic import XoptBaseModel
+from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
 
 import logging
+import os
 
 import numpy as np
 import pandas as pd
@@ -40,6 +42,11 @@ class Xopt(XoptBaseModel):
     )
     data: DataFrame = Field(
         pd.DataFrame(), description="internal DataFrame object"
+    )
+    serialize_torch: bool = Field(
+        False,
+        description="flag to indicate that torch models should be serialized "
+        "when dumping",
     )
 
     @validator("vocs", pre=True)
@@ -69,6 +76,7 @@ class Xopt(XoptBaseModel):
             generator_class = get_generator(value)
             return generator_class.parse_obj(
                 {"vocs": values["vocs"]})
+
 
     def step(self):
         """
@@ -108,10 +116,7 @@ class Xopt(XoptBaseModel):
         new_data = pd.concat([input_data, output_data], axis=1)
 
         # explode any list like results if all of the output names exist
-        try:
-            new_data = new_data.explode(self.vocs.output_names)
-        except KeyError:
-            pass
+        new_data = explode_all_columns(new_data)
 
         self.add_data(new_data)
 
@@ -119,6 +124,7 @@ class Xopt(XoptBaseModel):
         self.dump_state()
 
         return new_data
+
 
     def add_data(self, new_data: pd.DataFrame):
         """
@@ -139,6 +145,7 @@ class Xopt(XoptBaseModel):
         self.data = pd.DataFrame()
         self.generator.data = pd.DataFrame()
 
+
     def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """
         Convenience method to generate random inputs using vocs
@@ -148,7 +155,7 @@ class Xopt(XoptBaseModel):
         random_inputs = pd.DataFrame(
             self.vocs.random_inputs(n_samples, seed=seed, **kwargs), index=index
         )
-        result = self.evaluate_data(random_inputs)
+        result = self.evaluate_data(random_inputs[self.vocs.variable_names])
         return result
 
     def dump_state(self):

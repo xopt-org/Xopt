@@ -10,4 +10,6 @@ class RandomGenerator(Generator):
 
     def generate(self, n_candidates) -> pd.DataFrame:
         """generate uniform random data points"""
-        return pd.DataFrame(self.vocs.random_inputs(n_candidates))
+        return pd.DataFrame(
+            self.vocs.random_inputs(n_candidates, include_constants=False),
+        )

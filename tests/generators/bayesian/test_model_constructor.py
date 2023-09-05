@@ -8,7 +8,7 @@ import pytest
 import torch
 import yaml
 from botorch import fit_gpytorch_mll
-from botorch.models import SingleTaskGP
+from botorch.models import HeteroskedasticSingleTaskGP, SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
@@ -16,8 +16,12 @@ from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
 
+from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
+    XoptHeteroskedasticSingleTaskGP,
+)
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.utils import get_input_transform, get_training_data
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
@@ -34,6 +38,20 @@ class TestModelConstructor:
         )
 
         constructor.build_model_from_vocs(test_vocs, test_data)
+
+    def test_duplicate_keys(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.observables = ["y1"]
+
+        constructor = StandardModelConstructor()
+
+        constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert model.num_outputs == 2
 
     def test_custom_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -94,11 +112,22 @@ class TestModelConstructor:
         assert model3.train_inputs[0][0].shape == torch.Size([9, 2])
         assert model3.train_inputs[1][0].shape == torch.Size([8, 2])
 
+    def test_model_w_same_data(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables["x1"] = [5.0, 6.0]
+        constructor = StandardModelConstructor()
+
+        # set all of the elements of a given input variable to the same value
+        test_data["x1"] = 5.0
+
+        constructor.build_model_from_vocs(test_vocs, test_data)
+
     def test_serialization(self):
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
         constructor = StandardModelConstructor(covar_modules=custom_covar)
-        constructor.json()
+        constructor.json(serialize_torch=True)
 
         import os
 
@@ -131,7 +160,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.json())
+        options = json.loads(generator.json(serialize_torch=True))
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -176,7 +205,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.json())
+        options = json.loads(generator.json(serialize_torch=True))
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -386,3 +415,43 @@ class TestModelConstructor:
 
             assert torch.allclose(generated_pred, benchmark_pred, rtol=1e-3)
             assert ~torch.allclose(generated_pred, old_prediction, rtol=1e-3)
+
+    def test_heteroskedastic(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        model_constructor = StandardModelConstructor()
+        model = model_constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model.models[0], SingleTaskGP)
+
+        # test with variance data
+        test_data["y1_var"] = test_data["y1"] * 0.1
+        model = model_constructor.build_model_from_vocs(test_vocs, test_data)
+
+        # validate against botorch HeteroskedasticSingleTaskGP
+        train_x, train_y, train_yvar = get_training_data(
+            test_vocs.variable_names, "y1", test_data
+        )
+        bmodel = HeteroskedasticSingleTaskGP(
+            train_x,
+            train_y,
+            train_yvar,
+            input_transform=get_input_transform(
+                test_vocs.variable_names, test_vocs.variables
+            ),
+            outcome_transform=Standardize(1),
+        )
+        mll = ExactMarginalLogLikelihood(bmodel.likelihood, bmodel)
+        fit_gpytorch_mll(mll)
+
+        assert isinstance(model.models[0], XoptHeteroskedasticSingleTaskGP)
+        test_x = torch.rand(20, len(test_vocs.variable_names))
+        with torch.no_grad():
+            posterior = model.posterior(test_x.unsqueeze(1))
+            bposterior = bmodel.posterior(test_x.unsqueeze(1))
+        assert torch.allclose(
+            posterior.mean[..., 0].flatten(), bposterior.mean.flatten()
+        )
+        assert torch.allclose(
+            posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
+        )

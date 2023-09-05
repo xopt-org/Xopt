@@ -17,6 +17,7 @@ nav:
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
             - Single Objective Bayesian Optimization:
                 - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
+                - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
                 - Expected improvement: examples/single_objective_bayes_opt/expected_improvement_rosenbrock.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
@@ -24,6 +25,9 @@ nav:
                 - Multi-Fidelity: examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb
                 - Time dependent upper confidence bound: examples/single_objective_bayes_opt/time_dependent_bo.ipynb
                 - Bayesian Algorithm Execution: examples/single_objective_bayes_opt/bax_tutorial.ipynb
+                - Bayesian Optimization with fixed features: examples/single_objective_bayes_opt/fixed_features.ipynb
+                - Heteroskedastic modeling: examples/single_objective_bayes_opt/heteroskedastic_noise_tutorial.ipynb
+
             - Multi-Objective Bayesian Optimization:
                 - Expected hypervolume improvement: examples/multi_objective_bayes_opt/mobo.ipynb
                 - Multi-fidelity expected hypervolume improvement: examples/multi_objective_bayes_opt/multi_fidelity_mobo.ipynb

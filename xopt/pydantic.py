@@ -10,6 +10,7 @@ from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
 
 import numpy as np
 import orjson
+import pandas as pd
 import torch.nn
 from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
@@ -34,23 +35,32 @@ JSON_ENCODERS = {
 }
 
 
-def recursive_serialize(v, base_key=""):
-    for key, value in v.items():
-        if isinstance(value, dict):
-            v[key] = recursive_serialize(value, key)
-        elif isinstance(value, torch.nn.Module):
-            v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
-        elif isinstance(value, torch.dtype):
-            v[key] = str(value)
+def recursive_serialize(v, base_key="", serialize_torch=False):
+    for key in list(v):
+        if isinstance(v[key], dict):
+            v[key] = recursive_serialize(v[key], key, serialize_torch)
+        elif isinstance(v[key], torch.nn.Module):
+            if serialize_torch:
+                v[key] = process_torch_module(
+                    module=v[key], name="_".join((base_key, key))
+                )
+            else:
+                del v[key]
+        elif isinstance(v[key], torch.dtype):
+            v[key] = str(v[key])
+        elif isinstance(v[key], pd.DataFrame):
+            v[key] = json.loads(v[key].to_json())
         else:
             for _type, func in JSON_ENCODERS.items():
-                if isinstance(value, _type):
-                    v[key] = func(value)
+                if isinstance(v[key], _type):
+                    v[key] = func(v[key])
 
         # check to make sure object has been serialized,
         # if not use a generic serializer
         try:
-            json.dumps(v[key])
+            # handle case when key is (not) deleted
+            if key in v:
+                json.dumps(v[key])
         except (TypeError, OverflowError):
             v[key] = f"{v[key].__module__}.{v[key].__class__.__qualname__}"
 
@@ -75,8 +85,8 @@ def recursive_deserialize(v: dict):
 
 
 # define custom json_dumps using orjson
-def orjson_dumps(v, *, default, base_key=""):
-    v = recursive_serialize(v, base_key=base_key)
+def orjson_dumps(v, *, default, base_key="", serialize_torch=False):
+    v = recursive_serialize(v, base_key=base_key, serialize_torch=serialize_torch)
     # orjson.dumps returns bytes, to match standard json.dumps we need to decode
     return orjson.dumps(v, default=default).decode()
 

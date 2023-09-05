@@ -46,7 +46,6 @@ def evaluate_TNK(inputs: Dict, sleep=0, random_sleep=0, raise_probability=0, **p
         "y2": objectives[1],
         "c1": constraints[0],
         "c2": constraints[1],
-        "some_array": np.array([1, 2, 3]),
     }
 
     return outputs
