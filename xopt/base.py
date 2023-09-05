@@ -40,6 +40,11 @@ class XoptOptions(XoptBaseModel):
     max_evaluations: int = Field(
         None, description="maximum number of evaluations to perform"
     )
+    serialize_torch: bool = Field(
+        False,
+        description="flag to indicate that torch models should be serialized "
+        "when dumping",
+    )
 
 
 class Xopt:
@@ -324,7 +329,7 @@ class Xopt:
     def dump_state(self):
         """dump data to file"""
         if self.options.dump_file is not None:
-            output = state_to_dict(self)
+            output = state_to_dict(self, serialize_torch=self.options.serialize_torch)
             with open(self.options.dump_file, "w") as f:
                 yaml.dump(output, f)
             logger.debug(f"Dumped state to YAML file: {self.options.dump_file}")
@@ -488,13 +493,17 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     }
 
 
-def state_to_dict(X, include_data=True):
+def state_to_dict(X, include_data=True, serialize_torch=False):
     # dump data to dict with config metadata
     output = {
         "xopt": json.loads(X.options.json()),
         "generator": {
             "name": type(X.generator).name,
-            **json.loads(X.generator.json(base_key=type(X.generator).name)),
+            **json.loads(
+                X.generator.json(
+                    base_key=type(X.generator).name, serialize_torch=serialize_torch
+                )
+            ),
         },
         "evaluator": json.loads(X.evaluator.json()),
         "vocs": json.loads(X.vocs.json()),
