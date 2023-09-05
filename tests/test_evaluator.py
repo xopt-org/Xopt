@@ -23,6 +23,21 @@ class TestEvaluator:
     def identity(x, a=True):
         return {k + "_out": v for k, v in x.items()}
 
+    def test_evaluate(self):
+        # test in serial
+        evaluator = Evaluator(function=self.f)
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
+        results = evaluator.evaluate_data(candidates)
+        assert len(results) == 10
+
+        # test in parallel
+        evaluator = Evaluator(
+            function=self.f, executor=ProcessPoolExecutor(), max_workers=2
+        )
+        candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
+        results = evaluator.evaluate_data(candidates)
+        assert len(results) == 10
+
     def test_submit(self):
         evaluator = Evaluator(function=self.f)
         candidates = pd.DataFrame(np.random.rand(10, 2), columns=["x1", "x2"])
@@ -52,18 +67,23 @@ class TestEvaluator:
                 "_leading": [2.0, 3.0, 4.0],
                 "has:colon": [1, 2.0, 3],
                 ":colon:leading": [2.0, 3.0, 4.0],
-                #  Do not add these.
-                # 'strings': ['a','b','c'],
-                # 'booleans': [True, False, True],
-                # 'lists': [[1,2,3],[4,5,6],[7,8,9]],
-                # 'dicts': [{'a':1,'b':2},{'c':3,'d':4},{'e':5,'f':6}],
-                # 'tuples': [(1,2,3),(4,5,6),(7,8,9)]
+                "strings": ["a", "b", "c"],
+                "booleans": [True, False, True],
+                "lists": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+                "dicts": [{"a": 1, "b": 2}, {"c": 3, "d": 4}, {"e": 5, "f": 6}],
+                "dicts_compund": [
+                    {"a": 1, "b": True},
+                    {"c": 3, "d": "4"},
+                    {"e": 5, "f": 6},
+                ],
+                "tuples": [(1, 2, 3), (4, 5, 6), (7, 8, 9)],
             },
             index=[7, 8, 9],
         )
         futures = evaluator.submit_data(candidates)
         data = [fut.result() for fut in futures]
         df2 = pd.DataFrame(data, index=candidates.index)
+
         # Strip additional Xopt columns
         for key in df2.columns:
             if key.startswith("xopt_"):

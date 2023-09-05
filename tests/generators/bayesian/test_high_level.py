@@ -85,9 +85,11 @@ class TestHighLevel:
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
-    def test_restart(self):
+    def test_restart_torch_serialization(self):
         YAML = """
                 dump_file: dump.yml
+                serialize_torch: True
+
                 generator:
                     name: mobo
                     reference_point: {y1: 1.5, y2: 1.5}
@@ -122,4 +124,41 @@ class TestHighLevel:
         import os
 
         os.remove("mobo_model.pt")
+        os.remove("dump.yml")
+
+    def test_restart(self):
+        YAML = """
+                dump_file: dump.yml
+                generator:
+                    name: mobo
+                    reference_point: {y1: 1.5, y2: 1.5}
+                    numerical_optimizer:
+                        name: LBFGS
+                        n_restarts: 1
+                        n_raw_samples: 2
+
+                evaluator:
+                    function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+                vocs:
+                    variables:
+                        x1: [0, 3.14159]
+                        x2: [0, 3.14159]
+                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                    constraints: {}
+                """
+        X = Xopt(config=yaml.safe_load(YAML))
+        X.random_evaluate(3)
+        X.step()
+
+        config = yaml.safe_load(open("dump.yml"))
+
+        # test restart
+        X2 = Xopt(config=config)
+
+        assert X2.generator.vocs.variable_names == ["x1", "x2"]
+        assert X2.generator.numerical_optimizer.n_restarts == 1
+
+        import os
+
         os.remove("dump.yml")

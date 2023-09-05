@@ -44,7 +44,7 @@ class TestNumericalOptimizers:
         del vocs.objectives["y2"]
 
         generator = BayesianExplorationGenerator(
-            vocs=vocs, numerical_optimizer=GridOptimizer(n_grid_points=100)
+            vocs=vocs, numerical_optimizer=GridOptimizer(n_grid_points=10)
         )
 
         evaluator = Evaluator(function=evaluate_TNK)

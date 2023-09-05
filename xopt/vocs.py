@@ -105,10 +105,20 @@ class VOCS(XoptBaseModel):
     @property
     def output_names(self):
         """
-        Returns a sorted list of objective and constraint names (objectives first
-        then constraints)
+        Returns a list of expected output keys:
+            (objectives + constraints + observables)
+        Each sub-list is sorted.
         """
-        return self.objective_names + self.constraint_names + self.observable_names
+        full_list = self.objective_names
+        for ele in self.constraint_names:
+            if ele not in full_list:
+                full_list += [ele]
+
+        for ele in self.observable_names:
+            if ele not in full_list:
+                full_list += [ele]
+
+        return full_list
 
     @property
     def constant_names(self):
@@ -119,14 +129,8 @@ class VOCS(XoptBaseModel):
 
     @property
     def all_names(self):
-        """Returns all vocs names (variables, constants, objectives, constraints"""
-        return (
-            self.variable_names
-            + self.constant_names
-            + self.objective_names
-            + self.constraint_names
-            + self.observable_names
-        )
+        """Returns all vocs names (variables, constants, objectives, constraints)"""
+        return self.variable_names + self.constant_names + self.output_names
 
     @property
     def n_variables(self):
@@ -160,8 +164,11 @@ class VOCS(XoptBaseModel):
 
     @property
     def n_outputs(self):
-        """Returns the number of outputs (objectives and constraints)"""
-        return self.n_objectives + self.n_constraints + self.n_observables
+        """
+        Returns the number of outputs
+            len(objectives + constraints + observables)
+        """
+        return len(self.output_names)
 
     def random_inputs(
         self,
@@ -215,29 +222,34 @@ class VOCS(XoptBaseModel):
 
         return inputs
 
-    def convert_dataframe_to_inputs(self, data: pd.DataFrame) -> pd.DataFrame:
+    def convert_dataframe_to_inputs(
+        self, data: pd.DataFrame, include_constants=True
+    ) -> pd.DataFrame:
         """
         Extracts only inputs from a dataframe.
-        This will add constants.
+        This will add constants if `include_constants` is true.
         """
-        # make sure that the df keys contain the vocs variables
-        if not set(self.variable_names).issubset(set(data.keys())):
-            raise RuntimeError(
-                "input dataframe must at least contain the vocs variables"
+        # make sure that the df keys only contain vocs variables
+        if not set(self.variable_names) == set(data.keys()):
+            raise ValueError(
+                "input dataframe column set must equal set of vocs variables"
             )
 
         # only keep the variables
-        in_copy = data[self.variable_names].copy()
+        inner_copy = data.copy()
 
-        # append constants
-        constants = self.constants
-        if constants is not None:
-            for name, val in constants.items():
-                in_copy[name] = val
+        # append constants if requested
+        if include_constants:
+            constants = self.constants
+            if constants is not None:
+                for name, val in constants.items():
+                    inner_copy[name] = val
 
-        return in_copy
+        return inner_copy
 
-    def convert_numpy_to_inputs(self, inputs: np.ndarray) -> pd.DataFrame:
+    def convert_numpy_to_inputs(
+        self, inputs: np.ndarray, include_constants=True
+    ) -> pd.DataFrame:
         """
         convert 2D numpy array to list of dicts (inputs) for evaluation
         Assumes that the columns of the array match correspond to
@@ -245,7 +257,7 @@ class VOCS(XoptBaseModel):
 
         """
         df = pd.DataFrame(inputs, columns=self.variable_names)
-        return self.convert_dataframe_to_inputs(df)
+        return self.convert_dataframe_to_inputs(df, include_constants)
 
     # Extract optimization data (in correct column order)
     def variable_data(
@@ -327,7 +339,7 @@ class VOCS(XoptBaseModel):
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
-        not. Returned dataframe also contains a column `feasibility` which denotes if
+        not. Returned dataframe also contains a column `feasible` which denotes if
         all constraints are satisfied.
 
         Args:
@@ -514,7 +526,7 @@ def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     """
     Use constraint dict and data to identify feasible points in the the dataset.
 
-    Returns a dataframe with the feasibility data.
+    Returns a dataframe with the feasible data.
     """
     if not constraints:
         df = pd.DataFrame(index=data.index)
@@ -537,6 +549,13 @@ def validate_input_data(vocs, data):
         lower = vocs.variables[name][0]
         upper = vocs.variables[name][1]
 
-        d = data[name].to_numpy()
-        if np.any(d > upper) or np.any(d < lower):
-            raise ValueError("input points are not valid for VOCS!")
+        d = data[name]
+
+        # see if points violate limits
+        is_out_of_bounds = pd.DataFrame((d < lower, d > upper)).any(axis=0)
+        is_out_of_bounds_idx = list(is_out_of_bounds[is_out_of_bounds].index)
+
+        if len(is_out_of_bounds_idx):
+            raise ValueError(
+                f"input points at indices {is_out_of_bounds_idx} are not valid for {name} range in VOCS!"
+            )
