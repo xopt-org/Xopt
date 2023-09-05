@@ -14,6 +14,7 @@ import yaml
 from pydantic import BaseModel
 
 from xopt.generator import Generator
+from .generators.bayesian.bayesian_generator import BayesianGenerator
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
@@ -257,49 +258,72 @@ def read_xopt_csv(*files):
     return pd.concat(dfs)
 
 
-def visualize_model(generator, data, axes=None):
-    test_x = torch.linspace(*torch.tensor(generator.vocs.bounds.flatten()), 100)
-    generator.add_data(data)
+def visualize_model(generator: BayesianGenerator, axes=None):
+    test_x = torch.linspace(*generator.vocs.bounds.flatten(), 50).double()
+
+    vocs = generator.vocs
+
     model = generator.train_model()
+
+    # get acquisition function from generator
+    acq = generator.get_acquisition(model)
+
+    # calculate model posterior and acquisition function at each test point
+    # NOTE: need to add a dimension to the input tensor for evaluating the
+    # posterior and another for the acquisition function, see
+    # https://botorch.org/docs/batching for details
+    # NOTE: we use the `torch.no_grad()` environment to speed up computation by
+    # skipping calculations for backpropagation
+    with torch.no_grad():
+        posterior = model.posterior(test_x.unsqueeze(1))
+        acq_val = acq(test_x.reshape(-1, 1, 1))
+
+    # get mean function and confidence regions
+    mean = posterior.mean
+    lower, upper = posterior.mvn.confidence_region()
+
+    # plot model and acquisition function
+    n_outputs = vocs.n_outputs
+    if n_outputs == 1:
+        lower = lower.unsqueeze(-1)
+        upper = upper.unsqueeze(-1)
 
     if axes is None:
         # Lazy import
         from matplotlib import pyplot as plt
 
-        fig, ax = plt.subplots(2, 1, sharex="all")
-        fig.set_size_inches(6, 6)
+        fig, ax = plt.subplots(n_outputs + 1, 1, sharex="all")
+        fig.set_size_inches(4, 2 * n_outputs)
     else:
         ax = axes
+        fig = axes.gcf()
 
-    with torch.no_grad():
-        post = model.posterior(test_x.reshape(-1, 1, 1).double())
+    # plot model posterior
+    for i in range(n_outputs):
+        ax[i].plot(test_x, mean[:, i], f"C{i}", label=vocs.output_names[i])
+        ax[i].fill_between(test_x, lower[:, i], upper[:, i], alpha=0.25, fc=f"C{i}")
 
-        for i in range(len(generator.vocs.output_names)):
-            mean = post.mean
-            l, u = post.mvn.confidence_region()
+        # add data to model plot
+        ax[i].plot(
+            generator.data[vocs.variable_names],
+            generator.data[vocs.output_names[i]],
+            f"C{i}o",
+            label="Training data",
+        )
+        ax[i].set_ylabel(vocs.output_names[i])
 
-            ax[0].plot(
-                test_x,
-                mean[..., i],
-                f"C{i}",
-                label=f"{generator.vocs.output_names[i]} model",
-            )
-            ax[0].fill_between(
-                test_x, l[..., i].flatten(), u[..., i].flatten(), alpha=0.5
-            )
-            generator.data.plot(
-                x=generator.vocs.variable_names[0],
-                y=generator.vocs.output_names[i],
-                ax=ax[0],
-                style=f"oC{i}",
+        if vocs.output_names[i] in vocs.constraint_names:
+            ax[i].axhline(
+                vocs.constraints[vocs.output_names[i]][-1], ls="--", c=f"C{i}"
             )
 
-        ax[0].legend()
+    # plot acquisition function
+    ax[-1].plot(test_x, acq_val.flatten())
 
-        acq = generator.get_acquisition(model)(test_x.reshape(-1, 1, 1).double())
+    ax[-1].set_ylabel(r"$\alpha(x)$")
+    ax[-1].set_xlabel("x")
 
-        ax[1].plot(test_x, acq, label="Acquisition Function")
-        ax[1].legend()
+    return fig, ax
 
 
 def explode_all_columns(data: pd.DataFrame):
