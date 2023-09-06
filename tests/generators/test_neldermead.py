@@ -1,4 +1,5 @@
 import pytest
+import yaml
 from pydantic import ValidationError
 from scipy.optimize import fmin
 
@@ -47,7 +48,6 @@ class TestNelderMeadGenerator:
 
         # Xopt Simplex
         YAML = """
-        xopt: {}
         generator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
@@ -62,7 +62,7 @@ class TestNelderMeadGenerator:
                 x1: [-5, 5]
             objectives: {y: MINIMIZE}
         """
-        X = Xopt(YAML)
+        X = Xopt.parse_obj(yaml.safe_load(YAML))
         X.run()
 
         # Results should be the same

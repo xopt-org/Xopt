@@ -88,7 +88,7 @@ class ExtremumSeekingGenerator(Generator):
             )
 
         # Initial data point
-        if self.data.empty:
+        if self.data is None:
             return pd.DataFrame(
                 dict(zip(self.vocs.variable_names, self._p_ave.reshape(-1, 1)))
             )

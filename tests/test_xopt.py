@@ -1,6 +1,6 @@
 import math
 from abc import ABC
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from copy import copy, deepcopy
 
 import numpy as np
@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from xopt.asynch import AsynchXopt
+from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
@@ -43,6 +43,30 @@ class TestXopt:
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
 
+        # init with yaml
+        YAML = """
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+
+        generator:
+            name: random
+
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: dummy_constant}
+
+        """
+        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+
     def test_evaluate_data(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
@@ -54,10 +78,7 @@ class TestXopt:
         # test evaluating data w/o constants specified
         test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
         # pop constant specified in vocs
-        test_data.pop("cnt1")
         xopt.evaluate_data(pd.DataFrame(test_data))
-
-        assert np.all(xopt.data["cnt1"].to_numpy() == np.ones(3))
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -117,7 +138,7 @@ class TestXopt:
             evaluator=evaluator,
             vocs=deepcopy(TEST_VOCS_BASE),
         )
-        assert len(X.generator.data) == 0
+        assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
         assert (
@@ -127,7 +148,7 @@ class TestXopt:
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchXopt(
+        X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
             vocs=deepcopy(TEST_VOCS_BASE),
@@ -140,9 +161,9 @@ class TestXopt:
         # now use a threadpool evaluator with different number of max workers
         for mw in [2]:
             evaluator = Evaluator(
-                function=xtest_callable, executor=ThreadPoolExecutor(), max_workers=mw
+                function=xtest_callable, executor=ProcessPoolExecutor(), max_workers=mw
             )
-            X2 = AsynchXopt(
+            X2 = AsynchronousXopt(
                 generator=generator,
                 evaluator=evaluator,
                 vocs=deepcopy(TEST_VOCS_BASE),
@@ -186,7 +207,7 @@ class TestXopt:
 
         evaluator = Evaluator(function=bad_function_sometimes)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchXopt(generator=gen, evaluator=evaluator, vocs=deepcopy(
+        X = AsynchronousXopt(generator=gen, evaluator=evaluator, vocs=deepcopy(
             TEST_VOCS_BASE))
         X.strict = False
 

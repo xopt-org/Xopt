@@ -150,7 +150,7 @@ class BayesianGenerator(Generator, ABC):
             )
 
         # if no data exists raise error
-        if self.data.empty:
+        if self.data is None:
             raise RuntimeError(
                 "no data contained in generator, call `add_data` "
                 "method to add data, see also `Xopt.random_evaluate()`"
@@ -428,7 +428,7 @@ class BayesianGenerator(Generator, ABC):
             )
 
         # get last point
-        if self.data.empty:
+        if self.data is None:
             raise ValueError(
                 "No data exists to specify max_travel_distances "
                 "from, add data first to use during BO"

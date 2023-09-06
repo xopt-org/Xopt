@@ -37,7 +37,7 @@ class ScipyOptimizeGenerator(Generator):
     _state = None
     _inputs = None
 
-    _is_done = True
+    _is_done = False
     _saved_options: Dict = None
 
     class Config:
