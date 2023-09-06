@@ -11,7 +11,7 @@ from xopt.base import logger
 from xopt.evaluator import validate_outputs
 
 
-class AsynchXopt(Xopt):
+class AsynchronousXopt(Xopt):
     _futures: Dict = {}
     _ix_last: int = 0
     _n_unfinished_futures: int = 0
@@ -45,7 +45,7 @@ class AsynchXopt(Xopt):
 
         # add futures to internal list
         for key, future in new_futures.items():
-            assert key not in self._futures
+            assert key not in self._futures, f"{key}, {self._futures}, {future}"
             self._futures[key] = future
 
         return futures
@@ -66,7 +66,7 @@ class AsynchXopt(Xopt):
         # validate data before submission
         self.vocs.validate_input_data(self._input_data)
 
-        return self._input_data
+        return input_data
 
     def step(self):
         if self.is_done:

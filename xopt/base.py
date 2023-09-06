@@ -1,6 +1,11 @@
 import json
+import logging
+from copy import deepcopy
 from typing import Dict
 
+import numpy as np
+import pandas as pd
+import yaml
 from pandas import DataFrame
 from pydantic import Field, validator
 
@@ -13,13 +18,6 @@ from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
-
-import logging
-import os
-
-import numpy as np
-import pandas as pd
-import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -35,19 +33,20 @@ class Xopt(XoptBaseModel):
     strict: bool = Field(
         True,
         description="flag to indicate if exceptions raised during evaluation "
-        "should stop Xopt",
+                    "should stop Xopt",
     )
     dump_file: str = Field(
         None, description="file to dump the results of the evaluations"
     )
     data: DataFrame = Field(
-        pd.DataFrame(), description="internal DataFrame object"
+        None, description="internal DataFrame object"
     )
     serialize_torch: bool = Field(
         False,
         description="flag to indicate that torch models should be serialized "
-        "when dumping",
+                    "when dumping",
     )
+    max_evaluations: int = Field(None)
 
     @validator("vocs", pre=True)
     def validate_vocs(cls, value):
@@ -77,6 +76,21 @@ class Xopt(XoptBaseModel):
             return generator_class.parse_obj(
                 {"vocs": values["vocs"]})
 
+    @validator("data", pre=True)
+    def validate_data(cls, v):
+        if isinstance(v, dict):
+            try:
+                v = pd.DataFrame(v)
+            except IndexError:
+                v = pd.DataFrame(v, index=[0])
+        return v
+
+    @property
+    def n_data(self):
+        if self.data is None:
+            return 0
+        else:
+            return len(self.data)
 
     def step(self):
         """
@@ -102,6 +116,21 @@ class Xopt(XoptBaseModel):
         # Evaluate data
         self.evaluate_data(new_samples)
 
+    def run(self):
+        """run until either max_evaluations is reached or the generator is
+        done"""
+        while not self.generator.is_done:
+            # Stopping criteria
+            if self.max_evaluations is not None:
+                if self.n_data >= self.max_evaluations:
+                    logger.info(
+                        "Xopt is done. "
+                        f"Max evaluations {self.max_evaluations} reached."
+                    )
+                    break
+
+            self.step()
+
     def evaluate_data(self, input_data: pd.DataFrame):
         """
         Evaluate data using the evaluator and wait for results.
@@ -125,7 +154,6 @@ class Xopt(XoptBaseModel):
 
         return new_data
 
-
     def add_data(self, new_data: pd.DataFrame):
         """
         Concatenate new data to internal dataframe,
@@ -133,18 +161,21 @@ class Xopt(XoptBaseModel):
         """
         logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
 
-        # Set internal dataframe. Don't use self.data =
-        new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
-        new_data.index = np.arange(
-            len(self.data) + 1, len(self.data) + len(new_data) + 1
-        )
-        self.data = pd.concat([self.data, new_data], axis=0)
+        # Set internal dataframe.
+        if self.data is not None:
+            new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
+            new_data.index = np.arange(
+                len(self.data) + 1, len(self.data) + len(new_data) + 1
+            )
+
+            self.data = pd.concat([self.data, new_data], axis=0)
+        else:
+            self.data = new_data
         self.generator.add_data(new_data)
 
     def reset_data(self):
         self.data = pd.DataFrame()
         self.generator.data = pd.DataFrame()
-
 
     def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """
@@ -161,7 +192,7 @@ class Xopt(XoptBaseModel):
     def dump_state(self):
         """dump data to file"""
         if self.dump_file is not None:
-            output = json.loads(self.json())
+            output = json.loads(self.json(serialize_torch=self.serialize_torch))
             with open(self.dump_file, "w") as f:
                 yaml.dump(output, f)
             logger.debug(f"Dumped state to YAML file: {self.dump_file}")
@@ -177,11 +208,32 @@ class Xopt(XoptBaseModel):
         result = super().json(**kwargs)
         dict_result = json.loads(result)
         dict_result["generator"] = {
-            "name": self.generator.name
-        } | dict_result["generator"]
+                                       "name": self.generator.name
+                                   } | dict_result["generator"]
         dict_result["data"] = json.loads(self.data.to_json())
 
         # TODO: implement version checking
-        #dict_result["xopt_version"] = __version__
+        # dict_result["xopt_version"] = __version__
 
         return json.dumps(dict_result)
+
+    def __repr__(self):
+        """
+        Returns infor about the Xopt object, including the YAML representation without data.
+        """
+
+        # get dict minus data
+        config = deepcopy(self.dict())
+        config.pop("data")
+        return f"""
+            Xopt
+________________________________
+Version: {__version__}
+Data size: {self.n_data}
+Config as YAML:
+{yaml.dump(config)}
+"""
+
+    def __str__(self):
+        return self.__repr__()
+
