@@ -213,6 +213,7 @@ class VOCS(XoptBaseModel):
 
         for key, val in bounds.items():  # No need to sort here
             a, b = val
+            n = n if n is not None else 1
             x = rng_sample_function(n)
             inputs[key] = x * a + (1 - x) * b
 
@@ -220,7 +221,10 @@ class VOCS(XoptBaseModel):
         if include_constants and self.constants is not None:
             inputs.update(self.constants)
 
-        return inputs
+        if n == 1:
+            return pd.DataFrame(inputs, index=[0])
+        else:
+            return pd.DataFrame(inputs)
 
     def convert_dataframe_to_inputs(
         self, data: pd.DataFrame, include_constants=True
