@@ -6,8 +6,7 @@ import pandas as pd
 from pandas import DataFrame
 from pydantic import Field
 
-from xopt import Xopt
-from xopt.base import logger
+from xopt.base import logger, Xopt
 from xopt.evaluator import validate_outputs
 
 
