@@ -16,8 +16,9 @@ class AsynchronousXopt(Xopt):
     _ix_last: int = 0
     _n_unfinished_futures: int = 0
     _input_data: DataFrame = DataFrame([])
-    is_done: bool = Field(default=False, description="flag indicating that Xopt "
-                                                     "fininshed running")
+    is_done: bool = Field(
+        default=False, description="flag indicating that Xopt " "fininshed running"
+    )
 
     class Config:
         underscore_attrs_are_private = True

@@ -26,6 +26,7 @@ class Xopt(XoptBaseModel):
     """
     Object to handle a single optimization problem.
     """
+
     vocs: VOCS = Field(description="VOCS object for Xopt")
     generator: Generator = Field(description="generator object for Xopt")
     evaluator: Evaluator = Field(description="evaluator object for Xopt")
@@ -33,18 +34,16 @@ class Xopt(XoptBaseModel):
     strict: bool = Field(
         True,
         description="flag to indicate if exceptions raised during evaluation "
-                    "should stop Xopt",
+        "should stop Xopt",
     )
     dump_file: str = Field(
         None, description="file to dump the results of the evaluations"
     )
-    data: DataFrame = Field(
-        None, description="internal DataFrame object"
-    )
+    data: DataFrame = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
         False,
         description="flag to indicate that torch models should be serialized "
-                    "when dumping",
+        "when dumping",
     )
     max_evaluations: int = Field(None)
 
@@ -69,12 +68,10 @@ class Xopt(XoptBaseModel):
         elif isinstance(value, dict):
             name = value.pop("name")
             generator_class = get_generator(name)
-            return generator_class.parse_obj(
-                {**value, "vocs": values["vocs"]})
+            return generator_class.parse_obj({**value, "vocs": values["vocs"]})
         elif isinstance(value, str):
             generator_class = get_generator(value)
-            return generator_class.parse_obj(
-                {"vocs": values["vocs"]})
+            return generator_class.parse_obj({"vocs": values["vocs"]})
 
     @validator("data", pre=True)
     def validate_data(cls, v):
@@ -198,18 +195,18 @@ class Xopt(XoptBaseModel):
             logger.debug(f"Dumped state to YAML file: {self.dump_file}")
 
     def dict(self, **kwargs) -> Dict:
-        """ handle custom dict generation"""
+        """handle custom dict generation"""
         result = super().dict(**kwargs)
         result["generator"] = {"name": self.generator.name} | result["generator"]
         return result
 
     def json(self, **kwargs) -> str:
-        """ handle custom serialization of generators and dataframes"""
+        """handle custom serialization of generators and dataframes"""
         result = super().json(**kwargs)
         dict_result = json.loads(result)
-        dict_result["generator"] = {
-                                       "name": self.generator.name
-                                   } | dict_result["generator"]
+        dict_result["generator"] = {"name": self.generator.name} | dict_result[
+            "generator"
+        ]
         dict_result["data"] = json.loads(self.data.to_json())
 
         # TODO: implement version checking
@@ -236,4 +233,3 @@ Config as YAML:
 
     def __str__(self):
         return self.__repr__()
-
