@@ -3,9 +3,11 @@ import logging
 import os
 import sys
 
+import yaml
 from mpi4py import MPI
 from mpi4py.futures import MPICommExecutor
 
+from xopt import AsynchronousXopt
 # from mpi4py.futures import MPIPoolExecutor
 from xopt.base import Xopt
 from xopt.log import set_handler_with_logger
@@ -36,6 +38,9 @@ if __name__ == "__main__":
     parser.add_argument("--logfile", "-l", help="Log file to write to")
 
     parser.add_argument("--verbose", "-v", action="count", help="Show more log output")
+    parser.add_argument(
+        "--asynch", "-a", action="store_true", help="Use asynchronous execution"
+    )
 
     args = parser.parse_args()
     print(args)
@@ -62,9 +67,13 @@ if __name__ == "__main__":
     # logger.info('_________________________________')
     logger.info(f"Parallel execution with {mpi_size} workers")
 
-    X = Xopt(infile)
-    logger.info("Enabling async mode")
-    X.options.asynch = True  # Force asynch
+    config = yaml.safe_load(infile)
+
+    if args.asynch:
+        logger.info("Enabling async mode")
+        X = AsynchronousXopt.parse_obj(config)
+    else:
+        X = Xopt.parse_obj(config)
 
     print(X)
     sys.stdout.flush()
