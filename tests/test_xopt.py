@@ -1,9 +1,8 @@
 import math
 from abc import ABC
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-from copy import copy, deepcopy
+from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 
-import numpy as np
 import pandas as pd
 import pytest
 import yaml
@@ -15,7 +14,7 @@ from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
 from xopt.io import load_xopt_from_file
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
+from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.vocs import VOCS
 
 
@@ -34,7 +33,6 @@ class DummyGenerator(Generator, ABC):
 
 class TestXopt:
     def test_init(self):
-
         # init with generator and evaluator
         def dummy(x):
             pass
@@ -207,8 +205,9 @@ class TestXopt:
 
         evaluator = Evaluator(function=bad_function_sometimes)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(generator=gen, evaluator=evaluator, vocs=deepcopy(
-            TEST_VOCS_BASE))
+        X = AsynchronousXopt(
+            generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
         X.strict = False
 
         # Submit to the evaluator some new inputs
