@@ -3,6 +3,7 @@ from abc import ABC
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
+import numpy as np
 import pandas as pd
 import pytest
 import yaml
@@ -260,6 +261,9 @@ class TestXopt:
         xopt = Xopt(
             generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
-        xopt.random_evaluate(2)
+
+        # fixed seed for deterministic results
+        xopt.random_evaluate(2, seed=1)
         xopt.random_evaluate(1)
+        assert np.isclose(xopt.data["x1"].iloc[0], 0.488178)
         assert len(xopt.data) == 3

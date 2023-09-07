@@ -96,7 +96,7 @@ class ScipyOptimizeGenerator(Generator):
         self.data = new_data_df
         self._lock = False  # unlock
 
-    def generate(self, n_candidates) -> List[Dict]:
+    def generate(self, n_candidates) -> pd.DataFrame:
         # Check if any options were changed from init. If so, reset the algorithm
         if self.dict() != self._saved_options:
             self._algorithm = None
@@ -135,7 +135,7 @@ class ScipyOptimizeGenerator(Generator):
         except StopIteration:
             self._is_done = True
 
-        return self._inputs
+        return pd.DataFrame(self._inputs, index=np.arange(len(self._inputs)))
 
 
 class NelderMeadGenerator(ScipyOptimizeGenerator):
