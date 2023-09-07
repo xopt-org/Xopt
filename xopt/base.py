@@ -108,7 +108,7 @@ class Xopt(XoptBaseModel):
 
         # generate samples and submit to evaluator
         logger.debug(f"Generating {n_generate} candidates")
-        new_samples = pd.DataFrame(self.generator.generate(n_generate))
+        new_samples = self.generator.generate(n_generate)
 
         # Evaluate data
         self.evaluate_data(new_samples)
@@ -177,12 +177,9 @@ class Xopt(XoptBaseModel):
     def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """
         Convenience method to generate random inputs using vocs
-        and evaluate them (adding data to Xopt object and generator.
+        and evaluate them (adding data to Xopt object and generator).
         """
-        index = [1] if n_samples == 1 else None
-        random_inputs = pd.DataFrame(
-            self.vocs.random_inputs(n_samples, seed=seed, **kwargs), index=index
-        )
+        random_inputs = self.vocs.random_inputs(n_samples, seed=seed, **kwargs)
         result = self.evaluate_data(random_inputs[self.vocs.variable_names])
         return result
 
