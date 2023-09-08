@@ -34,3 +34,9 @@
 2023-09-06T16:54:09-0500 - __main__ - INFO - some info message
 2023-09-06T16:54:09-0500 - __main__ - DEBUG - another debug message
 2023-09-06T16:54:09-0500 - __main__ - INFO - another info message
+2023-09-08T14:50:57-0500 - __main__ - INFO - some info message
+2023-09-08T14:50:57-0500 - __main__ - DEBUG - another debug message
+2023-09-08T14:50:57-0500 - __main__ - INFO - another info message
+2023-09-08T15:03:03-0500 - __main__ - INFO - some info message
+2023-09-08T15:03:03-0500 - __main__ - DEBUG - another debug message
+2023-09-08T15:03:03-0500 - __main__ - INFO - another info message

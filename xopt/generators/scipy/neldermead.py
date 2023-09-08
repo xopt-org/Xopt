@@ -48,7 +48,7 @@ class ScipyOptimizeGenerator(Generator):
 
         # Initialize the first candidate if not given
         if self.initial_point is None:
-            self.initial_point = self.vocs.random_inputs()
+            self.initial_point = self.vocs.random_inputs()[0]
         self._saved_options = (
             self.dict().copy()
         )  # Used to keep track of changed options
@@ -96,7 +96,7 @@ class ScipyOptimizeGenerator(Generator):
         self.data = new_data_df
         self._lock = False  # unlock
 
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         # Check if any options were changed from init. If so, reset the algorithm
         if self.dict() != self._saved_options:
             self._algorithm = None
@@ -135,7 +135,7 @@ class ScipyOptimizeGenerator(Generator):
         except StopIteration:
             self._is_done = True
 
-        return pd.DataFrame(self._inputs, index=np.arange(len(self._inputs)))
+        return self._inputs
 
 
 class NelderMeadGenerator(ScipyOptimizeGenerator):

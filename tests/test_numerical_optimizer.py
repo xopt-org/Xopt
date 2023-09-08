@@ -50,13 +50,13 @@ class TestNumericalOptimizers:
 
         X = Xopt(generator=generator, evaluator=evaluator, vocs=vocs)
 
-        X.evaluate_data(pd.DataFrame(
-            {"x1": [1.0, 0.75, 3.14, 0],
-             "x2": [0.7, 0.95, 0, 3.14]}
-        ))
+        X.evaluate_data(
+            pd.DataFrame({"x1": [1.0, 0.75, 3.14, 0], "x2": [0.7, 0.95, 0, 3.14]})
+        )
 
         X.step()
         assert np.allclose(
             X.data.iloc[-1][X.vocs.variable_names].to_numpy().astype(float),
-            np.zeros(2), atol=1e-4
+            np.zeros(2),
+            atol=1e-4,
         )

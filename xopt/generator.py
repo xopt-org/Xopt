@@ -65,7 +65,7 @@ class Generator(XoptBaseModel, ABC):
         return self._is_done
 
     @abstractmethod
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         """
         generate `n_candidates` candidates
 

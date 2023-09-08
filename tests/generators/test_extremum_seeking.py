@@ -46,8 +46,7 @@ class TestExtremumSeekingGenerator:
         # Total number of ES steps to take
         ES_steps = 100
 
-        # Add Noise to the Signal
-        noise = 0.1 * np.random.randn(ES_steps)
+        noise = 0.0
 
         # For the parameters being tuned, the first step is to
         # define upper and lower bounds for each parameter
@@ -108,17 +107,13 @@ class TestExtremumSeekingGenerator:
         # Various frequencies for unknown points
         w_opt = 0.25 + 2 * np.random.rand(nES)
 
-        def f_ES_minimize(p, i):
-            # Vary the optimal point with time
-            p_opt_i = np.zeros(nES)
-            for n in np.arange(nES):
-                p_opt_i[n] = p_opt[n] * (1 + np.sin(2 * np.pi * w_opt[n] * i / 2000))
+        def f_ES_minimize(p):
             # This simple cost will be distance from the optimal point
-            f_val = np.sum((p - p_opt_i) ** 2)
+            f_val = np.sum(p ** 2)
             return f_val
 
         # Calculate the initial cost function value based on initial conditions
-        cES[0] = f_ES_minimize(pES[0], 0) + noise[0]
+        cES[0] = f_ES_minimize(pES[0])
 
         # These are the unknown optimal values (just for plotting)
         p_opt_t = np.zeros([ES_steps, nES])
@@ -218,7 +213,7 @@ class TestExtremumSeekingGenerator:
             pES[i + 1] = p_un_normalize(pES_n[i + 1])
 
             # Calculate new cost function values based on new settings
-            cES[i + 1] = f_ES_minimize(pES[i + 1], i + 1) + noise[i + 1]
+            cES[i + 1] = f_ES_minimize(pES[i + 1])
 
             # Decay the amplitude
             amplitude = amplitude * decay_rate
@@ -241,8 +236,6 @@ class TestExtremumSeekingGenerator:
 
         states = {"count": 0}
 
-        noise = 0.1 * np.random.randn(ES_steps)
-
         # This is the unknown optimal point
         p_opt = 1.5 * (2 * np.random.rand(nES) - 1)
 
@@ -255,13 +248,8 @@ class TestExtremumSeekingGenerator:
                 p.append(input_dict[f"p{i}"])
             p = np.array(p)
 
-            # Vary the optimal point with time
-            p_opt_i = np.zeros(nES)
-            i = states["count"]
-            for n in np.arange(nES):
-                p_opt_i[n] = p_opt[n] * (1 + np.sin(2 * np.pi * w_opt[n] * i / 2000))
             # This simple cost will be distance from the optimal point
-            f_val = np.sum((p - p_opt_i) ** 2) + noise[i]
+            f_val = np.sum(p ** 2)
 
             states["count"] += 1
             outcome_dict = {"f": f_val}

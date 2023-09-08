@@ -28,7 +28,7 @@ class BaxGenerator(BayesianGenerator):
     class Config:
         underscore_attrs_are_private = True
 
-    def generate(self, n_candidates: int) -> pd.DataFrame:
+    def generate(self, n_candidates: int) -> list[dict]:
         self._n_calls += 1
         return super().generate(n_candidates)
 

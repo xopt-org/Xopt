@@ -1,7 +1,7 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -127,11 +127,26 @@ class Xopt(XoptBaseModel):
 
             self.step()
 
-    def evaluate_data(self, input_data: pd.DataFrame):
+    def evaluate_data(
+        self,
+        input_data: Union[
+            pd.DataFrame,
+            List[Dict[str, float]],
+            Dict[str, List[float]],
+            Dict[str, float],
+        ],
+    ) -> pd.DataFrame:
         """
         Evaluate data using the evaluator and wait for results.
         Adds results to the internal dataframe.
         """
+        # translate input data into pandas dataframes
+        if not isinstance(input_data, DataFrame):
+            try:
+                input_data = DataFrame(input_data)
+            except ValueError:
+                input_data = DataFrame(input_data, index=[0])
+
         logger.debug(f"Evaluating {len(input_data)} inputs")
         self.vocs.validate_input_data(input_data)
         output_data = self.evaluator.evaluate_data(input_data)
@@ -179,7 +194,7 @@ class Xopt(XoptBaseModel):
         and evaluate them (adding data to Xopt object and generator).
         """
         random_inputs = self.vocs.random_inputs(n_samples, seed=seed, **kwargs)
-        result = self.evaluate_data(random_inputs[self.vocs.variable_names])
+        result = self.evaluate_data(random_inputs)
         return result
 
     def dump_state(self):

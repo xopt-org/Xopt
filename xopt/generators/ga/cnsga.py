@@ -96,7 +96,7 @@ class CNSGAGenerator(Generator):
             if self._loaded_population is None:
                 return self.vocs.random_inputs(
                     self.n_pop, include_constants=False
-                ).to_dict("records")
+                )
             else:
                 pop = self._loaded_population
         else:
@@ -129,7 +129,7 @@ class CNSGAGenerator(Generator):
             self.children = []  # reset children
             self.offspring = None  # reset offspring
 
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         """
         generate `n_candidates` candidates
 
@@ -139,8 +139,7 @@ class CNSGAGenerator(Generator):
         while len(self.children) < n_candidates:
             self.children.extend(self.create_children())
 
-        return_list = [self.children.pop() for _ in range(n_candidates)]
-        return pd.DataFrame(return_list, index=list(range(len(return_list))))
+        return [self.children.pop() for _ in range(n_candidates)]
 
     def write_offspring(self, filename=None):
         """
