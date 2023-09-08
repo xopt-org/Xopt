@@ -59,7 +59,7 @@ class TestHighLevel:
                 c1: [GREATER_THAN, 0]
                 c2: [LESS_THAN, 0.5]
         """
-        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
@@ -81,7 +81,7 @@ class TestHighLevel:
                 objectives: {y1: MINIMIZE, y2: MINIMIZE}
                 constraints: {}
         """
-        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
@@ -108,7 +108,7 @@ class TestHighLevel:
                     objectives: {y1: MINIMIZE, y2: MINIMIZE}
                     constraints: {}
                 """
-        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
 
@@ -147,7 +147,7 @@ class TestHighLevel:
                     objectives: {y1: MINIMIZE, y2: MINIMIZE}
                     constraints: {}
                 """
-        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
 
