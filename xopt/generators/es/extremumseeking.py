@@ -89,9 +89,7 @@ class ExtremumSeekingGenerator(Generator):
 
         # Initial data point
         if self.data is None:
-            return [
-                dict(zip(self.vocs.variable_names, self._p_ave.reshape(-1, 1)))
-            ]
+            return [dict(zip(self.vocs.variable_names, self._p_ave.reshape(-1, 1)))]
 
         p_n = self.p_normalize(self._last_input)
 

@@ -94,9 +94,7 @@ class CNSGAGenerator(Generator):
         if self.population is None:
             # Special case when pop is loaded from file
             if self._loaded_population is None:
-                return self.vocs.random_inputs(
-                    self.n_pop, include_constants=False
-                )
+                return self.vocs.random_inputs(self.n_pop, include_constants=False)
             else:
                 pop = self._loaded_population
         else:

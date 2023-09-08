@@ -46,8 +46,6 @@ class TestExtremumSeekingGenerator:
         # Total number of ES steps to take
         ES_steps = 100
 
-        noise = 0.0
-
         # For the parameters being tuned, the first step is to
         # define upper and lower bounds for each parameter
 
@@ -109,7 +107,7 @@ class TestExtremumSeekingGenerator:
 
         def f_ES_minimize(p):
             # This simple cost will be distance from the optimal point
-            f_val = np.sum(p ** 2)
+            f_val = np.sum(p**2)
             return f_val
 
         # Calculate the initial cost function value based on initial conditions
@@ -236,12 +234,6 @@ class TestExtremumSeekingGenerator:
 
         states = {"count": 0}
 
-        # This is the unknown optimal point
-        p_opt = 1.5 * (2 * np.random.rand(nES) - 1)
-
-        # Various frequencies for unknown points
-        w_opt = 0.25 + 2 * np.random.rand(nES)
-
         def f_ES_minimize(input_dict):
             p = []
             for i in range(10):
@@ -249,7 +241,7 @@ class TestExtremumSeekingGenerator:
             p = np.array(p)
 
             # This simple cost will be distance from the optimal point
-            f_val = np.sum(p ** 2)
+            f_val = np.sum(p**2)
 
             states["count"] += 1
             outcome_dict = {"f": f_val}

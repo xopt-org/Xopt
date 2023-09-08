@@ -2,7 +2,7 @@ import logging
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
-from typing import Callable, Dict, Union, List
+from typing import Callable, Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -91,13 +91,15 @@ class Evaluator(XoptBaseModel):
         """
         return self.safe_function(input, **{**self.function_kwargs, **kwargs})
 
-    def evaluate_data(self, input_data: Union[
+    def evaluate_data(
+        self,
+        input_data: Union[
             pd.DataFrame,
             List[Dict[str, float]],
             Dict[str, List[float]],
             Dict[str, float],
         ],
-        ) -> pd.DataFrame:
+    ) -> pd.DataFrame:
         """evaluate dataframe of inputs"""
         if self.vectorized:
             output_data = self.safe_function(input_data, **self.function_kwargs)
