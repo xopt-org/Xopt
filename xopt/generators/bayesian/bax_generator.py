@@ -3,7 +3,6 @@ import pickle
 from copy import deepcopy
 from typing import Dict
 
-import pandas as pd
 from pydantic import Field
 
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain

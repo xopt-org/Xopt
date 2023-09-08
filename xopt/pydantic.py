@@ -6,7 +6,7 @@ import os.path
 from concurrent.futures import Future
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar, TextIO
+from typing import Any, Callable, Generic, Iterable, List, Optional, TextIO, TypeVar
 
 import numpy as np
 import orjson
