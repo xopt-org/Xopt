@@ -1,7 +1,5 @@
 from copy import copy
 
-import yaml
-
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.random import RandomGenerator

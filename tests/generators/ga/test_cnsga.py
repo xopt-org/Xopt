@@ -1,5 +1,3 @@
-import yaml
-
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.cnsga import CNSGAGenerator

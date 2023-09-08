@@ -1,5 +1,4 @@
 import pytest
-import yaml
 from pydantic import ValidationError
 from scipy.optimize import fmin
 
