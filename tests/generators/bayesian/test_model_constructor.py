@@ -127,8 +127,7 @@ class TestModelConstructor:
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
         constructor = StandardModelConstructor(covar_modules=custom_covar)
-        constructor.model_dump_json(serialize_torch=True)
-        import os
+        constructor.serialize_json_custom(serialize_torch=True)
         os.remove("covar_modules_y1.pt")
 
     def test_model_saving(self):
@@ -158,7 +157,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        gen_dump = generator.model_dump_json(serialize_torch=True)
+        gen_dump = generator.serialize_json_custom(serialize_torch=True)
         options = json.loads(gen_dump)
 
         with open("test.yml", "w") as f:
@@ -207,7 +206,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.model_dump_json(serialize_torch=True))
+        options = json.loads(generator.serialize_json_custom(serialize_torch=True))
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
