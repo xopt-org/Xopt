@@ -71,7 +71,7 @@ class BayesianGenerator(Generator, ABC):
     fixed_features: Optional[Dict[str, float]] = Field(
         None, description="fixed features used in Bayesian optimization"
     )
-    computation_time: pd.DataFrame = Field(
+    computation_time: Optional[pd.DataFrame] = Field(
         None,
         description="data frame tracking computation time in seconds",
     )
