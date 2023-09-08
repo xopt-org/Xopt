@@ -42,10 +42,10 @@ JSON_ENCODERS = {
 # meaning whichever model method is decorated with @model_serializer cant adjust for 'base_key'
 # and other similar options - it renders whole v2 scheme quite useless. We can still try
 # to use @field_serializer, but there is a lack of documentation on how to call these
-# handlers from a custom function.
+# handlers from a custom function. So, we implement a fully custom serialization scheme.
 
 # Pydantic v2 will by default serialize submodels as annotated types, dropping subclass attributes
-# TODO: modify nested models to use SerializeAsAny when we get there
+# TODO: modify nested models to use SerializeAsAny
 
 def recursive_serialize(v, base_key="", serialize_torch=False):
     for key in list(v):
@@ -79,43 +79,10 @@ def recursive_serialize(v, base_key="", serialize_torch=False):
     return v
 
 
-def recursive_serialize_v2(v: dict, base_key: str = ""):
-    # Pydantic v2 will by default serialize submodels as annotated, dropping subclass attributes
-    # We don't want that, so need to modify things to SerializeAsAny later
-
-    # This will iterate model fields
-    for key, value in v.items():
-        if isinstance(value, dict):
-            v[key] = recursive_serialize_v2(value, base_key=key)
-        elif isinstance(value, torch.nn.Module):
-            v[key] = process_torch_module(module=value, name="_".join((base_key, key)))
-        elif isinstance(value, torch.dtype):
-            v[key] = str(value)
-        elif isinstance(value, pd.DataFrame):
-            v[key] = json.loads(value.to_json())
-        elif isinstance(value, BaseModel):
-            # v[key] = value.model_dump_json()
-            v[key] = recursive_serialize_v2(value, base_key=key)
-        else:
-            for _type, func in JSON_ENCODERS.items():
-                if isinstance(value, _type):
-                    v[key] = func(value)
-
-        # check to make sure object has been serialized,
-        # if not use a generic serializer
-        try:
-            json.dumps(v[key])
-        except (TypeError, OverflowError) as ex:
-            print(ex)
-            v[key] = f"{v[key].__module__}.{v[key].__class__.__qualname__}"
-
-    return v
-
-
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 
 
-def recursive_deserialize(v: dict):
+def recursive_deserialize(v: dict) -> dict:
     """deserialize strings from xopt outputs"""
     for key, value in v.items():
         # process dicts
@@ -129,32 +96,26 @@ def recursive_deserialize(v: dict):
     return v
 
 
-def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False):
-    # from main v1 deprecated section
-    # TODO: replace with custom rules, or maybe orjson supports enough?
+def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False) -> str:
+    # TODO: move away from borrowing pydantic v1 encoder
     json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
-    return orjson_dumps_custom(v, default=json_encoder, base_key=base_key, serialize_torch=serialize_torch)
+    return orjson_dumps_custom(v, default=json_encoder, base_key=base_key,
+                               serialize_torch=serialize_torch)
 
 
-def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False):
+def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False) -> str:
     v = recursive_serialize(v.model_dump(), base_key=base_key, serialize_torch=serialize_torch)
     return orjson.dumps(v, default=default).decode()
 
 
 
-def orjson_dumps_except_root(v: BaseModel, *, base_key="") -> dict:
+def orjson_dumps_except_root(v: BaseModel, *, base_key="", serialize_torch=False) -> dict:
     dump = v.model_dump()
-    encoded_dump = recursive_serialize_v2(dump, base_key=base_key)
+    encoded_dump = recursive_serialize(dump, base_key=base_key, serialize_torch=serialize_torch)
     return encoded_dump
 
 
-def orjson_loads(v, default=None):
-    v = orjson.loads(v)
-    v = recursive_deserialize(v)
-    return v
-
-
-def orjson_loads_v2(v, default=None):
+def orjson_loads(v, default=None) -> dict:
     v = orjson.loads(v)
     v = recursive_deserialize(v)
     return v
@@ -188,15 +149,8 @@ class XoptBaseModel(BaseModel):
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
         return orjson_dumps_except_root(self, base_key="")
 
-    # TODO: determine how to pass in non-default base_key, not supported by pydantic
-    def serialize_json_str_custom(self, base_key="") -> str:
-        return orjson_dumps(self, base_key=base_key)
-
-    # TODO: implement json load parsing on main object (json_loads is gone)
-    # def deserialize_json(v, default=None):
-    #     v = orjson.loads(v)
-    #     v = recursive_deserialize(v)
-    #     return v
+    def serialize_json_custom(self, **kwargs) -> str:
+        return orjson_dumps(self, **kwargs)
 
 
 def get_descriptions_defaults(model: XoptBaseModel):
