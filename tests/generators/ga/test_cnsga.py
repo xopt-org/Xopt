@@ -18,7 +18,7 @@ def test_cnsga():
 
 
 def test_cnsga_from_yaml():
-    X = Xopt.parse_obj(yaml.safe_load(TEST_YAML))
+    X = Xopt.from_yaml(TEST_YAML)
     # Patch in generator
     X.generator = CNSGAGenerator(vocs=X.vocs)
     X.max_evaluations = 5

@@ -62,7 +62,7 @@ class TestNelderMeadGenerator:
                 x1: [-5, 5]
             objectives: {y: MINIMIZE}
         """
-        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.run()
 
         # Results should be the same

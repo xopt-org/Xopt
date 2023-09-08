@@ -25,4 +25,4 @@ class Test_IO:
         X.parse_obj(state_dict)
 
     def test_parse_config(self):
-        Xopt.parse_obj(yaml.safe_load(copy(TEST_YAML)))
+        Xopt.from_yaml(copy(TEST_YAML))

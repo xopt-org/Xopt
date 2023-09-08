@@ -14,7 +14,6 @@ from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
-from xopt.io import load_xopt_from_file
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.vocs import VOCS
 
@@ -63,7 +62,7 @@ class TestXopt:
             constants: {a: dummy_constant}
 
         """
-        X = Xopt.parse_obj(yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
 
     def test_evaluate_data(self):
@@ -235,7 +234,7 @@ class TestXopt:
 
         try:
             # try to load the state from nothing
-            X2 = load_xopt_from_file(X.dump_file)
+            X2 = Xopt.from_file(X.dump_file)
 
             for _ in range(5):
                 X2.step()
