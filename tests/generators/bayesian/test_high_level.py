@@ -152,6 +152,7 @@ class TestHighLevel:
         X.step()
 
         config = yaml.safe_load(open("dump.yml"))
+        os.remove("dump.yml")
 
         # test restart
         X2 = Xopt(config=config)
@@ -159,10 +160,6 @@ class TestHighLevel:
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
 
-        import os
-
-        os.remove("dump.yml")
-        
     @pytest.fixture(scope='module', autouse=True)
     def clean_up(self):
         yield

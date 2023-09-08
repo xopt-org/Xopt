@@ -495,9 +495,10 @@ def xopt_kwargs_from_dict(config: dict) -> dict:
     }
 
 
-def state_to_dict(X: Xopt, include_data=True, serialize_torch=False):
+def state_to_dict(X: Xopt, include_data=True, serialize_torch=False) -> dict:
     # dump data to dict with config metadata
-    gen_str = X.generator.serialize_json_str_custom(base_key=type(X.generator).name, serialize_torch=serialize_torch)
+    gen_str = X.generator.serialize_json_custom(base_key=type(X.generator).name,
+                                                serialize_torch=serialize_torch)
     output = {
         "xopt": X.options.model_dump(),
         "generator": {
