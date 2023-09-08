@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 import pandas as pd
-from pydantic import Field
+from pydantic import Field, validator
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
-    data: pd.DataFrame = Field(
-        pd.DataFrame(), description="generator data", exclude=True
-    )
+    data: pd.DataFrame = Field(None, description="generator data", exclude=True)
 
     supports_batch_generation: ClassVar[bool] = Field(
         default=False,
@@ -30,6 +28,17 @@ class Generator(XoptBaseModel, ABC):
         "problems",
     )
 
+    _is_done = False
+
+    @validator("data", pre=True)
+    def validate_data(cls, v):
+        if isinstance(v, dict):
+            try:
+                v = pd.DataFrame(v)
+            except IndexError:
+                v = pd.DataFrame(v, index=[0])
+        return v
+
     # @validator("vocs", pre=True)
     # def vocs_validation(cls, v):
     #     # do vocs first
@@ -37,6 +46,7 @@ class Generator(XoptBaseModel, ABC):
 
     class Config:
         validate_assignment = True
+        underscore_attrs_are_private = True
 
     def __init__(self, **kwargs):
         """
@@ -50,8 +60,12 @@ class Generator(XoptBaseModel, ABC):
         _check_vocs(self.vocs, self.supports_multi_objective)
         logger.info(f"Initialized generator {self.name}")
 
+    @property
+    def is_done(self):
+        return self._is_done
+
     @abstractmethod
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         """
         generate `n_candidates` candidates
 
@@ -65,7 +79,10 @@ class Generator(XoptBaseModel, ABC):
         This is intended for generators that maintain their own data.
 
         """
-        pass
+        if self.data is not None:
+            self.data = pd.concat([self.data, new_data], axis=0)
+        else:
+            self.data = new_data
 
 
 def _check_vocs(vocs, multi_objective_allowed):

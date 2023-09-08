@@ -1,8 +1,6 @@
 from copy import copy
 
-import yaml
-
-from xopt.base import parse_config, state_to_dict, Xopt
+from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML
@@ -18,12 +16,11 @@ class Test_IO:
         generator = RandomGenerator(vocs=TEST_VOCS_BASE)
 
         X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
-        state_dict = state_to_dict(X)
+        state_dict = X.dict()
         assert state_dict["generator"]["name"] == generator.name
 
-        # read from dict
-        config = parse_config(state_dict)
-        assert config["evaluator"].function == dummy
+        # load from dict
+        X.parse_obj(state_dict)
 
     def test_parse_config(self):
-        parse_config(yaml.safe_load(copy(TEST_YAML)))
+        Xopt.from_yaml(copy(TEST_YAML))

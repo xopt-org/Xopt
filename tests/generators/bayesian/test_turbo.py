@@ -194,9 +194,9 @@ class TestTurbo(TestCase):
         X.evaluate_data(pd.DataFrame({"x": [3.0, 1.75, 2.0]}))
 
         # determine trust region from gathered data
-        generator.train_model()
-        generator.turbo_controller.update_state(generator.data)
-        generator.turbo_controller.get_trust_region(generator.model)
+        X.generator.train_model()
+        X.generator.turbo_controller.update_state(X.generator.data)
+        X.generator.turbo_controller.get_trust_region(X.generator.model)
 
     def test_safety(self):
         test_vocs = VOCS(
