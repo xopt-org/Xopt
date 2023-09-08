@@ -49,29 +49,28 @@ class Xopt(XoptBaseModel):
 
     @validator("vocs", pre=True)
     def validate_vocs(cls, value):
-        if isinstance(value, VOCS):
-            return value
-        elif isinstance(value, dict):
-            return VOCS(**value)
+        if isinstance(value, dict):
+            value = VOCS(**value)
+        return value
 
     @validator("evaluator", pre=True)
     def validate_evaluator(cls, value):
-        if isinstance(value, Evaluator):
-            return value
-        elif isinstance(value, dict):
-            return Evaluator(**value)
+        if isinstance(value, dict):
+            value = Evaluator(**value)
+
+        return value
 
     @validator("generator", pre=True)
     def validate_generator(cls, value, values):
-        if isinstance(value, Generator):
-            return value
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             name = value.pop("name")
             generator_class = get_generator(name)
-            return generator_class.parse_obj({**value, "vocs": values["vocs"]})
+            value = generator_class.parse_obj({**value, "vocs": values["vocs"]})
         elif isinstance(value, str):
             generator_class = get_generator(value)
-            return generator_class.parse_obj({"vocs": values["vocs"]})
+            value = generator_class.parse_obj({"vocs": values["vocs"]})
+
+        return value
 
     @validator("data", pre=True)
     def validate_data(cls, v):
