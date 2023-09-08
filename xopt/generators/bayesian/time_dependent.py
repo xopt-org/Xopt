@@ -50,7 +50,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
             data[self.vocs.variable_names + ["time"]].to_numpy(), **self._tkwargs
         )
 
-    def generate(self, n_candidates: int) -> pd.DataFrame:
+    def generate(self, n_candidates: int) -> list[dict]:
         self.target_prediction_time = time.time() + self.added_time
         output = super().generate(n_candidates)
 

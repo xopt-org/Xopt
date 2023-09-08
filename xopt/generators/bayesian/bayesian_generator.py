@@ -141,7 +141,7 @@ class BayesianGenerator(Generator, ABC):
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
-    def generate(self, n_candidates: int) -> pd.DataFrame:
+    def generate(self, n_candidates: int) -> list[dict]:
         self.n_candidates = n_candidates
         if n_candidates > 1 and not self.supports_batch_generation:
             raise NotImplementedError(
@@ -150,7 +150,7 @@ class BayesianGenerator(Generator, ABC):
             )
 
         # if no data exists raise error
-        if self.data.empty:
+        if self.data is None:
             raise RuntimeError(
                 "no data contained in generator, call `add_data` "
                 "method to add data, see also `Xopt.random_evaluate()`"
@@ -187,7 +187,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
 
-            return result
+            return result.to_dict("records")
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
@@ -428,7 +428,7 @@ class BayesianGenerator(Generator, ABC):
             )
 
         # get last point
-        if self.data.empty:
+        if self.data is None:
             raise ValueError(
                 "No data exists to specify max_travel_distances "
                 "from, add data first to use during BO"

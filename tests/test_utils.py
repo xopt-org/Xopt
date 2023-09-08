@@ -6,6 +6,7 @@ import pytest
 import torch
 from pydantic import BaseModel, Extra
 from torch import nn
+
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.utils import (
     add_constraint_information,
