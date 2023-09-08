@@ -171,6 +171,10 @@ class TestModelConstructor:
         # create generator from dict
         saved_options_dict["vocs"] = my_vocs.model_dump()
         dump = json.dumps(saved_options_dict)
+
+        reloaded_json = json.loads(dump)
+        ExpectedImprovementGenerator.model_validate(reloaded_json)
+
         loaded_generator = ExpectedImprovementGenerator.model_validate_json(dump)
         assert isinstance(
                 loaded_generator.model_constructor.covar_modules["y"], ScaleKernel
