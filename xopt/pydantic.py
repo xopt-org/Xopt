@@ -12,6 +12,7 @@ import numpy as np
 import orjson
 import pandas as pd
 import torch.nn
+import yaml
 from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
 from pydantic.generics import GenericModel
 
@@ -123,6 +124,10 @@ class XoptBaseModel(BaseModel):
                     value = torch.load(value)
 
         return value
+
+    @classmethod
+    def from_yaml(cls, yaml_str: str):
+        return cls.parse_obj(yaml.safe_load(yaml_str))
 
 
 def get_descriptions_defaults(model: XoptBaseModel):
