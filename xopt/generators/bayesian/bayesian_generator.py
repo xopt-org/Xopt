@@ -141,7 +141,7 @@ class BayesianGenerator(Generator, ABC):
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
-    def generate(self, n_candidates: int) -> pd.DataFrame:
+    def generate(self, n_candidates: int) -> list[dict]:
         self.n_candidates = n_candidates
         if n_candidates > 1 and not self.supports_batch_generation:
             raise NotImplementedError(
@@ -187,7 +187,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
 
-            return result
+            return result.to_dict("records")
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """

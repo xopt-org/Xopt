@@ -74,8 +74,18 @@ class TestXopt:
 
         # test evaluating data w/o constants specified
         test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
-        # pop constant specified in vocs
+
+        # test list of dicts
+        xopt.evaluate_data(test_data)
+
+        # pandas
         xopt.evaluate_data(pd.DataFrame(test_data))
+
+        # test dict of lists
+        xopt.evaluate_data(pd.DataFrame(test_data).to_dict())
+
+        # test single input
+        xopt.evaluate_data({"x1": 0.5, "x2": 0.1})
 
     def test_function_checking(self):
         def f(x, a=True):

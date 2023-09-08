@@ -1,5 +1,5 @@
 import concurrent
-from typing import Dict
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,15 @@ class AsynchronousXopt(Xopt):
     class Config:
         underscore_attrs_are_private = True
 
-    def submit_data(self, input_data: pd.DataFrame):
+    def submit_data(
+        self,
+        input_data: Union[
+            pd.DataFrame,
+            List[Dict[str, float]],
+            Dict[str, List[float]],
+            Dict[str, float],
+        ],
+    ):
         """
         Submit data to evaluator and return futures indexed to internal futures list.
 
@@ -30,12 +38,20 @@ class AsynchronousXopt(Xopt):
             input_data: dataframe containing input data
 
         """
+
+        if not isinstance(input_data, DataFrame):
+            try:
+                input_data = DataFrame(input_data)
+            except ValueError:
+                input_data = DataFrame(input_data, index=[0])
+
         logger.debug(f"Submitting {len(input_data)} inputs")
         input_data = self.prepare_input_data(input_data)
 
         # submit data to evaluator. Futures are keyed on the index of the input data.
         futures = self.evaluator.submit_data(input_data)
         index = input_data.index
+
         # Special handling for vectorized evaluations
         if self.evaluator.vectorized:
             assert len(futures) == 1

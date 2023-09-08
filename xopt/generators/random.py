@@ -8,8 +8,6 @@ class RandomGenerator(Generator):
     supports_batch_generation = True
     supports_multi_objective = True
 
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         """generate uniform random data points"""
-        return pd.DataFrame(
-            self.vocs.random_inputs(n_candidates, include_constants=False),
-        )
+        return self.vocs.random_inputs(n_candidates, include_constants=False)

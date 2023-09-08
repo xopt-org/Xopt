@@ -176,7 +176,7 @@ class VOCS(XoptBaseModel):
         custom_bounds: dict = None,
         include_constants: bool = True,
         seed: int = None,
-    ):
+    ) -> list[dict]:
         """
         Uniform sampling of the variables.
 
@@ -222,9 +222,9 @@ class VOCS(XoptBaseModel):
             inputs.update(self.constants)
 
         if n == 1:
-            return pd.DataFrame(inputs, index=[0])
+            return [inputs]
         else:
-            return pd.DataFrame(inputs)
+            return pd.DataFrame(inputs).to_dict("records")
 
     def convert_dataframe_to_inputs(
         self, data: pd.DataFrame, include_constants=True
