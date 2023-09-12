@@ -45,7 +45,7 @@ JSON_ENCODERS = {
 # handlers from a custom function. So, we implement a fully custom serialization scheme.
 
 # Pydantic v2 will by default serialize submodels as annotated types, dropping subclass attributes
-# TODO: modify nested models to use SerializeAsAny
+
 
 def recursive_serialize(v, base_key="", serialize_torch=False):
     for key in list(v):
@@ -106,7 +106,6 @@ def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False) -> str:
 def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False) -> str:
     v = recursive_serialize(v.model_dump(), base_key=base_key, serialize_torch=serialize_torch)
     return orjson.dumps(v, default=default).decode()
-
 
 
 def orjson_dumps_except_root(v: BaseModel, *, base_key="", serialize_torch=False) -> dict:

@@ -30,11 +30,6 @@ class Generator(XoptBaseModel, ABC):
         "problems",
     )
 
-    # @validator("vocs", pre=True)
-    # def vocs_validation(cls, v):
-    #     # do vocs first
-    #     return v
-
     model_config = ConfigDict(validate_assignment=True)
 
     def __init__(self, **kwargs):
