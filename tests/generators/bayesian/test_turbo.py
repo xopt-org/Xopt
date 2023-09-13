@@ -176,7 +176,7 @@ class TestTurbo(TestCase):
         test_vocs.objectives[test_vocs.objective_names[0]] = "MAXIMIZE"
 
         turbo_state = OptimizeTurboController(test_vocs)
-        assert turbo_state.minimize == False
+        assert not turbo_state.minimize
         turbo_state.update_state(TEST_VOCS_DATA)
         best_value = TEST_VOCS_DATA[
             test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]

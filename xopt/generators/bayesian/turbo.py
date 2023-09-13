@@ -201,7 +201,6 @@ class OptimizeTurboController(TurboController):
             self.failure_counter = 0
 
 
-
 class SafetyTurboController(TurboController):
     scale_factor: float = float(1.25)
     min_feasible_fraction: float = 0.75
