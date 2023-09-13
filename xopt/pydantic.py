@@ -159,11 +159,11 @@ class XoptBaseModel(BaseModel):
 
     @classmethod
     def from_yaml(cls, yaml_str: [str, TextIO]):
-        return cls.parse_obj(yaml.safe_load(yaml_str))
+        return cls.model_validate(yaml.safe_load(yaml_str))
 
     @classmethod
     def from_dict(cls, config: dict):
-        return cls.parse_obj(config)
+        return cls.model_validate(config)
 
 
 def get_descriptions_defaults(model: XoptBaseModel):
