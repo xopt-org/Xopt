@@ -1,8 +1,10 @@
 import copy
 import inspect
+import io
 import json
 import logging
 import os.path
+import pickle
 import typing
 from concurrent.futures import Future
 from functools import partial
@@ -148,7 +150,7 @@ class XoptBaseModel(BaseModel):
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
         return orjson_dumps_except_root(self, base_key="")
 
-    def serialize_json_custom(self, **kwargs) -> str:
+    def to_json(self, **kwargs) -> str:
         return orjson_dumps(self, **kwargs)
     
     @classmethod
