@@ -116,23 +116,22 @@ class TurboController(XoptBaseModel, ABC):
 
 
 class OptimizeTurboController(TurboController):
-    minimize: bool = Field(
-        default=True, description="flag to specifiy minimization " "or maximization"
-    )
     best_value: float = None
+
+    @property
+    def minimize(self) -> bool:
+        return self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE"
 
     def _set_best_point(self, data):
         # get location of best point so far
         variable_data = self.vocs.variable_data(data, "")
-        objective_data = self.vocs.objective_data(data, "")
-
-        # note that the trust region will be around the minimum point since Xopt
-        # assumes minimization
-        best_idx = objective_data.idxmin()
+        objective_data = self.vocs.objective_data(data, "", return_raw=True)
 
         if self.minimize:
+            best_idx = objective_data.idxmin()
             self.best_value = objective_data.min()[self.vocs.objective_names[0]]
         else:
+            best_idx = objective_data.idxmax()
             self.best_value = objective_data.max()[self.vocs.objective_names[0]]
 
         self.center_x = (
