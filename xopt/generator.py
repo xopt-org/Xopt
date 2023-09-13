@@ -15,7 +15,6 @@ class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: pd.DataFrame = Field(None, description="generator data", exclude=True)
-
     supports_batch_generation: ClassVar[bool] = Field(
         default=False,
         description="flag that describes if this "
@@ -32,7 +31,7 @@ class Generator(XoptBaseModel, ABC):
 
     _is_done = False
 
-    @validator("data", pre=True)
+    @field_validator("data", mode='before')
     def validate_data(cls, v):
         if isinstance(v, dict):
             try:

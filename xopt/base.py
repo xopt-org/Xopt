@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 from xopt import _version
 from xopt.evaluator import Evaluator, validate_outputs
@@ -30,7 +30,6 @@ class Xopt(XoptBaseModel):
     vocs: VOCS = Field(description="VOCS object for Xopt")
     generator: Generator = Field(description="generator object for Xopt")
     evaluator: Evaluator = Field(description="evaluator object for Xopt")
-
     strict: bool = Field(
         True,
         description="flag to indicate if exceptions raised during evaluation "
@@ -49,20 +48,20 @@ class Xopt(XoptBaseModel):
         "when dumping",
     )
     
-    @validator("vocs", pre=True)
+    @field_validator("vocs", mode='before')
     def validate_vocs(cls, value):
         if isinstance(value, dict):
             value = VOCS(**value)
         return value
 
-    @validator("evaluator", pre=True)
+    @field_validator("evaluator", mode='before')
     def validate_evaluator(cls, value):
         if isinstance(value, dict):
             value = Evaluator(**value)
 
         return value
 
-    @validator("generator", pre=True)
+    @validator("generator", mode='before')
     def validate_generator(cls, value, values):
         if isinstance(value, dict):
             name = value.pop("name")
@@ -74,7 +73,7 @@ class Xopt(XoptBaseModel):
 
         return value
 
-    @validator("data", pre=True)
+    @field_validator("data", mode='before')
     def validate_data(cls, v):
         if isinstance(v, dict):
             try:
@@ -83,7 +82,7 @@ class Xopt(XoptBaseModel):
                 v = pd.DataFrame(v, index=[0])
         return v
 
-    @property
+    @field_property
     def n_data(self):
         if self.data is None:
             return 0
@@ -215,7 +214,7 @@ class Xopt(XoptBaseModel):
 
     def json(self, **kwargs) -> str:
         """handle custom serialization of generators and dataframes"""
-        result = super().json(**kwargs)
+        result = super().to_json(**kwargs)
         dict_result = json.loads(result)
         dict_result["generator"] = {"name": self.generator.name} | dict_result[
             "generator"
