@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 import pandas as pd
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
