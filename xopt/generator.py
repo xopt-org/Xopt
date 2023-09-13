@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
-    data: pd.DataFrame = Field(None, description="generator data", exclude=True)
+    data: Optional[pd.DataFrame] = Field(None, description="generator data", exclude=True)
     supports_batch_generation: ClassVar[bool] = Field(
         default=False,
         description="flag that describes if this "
