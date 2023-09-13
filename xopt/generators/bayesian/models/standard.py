@@ -1,3 +1,5 @@
+import base64
+import io
 import os.path
 from copy import deepcopy
 from typing import Dict, List, Optional, Union
@@ -16,6 +18,7 @@ from torch.nn import Module
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
+from xopt.pydantic import decode_torch_module
 from pydantic_core.core_schema import FieldValidationInfo
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
@@ -46,7 +49,9 @@ class StandardModelConstructor(ModelConstructor):
         else:
             for key, val in v.items():
                 if isinstance(val, str):
-                    if os.path.exists(val):
+                    if val.startswith('base64:'):
+                        v[key] = decode_torch_module(val)
+                    elif os.path.exists(val):
                         v[key] = torch.load(val)
 
         return v

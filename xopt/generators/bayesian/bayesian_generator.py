@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import warnings
 from abc import ABC, abstractmethod
@@ -33,6 +34,7 @@ from xopt.generators.bayesian.turbo import (
 )
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
+from xopt.pydantic import decode_torch_module
 
 logger = logging.getLogger()
 
@@ -76,6 +78,15 @@ class BayesianGenerator(Generator, ABC):
         description="data frame tracking computation time in seconds",
     )
     n_candidates: int = 1
+
+    @field_validator("model",  mode='before')
+    def validate_torch_modules(cls, v):
+        if isinstance(v, str):
+            if v.startswith('base64:'):
+                v = decode_torch_module(v)
+            elif os.path.exists(v):
+                v = torch.load(v)
+        return v
 
     @field_validator("model_constructor", mode='before')
     def validate_model_constructor(cls, value):
