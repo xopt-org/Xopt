@@ -2,6 +2,7 @@ import copy
 import inspect
 import io
 import json
+import yaml
 import logging
 import os.path
 import pickle
@@ -49,15 +50,18 @@ JSON_ENCODERS = {
 # Pydantic v2 will by default serialize submodels as annotated types, dropping subclass attributes
 
 
-def recursive_serialize(v, base_key="", serialize_torch=False):
+def recursive_serialize(v, base_key="", serialize_torch=False, inline_serialize: bool = False):
     for key in list(v):
         if isinstance(v[key], dict):
-            v[key] = recursive_serialize(v[key], key, serialize_torch)
+            v[key] = recursive_serialize(v[key], key, serialize_torch, inline_serialize)
         elif isinstance(v[key], torch.nn.Module):
             if serialize_torch:
-                v[key] = process_torch_module(
-                    module=v[key], name="_".join((base_key, key))
-                )
+                if inline_serialize:
+                    v[key] = 'base64:' + encode_torch_module(v[key])
+                else:
+                    v[key] = process_torch_module(
+                        module=v[key], name="_".join((base_key, key))
+                    )
             else:
                 del v[key]
         elif isinstance(v[key], torch.dtype):
@@ -98,15 +102,18 @@ def recursive_deserialize(v: dict) -> dict:
     return v
 
 
-def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False) -> str:
+def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False, inline_serialize=False) -> str:
     # TODO: move away from borrowing pydantic v1 encoder
     json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
     return orjson_dumps_custom(v, default=json_encoder, base_key=base_key,
-                               serialize_torch=serialize_torch)
+                               serialize_torch=serialize_torch,
+                               inline_serialize=inline_serialize)
 
 
-def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False) -> str:
-    v = recursive_serialize(v.model_dump(), base_key=base_key, serialize_torch=serialize_torch)
+def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False, inline_serialize=False) -> str:
+    v = recursive_serialize(v.model_dump(), base_key=base_key,
+                            serialize_torch=serialize_torch,
+                            inline_serialize=inline_serialize)
     return orjson.dumps(v, default=default).decode()
 
 
@@ -129,6 +136,30 @@ def process_torch_module(module, name):
     module_name = f"{name}.pt"
     torch.save(module, module_name)
     return module_name
+
+
+def encode_torch_module(module):
+    import base64
+    import gzip
+    buffer = io.BytesIO()
+    # 5 supported since 3.8
+    torch.save(module, buffer, pickle_protocol=5)
+    module_bytes = buffer.getbuffer().tobytes()
+    cb = gzip.compress(module_bytes, compresslevel=9)
+    encoded_bytes = base64.standard_b64encode(cb)
+    return encoded_bytes.decode('ascii')
+
+
+def decode_torch_module(modulestr: str):
+    import base64
+    import gzip
+    assert modulestr.startswith('base64:')
+    base64str = modulestr.split('base64:', 1)[1]
+    decoded = base64.standard_b64decode(base64str)
+    decompressed = gzip.decompress(decoded)
+    bytestream = io.BytesIO(decompressed)
+    module = torch.load(bytestream)
+    return module
 
 
 class XoptBaseModel(BaseModel):
