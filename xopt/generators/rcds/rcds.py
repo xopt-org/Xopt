@@ -460,7 +460,7 @@ class RCDSGenerator(Generator):
         obj = res[0, 0]
         self._rcds.update_obj(obj)
 
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         if n_candidates != 1:
             raise NotImplementedError("rcds can only produce one candidate at a time")
 
@@ -480,4 +480,4 @@ class RCDSGenerator(Generator):
             print(self.vocs.variable_names, x_next, type(x_next), x_next.shape)
             raise e
 
-        return pd.DataFrame(dict(zip(self.vocs.variable_names, x_next)))
+        return [dict(zip(self.vocs.variable_names, x_next))]

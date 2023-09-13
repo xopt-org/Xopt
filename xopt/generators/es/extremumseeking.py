@@ -78,17 +78,15 @@ class ExtremumSeekingGenerator(Generator):
         p_un_norm = p * self._p_diff / 2.0 + self._p_ave
         return p_un_norm
 
-    def generate(self, n_candidates) -> pd.DataFrame:
+    def generate(self, n_candidates) -> list[dict]:
         if n_candidates != 1:
             raise NotImplementedError(
                 "extremum seeking can only produce one candidate at a time"
             )
 
         # Initial data point
-        if self.data.empty:
-            return pd.DataFrame(
-                dict(zip(self.vocs.variable_names, self._p_ave.reshape(-1, 1)))
-            )
+        if self.data is None:
+            return [dict(zip(self.vocs.variable_names, self._p_ave.reshape(-1, 1)))]
 
         p_n = self.p_normalize(self._last_input)
 
@@ -120,4 +118,4 @@ class ExtremumSeekingGenerator(Generator):
         self._amplitude *= self.decay_rate  # decay the osc amplitude
 
         # Return the next value
-        return pd.DataFrame(dict(zip(self.vocs.variable_names, p_next.reshape(-1, 1))))
+        return [dict(zip(self.vocs.variable_names, p_next.reshape(-1, 1)))]

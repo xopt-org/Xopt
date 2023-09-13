@@ -41,7 +41,6 @@ class TestHighLevel:
 
     def test_constrained_mobo(self):
         YAML = """
-        xopt: {}
         generator:
             name: mobo
             reference_point: {y1: 1.5, y2: 1.5}
@@ -62,13 +61,12 @@ class TestHighLevel:
                 c1: [GREATER_THAN, 0]
                 c2: [LESS_THAN, 0.5]
         """
-        X = Xopt(config=yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
     def test_mobo(self):
         YAML = """
-            xopt: {}
             generator:
                 name: mobo
                 reference_point: {y1: 1.5, y2: 1.5}
@@ -85,13 +83,15 @@ class TestHighLevel:
                 objectives: {y1: MINIMIZE, y2: MINIMIZE}
                 constraints: {}
         """
-        X = Xopt(config=yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
     def test_restart_torch_serialization(self):
         YAML = """
-                xopt: {dump_file: dump.yml, serialize_torch: True}
+                dump_file: dump.yml
+                serialize_torch: True
+
                 generator:
                     name: mobo
                     reference_point: {y1: 1.5, y2: 1.5}
@@ -108,27 +108,27 @@ class TestHighLevel:
                     objectives: {y1: MINIMIZE, y2: MINIMIZE}
                     constraints: {}
                 """
-        X = Xopt(config=yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
 
         config = yaml.safe_load(open("dump.yml"))
-        assert config["generator"]["model"] == "mobo_model.pt"
+        assert config["generator"]["model"] == "generator_model.pt"
 
         # test restart
-        X2 = Xopt(config=config)
+        X2 = Xopt.parse_obj(config)
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
 
         X2.step()
 
-        os.remove("mobo_model.pt")
+        os.remove("generator_model.pt")
         os.remove("dump.yml")
 
     def test_restart(self):
         YAML = """
-                xopt: {dump_file: dump.yml}
+                dump_file: dump.yml
                 generator:
                     name: mobo
                     reference_point: {y1: 1.5, y2: 1.5}
@@ -147,7 +147,7 @@ class TestHighLevel:
                     objectives: {y1: MINIMIZE, y2: MINIMIZE}
                     constraints: {}
                 """
-        X = Xopt(config=yaml.safe_load(YAML))
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
 
@@ -155,7 +155,7 @@ class TestHighLevel:
         os.remove("dump.yml")
 
         # test restart
-        X2 = Xopt(config=config)
+        X2 = Xopt.parse_obj(config)
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1

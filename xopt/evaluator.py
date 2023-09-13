@@ -2,7 +2,7 @@ import logging
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
-from typing import Callable, Dict
+from typing import Callable, Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -88,14 +88,27 @@ class Evaluator(XoptBaseModel):
         """
         return self.safe_function(input, **{**self.function_kwargs, **kwargs})
 
-    def evaluate_data(self, input_data: pd.DataFrame):
+    def evaluate_data(
+        self,
+        input_data: Union[
+            pd.DataFrame,
+            List[Dict[str, float]],
+            Dict[str, List[float]],
+            Dict[str, float],
+        ],
+    ) -> pd.DataFrame:
         """evaluate dataframe of inputs"""
-        input_data = pd.DataFrame(input_data)
-
         if self.vectorized:
             output_data = self.safe_function(input_data, **self.function_kwargs)
         else:
             # This construction is needed to avoid a pickle error
+            # translate input data into pandas dataframes
+            if not isinstance(input_data, DataFrame):
+                try:
+                    input_data = DataFrame(input_data)
+                except ValueError:
+                    input_data = DataFrame(input_data, index=[0])
+
             inputs = input_data.to_dict("records")
 
             funcs = [self.function] * len(inputs)
@@ -108,7 +121,7 @@ class Evaluator(XoptBaseModel):
                 kwargs,
             )
 
-        return pd.DataFrame(output_data, index=input_data.index)
+        return DataFrame(output_data, index=input_data.index)
 
     def safe_function(self, *args, **kwargs):
         """

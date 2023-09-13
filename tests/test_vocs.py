@@ -96,6 +96,7 @@ class TestVOCS(object):
         custom_bounds = {"x1": [0.5, 0.75], "x2": [7.5, 15.0]}
 
         random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+        random_input_data = pd.DataFrame(random_input_data)
         assert all(random_input_data["x1"] < 0.75)
         assert all(random_input_data["x1"] > 0.5)
         assert all(random_input_data["x2"] > 7.5)

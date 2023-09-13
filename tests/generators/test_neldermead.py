@@ -47,7 +47,6 @@ class TestNelderMeadGenerator:
 
         # Xopt Simplex
         YAML = """
-        xopt: {}
         generator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
@@ -62,7 +61,7 @@ class TestNelderMeadGenerator:
                 x1: [-5, 5]
             objectives: {y: MINIMIZE}
         """
-        X = Xopt(YAML)
+        X = Xopt.from_yaml(YAML)
         X.run()
 
         # Results should be the same

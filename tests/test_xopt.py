@@ -1,20 +1,20 @@
 import math
 import os
 from abc import ABC
-from concurrent.futures import ThreadPoolExecutor
-from copy import copy, deepcopy
+from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
 
-from xopt.base import Xopt, XoptOptions
+from xopt.asynchronous import AsynchronousXopt
+from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_YAML, xtest_callable
+from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.vocs import VOCS
 
 
@@ -33,15 +33,6 @@ class DummyGenerator(Generator, ABC):
 
 class TestXopt:
     def test_init(self):
-        # init with no arguments
-        with pytest.raises(XoptError):
-            Xopt()
-
-        # init with YAML
-        X = Xopt(config=yaml.safe_load(copy(TEST_YAML)))
-        assert X.evaluator.function == xtest_callable
-        assert isinstance(X.generator, RandomGenerator)
-
         # init with generator and evaluator
         def dummy(x):
             pass
@@ -49,6 +40,30 @@ class TestXopt:
         evaluator = Evaluator(function=dummy)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+
+        # init with yaml
+        YAML = """
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+
+        generator:
+            name: random
+
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: dummy_constant}
+
+        """
+        X = Xopt.from_yaml(YAML)
+        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
 
     def test_evaluate_data(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -60,11 +75,18 @@ class TestXopt:
 
         # test evaluating data w/o constants specified
         test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
-        # pop constant specified in vocs
-        test_data.pop("cnt1")
+
+        # test list of dicts
+        xopt.evaluate_data(test_data)
+
+        # pandas
         xopt.evaluate_data(pd.DataFrame(test_data))
 
-        assert np.all(xopt.data["cnt1"].to_numpy() == np.ones(3))
+        # test dict of lists
+        xopt.evaluate_data(pd.DataFrame(test_data).to_dict())
+
+        # test single input
+        xopt.evaluate_data({"x1": 0.5, "x2": 0.1})
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -85,10 +107,10 @@ class TestXopt:
         evaluator = Evaluator(function=f)
         generator = RandomGenerator(vocs=vocs)
         X = Xopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=vocs,
-                options=XoptOptions(strict=True),
+            generator=generator,
+            evaluator=evaluator,
+            vocs=vocs,
+            strict=True,
         )
         with pytest.raises(XoptError):
             X.step()
@@ -97,10 +119,10 @@ class TestXopt:
         evaluator = Evaluator(function=g)  # Has non-dict return type
         generator = RandomGenerator(vocs=vocs)
         X2 = Xopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=vocs,
-                options=XoptOptions(strict=True),
+            generator=generator,
+            evaluator=evaluator,
+            vocs=vocs,
+            strict=True,
         )
         with pytest.raises(XoptError):
             X2.step()
@@ -124,7 +146,7 @@ class TestXopt:
                 evaluator=evaluator,
                 vocs=deepcopy(TEST_VOCS_BASE),
         )
-        assert len(X.generator.data) == 0
+        assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
         assert (
@@ -134,11 +156,10 @@ class TestXopt:
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = Xopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
-                options=XoptOptions(asynch=True),
+        X = AsynchronousXopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
         )
         n_steps = 5
         for i in range(n_steps):
@@ -148,13 +169,12 @@ class TestXopt:
         # now use a threadpool evaluator with different number of max workers
         for mw in [2]:
             evaluator = Evaluator(
-                    function=xtest_callable, executor=ThreadPoolExecutor(), max_workers=mw
+                function=xtest_callable, executor=ProcessPoolExecutor(), max_workers=mw
             )
-            X2 = Xopt(
-                    generator=generator,
-                    evaluator=evaluator,
-                    vocs=deepcopy(TEST_VOCS_BASE),
-                    options=XoptOptions(asynch=True),
+            X2 = AsynchronousXopt(
+                generator=generator,
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
             )
 
             n_steps = 5
@@ -177,7 +197,7 @@ class TestXopt:
             X.step()
 
         X2 = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
-        X2.options.strict = False
+        X2.strict = False
 
         X2.random_evaluate(10)
         # should run fine
@@ -195,8 +215,10 @@ class TestXopt:
 
         evaluator = Evaluator(function=bad_function_sometimes)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
-        X.options.strict = False
+        X = AsynchronousXopt(
+            generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+        X.strict = False
 
         # Submit to the evaluator some new inputs
         X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
@@ -213,7 +235,7 @@ class TestXopt:
         X = Xopt(
                 generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
-        X.options.dump_file = "test_checkpointing.yaml"
+        X.dump_file = "test_checkpointing.yaml"
 
         X.step()
 
@@ -221,24 +243,15 @@ class TestXopt:
             X.step()
 
         # try to load the state from nothing
-        with open(X.options.dump_file, "r") as f:
-            config = yaml.safe_load(f)
-        os.remove(X.options.dump_file)
-        X2 = Xopt(config=config)
-
-        for _ in range(5):
-            X2.step()
+        X2 = Xopt.from_file(X.dump_file)
 
         assert len(X2.data) == 11
         assert X2._ix_last == 11
+        assert isinstance(X2.generator, RandomGenerator)
+        assert isinstance(X2.evaluator, Evaluator)
+        assert X.vocs == X2.vocs
+        assert len(X2.data) == 11
 
-    @pytest.fixture(scope='module', autouse=True)
-    def clean_up(self):
-        yield
-        files = ['test_checkpointing.yaml']
-        for f in files:
-            if os.path.exists(f):
-                os.remove(f)
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -247,6 +260,17 @@ class TestXopt:
         xopt = Xopt(
                 generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
-        xopt.random_evaluate(2)
+
+        # fixed seed for deterministic results
+        xopt.random_evaluate(2, seed=1)
         xopt.random_evaluate(1)
+        assert np.isclose(xopt.data["x1"].iloc[0], 0.488178)
         assert len(xopt.data) == 3
+
+    @pytest.fixture(scope='module', autouse=True)
+    def clean_up(self):
+        yield
+        files = ['test_checkpointing.yaml']
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)
