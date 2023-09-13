@@ -81,6 +81,7 @@ class Xopt(XoptBaseModel):
                 v = pd.DataFrame(v, index=[0])
 
         # also add data to generator
+        # TODO: find a more robust way of doing this
         values["generator"].add_data(v)
 
         return v
