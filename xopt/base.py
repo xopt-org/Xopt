@@ -73,12 +73,16 @@ class Xopt(XoptBaseModel):
         return value
 
     @validator("data", pre=True)
-    def validate_data(cls, v):
+    def validate_data(cls, v, values):
         if isinstance(v, dict):
             try:
                 v = pd.DataFrame(v)
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
+
+        # also add data to generator
+        values["generator"].add_data(v)
+
         return v
 
     @property
