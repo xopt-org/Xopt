@@ -38,8 +38,6 @@ test_init_data.update(xtest_callable(test_init_data))
 TEST_VOCS_DATA = pd.DataFrame(test_init_data)
 
 TEST_YAML = """
-xopt:
-    asynch: True
 generator:
     name: random
 

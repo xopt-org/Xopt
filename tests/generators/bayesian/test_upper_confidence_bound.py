@@ -108,8 +108,8 @@ class TestUpperConfidenceBoundGenerator:
         data["p"] = np.random.rand(len(data))
 
         gen.add_data(data)
-        candidate = gen.generate(1)
-        assert all(candidate["p"] == 3)
+        candidate = gen.generate(1)[0]
+        assert candidate["p"] == 3
 
         # test with fixed feature in vocs
         gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
@@ -118,5 +118,5 @@ class TestUpperConfidenceBoundGenerator:
         gen.numerical_optimizer.n_restarts = 1
 
         gen.add_data(data)
-        candidate = gen.generate(1)
-        assert all(candidate["x1"] == 3)
+        candidate = gen.generate(1)[0]
+        assert candidate["x1"] == 3

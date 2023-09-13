@@ -27,3 +27,4 @@ site
 # pytorch modules
 *.pt
 *.csv
+*.yml

@@ -8,7 +8,7 @@ from concurrent.futures import Future
 from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, List, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterable, List, Optional, TextIO, TypeVar
 
 import numpy as np
 import orjson
@@ -150,6 +150,18 @@ class XoptBaseModel(BaseModel):
 
     def serialize_json_custom(self, **kwargs) -> str:
         return orjson_dumps(self, **kwargs)
+    
+    @classmethod
+    def from_file(cls, filename: str):
+        return cls.from_yaml(open(filename))
+
+    @classmethod
+    def from_yaml(cls, yaml_str: [str, TextIO]):
+        return cls.parse_obj(yaml.safe_load(yaml_str))
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        return cls.parse_obj(config)
 
 
 def get_descriptions_defaults(model: XoptBaseModel):

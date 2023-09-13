@@ -37,7 +37,7 @@ class ScipyOptimizeGenerator(Generator):
     _state = None
     _inputs = None
 
-    _is_done = True
+    _is_done = False
     _saved_options: Dict = None
 
     def __init__(self, **kwargs):
@@ -45,7 +45,7 @@ class ScipyOptimizeGenerator(Generator):
 
         # Initialize the first candidate if not given
         if self.initial_point is None:
-            self.initial_point = self.vocs.random_inputs()
+            self.initial_point = self.vocs.random_inputs()[0]
         self._saved_options = (
             self.model_dump().copy()
         )  # Used to keep track of changed options
@@ -93,7 +93,7 @@ class ScipyOptimizeGenerator(Generator):
         self.data = new_data_df
         self._lock = False  # unlock
 
-    def generate(self, n_candidates) -> List[Dict]:
+    def generate(self, n_candidates) -> list[dict]:
         # Check if any options were changed from init. If so, reset the algorithm
         dump = self.model_dump()
         if dump != self._saved_options:
