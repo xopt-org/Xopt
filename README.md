@@ -13,43 +13,53 @@ Xopt
 |----------------------------------------------------------------------------------------------------------------------------------|
 | [![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://ChristopherMayes.github.io/Xopt/index.html) |
 
+| Name | Downloads | Version | Platforms |
+| --- | --- | --- | --- |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) |
+
 
 
 
 Flexible optimization of arbitrary problems in Python.
 
 The goal of this package is to provide advanced algorithmic support for arbitrary 
-simulations/control systems with minimal required coding. Users can easily connect 
+optimization problems (simulations/control systems) with minimal required coding. Users 
+can easily connect 
 arbitrary evaluation functions to advanced algorithms with minimal coding with 
 support for multi-threaded or MPI-enabled execution.
 
 Currenty **Xopt** provides:
 
-- optimization algorithms:
-  - `cnsga` Continuous NSGA-II with constraints.
-  - `bayesian_optimization` Single objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
-  - `mobo` Multi-objective Bayesian optimization (w/ or w/o constraints, serial or parallel).
-  - `bayesian_exploration` Bayesian exploration.
-- sampling algorithms:
+- Optimization algorithms:
+  - Genetic algorithms
+    - `cnsga` Continuous NSGA-II with constraints
+  - Bayesian optimization (BO) algorithms:
+    - `upper_confidence_bound` BO using Upper Confidence Bound acquisition function 
+      (w/ or w/o constraints, serial or parallel)
+    - `expected_improvement` BO using Expected Improvement acquisition function 
+      (w/ or w/o constraints, serial or parallel)
+    - `mobo` Multi-objective BO (w/ or w/o constraints, serial or parallel)
+    - `bayesian_exploration` Autonomous function characterization using Bayesian 
+      Exploration
+    - `mggpo` Parallelized hybrid Multi-Generation Multi-Objective Bayesian 
+      optimization
+    - `multi_fidelity` Multi-fidelity single or multi objective optimization
+    - `BAX` Bayesian algorithm execution using virtual measurements
+    - BO customization:
+      - Trust region BO
+      - Heteroskedastic noise specification
+      - Multiple acquisition function optimization stratigies
+  - `extremum_seeking` Extremum seeking time-dependent optimization
+  - `rcds` Robust Conjugate Direction Search (RCDS)
+  - `neldermead` Nelder-Mead Simplex
+- Sampling algorithms:
   - `random sampler`
-- Convenient YAML/JSON based input format.
+- Convenient YAML/JSON based input format
 - Driver programs:
-  - `xopt.mpi.run` Parallel MPI execution using this input format.
+  - `xopt.mpi.run` Parallel MPI execution using this input format
 
 Xopt does **not** provide: 
-- your custom simulation via an `evaluate` function.
-
-
-
-
-
-
-Current release info
-====================
-
-| Name | Downloads | Version | Platforms |
-| --- | --- | --- | --- |
-| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) |
+- your custom simulation or experimental measurement via an `evaluate` function.
 
 
 Installing Xopt
@@ -76,7 +86,33 @@ conda search xopt --channel conda-forge
 
 Configuring an Xopt run
 ===============
-Xopt can be used through a simple python interface.
+Xopt runs can be specified via a YAML file or dictonary input.
+
+```yaml
+max_evaluations: 6400
+generator:
+    name: cnsga
+    population_size: 64
+    population_file: test.csv
+    output_path: .
+
+evaluator:
+    function: my_function
+    function_kwargs:
+      my_arguments: 42
+
+vocs:
+    variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+    constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    constants: {a: dummy_constant}
+```
+
+Xopt can also be used through a simple python interface.
 ```python
 import math
 
@@ -110,35 +146,6 @@ for i in range(10):
 # view collected data
 print(X.data)
 ```
-
-
-Xopt runs can also be specified via a dictionary that can be directly imported from a 
-YAML file.
-
-```yaml
-max_evaluations: 6400
-generator:
-    name: cnsga
-    population_size: 64
-    population_file: test.csv
-    output_path: .
-
-evaluator:
-    function: xopt.resources.test_functions.tnk.evaluate_TNK
-    function_kwargs:
-      raise_probability: 0.1
-
-vocs:
-    variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
-    objectives: {y1: MINIMIZE, y2: MINIMIZE}
-    constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
-    constants: {a: dummy_constant}
-```
-
 
 Defining an evaluation function
 ===============
