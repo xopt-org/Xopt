@@ -9,9 +9,9 @@ Xopt
 ====
 
 
-**`Documentation`** |
-------------------- |
-[![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://ChristopherMayes.github.io/Xopt/index.html)  |
+| **`Documentation`**                                                                                                              |
+|----------------------------------------------------------------------------------------------------------------------------------|
+| [![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://ChristopherMayes.github.io/Xopt/index.html) |
 
 
 
@@ -52,16 +52,71 @@ Current release info
 | [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) |
 
 
+Installing Xopt
+===============
+
+Installing `xopt` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
+
+```shell
+conda config --add channels conda-forge
+```
+
+Once the `conda-forge` channel has been enabled, `xopt` can be installed with:
+
+```shell
+conda install xopt
+```
+
+It is possible to list all of the versions of `xopt` available on your platform with:
+
+```shell
+conda search xopt --channel conda-forge
+```
+
 
 Configuring an Xopt run
 ===============
-Xopt runs can be specified via a dictionary that can be directly imported from a YAML 
-file.
+Xopt can be used through a simple python interface.
+```python
+import math
+
+from xopt.vocs import VOCS
+from xopt.evaluator import Evaluator
+from xopt.generators.bayesian import UpperConfidenceBoundGenerator
+from xopt import Xopt
+
+# define variables and function objectives
+vocs = VOCS(
+    variables={"x": [0, 2 * math.pi]},
+    objectives={"f": "MINIMIZE"},
+)
+
+# define the function to optimize
+def sin_function(input_dict):
+    return {"f": math.sin(input_dict["x"])}
+
+# create Xopt evaluator, generator, and Xopt objects
+evaluator = Evaluator(function=sin_function)
+generator = UpperConfidenceBoundGenerator(vocs=vocs)
+X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+
+# call X.random_evaluate() to generate + evaluate 3 initial points
+X.random_evaluate(3)
+
+# run optimization for 10 steps
+for i in range(10):
+    X.step()
+
+# view collected data
+print(X.data)
+```
+
+
+Xopt runs can also be specified via a dictionary that can be directly imported from a 
+YAML file.
 
 ```yaml
-xopt:
-    max_evaluations: 6400
-
+max_evaluations: 6400
 generator:
     name: cnsga
     population_size: 64
@@ -85,24 +140,13 @@ vocs:
 ```
 
 
-Using MPI
-===============
-Example MPI run, with `xopt.yaml` as the only user-defined file:
-```b
-mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
-```
-
-
-
-
-
-
-Defining evaluation function
+Defining an evaluation function
 ===============
 Xopt can interface with arbitrary evaluate functions (defined in Python) with the 
 following form:
 ```python
-evaluate(inputs: dict) -> dict
+def evaluate(inputs: dict) -> dict:
+    """ your code here """
 ```
 Evaluate functions must accept a dictionary object that **at least** has the keys 
 specified in `variables, constants` and returns a dictionary 
@@ -110,28 +154,11 @@ containing **at least** the
 keys contained in `objectives, constraints`. Extra dictionary keys are tracked and 
 used in the evaluate function but are not modified by xopt.
 
-
-
-
-Installing Xopt
+Using MPI
 ===============
-
-Installing `xopt` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
-
-```shell
-conda config --add channels conda-forge
-```
-
-Once the `conda-forge` channel has been enabled, `xopt` can be installed with:
-
-```shell
-conda install xopt
-```
-
-It is possible to list all of the versions of `xopt` available on your platform with:
-
-```shell
-conda search xopt --channel conda-forge
+Example MPI run, with `xopt.yaml` as the only user-defined file:
+```b
+mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
 ```
 
 
