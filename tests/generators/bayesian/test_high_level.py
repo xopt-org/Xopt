@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import numpy as np
 import pandas as pd
 import torch
 import yaml
@@ -120,6 +121,12 @@ class TestHighLevel:
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
+        assert np.allclose(
+            X2.generator.data[X2.vocs.all_names].to_numpy(),
+            X.data[X.vocs.all_names].to_numpy()
+        )
+
+        X2.step()
 
         import os
 
@@ -158,6 +165,12 @@ class TestHighLevel:
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
+        assert np.allclose(
+            X2.generator.data[X2.vocs.all_names].to_numpy(),
+            X.data[X.vocs.all_names].to_numpy()
+        )
+
+        X2.step()
 
         import os
 
