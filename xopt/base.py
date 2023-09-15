@@ -47,6 +47,8 @@ class Xopt(XoptBaseModel):
         description="flag to indicate that torch models should be serialized "
         "when dumping",
     )
+    serialize_inline: bool = Field(False, description="flag to indicate if torch models"
+                                                      " should be stored inside main config file")
     
     @field_validator("vocs", mode='before')
     def validate_vocs(cls, value):
