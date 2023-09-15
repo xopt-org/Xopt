@@ -39,12 +39,14 @@ from xopt.pydantic import decode_torch_module
 logger = logging.getLogger()
 
 # It seems pydantic v2 does not auto-register models anymore
-# So one option is to have explicit unions for model subclasses, like here
+# So one option is to have explicit unions for model subclasses
 # The other is to define a descriminated union with name as key, but that stops name field from
 # getting exported, and we want to keep it for readability
 # See https://github.com/pydantic/pydantic/discussions/5785
-T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
-T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
+
+# Update: using parent model now seems to work, keeping this just in case
+#T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
+#T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
 
 
 class BayesianGenerator(Generator, ABC):
@@ -59,10 +61,10 @@ class BayesianGenerator(Generator, ABC):
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
-    model_constructor: SerializeAsAny[T_ModelConstructor] = Field(
+    model_constructor: SerializeAsAny[ModelConstructor] = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
-    numerical_optimizer: SerializeAsAny[T_NumericalOptimizer] = Field(
+    numerical_optimizer: SerializeAsAny[NumericalOptimizer] = Field(
         LBFGSOptimizer(),
         description="optimizer used to optimize the acquisition " "function",
     )
