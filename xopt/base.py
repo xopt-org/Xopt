@@ -82,6 +82,11 @@ class Xopt(XoptBaseModel):
                 v = pd.DataFrame(v)
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
+
+        # also add data to generator
+        # TODO: find a more robust way of doing this
+        values["generator"].add_data(v)
+
         return v
 
     @property
@@ -221,7 +226,9 @@ class Xopt(XoptBaseModel):
         dict_result["generator"] = {"name": self.generator.name} | dict_result[
             "generator"
         ]
-        dict_result["data"] = json.loads(self.data.to_json())
+        dict_result["data"] = (
+            json.loads(self.data.to_json()) if self.data is not None else None
+        )
 
         # TODO: implement version checking
         # dict_result["xopt_version"] = __version__
@@ -234,7 +241,7 @@ class Xopt(XoptBaseModel):
         """
 
         # get dict minus data
-        config = deepcopy(self.dict())
+        config = json.loads(self.json())
         config.pop("data")
         return f"""
             Xopt

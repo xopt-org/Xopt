@@ -6,7 +6,6 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-
 from xopt import Evaluator, VOCS, Xopt
 from xopt.generators import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
@@ -26,6 +25,14 @@ class TestTurbo(TestCase):
         assert state.dim == 1
         assert state.failure_tolerance == 2
         assert state.success_tolerance == 2
+        assert state.minimize
+
+        test_vocs.objectives[test_vocs.objective_names[0]] = "MAXIMIZE"
+        state = OptimizeTurboController(test_vocs)
+        assert state.dim == 1
+        assert state.failure_tolerance == 2
+        assert state.success_tolerance == 2
+        assert not state.minimize
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_trust_region(self):
@@ -156,6 +163,24 @@ class TestTurbo(TestCase):
         best_value = TEST_VOCS_DATA[
             test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
         ].min()[test_vocs.objective_names[0]]
+        best_point = TEST_VOCS_DATA.iloc[
+            TEST_VOCS_DATA[test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]][
+                test_vocs.objective_names[0]
+            ].idxmin()
+        ][test_vocs.variable_names].to_dict()
+        assert turbo_state.best_value == best_value
+        assert turbo_state.center_x == best_point
+
+        # test with maximization
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives[test_vocs.objective_names[0]] = "MAXIMIZE"
+
+        turbo_state = OptimizeTurboController(test_vocs)
+        assert not turbo_state.minimize
+        turbo_state.update_state(TEST_VOCS_DATA)
+        best_value = TEST_VOCS_DATA[
+            test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
+        ].max()[test_vocs.objective_names[0]]
         assert turbo_state.best_value == best_value
 
     def test_batch_turbo(self):
