@@ -208,7 +208,7 @@ class Xopt(XoptBaseModel):
 
     def dict(self, **kwargs) -> Dict:
         """handle custom dict generation"""
-        result = super().dict(**kwargs)
+        result = super().model_dump(**kwargs)
         result["generator"] = {"name": self.generator.name} | result["generator"]
         return result
 

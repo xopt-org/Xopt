@@ -28,7 +28,7 @@ class Test_IO:
         print(state_dict)
 
         # load from dict
-        X.parse_obj(state_dict)
+        X.model_validate(state_dict)
 
     def test_parse_config(self):
         Xopt.from_yaml(copy(TEST_YAML))

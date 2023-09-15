@@ -195,7 +195,7 @@ def recursive_move_data_gpu_to_cpu(
     list_of_fields_on_gpu : list[str]
 
     """
-    pydantic_object_dict = pydantic_object.dict()
+    pydantic_object_dict = pydantic_object.model_dump()
     list_of_fields_on_gpu = [pydantic_object.__class__.__name__]
 
     for field_name, field_value in pydantic_object_dict.items():

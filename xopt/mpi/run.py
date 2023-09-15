@@ -72,9 +72,9 @@ if __name__ == "__main__":
 
     if args.asynch:
         logger.info("Enabling async mode")
-        X = AsynchronousXopt.parse_obj(config)
+        X = AsynchronousXopt.model_validate(config)
     else:
-        X = Xopt.parse_obj(config)
+        X = Xopt.model_validate(config)
 
     print(X)
     sys.stdout.flush()
