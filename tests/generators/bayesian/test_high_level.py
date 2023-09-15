@@ -114,7 +114,7 @@ class TestHighLevel:
         X.random_evaluate(3)
         X.step()
 
-        out = X.json(inline_serialize=True)
+        out = X.json()
         assert len(out) > 500
 
         assert not os.path.exists("generator_model.pt")
@@ -124,7 +124,11 @@ class TestHighLevel:
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
-        assert len(X2.data) == 4
+        assert np.allclose(
+                X2.generator.data[X2.vocs.all_names].to_numpy(),
+                X.data[X.vocs.all_names].to_numpy()
+        )
+        assert X.generator.model.state_dict().__str__() == X2.generator.model.state_dict().__str__()
 
         X2.step()
 
@@ -167,8 +171,7 @@ class TestHighLevel:
             X2.generator.data[X2.vocs.all_names].to_numpy(),
             X.data[X.vocs.all_names].to_numpy()
         )
-
-        X2.step()
+        assert X.generator.model.state_dict().__str__() == X2.generator.model.state_dict().__str__()
 
         X2.step()
 
@@ -205,8 +208,6 @@ class TestHighLevel:
 
         # test restart
         X2 = Xopt.model_validate(config)
-
-        X2.step()
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1

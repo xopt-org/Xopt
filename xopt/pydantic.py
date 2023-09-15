@@ -40,26 +40,35 @@ JSON_ENCODERS = {
     # torch.Tensor: lambda x: x.detach().cpu().numpy().tolist(),
 }
 
+
 # The problem with v2 serialization is that model_serialize_json() does not accept kwargs
 # meaning whichever model method is decorated with @model_serializer cant adjust for 'base_key'
-# and other similar options - it renders whole v2 scheme quite useless. We can still try
+# and other similar options - it renders native whole v2 scheme quite useless. We can still try
 # to use @field_serializer, but there is a lack of documentation on how to call these
-# handlers from a custom function. So, we implement a fully custom serialization scheme.
+# handlers from a custom function.
+#
+# So, we implement two serialization options for now.
+# First is the native one, with no customization, under serialize_json() method. It needs to
+# invoked as xopt.model_dump_json(), the standard pydantic v2 syntax.
+# Second method bypasses pydantic completely. It is invoked via 'xopt.json()'
+# or '<any xopt model>.to_json()'
 
 # Pydantic v2 will by default serialize submodels as annotated types, dropping subclass attributes
 
 
-def recursive_serialize(v, base_key="", serialize_torch=False, inline_serialize: bool = False):
+def recursive_serialize(v, base_key="", serialize_torch=False,
+                        serialize_inline: bool = False
+                        ) -> dict:
     for key in list(v):
         if isinstance(v[key], dict):
-            v[key] = recursive_serialize(v[key], key, serialize_torch, inline_serialize)
+            v[key] = recursive_serialize(v[key], key, serialize_torch, serialize_inline)
         elif isinstance(v[key], torch.nn.Module):
             if serialize_torch:
-                if inline_serialize:
+                if serialize_inline:
                     v[key] = 'base64:' + encode_torch_module(v[key])
                 else:
                     v[key] = process_torch_module(
-                        module=v[key], name="_".join((base_key, key))
+                            module=v[key], name="_".join((base_key, key))
                     )
             else:
                 del v[key]
@@ -101,24 +110,25 @@ def recursive_deserialize(v: dict) -> dict:
     return v
 
 
-def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False, inline_serialize=False) -> str:
-    # TODO: move away from borrowing pydantic v1 encoder
+def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False,
+                 serialize_inline=False
+                 ) -> str:
+    # TODO: move away from borrowing pydantic v1 encoder preset
     json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
     return orjson_dumps_custom(v, default=json_encoder, base_key=base_key,
                                serialize_torch=serialize_torch,
-                               inline_serialize=inline_serialize)
+                               serialize_inline=serialize_inline)
 
 
-def orjson_dumps_custom(v: BaseModel, *, default, base_key="", serialize_torch=False, inline_serialize=False) -> str:
-    v = recursive_serialize(v.model_dump(), base_key=base_key,
-                            serialize_torch=serialize_torch,
-                            inline_serialize=inline_serialize)
+def orjson_dumps_custom(v: BaseModel, *, default, base_key="", **kwargs) -> str:
+    v = recursive_serialize(v.model_dump(), base_key=base_key, **kwargs)
     return orjson.dumps(v, default=default).decode()
 
 
-def orjson_dumps_except_root(v: BaseModel, *, base_key="", serialize_torch=False) -> dict:
+def orjson_dumps_except_root(v: BaseModel, *, base_key="", **kwargs) -> dict:
+    """ Same as above but start at fields of root model, instead of model itself """
     dump = v.model_dump()
-    encoded_dump = recursive_serialize(dump, base_key=base_key, serialize_torch=serialize_torch)
+    encoded_dump = recursive_serialize(dump, base_key=base_key, **kwargs)
     return encoded_dump
 
 
@@ -175,14 +185,14 @@ class XoptBaseModel(BaseModel):
         return value
 
     # Note that this function still returns a dict, NOT a string. Pydantic will handle
-    # final serialization of basic types in Rust. We cannot override this...
+    # final serialization of basic types in Rust.
     @model_serializer(mode='plain', when_used='json')
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
-        return orjson_dumps_except_root(self, base_key="")
+        return orjson_dumps_except_root(self)
 
     def to_json(self, **kwargs) -> str:
         return orjson_dumps(self, **kwargs)
-    
+
     @classmethod
     def from_file(cls, filename: str):
         return cls.from_yaml(open(filename))
