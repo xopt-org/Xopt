@@ -87,6 +87,48 @@ class TestHighLevel:
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
+    def test_restart_torch_inline_serialization(self):
+        YAML = """
+                dump_file: dump_inline.yml
+                serialize_torch: True
+                serialize_inline: True
+
+                generator:
+                    name: mobo
+                    reference_point: {y1: 1.5, y2: 1.5}
+                    numerical_optimizer:
+                        name: LBFGS
+                        n_restarts: 1
+                        n_raw_samples: 2
+                evaluator:
+                    function: xopt.resources.test_functions.tnk.evaluate_TNK
+                vocs:
+                    variables:
+                        x1: [0, 3.14159]
+                        x2: [0, 3.14159]
+                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                    constraints: {}
+                """
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        X.step()
+
+        out = X.json(inline_serialize=True)
+        assert len(out) > 500
+
+        assert not os.path.exists("generator_model.pt")
+        config = yaml.safe_load(open("dump_inline.yml"))
+
+        X2 = Xopt.model_validate(config)
+
+        assert X2.generator.vocs.variable_names == ["x1", "x2"]
+        assert X2.generator.numerical_optimizer.n_restarts == 1
+        assert len(X2.data) == 4
+
+        X2.step()
+
+        os.remove("dump_inline.yml")
+
     def test_restart_torch_serialization(self):
         YAML = """
                 dump_file: dump.yml
@@ -116,7 +158,7 @@ class TestHighLevel:
         assert config["generator"]["model"] == "generator_model.pt"
 
         # test restart
-        X2 = Xopt.parse_obj(config)
+        X2 = Xopt.model_validate(config)
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
@@ -155,7 +197,9 @@ class TestHighLevel:
         os.remove("dump.yml")
 
         # test restart
-        X2 = Xopt.parse_obj(config)
+        X2 = Xopt.model_validate(config)
+
+        X2.step()
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
@@ -163,7 +207,7 @@ class TestHighLevel:
     @pytest.fixture(scope='module', autouse=True)
     def clean_up(self):
         yield
-        files = ['dump.yml', 'mobo_model.pt']
+        files = ['dump.yml', 'mobo_model.pt', 'dump_inline.yml']
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
