@@ -4,7 +4,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import pandas as pd
 import torch
@@ -22,7 +22,6 @@ from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
-from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
@@ -45,8 +44,8 @@ logger = logging.getLogger()
 # See https://github.com/pydantic/pydantic/discussions/5785
 
 # Update: using parent model now seems to work, keeping this just in case
-#T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
-#T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
+# T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
+# T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
 
 
 class BayesianGenerator(Generator, ABC):
