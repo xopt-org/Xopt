@@ -76,7 +76,7 @@ class Xopt(XoptBaseModel):
         return value
 
     @field_validator("data", mode='before')
-    def validate_data(cls, v):
+    def validate_data(cls, v, info: FieldValidationInfo):
         if isinstance(v, dict):
             try:
                 v = pd.DataFrame(v)
@@ -85,7 +85,7 @@ class Xopt(XoptBaseModel):
 
         # also add data to generator
         # TODO: find a more robust way of doing this
-        values["generator"].add_data(v)
+        info.data["generator"].add_data(v)
 
         return v
 
@@ -208,7 +208,9 @@ class Xopt(XoptBaseModel):
     def dump_state(self, **kwargs):
         """dump data to file"""
         if self.dump_file is not None:
-            output = json.loads(self.json(serialize_torch=self.serialize_torch, **kwargs))
+            output = json.loads(self.json(serialize_torch=self.serialize_torch,
+                                          serialize_inline=self.serialize_inline,
+                                          **kwargs))
             with open(self.dump_file, "w") as f:
                 yaml.dump(output, f)
             logger.debug(f"Dumped state to YAML file: {self.dump_file}")
