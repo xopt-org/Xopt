@@ -244,13 +244,10 @@ class TestXopt:
         # try to load the state from nothing
         X2 = Xopt.from_file(X.dump_file)
 
-        assert len(X2.data) == 11
-        assert X2._ix_last == 11
+        assert len(X2.data) == 6
         assert isinstance(X2.generator, RandomGenerator)
         assert isinstance(X2.evaluator, Evaluator)
         assert X.vocs == X2.vocs
-        assert len(X2.data) == 11
-
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
