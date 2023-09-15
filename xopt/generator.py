@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator

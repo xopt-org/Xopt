@@ -5,7 +5,6 @@ import json
 import yaml
 import logging
 import os.path
-import pickle
 import typing
 from concurrent.futures import Future
 from functools import partial
@@ -18,7 +17,7 @@ import orjson
 import pandas as pd
 import torch.nn
 from pydantic import BaseModel, ConfigDict, create_model, Field, field_serializer, field_validator, \
-    model_serializer, model_validator, validator
+    model_serializer, model_validator
 from pydantic.v1.json import custom_pydantic_encoder
 from pydantic_core.core_schema import FieldValidationInfo, SerializationInfo
 
@@ -409,7 +408,7 @@ class BaseExecutor(
     # This is a utility field not included in reps. The typing lib has opened
     # issues on access of generic type within class.
     # This tracks for if-necessary future use.
-    executor_type: Optional[type] = Field(None, exclude=True)
+    executor_type: Optional[type] = Field(None, exclude=True, validate_default=True)
     submit_callable: str = "submit"
     map_callable: str = "map"
     shutdown_callable: str = "shutdown"
@@ -523,18 +522,18 @@ class NormalExecutor(
 ):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # TODO: verify if new style works same as 'always'
-    @validator("executor", always=True)
-    def validate_executor(cls, v, values):
+    # TODO: check if validate_default is sufficient
+    @field_validator("executor")
+    def validate_executor(cls, v, info: FieldValidationInfo):
         if v is None:
-            v = values["loader"].load()
+            v = info.data["loader"].load()
 
         # if not None, validate against executor type
         else:
-            if not isinstance(v, (values["executor_type"],)):
+            if not isinstance(v, (info.data["executor_type"],)):
                 raise ValueError(
                         "Provided executor is not instance of %s",
-                        values["executor_type"].__name__,
+                        info.data["executor_type"].__name__,
                 )
 
         return v
