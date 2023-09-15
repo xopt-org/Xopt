@@ -1,5 +1,3 @@
-import base64
-import io
 import os.path
 from copy import deepcopy
 from typing import Dict, List, Optional, Union

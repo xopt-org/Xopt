@@ -1,6 +1,5 @@
 import json
 import logging
-from copy import deepcopy
 from typing import Dict, List, Union, Optional
 
 import numpy as np
@@ -49,7 +48,7 @@ class Xopt(XoptBaseModel):
     )
     serialize_inline: bool = Field(False, description="flag to indicate if torch models"
                                                       " should be stored inside main config file")
-    
+
     @field_validator("vocs", mode='before')
     def validate_vocs(cls, value):
         if isinstance(value, dict):
