@@ -141,7 +141,7 @@ class AsynchronousXopt(Xopt):
         # Form completed evaluation
         new_data = pd.concat([input_data_done, output_data], axis=1)
 
-        self.add_data(new_data)
+        self.update_generator(new_data)
 
         # Cleanup
         self._input_data.drop(index, inplace=True)

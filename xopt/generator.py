@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
-    data: pd.DataFrame = Field(None, description="generator data", exclude=True)
+    data: pd.DataFrame = Field(None, description="generator data")
 
     supports_batch_generation: ClassVar[bool] = Field(
         default=False,
@@ -71,18 +71,6 @@ class Generator(XoptBaseModel, ABC):
 
         """
         pass
-
-    def add_data(self, new_data: pd.DataFrame):
-        """
-        update dataframe with results from new evaluations.
-
-        This is intended for generators that maintain their own data.
-
-        """
-        if self.data is not None:
-            self.data = pd.concat([self.data, new_data], axis=0)
-        else:
-            self.data = new_data
 
 
 def _check_vocs(vocs, multi_objective_allowed):

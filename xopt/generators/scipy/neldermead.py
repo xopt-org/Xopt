@@ -1,11 +1,13 @@
 import logging
 import warnings
 from abc import abstractmethod
+from copy import deepcopy
 from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
 from numpy import asfarray, shape
+from pydantic import validator
 
 from xopt.generator import Generator
 
@@ -31,8 +33,8 @@ class ScipyOptimizeGenerator(Generator):
 
     # Internal data structures
     _x = None
-    _y = None  # Used to coordinate with func
-    _lock = False  # mechanism to lock function calls
+    y: np.ndarray = None  # Used to coordinate with func
+    lock: bool = False  # mechanism to lock function calls
     _algorithm = None  # Will initialize on first generate
     _state = None
     _inputs = None
@@ -40,8 +42,20 @@ class ScipyOptimizeGenerator(Generator):
     _is_done = False
     _saved_options: Dict = None
 
-    class Config:
-        underscore_attrs_are_private = True
+    @validator("data", pre=True)
+    def validate_data(cls, v, values):
+        if isinstance(v, dict):
+            try:
+                v = pd.DataFrame(v)
+            except IndexError:
+                v = pd.DataFrame(v, index=[0])
+
+        # in addition to validating the data we also need to set _y attributes
+        # every time it is set
+        values["y"] = values["vocs"].objective_data(v).to_numpy()[-1]
+        values["lock"] = False  # unlock
+
+        return v
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -49,14 +63,17 @@ class ScipyOptimizeGenerator(Generator):
         # Initialize the first candidate if not given
         if self.initial_point is None:
             self.initial_point = self.vocs.random_inputs()[0]
+
+        config = deepcopy(self.dict())
+        config.pop("data")
         self._saved_options = (
-            self.dict().copy()
+            config
         )  # Used to keep track of changed options
 
     # Wrapper to refer to internal data
     def func(self, x):
         assert np.array_equal(x, self._x), f"{x} should equal {self._x}"
-        return self._y
+        return self.y
 
     @property
     def x0(self):
@@ -80,27 +97,13 @@ class ScipyOptimizeGenerator(Generator):
         #    **kwargs)
         #
 
-    def add_data(self, new_data: pd.DataFrame):
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
-        new_data_df = self.vocs.objective_data(new_data)
-        res = new_data_df.to_numpy()
-        assert shape(res) == (1, 1)
-        y = res[0, 0]
-        if np.isinf(y) or np.isnan(y):
-            self._is_done = True
-            return
-
-        self._y = y  # generator_function accesses this
-        self.data = new_data_df
-        self._lock = False  # unlock
-
     def generate(self, n_candidates) -> list[dict]:
         # Check if any options were changed from init. If so, reset the algorithm
-        if self.dict() != self._saved_options:
+        config = deepcopy(self.dict())
+        config.pop("data")
+        if config != self._saved_options:
             self._algorithm = None
-            self._saved_options = self.dict().copy()
+            self._saved_options = config
 
         # Actually start the algorithm.
         if self._algorithm is None:
@@ -110,10 +113,10 @@ class ScipyOptimizeGenerator(Generator):
         if self.is_done:
             return None
 
-        if self._lock:
+        if self.lock:
             raise ValueError(
-                "Generation is locked via ._lock. "
-                "Please call `add_data` before any further generate(1)"
+                "Generation is locked via .lock. "
+                "Please add data before any further calls to generate"
             )
 
         if n_candidates != 1:
@@ -125,7 +128,7 @@ class ScipyOptimizeGenerator(Generator):
             self._x, self._state = next(
                 self._algorithm
             )  # raw x point and any state to be passed back
-            self._lock = True
+            self.lock = True
 
             inputs = dict(zip(self.vocs.variable_names, self._x))
             if self.vocs.constants is not None:

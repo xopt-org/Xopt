@@ -38,7 +38,6 @@ class Xopt(XoptBaseModel):
     dump_file: str = Field(
         None, description="file to dump the results of the evaluations"
     )
-    data: DataFrame = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
         False,
         description="flag to indicate that torch models should be serialized "
@@ -71,26 +70,16 @@ class Xopt(XoptBaseModel):
 
         return value
 
-    @validator("data", pre=True)
-    def validate_data(cls, v, values):
-        if isinstance(v, dict):
-            try:
-                v = pd.DataFrame(v)
-            except IndexError:
-                v = pd.DataFrame(v, index=[0])
-
-        # also add data to generator
-        # TODO: find a more robust way of doing this
-        values["generator"].add_data(v)
-
-        return v
-
     @property
     def n_data(self):
         if self.data is None:
             return 0
         else:
             return len(self.data)
+
+    @property
+    def data(self):
+        return self.generator.data
 
     def step(self):
         """
@@ -162,35 +151,27 @@ class Xopt(XoptBaseModel):
         # explode any list like results if all of the output names exist
         new_data = explode_all_columns(new_data)
 
-        self.add_data(new_data)
+        # update generator
+        self.update_generator(new_data)
 
         # dump data to file if specified
         self.dump_state()
 
         return new_data
 
-    def add_data(self, new_data: pd.DataFrame):
+    def update_generator(self, new_data: pd.DataFrame):
         """
-        Concatenate new data to internal dataframe,
-        and also adds this data to the generator.
+        Update generator with new data + anything else that needs to be done
         """
         logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
 
-        # Set internal dataframe.
-        if self.data is not None:
-            new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
-            new_data.index = np.arange(
-                len(self.data) + 1, len(self.data) + len(new_data) + 1
-            )
+        # concatenate dataframe of generator with new data
+        self.generator.data = pd.concat(
+            (self.generator.data, new_data), ignore_index=True
+        )
 
-            self.data = pd.concat([self.data, new_data], axis=0)
-        else:
-            self.data = new_data
-        self.generator.add_data(new_data)
-
-    def reset_data(self):
-        self.data = pd.DataFrame()
-        self.generator.data = pd.DataFrame()
+    def set_data(self, data: pd.DataFrame):
+        self.generator.data = data
 
     def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """
@@ -206,7 +187,7 @@ class Xopt(XoptBaseModel):
         if self.dump_file is not None:
             output = json.loads(self.json(serialize_torch=self.serialize_torch))
             with open(self.dump_file, "w") as f:
-                yaml.dump(output, f)
+                yaml.dump(output, f, sort_keys=False)
             logger.debug(f"Dumped state to YAML file: {self.dump_file}")
 
     def dict(self, **kwargs) -> Dict:
@@ -222,9 +203,6 @@ class Xopt(XoptBaseModel):
         dict_result["generator"] = {"name": self.generator.name} | dict_result[
             "generator"
         ]
-        dict_result["data"] = (
-            json.loads(self.data.to_json()) if self.data is not None else None
-        )
 
         # TODO: implement version checking
         # dict_result["xopt_version"] = __version__

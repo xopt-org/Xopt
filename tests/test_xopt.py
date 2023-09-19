@@ -136,7 +136,7 @@ class TestXopt:
         with pytest.raises(ValueError):
             X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
 
-    def test_add_data(self):
+    def test_set_data(self):
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
@@ -145,7 +145,7 @@ class TestXopt:
             vocs=deepcopy(TEST_VOCS_BASE),
         )
         assert X.generator.data is None
-        X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
+        X.set_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
         assert (
             len(X.generator.data) == 2
