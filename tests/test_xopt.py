@@ -87,6 +87,22 @@ class TestXopt:
         # test single input
         xopt.evaluate_data({"x1": 0.5, "x2": 0.1})
 
+    def test_str_method(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+
+        # fixed seed for deterministic results
+        xopt.random_evaluate(2, seed=1)
+
+        val = str(xopt)
+        assert "Data size: 2" in val
+        assert "vocs:\n  constants:\n    cnt1: 1.0\n  constraints:\n    c1:\n    - " \
+               "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
+
     def test_function_checking(self):
         def f(x, a=True):
             if a:
