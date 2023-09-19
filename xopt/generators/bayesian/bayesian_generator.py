@@ -60,7 +60,7 @@ class BayesianGenerator(Generator, ABC):
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
-    model_constructor: SerializeAsAny[ModelConstructor] = Field(
+    gp_constructor: SerializeAsAny[ModelConstructor] = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
     numerical_optimizer: SerializeAsAny[NumericalOptimizer] = Field(
@@ -89,8 +89,8 @@ class BayesianGenerator(Generator, ABC):
                 v = torch.load(v)
         return v
 
-    @field_validator("model_constructor", mode='before')
-    def validate_model_constructor(cls, value):
+    @field_validator("gp_constructor", mode='before')
+    def validate_gp_constructor(cls, value):
         print(f'Verifying model {value}')
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
@@ -236,7 +236,7 @@ class BayesianGenerator(Generator, ABC):
                         bounds[1] = bounds[0] + 1e-8
                     variable_bounds[key] = bounds
 
-        _model = self.model_constructor.build_model(
+        _model = self.gp_constructor.build_model(
             self.model_input_names,
             self.vocs.output_names,
             data,

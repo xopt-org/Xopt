@@ -19,13 +19,13 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         description="time added to current time to get target predcition time",
     )
 
-    model_constructor: TimeDependentModelConstructor = Field(
+    gp_constructor: TimeDependentModelConstructor = Field(
         TimeDependentModelConstructor(),
         description="constructor used to generate model",
     )
 
-    @field_validator("model_constructor", mode='before')
-    def validate_model_constructor(cls, value):
+    @field_validator("gp_constructor", mode='before')
+    def validate_gp_constructor(cls, value):
         constructor_dict = {"time_dependent": TimeDependentModelConstructor}
         if value is None:
             value = TimeDependentModelConstructor()
