@@ -49,8 +49,7 @@ class TestTurbo(TestCase):
         # turbo controller dict needs to have a name attribute
         with pytest.raises(ValueError):
             BayesianGenerator(
-                vocs=test_vocs,
-                turbo_controller={"bad_keyword": "result"}
+                vocs=test_vocs, turbo_controller={"bad_keyword": "result"}
             )
 
         # test specifying controller via string

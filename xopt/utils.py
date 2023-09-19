@@ -326,7 +326,7 @@ def visualize_model(generator: BayesianGenerator, axes=None):
     return fig, ax
 
 
-def get_local_region(center_point: dict, vocs:VOCS, fraction: float=0.1) -> dict:
+def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> dict:
     """
     calculates the bounds of a local region around a center point with side lengths
     equal to a fixed fraction of the input space for each variable
@@ -336,12 +336,15 @@ def get_local_region(center_point: dict, vocs:VOCS, fraction: float=0.1) -> dict
         raise KeyError("Center point keys must match vocs variable names")
 
     bounds = {}
-    widths = {ele: vocs.variables[ele][1] - vocs.variables[ele][0] for ele in vocs.variable_names}
+    widths = {
+        ele: vocs.variables[ele][1] - vocs.variables[ele][0]
+        for ele in vocs.variable_names
+    }
 
     for name in vocs.variable_names:
         bounds[name] = [
             center_point[name] - widths[name] * fraction,
-            center_point[name] + widths[name] * fraction
+            center_point[name] + widths[name] * fraction,
         ]
 
     return bounds
