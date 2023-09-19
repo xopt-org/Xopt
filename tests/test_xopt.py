@@ -13,6 +13,7 @@ from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
+from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 
@@ -225,6 +226,30 @@ class TestXopt:
         ss = 1
         X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
         X.process_futures()
+
+    def test_dump_w_exploded_cols(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+        X.dump_file = "test_checkpointing.yaml"
+
+        # test case with exploded data
+        data = pd.DataFrame(
+            {
+                "x": [np.array([1.0, 2.0, 3.0])],
+                "y": [np.array([1.0, 2.0, 3.0])],
+            },
+            index=[0],
+        )
+        data = explode_all_columns(data)
+        X.add_data(data)
+        X.dump_state()
+
+        import os
+        os.remove(X.dump_file)
 
     def test_checkpointing(self):
         evaluator = Evaluator(function=xtest_callable)

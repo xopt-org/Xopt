@@ -359,7 +359,7 @@ def explode_all_columns(data: pd.DataFrame):
 
     if len(list_types):
         try:
-            return data.explode(list_types)
+            return data.explode(list_types, ignore_index=True)
         except ValueError:
             raise ValueError("evaluator outputs that are lists must match in size")
     else:
