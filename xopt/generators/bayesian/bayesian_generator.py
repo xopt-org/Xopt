@@ -123,8 +123,10 @@ class BayesianGenerator(Generator, ABC):
             if value in optimizer_dict:
                 value = optimizer_dict[value](values["vocs"])
             else:
-                raise ValueError(f"{value} not found, available values are "
-                                 f"{optimizer_dict.keys()}")
+                raise ValueError(
+                    f"{value} not found, available values are "
+                    f"{optimizer_dict.keys()}"
+                )
         elif isinstance(value, dict):
             # create turbo controller from dict input
             if "name" not in value:
@@ -133,8 +135,10 @@ class BayesianGenerator(Generator, ABC):
             if name in optimizer_dict:
                 value = optimizer_dict[name](vocs=values["vocs"], **value)
             else:
-                raise ValueError(f"{value} not found, available values are "
-                                 f"{optimizer_dict.keys()}")
+                raise ValueError(
+                    f"{value} not found, available values are "
+                    f"{optimizer_dict.keys()}"
+                )
         return value
 
     @validator("computation_time", pre=True)
