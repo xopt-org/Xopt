@@ -35,6 +35,30 @@ class TestTurbo(TestCase):
         assert not state.minimize
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_turbo_validation(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables = {"x1": [0, 1]}
+
+        turbo_controller = OptimizeTurboController(test_vocs)
+        BayesianGenerator(vocs=test_vocs, turbo_controller=turbo_controller)
+
+        turbo_controller = {"name": "optimize", "length": 0.5}
+        gen = BayesianGenerator(vocs=test_vocs, turbo_controller=turbo_controller)
+        assert gen.turbo_controller.length == 0.5
+
+        # turbo controller dict needs to have a name attribute
+        with pytest.raises(ValueError):
+            BayesianGenerator(
+                vocs=test_vocs, turbo_controller={"bad_keyword": "result"}
+            )
+
+        # test specifying controller via string
+        BayesianGenerator(vocs=test_vocs, turbo_controller="optimize")
+
+        with pytest.raises(ValueError):
+            BayesianGenerator(vocs=test_vocs, turbo_controller="bad_controller")
+
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_trust_region(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)

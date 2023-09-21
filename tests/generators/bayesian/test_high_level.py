@@ -123,7 +123,7 @@ class TestHighLevel:
         assert X2.generator.numerical_optimizer.n_restarts == 1
         assert np.allclose(
             X2.generator.data[X2.vocs.all_names].to_numpy(),
-            X.data[X.vocs.all_names].to_numpy()
+            X.data[X.vocs.all_names].to_numpy(),
         )
 
         X2.step()
@@ -167,7 +167,7 @@ class TestHighLevel:
         assert X2.generator.numerical_optimizer.n_restarts == 1
         assert np.allclose(
             X2.generator.data[X2.vocs.all_names].to_numpy(),
-            X.data[X.vocs.all_names].to_numpy()
+            X.data[X.vocs.all_names].to_numpy(),
         )
 
         X2.step()
