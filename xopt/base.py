@@ -67,10 +67,10 @@ class Xopt(XoptBaseModel):
         if isinstance(value, dict):
             name = value.pop("name")
             generator_class = get_generator(name)
-            value = generator_class.parse_obj({**value, "vocs": info.data["vocs"]})
+            value = generator_class.model_validate({**value, "vocs": info.data["vocs"]})
         elif isinstance(value, str):
             generator_class = get_generator(value)
-            value = generator_class.parse_obj({"vocs": info.data["vocs"]})
+            value = generator_class.model_validate({"vocs": info.data["vocs"]})
 
         return value
 
