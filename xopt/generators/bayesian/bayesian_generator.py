@@ -135,22 +135,32 @@ class BayesianGenerator(Generator, ABC):
     def validate_turbo_controller(cls, value, info: FieldValidationInfo):
         """note default behavior is no use of turbo"""
         optimizer_dict = {
-            "optimize": OptimizeTurboController(info.data["vocs"]),
-            "safety": SafetyTurboController(info.data["vocs"]),
+            "optimize": OptimizeTurboController,
+            "safety": SafetyTurboController,
         }
         if isinstance(value, TurboController):
             pass
         elif isinstance(value, str):
+            # create turbo controller from string input
             if value in optimizer_dict:
-                value = optimizer_dict[value]
+                value = optimizer_dict[value](info.data["vocs"])
             else:
-                raise ValueError(f"{value} not found")
+                raise ValueError(
+                    f"{value} not found, available values are "
+                    f"{optimizer_dict.keys()}"
+                )
         elif isinstance(value, dict):
+            # create turbo controller from dict input
+            if "name" not in value:
+                raise ValueError("turbo input dict needs to have a `name` attribute")
             name = value.pop("name")
             if name in optimizer_dict:
-                value = optimizer_dict[name](**value)
+                value = optimizer_dict[name](vocs=info.data["vocs"], **value)
             else:
-                raise ValueError(f"{value} not found")
+                raise ValueError(
+                    f"{value} not found, available values are "
+                    f"{optimizer_dict.keys()}"
+                )
         return value
 
     @field_validator("computation_time", mode='before')
