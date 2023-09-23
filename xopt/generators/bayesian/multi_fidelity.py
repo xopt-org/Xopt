@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Literal, Optional
 
 import pandas as pd
 import torch
@@ -9,7 +9,7 @@ from botorch.acquisition import (
     GenericMCObjective,
     qUpperConfidenceBound,
 )
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
     ConstrainedMCAcquisitionFunction,
@@ -23,8 +23,8 @@ logger = logging.getLogger()
 
 class MultiFidelityGenerator(MOBOGenerator):
     name = "multi_fidelity"
-    fidelity_parameter: str = Field(
-        "s", description="fidelity parameter name", const=True
+    fidelity_parameter: Literal["s"] = Field(
+        "s", description="fidelity parameter name"
     )
     cost_function: Callable = Field(
         lambda x: x + 1.0,
@@ -39,7 +39,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         Assumes a fidelity parameter [0,1]
         """
 
-    @validator("vocs", pre=True)
+    @field_validator("vocs", mode='before')
     def validate_vocs(cls, v: VOCS):
         v.variables["s"] = [0, 1]
         v.objectives["s"] = ObjectiveEnum("MAXIMIZE")

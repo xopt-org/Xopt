@@ -13,7 +13,7 @@ logger = logging.getLogger()
 
 
 class BaxGenerator(BayesianGenerator):
-    alias = "BAX"
+    name = "BAX"
     algorithm: Algorithm = Field(description="algorithm evaluated in the BAX process")
     algorithm_results: Dict = Field(
         None, description="dictionary results from algorithm", exclude=True
@@ -23,9 +23,6 @@ class BaxGenerator(BayesianGenerator):
     )
 
     _n_calls: int = 0
-
-    class Config:
-        underscore_attrs_are_private = True
 
     def generate(self, n_candidates: int) -> list[dict]:
         self._n_calls += 1

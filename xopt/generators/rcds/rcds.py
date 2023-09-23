@@ -1,8 +1,10 @@
 import logging
 import math
+from typing import Optional
 
 import numpy as np
 import pandas as pd
+from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
 from xopt.generator import Generator
@@ -415,21 +417,19 @@ class RCDSGenerator(Generator):
     """
 
     name = "rcds"
-    x0: list = None
-    init_mat: np.ndarray = None
-    noise: PositiveFloat = 1e-5
-    step: PositiveFloat = 1e-2
-    tol: PositiveFloat = 1e-5
+    x0: Optional[list] = Field(None)
+    init_mat: Optional[np.ndarray] = Field(None)
+    noise: PositiveFloat = Field(1e-5)
+    step: PositiveFloat = Field(1e-2)
+    tol: PositiveFloat = Field(1e-5)
 
     _ub = 0
     _lb = 0
     _rcds: RCDS = None
     _generator = None
 
-    class Config:
-        arbitrary_types_allowed = True
-        validate_assignment = True
-        underscore_attrs_are_private = True
+    model_config = ConfigDict(arbitrary_types_allowed=True,
+                              validate_assignment=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

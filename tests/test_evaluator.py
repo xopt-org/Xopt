@@ -123,7 +123,7 @@ class TestEvaluator:
         for Executor in [ThreadPoolExecutor, ProcessPoolExecutor]:
             test_dict["executor"] = Executor()
             ev = Evaluator(**test_dict)
-            ev.json()
+            ev.model_dump_json()
 
     def test_multithreading(self):
         MAX_WORKERS = 10

@@ -12,7 +12,7 @@ from xopt.generators.bayesian.utils import set_botorch_weights
 class ExpectedImprovementGenerator(BayesianGenerator):
     name = "expected_improvement"
     supports_batch_generation = True
-    __doc__ = """Implements Bayeisan Optimization using the Expected Improvement
+    __doc__ = """Implements Bayesian Optimization using the Expected Improvement
         acquisition function"""
 
     def _get_acquisition(self, model):

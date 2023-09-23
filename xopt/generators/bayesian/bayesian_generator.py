@@ -1,9 +1,10 @@
 import logging
+import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pandas as pd
 import torch
@@ -12,9 +13,9 @@ from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, validator
+from pydantic import Field, SerializeAsAny, field_validator
+from pydantic_core.core_schema import FieldValidationInfo
 from torch import Tensor
-
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
@@ -32,44 +33,65 @@ from xopt.generators.bayesian.turbo import (
 )
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
+from xopt.pydantic import decode_torch_module
 
 logger = logging.getLogger()
+
+# It seems pydantic v2 does not auto-register models anymore
+# So one option is to have explicit unions for model subclasses
+# The other is to define a descriminated union with name as key, but that stops name field from
+# getting exported, and we want to keep it for readability
+# See https://github.com/pydantic/pydantic/discussions/5785
+
+# Update: using parent model now seems to work, keeping this just in case
+# T_ModelConstructor = Union[StandardModelConstructor, TimeDependentModelConstructor]
+# T_NumericalOptimizer = Union[LBFGSOptimizer, GridOptimizer]
 
 
 class BayesianGenerator(Generator, ABC):
     name = "base_bayesian_generator"
-    model: Model = Field(
+    model: Optional[Model] = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
-    n_monte_carlo_samples = Field(
+    n_monte_carlo_samples: int = Field(
         128, description="number of monte carlo samples to use"
     )
-    turbo_controller: TurboController = Field(
+    turbo_controller: SerializeAsAny[Optional[TurboController]] = Field(
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
-    model_constructor: ModelConstructor = Field(
+    gp_constructor: SerializeAsAny[ModelConstructor] = Field(
         StandardModelConstructor(), description="constructor used to generate model"
     )
-    numerical_optimizer: NumericalOptimizer = Field(
+    numerical_optimizer: SerializeAsAny[NumericalOptimizer] = Field(
         LBFGSOptimizer(),
         description="optimizer used to optimize the acquisition " "function",
     )
-    max_travel_distances: List[float] = Field(
+    max_travel_distances: Optional[List[float]] = Field(
         None,
         description="limits for travel distance between points in normalized space",
     )
-    fixed_features: Dict[str, float] = Field(
+    fixed_features: Optional[Dict[str, float]] = Field(
         None, description="fixed features used in Bayesian optimization"
     )
-    computation_time: pd.DataFrame = Field(
+    computation_time: Optional[pd.DataFrame] = Field(
         None,
         description="data frame tracking computation time in seconds",
     )
     n_candidates: int = 1
 
-    @validator("model_constructor", pre=True)
-    def validate_model_constructor(cls, value):
+    @field_validator("model",  mode='before')
+    def validate_torch_modules(cls, v):
+        if isinstance(v, str):
+            if v.startswith('base64:'):
+                v = decode_torch_module(v)
+            elif os.path.exists(v):
+                v = torch.load(v)
+        return v
+
+    @field_validator("gp_constructor", mode='before')
+    def validate_gp_constructor(cls, value):
+        print(f'Verifying model {value}')
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
@@ -89,7 +111,7 @@ class BayesianGenerator(Generator, ABC):
 
         return value
 
-    @validator("numerical_optimizer", pre=True)
+    @field_validator("numerical_optimizer", mode='before')
     def validate_numerical_optimizer(cls, value):
         optimizer_dict = {"grid": GridOptimizer, "LBFGS": LBFGSOptimizer}
         if value is None:
@@ -109,8 +131,8 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError(f"{value} not found")
         return value
 
-    @validator("turbo_controller", pre=True)
-    def validate_turbo_controller(cls, value, values):
+    @field_validator("turbo_controller", mode='before')
+    def validate_turbo_controller(cls, value, info: FieldValidationInfo):
         """note default behavior is no use of turbo"""
         optimizer_dict = {
             "optimize": OptimizeTurboController,
@@ -121,7 +143,7 @@ class BayesianGenerator(Generator, ABC):
         elif isinstance(value, str):
             # create turbo controller from string input
             if value in optimizer_dict:
-                value = optimizer_dict[value](values["vocs"])
+                value = optimizer_dict[value](info.data["vocs"])
             else:
                 raise ValueError(
                     f"{value} not found, available values are "
@@ -133,7 +155,7 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError("turbo input dict needs to have a `name` attribute")
             name = value.pop("name")
             if name in optimizer_dict:
-                value = optimizer_dict[name](vocs=values["vocs"], **value)
+                value = optimizer_dict[name](vocs=info.data["vocs"], **value)
             else:
                 raise ValueError(
                     f"{value} not found, available values are "
@@ -141,7 +163,7 @@ class BayesianGenerator(Generator, ABC):
                 )
         return value
 
-    @validator("computation_time", pre=True)
+    @field_validator("computation_time", mode='before')
     def validate_computation_time(cls, value):
         if isinstance(value, dict):
             value = pd.DataFrame(value)
@@ -224,7 +246,7 @@ class BayesianGenerator(Generator, ABC):
                         bounds[1] = bounds[0] + 1e-8
                     variable_bounds[key] = bounds
 
-        _model = self.model_constructor.build_model(
+        _model = self.gp_constructor.build_model(
             self.model_input_names,
             self.vocs.output_names,
             data,
