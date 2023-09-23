@@ -40,9 +40,6 @@ class ScipyOptimizeGenerator(Generator):
     _is_done = False
     _saved_options: Dict = None
 
-    class Config:
-        underscore_attrs_are_private = True
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -50,7 +47,7 @@ class ScipyOptimizeGenerator(Generator):
         if self.initial_point is None:
             self.initial_point = self.vocs.random_inputs()[0]
         self._saved_options = (
-            self.dict().copy()
+            self.model_dump().copy()
         )  # Used to keep track of changed options
 
     # Wrapper to refer to internal data
@@ -98,9 +95,10 @@ class ScipyOptimizeGenerator(Generator):
 
     def generate(self, n_candidates) -> list[dict]:
         # Check if any options were changed from init. If so, reset the algorithm
-        if self.dict() != self._saved_options:
+        dump = self.model_dump()
+        if dump != self._saved_options:
             self._algorithm = None
-            self._saved_options = self.dict().copy()
+            self._saved_options = dump.copy()
 
         # Actually start the algorithm.
         if self._algorithm is None:

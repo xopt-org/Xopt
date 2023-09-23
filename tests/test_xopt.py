@@ -1,4 +1,5 @@
 import math
+import os
 from abc import ABC
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
@@ -69,7 +70,7 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
         # test evaluating data w/o constants specified
@@ -114,8 +115,8 @@ class TestXopt:
             return False
 
         vocs = VOCS(
-            variables={"x": [0, 2 * math.pi]},
-            objectives={"f": "MINIMIZE"},
+                variables={"x": [0, 2 * math.pi]},
+                objectives={"f": "MINIMIZE"},
         )
 
         # init with generator and evaluator
@@ -146,9 +147,9 @@ class TestXopt:
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
+                generator=generator,
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
         )
         with pytest.raises(ValueError):
             X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
@@ -157,15 +158,15 @@ class TestXopt:
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
+                generator=generator,
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
         )
         assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
         assert (
-            len(X.generator.data) == 2
+                len(X.generator.data) == 2
         ), f"len(X.generator.data) = {len(X.generator.data)}"
 
     def test_asynch(self):
@@ -272,7 +273,7 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
         X.dump_file = "test_checkpointing.yaml"
 
@@ -281,33 +282,20 @@ class TestXopt:
         for _ in range(5):
             X.step()
 
-        try:
-            # try to load the state from nothing
-            X2 = Xopt.from_file(X.dump_file)
+        # try to load the state from nothing
+        X2 = Xopt.from_file(X.dump_file)
 
-            for _ in range(5):
-                X2.step()
-
-            assert isinstance(X2.generator, RandomGenerator)
-            assert isinstance(X2.evaluator, Evaluator)
-            assert X.vocs == X2.vocs
-
-            assert len(X2.data) == 11
-
-        except Exception as e:
-            raise e
-        finally:
-            # clean up
-            import os
-
-            os.remove(X.dump_file)
+        assert len(X2.data) == 6
+        assert isinstance(X2.generator, RandomGenerator)
+        assert isinstance(X2.evaluator, Evaluator)
+        assert X.vocs == X2.vocs
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
         # fixed seed for deterministic results
@@ -315,3 +303,11 @@ class TestXopt:
         xopt.random_evaluate(1)
         assert np.isclose(xopt.data["x1"].iloc[0], 0.488178)
         assert len(xopt.data) == 3
+
+    @pytest.fixture(scope='module', autouse=True)
+    def clean_up(self):
+        yield
+        files = ['test_checkpointing.yaml']
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)

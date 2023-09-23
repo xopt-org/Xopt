@@ -1,9 +1,13 @@
 import copy
 import inspect
+import io
 import json
+import yaml
 import logging
 import os.path
+import typing
 from concurrent.futures import Future
+from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
 from typing import Any, Callable, Generic, Iterable, List, Optional, TextIO, TypeVar
@@ -12,9 +16,10 @@ import numpy as np
 import orjson
 import pandas as pd
 import torch.nn
-import yaml
-from pydantic import BaseModel, create_model, Extra, Field, root_validator, validator
-from pydantic.generics import GenericModel
+from pydantic import BaseModel, ConfigDict, create_model, Field, field_serializer, field_validator, \
+    model_serializer, model_validator
+from pydantic.v1.json import custom_pydantic_encoder
+from pydantic_core.core_schema import FieldValidationInfo, SerializationInfo
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
@@ -36,15 +41,35 @@ JSON_ENCODERS = {
 }
 
 
-def recursive_serialize(v, base_key="", serialize_torch=False):
+# The problem with v2 serialization is that model_serialize_json() does not accept kwargs
+# meaning whichever model method is decorated with @model_serializer cant adjust for 'base_key'
+# and other similar options - it renders native whole v2 scheme quite useless. We can still try
+# to use @field_serializer, but there is a lack of documentation on how to call these
+# handlers from a custom function.
+#
+# So, we implement two serialization options for now.
+# First is the native one, with no customization, under serialize_json() method. It needs to
+# invoked as xopt.model_dump_json(), the standard pydantic v2 syntax.
+# Second method bypasses pydantic completely. It is invoked via 'xopt.json()'
+# or '<any xopt model>.to_json()'
+
+# Pydantic v2 will by default serialize submodels as annotated types, dropping subclass attributes
+
+
+def recursive_serialize(v, base_key="", serialize_torch=False,
+                        serialize_inline: bool = False
+                        ) -> dict:
     for key in list(v):
         if isinstance(v[key], dict):
-            v[key] = recursive_serialize(v[key], key, serialize_torch)
+            v[key] = recursive_serialize(v[key], key, serialize_torch, serialize_inline)
         elif isinstance(v[key], torch.nn.Module):
             if serialize_torch:
-                v[key] = process_torch_module(
-                    module=v[key], name="_".join((base_key, key))
-                )
+                if serialize_inline:
+                    v[key] = 'base64:' + encode_torch_module(v[key])
+                else:
+                    v[key] = process_torch_module(
+                            module=v[key], name="_".join((base_key, key))
+                    )
             else:
                 del v[key]
         elif isinstance(v[key], torch.dtype):
@@ -71,7 +96,7 @@ def recursive_serialize(v, base_key="", serialize_torch=False):
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 
 
-def recursive_deserialize(v: dict):
+def recursive_deserialize(v: dict) -> dict:
     """deserialize strings from xopt outputs"""
     for key, value in v.items():
         # process dicts
@@ -85,14 +110,29 @@ def recursive_deserialize(v: dict):
     return v
 
 
-# define custom json_dumps using orjson
-def orjson_dumps(v, *, default, base_key="", serialize_torch=False):
-    v = recursive_serialize(v, base_key=base_key, serialize_torch=serialize_torch)
-    # orjson.dumps returns bytes, to match standard json.dumps we need to decode
+def orjson_dumps(v: BaseModel, *, base_key="", serialize_torch=False,
+                 serialize_inline=False
+                 ) -> str:
+    # TODO: move away from borrowing pydantic v1 encoder preset
+    json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
+    return orjson_dumps_custom(v, default=json_encoder, base_key=base_key,
+                               serialize_torch=serialize_torch,
+                               serialize_inline=serialize_inline)
+
+
+def orjson_dumps_custom(v: BaseModel, *, default, base_key="", **kwargs) -> str:
+    v = recursive_serialize(v.model_dump(), base_key=base_key, **kwargs)
     return orjson.dumps(v, default=default).decode()
 
 
-def orjson_loads(v, default=None):
+def orjson_dumps_except_root(v: BaseModel, *, base_key="", **kwargs) -> dict:
+    """ Same as above but start at fields of root model, instead of model itself """
+    dump = v.model_dump()
+    encoded_dump = recursive_serialize(dump, base_key=base_key, **kwargs)
+    return encoded_dump
+
+
+def orjson_loads(v, default=None) -> dict:
     v = orjson.loads(v)
     v = recursive_deserialize(v)
     return v
@@ -107,16 +147,35 @@ def process_torch_module(module, name):
     return module_name
 
 
-class XoptBaseModel(BaseModel):
-    class Config:
-        extra = "forbid"
-        json_dumps = orjson_dumps
-        json_loads = orjson_loads
-        arbitrary_types_allowed = True
+def encode_torch_module(module):
+    import base64
+    import gzip
+    buffer = io.BytesIO()
+    # 5 supported since 3.8
+    torch.save(module, buffer, pickle_protocol=5)
+    module_bytes = buffer.getbuffer().tobytes()
+    cb = gzip.compress(module_bytes, compresslevel=9)
+    encoded_bytes = base64.standard_b64encode(cb)
+    return encoded_bytes.decode('ascii')
 
-    # root validator to process files
-    @validator("*", pre=True)
-    def validate_files(cls, value):
+
+def decode_torch_module(modulestr: str):
+    import base64
+    import gzip
+    assert modulestr.startswith('base64:')
+    base64str = modulestr.split('base64:', 1)[1]
+    decoded = base64.standard_b64decode(base64str)
+    decompressed = gzip.decompress(decoded)
+    bytestream = io.BytesIO(decompressed)
+    module = torch.load(bytestream)
+    return module
+
+
+class XoptBaseModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
+
+    @field_validator("*", mode='before')
+    def validate_files(cls, value, info: FieldValidationInfo):
         if isinstance(value, str):
             if os.path.exists(value):
                 extension = value.split(".")[-1]
@@ -125,36 +184,45 @@ class XoptBaseModel(BaseModel):
 
         return value
 
+    # Note that this function still returns a dict, NOT a string. Pydantic will handle
+    # final serialization of basic types in Rust.
+    @model_serializer(mode='plain', when_used='json')
+    def serialize_json(self, sinfo: SerializationInfo) -> dict:
+        return orjson_dumps_except_root(self)
+
+    def to_json(self, **kwargs) -> str:
+        return orjson_dumps(self, **kwargs)
+
     @classmethod
     def from_file(cls, filename: str):
         return cls.from_yaml(open(filename))
 
     @classmethod
     def from_yaml(cls, yaml_str: [str, TextIO]):
-        return cls.parse_obj(yaml.safe_load(yaml_str))
+        return cls.model_validate(yaml.safe_load(yaml_str))
 
     @classmethod
     def from_dict(cls, config: dict):
-        return cls.parse_obj(config)
+        return cls.model_validate(config)
 
 
 def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
     description_dict = {}
-    for name, val in model.__fields__.items():
+    for name, val in model.model_fields.items():
         try:
-            if issubclass(val.type_, XoptBaseModel):
+            if issubclass(getattr(model, name), XoptBaseModel):
                 description_dict[name] = get_descriptions_defaults(getattr(model, name))
             else:
                 description_dict[name] = [
-                    val.field_info.description,
-                    val.field_info.default,
+                    val.description,
+                    val.default,
                 ]
 
         except TypeError:
             # if the val is an object or callable type
-            description_dict[name] = val.field_info.description
+            description_dict[name] = val.description
 
     return description_dict
 
@@ -163,24 +231,25 @@ class CallableModel(BaseModel):
     callable: Callable
     signature: BaseModel
 
-    class Config:
-        arbitrary_types_allowed = True
-        json_dumps = orjson_dumps
-        extra = Extra.forbid
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
-    @root_validator(pre=True)
+    @model_serializer(mode='plain', when_used='json', return_type='str')
+    def serialize(self):
+        return orjson_dumps(self)
+
+    @model_validator(mode='before')
     def validate_all(cls, values):
         callable = values.pop("callable")
 
         if not isinstance(
-            callable,
-            (
-                str,
-                Callable,
-            ),
+                callable,
+                (
+                        str,
+                        Callable,
+                ),
         ):
             raise ValueError(
-                "Callable must be object or a string. Provided %s", type(callable)
+                    "Callable must be object or a string. Provided %s", type(callable)
             )
 
         # parse string to callable
@@ -231,19 +300,30 @@ class CallableModel(BaseModel):
 
 
 class ObjLoader(
-    GenericModel,
-    Generic[ObjType],
-    arbitrary_types_allowed=True,
-    json_dumps=orjson_dumps,
+        BaseModel,
+        Generic[ObjType],
 ):
-    object: Optional[ObjType]
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    object: Optional[ObjType] = None
     loader: CallableModel = None
-    object_type: Optional[type]
+    object_type: Optional[type] = None
 
-    @root_validator(pre=True)
+    @model_serializer(mode='plain', when_used='json', return_type='str')
+    def serialize_json(self) -> str:
+        return orjson_dumps(self)
+
+    @model_validator(mode='before')
     def validate_all(cls, values):
-        # inspect class init signature
-        obj_type = cls.__fields__["object"].type_
+        # In v1, could access type_ to get resolved inner type
+        # See https://stackoverflow.com/questions/75165745
+        # obj_type = cls.__fields__["object"].type_
+
+        # In v2, how to do this is unclear - internals have changed
+        # For now, use hacky way with annotations
+        annotation = cls.model_fields["object"].annotation
+        # inner_types are (ObjType,NoneType)
+        inner_types = typing.get_args(annotation)
+        obj_type = inner_types[0]
 
         # adjust for re init from json
         if "loader" not in values:
@@ -262,10 +342,10 @@ class ObjLoader(
 
                     if callable.callable is not obj_type:
                         raise ValueError(
-                            "Provided loader of type %s. ObjLoader parameterized for \
+                                "Provided loader of type %s. ObjLoader parameterized for \
                                 %s",
-                            callable.callable.__name__,
-                            obj_type,
+                                callable.callable.__name__,
+                                obj_type,
                         )
 
                     # opt for obj type
@@ -293,35 +373,68 @@ class ObjLoader(
             return self.loader()
 
 
+# For testing
+class ObjLoaderMinimal(
+        BaseModel,
+        Generic[ObjType],
+):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    object: Optional[ObjType] = None
+    object_type: Optional[type] = None
+
+    @model_validator(mode='before')
+    def validate_all(cls, values):
+        print('model validator before: ', values)
+        annotation = cls.model_fields["object"].annotation
+        inner_types = typing.get_args(annotation)
+        obj_type = inner_types[0]
+        print(f'{obj_type=}')
+        return {"object_type": obj_type}
+
+    @model_validator(mode='after')
+    def validate_print(cls, values):
+        print('model validator after: ', values)
+        return values
+
+    @field_serializer('object_type', when_used='json')
+    def serialize_object_type(self, x):
+        print('object_type serializer', x)
+        if x is None:
+            return x
+        return f"{x.__module__}.{x.__name__}"
+
+
 # COMMON BASE FOR EXECUTORS
 class BaseExecutor(
-    GenericModel,
-    Generic[ObjType],
-    arbitrary_types_allowed=True,
-    json_dumps=orjson_dumps,
-    copy_on_model_validation="none",
-    # Needed to avoid: https://github.com/samuelcolvin/pydantic/discussions/4099
+        BaseModel,
+        Generic[ObjType],
+
 ):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     # executor_type must comply with https://peps.python.org/pep-3148/ standard
-    loader: Optional[ObjLoader[ObjType]]  # loader of executor type
+    loader: Optional[ObjLoader[ObjType]] = None  # loader of executor type
 
     # This is a utility field not included in reps. The typing lib has opened
     # issues on access of generic type within class.
     # This tracks for if-necessary future use.
-    executor_type: type = Field(None, exclude=True)
+    executor_type: Optional[type] = Field(None, exclude=True, validate_default=True)
     submit_callable: str = "submit"
     map_callable: str = "map"
     shutdown_callable: str = "shutdown"
 
-    # executor will not be explicitely serialized, but loaded using loader with class
+    # executor will not be explicitly serialized, but loaded using loader with class
     # and kwargs
-    executor: Optional[ObjType]
+    executor: Optional[ObjType] = None
 
-    @root_validator(pre=True)
+    @model_serializer(mode='plain', when_used='json', return_type='str')
+    def serialize_json(self) -> str:
+        return orjson_dumps(self)
+
+    @model_validator(mode='before')
     def validate_all(cls, values):
-        executor_type = cls.__fields__[
-            "executor"
-        ].type_  # introspect fields to get type
+        # TODO: better solution, since type_ is no longer available
+        executor_type = typing.get_args(cls.model_fields["executor"].annotation)[0]
 
         # check if executor provided
         executor = values.get("executor")
@@ -331,7 +444,7 @@ class BaseExecutor(
         # VALIDATE SUBMIT CALLABLE AGAINST EXECUTOR TYPE
         if "submit_callable" not in values:
             # use default
-            submit_callable = cls.__fields__["submit_callable"].default
+            submit_callable = cls.model_fields["submit_callable"].default
         else:
             submit_callable = values.pop("submit_callable")
 
@@ -339,15 +452,15 @@ class BaseExecutor(
             getattr(executor_type, submit_callable)
         except AttributeError:
             raise ValueError(
-                "Executor type %s has no submit method %s.",
-                executor_type.__name__,
-                submit_callable,
+                    "Executor type %s has no submit method %s.",
+                    executor_type.__name__,
+                    submit_callable,
             )
 
         # VALIDATE MAP CALLABLE AGAINST EXECUTOR TYPE
         if not values.get("map_callable"):
             # use default
-            map_callable = cls.__fields__["map_callable"].default
+            map_callable = cls.model_fields["map_callable"].default
         else:
             map_callable = values.pop("map_callable")
 
@@ -355,15 +468,15 @@ class BaseExecutor(
             getattr(executor_type, map_callable)
         except AttributeError:
             raise ValueError(
-                "Executor type %s has no map method %s.",
-                executor_type.__name__,
-                map_callable,
+                    "Executor type %s has no map method %s.",
+                    executor_type.__name__,
+                    map_callable,
             )
 
         # VALIDATE SHUTDOWN CALLABLE AGAINST EXECUTOR TYPE
         if not values.get("shutdown_callable"):
             # use default
-            shutdown_callable = cls.__fields__["shutdown_callable"].default
+            shutdown_callable = cls.model_fields["shutdown_callable"].default
         else:
             shutdown_callable = values.pop("shutdown_callable")
 
@@ -371,9 +484,9 @@ class BaseExecutor(
             getattr(executor_type, shutdown_callable)
         except AttributeError:
             raise ValueError(
-                "Executor type %s has no shutdown method %s.",
-                executor_type.__name__,
-                shutdown_callable,
+                    "Executor type %s has no shutdown method %s.",
+                    executor_type.__name__,
+                    shutdown_callable,
             )
 
         # Compose loader utility
@@ -414,22 +527,23 @@ class BaseExecutor(
 
 # NormalExecutor with no context handling on submission and executor persistence
 class NormalExecutor(
-    BaseExecutor[ObjType],
-    Generic[ObjType],
-    arbitrary_types_allowed=True,
-    json_dumps=orjson_dumps,
+        BaseExecutor[ObjType],
+        Generic[ObjType],
 ):
-    @validator("executor", always=True)
-    def validate_executor(cls, v, values):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # TODO: check if validate_default is sufficient
+    @field_validator("executor")
+    def validate_executor(cls, v, info: FieldValidationInfo):
         if v is None:
-            v = values["loader"].load()
+            v = info.data["loader"].load()
 
         # if not None, validate against executor type
         else:
-            if not isinstance(v, (values["executor_type"],)):
+            if not isinstance(v, (info.data["executor_type"],)):
                 raise ValueError(
-                    "Provided executor is not instance of %s",
-                    values["executor_type"].__name__,
+                        "Provided executor is not instance of %s",
+                        info.data["executor_type"].__name__,
                 )
 
         return v
@@ -512,9 +626,9 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
         if bind is not None:
             if not isinstance(bind, (bound_class,)):
                 raise ValueError(
-                    "Provided bind %s is not instance of %s",
-                    bind,
-                    bound_class.__qualname__,
+                        "Provided bind %s is not instance of %s",
+                        bind,
+                        bound_class.__qualname__,
                 )
 
         if is_bound and isinstance(callable, (FunctionType,)) and bind is None:
@@ -537,11 +651,10 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
 
 
 class SignatureModel(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def build(self, *args, **kwargs):
-        stored_kwargs = self.dict()
+        stored_kwargs = self.model_dump()
 
         stored_args = []
         if "args" in stored_kwargs:
@@ -604,7 +717,7 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
     # create pydantic model
     pydantic_fields = {
         "args": (List[Any], Field(list(sig_args))),
-        "kwarg_order": Field(list(sig_kwargs.keys()), exclude=True),
+        "kwarg_order": (List[Any], Field(list(sig_kwargs.keys()), exclude=True)),
     }
     for key, value in sig_kwargs.items():
         if isinstance(value, (tuple,)):
@@ -619,10 +732,12 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
                 pydantic_fields[key] = (inspect.Parameter.empty, Field(None))
 
             else:
-                pydantic_fields[key] = value
+                # Pydantic v2 requires type spec on all fields
+                # TODO: maybe raise error on non-primitive types
+                pydantic_fields[key] = (type(value), value)
 
     model = create_model(
-        f"Kwargs_{callable.__qualname__}", __base__=SignatureModel, **pydantic_fields
+            f"Kwargs_{callable.__qualname__}", __base__=SignatureModel, **pydantic_fields
     )
 
     return model()

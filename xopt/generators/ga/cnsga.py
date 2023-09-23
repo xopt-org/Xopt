@@ -6,7 +6,7 @@ from typing import Dict, List
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
-from pydantic import confloat, Field
+from pydantic import ConfigDict, confloat, Field
 
 import xopt.utils
 from xopt.generator import Generator
@@ -35,8 +35,7 @@ class CNSGAGenerator(Generator):
     )
     output_path: str = Field(None, description="Output path for population files")
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
