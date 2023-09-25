@@ -42,21 +42,6 @@ class ScipyOptimizeGenerator(Generator):
     _is_done = False
     _saved_options: Dict = None
 
-    @validator("data", pre=True)
-    def validate_data(cls, v, values):
-        if isinstance(v, dict):
-            try:
-                v = pd.DataFrame(v)
-            except IndexError:
-                v = pd.DataFrame(v, index=[0])
-
-        # in addition to validating the data we also need to set _y attributes
-        # every time it is set
-        values["y"] = values["vocs"].objective_data(v).to_numpy()[-1]
-        values["lock"] = False  # unlock
-
-        return v
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -67,7 +52,7 @@ class ScipyOptimizeGenerator(Generator):
         config = deepcopy(self.dict())
         config.pop("data")
         self._saved_options = (
-            config
+            self.model_dump().copy()
         )  # Used to keep track of changed options
 
     # Wrapper to refer to internal data

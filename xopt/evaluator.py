@@ -7,7 +7,7 @@ from typing import Callable, Dict, List, Union
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from pydantic import Field, root_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from xopt.errors import XoptError
 from xopt.pydantic import NormalExecutor, XoptBaseModel
@@ -41,17 +41,14 @@ class Evaluator(XoptBaseModel):
     """
 
     function: Callable
-    max_workers: int = 1
+    max_workers: int = Field(1, ge=1)
     executor: NormalExecutor = Field(exclude=True)  # Do not serialize
-    function_kwargs: dict = {}
-    vectorized: bool = False
+    function_kwargs: dict = Field({})
+    vectorized: bool = Field(False)
 
-    class Config:
-        """config"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-        arbitrary_types_allowed = True
-
-    @root_validator(pre=True)
+    @model_validator(mode='before')
     def validate_all(cls, values):
         f = get_function(values["function"])
         kwargs = values.get("function_kwargs", {})

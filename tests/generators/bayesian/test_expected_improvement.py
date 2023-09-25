@@ -14,7 +14,7 @@ from xopt.vocs import ObjectiveEnum, VOCS
 class TestExpectedImprovement:
     def test_init(self):
         ei_gen = ExpectedImprovementGenerator(vocs=TEST_VOCS_BASE)
-        ei_gen.json()
+        ei_gen.model_dump_json()
 
     def test_generate(self):
         gen = ExpectedImprovementGenerator(

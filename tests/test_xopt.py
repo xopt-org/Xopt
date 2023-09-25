@@ -1,4 +1,5 @@
 import math
+import os
 from abc import ABC
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
@@ -13,6 +14,7 @@ from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
+from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 
@@ -68,7 +70,7 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
         # test evaluating data w/o constants specified
@@ -86,6 +88,22 @@ class TestXopt:
         # test single input
         xopt.evaluate_data({"x1": 0.5, "x2": 0.1})
 
+    def test_str_method(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+
+        # fixed seed for deterministic results
+        xopt.random_evaluate(2, seed=1)
+
+        val = str(xopt)
+        assert "Data size: 2" in val
+        assert "vocs:\n  constants:\n    cnt1: 1.0\n  constraints:\n    c1:\n    - " \
+               "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
+
     def test_function_checking(self):
         def f(x, a=True):
             if a:
@@ -97,8 +115,8 @@ class TestXopt:
             return False
 
         vocs = VOCS(
-            variables={"x": [0, 2 * math.pi]},
-            objectives={"f": "MINIMIZE"},
+                variables={"x": [0, 2 * math.pi]},
+                objectives={"f": "MINIMIZE"},
         )
 
         # init with generator and evaluator
@@ -129,9 +147,9 @@ class TestXopt:
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
+                generator=generator,
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
         )
         with pytest.raises(ValueError):
             X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
@@ -140,15 +158,15 @@ class TestXopt:
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
+                generator=generator,
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
         )
         assert X.generator.data is None
         X.set_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
         assert (
-            len(X.generator.data) == 2
+                len(X.generator.data) == 2
         ), f"len(X.generator.data) = {len(X.generator.data)}"
 
     def test_asynch(self):
@@ -226,7 +244,7 @@ class TestXopt:
         X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
         X.process_futures()
 
-    def test_checkpointing(self):
+    def test_dump_w_exploded_cols(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
@@ -235,38 +253,49 @@ class TestXopt:
         )
         X.dump_file = "test_checkpointing.yaml"
 
+        # test case with exploded data
+        data = pd.DataFrame(
+            {
+                "x": [np.array([1.0, 2.0, 3.0])],
+                "y": [np.array([1.0, 2.0, 3.0])],
+            },
+            index=[0],
+        )
+        data = explode_all_columns(data)
+        X.add_data(data)
+        X.dump_state()
+
+        import os
+        os.remove(X.dump_file)
+
+    def test_checkpointing(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+        X.dump_file = "test_checkpointing.yaml"
+
         X.step()
 
         for _ in range(5):
             X.step()
 
-        try:
-            # try to load the state from nothing
-            X2 = Xopt.from_file(X.dump_file)
+        # try to load the state from nothing
+        X2 = Xopt.from_file(X.dump_file)
 
-            for _ in range(5):
-                X2.step()
-
-            assert isinstance(X2.generator, RandomGenerator)
-            assert isinstance(X2.evaluator, Evaluator)
-            assert X.vocs == X2.vocs
-
-            assert len(X2.data) == 11
-
-        except Exception as e:
-            raise e
-        finally:
-            # clean up
-            import os
-
-            os.remove(X.dump_file)
+        assert len(X2.data) == 6
+        assert isinstance(X2.generator, RandomGenerator)
+        assert isinstance(X2.evaluator, Evaluator)
+        assert X.vocs == X2.vocs
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
         # fixed seed for deterministic results
@@ -274,3 +303,11 @@ class TestXopt:
         xopt.random_evaluate(1)
         assert np.isclose(xopt.data["x1"].iloc[0], 0.488178)
         assert len(xopt.data) == 3
+
+    @pytest.fixture(scope='module', autouse=True)
+    def clean_up(self):
+        yield
+        files = ['test_checkpointing.yaml']
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)

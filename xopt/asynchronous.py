@@ -19,9 +19,6 @@ class AsynchronousXopt(Xopt):
         default=False, description="flag indicating that Xopt " "fininshed running"
     )
 
-    class Config:
-        underscore_attrs_are_private = True
-
     def submit_data(
         self,
         input_data: Union[

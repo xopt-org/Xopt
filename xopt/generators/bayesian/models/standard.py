@@ -10,20 +10,21 @@ from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
-from pydantic import Field, validator
+from pydantic import ConfigDict, Field, field_validator
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
-from xopt.pydantic import orjson_dumps
+from xopt.pydantic import decode_torch_module
+from pydantic_core.core_schema import FieldValidationInfo
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
-    name = "standard"
+    name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
     )
@@ -37,27 +38,26 @@ class StandardModelConstructor(ModelConstructor):
         [], description="list of prior mean modules that can be trained"
     )
 
-    class Config:
-        arbitrary_types_allowed = True
-        json_dumps = orjson_dumps
-        validate_assignment = True
+    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    @validator("covar_modules", "mean_modules", pre=True)
+    @field_validator("covar_modules", "mean_modules", mode='before')
     def validate_torch_modules(cls, v):
         if not isinstance(v, dict):
             raise ValueError("must be dict")
         else:
             for key, val in v.items():
                 if isinstance(val, str):
-                    if os.path.exists(val):
+                    if val.startswith('base64:'):
+                        v[key] = decode_torch_module(val)
+                    elif os.path.exists(val):
                         v[key] = torch.load(val)
 
         return v
 
-    @validator("trainable_mean_keys")
-    def validate_trainable_mean_keys(cls, v, values):
+    @field_validator("trainable_mean_keys")
+    def validate_trainable_mean_keys(cls, v, info: FieldValidationInfo):
         for name in v:
-            assert name in values["mean_modules"]
+            assert name in info.data["mean_modules"]
         return v
 
     @property

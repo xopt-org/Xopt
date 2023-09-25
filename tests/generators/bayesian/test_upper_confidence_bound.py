@@ -15,7 +15,7 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callabl
 class TestUpperConfidenceBoundGenerator:
     def test_init(self):
         ucb_gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
-        ucb_gen.json()
+        ucb_gen.model_dump_json()
 
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(

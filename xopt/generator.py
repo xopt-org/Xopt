@@ -1,9 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 import pandas as pd
-from pydantic import Field, validator
+from pydantic import ConfigDict, Field, field_validator
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -15,7 +15,6 @@ class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: pd.DataFrame = Field(None, description="generator data")
-
     supports_batch_generation: ClassVar[bool] = Field(
         default=False,
         description="flag that describes if this "
@@ -28,9 +27,11 @@ class Generator(XoptBaseModel, ABC):
         "problems",
     )
 
+    model_config = ConfigDict(validate_assignment=True)
+
     _is_done = False
 
-    @validator("data", pre=True)
+    @field_validator("data", mode='before')
     def validate_data(cls, v):
         if isinstance(v, dict):
             try:
@@ -38,15 +39,6 @@ class Generator(XoptBaseModel, ABC):
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
         return v
-
-    # @validator("vocs", pre=True)
-    # def vocs_validation(cls, v):
-    #     # do vocs first
-    #     return v
-
-    class Config:
-        validate_assignment = True
-        underscore_attrs_are_private = True
 
     def __init__(self, **kwargs):
         """

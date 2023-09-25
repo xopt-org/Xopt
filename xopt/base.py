@@ -1,12 +1,12 @@
 import json
 import logging
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 
 import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import Field, validator
+from pydantic import Field, field_validator, FieldValidationInfo, SerializeAsAny
 
 from xopt import _version
 from xopt.evaluator import Evaluator, validate_outputs
@@ -27,15 +27,14 @@ class Xopt(XoptBaseModel):
     """
 
     vocs: VOCS = Field(description="VOCS object for Xopt")
-    generator: Generator = Field(description="generator object for Xopt")
-    evaluator: Evaluator = Field(description="evaluator object for Xopt")
-
+    generator: SerializeAsAny[Generator] = Field(description="generator object for Xopt")
+    evaluator: SerializeAsAny[Evaluator] = Field(description="evaluator object for Xopt")
     strict: bool = Field(
         True,
         description="flag to indicate if exceptions raised during evaluation "
         "should stop Xopt",
     )
-    dump_file: str = Field(
+    dump_file: Optional[str] = Field(
         None, description="file to dump the results of the evaluations"
     )
     serialize_torch: bool = Field(
@@ -43,30 +42,31 @@ class Xopt(XoptBaseModel):
         description="flag to indicate that torch models should be serialized "
         "when dumping",
     )
-    max_evaluations: int = Field(None)
+    serialize_inline: bool = Field(False, description="flag to indicate if torch models"
+                                                      " should be stored inside main config file")
 
-    @validator("vocs", pre=True)
+    @field_validator("vocs", mode='before')
     def validate_vocs(cls, value):
         if isinstance(value, dict):
             value = VOCS(**value)
         return value
 
-    @validator("evaluator", pre=True)
+    @field_validator("evaluator", mode='before')
     def validate_evaluator(cls, value):
         if isinstance(value, dict):
             value = Evaluator(**value)
 
         return value
 
-    @validator("generator", pre=True)
-    def validate_generator(cls, value, values):
+    @field_validator("generator", mode='before')
+    def validate_generator(cls, value, info: FieldValidationInfo):
         if isinstance(value, dict):
             name = value.pop("name")
             generator_class = get_generator(name)
-            value = generator_class.parse_obj({**value, "vocs": values["vocs"]})
+            value = generator_class.model_validate({**value, "vocs": info.data["vocs"]})
         elif isinstance(value, str):
             generator_class = get_generator(value)
-            value = generator_class.parse_obj({"vocs": values["vocs"]})
+            value = generator_class.model_validate({"vocs": info.data["vocs"]})
 
         return value
 
@@ -182,23 +182,25 @@ class Xopt(XoptBaseModel):
         result = self.evaluate_data(random_inputs)
         return result
 
-    def dump_state(self):
+    def dump_state(self, **kwargs):
         """dump data to file"""
         if self.dump_file is not None:
-            output = json.loads(self.json(serialize_torch=self.serialize_torch))
+            output = json.loads(self.json(serialize_torch=self.serialize_torch,
+                                          serialize_inline=self.serialize_inline,
+                                          **kwargs))
             with open(self.dump_file, "w") as f:
                 yaml.dump(output, f, sort_keys=False)
             logger.debug(f"Dumped state to YAML file: {self.dump_file}")
 
     def dict(self, **kwargs) -> Dict:
         """handle custom dict generation"""
-        result = super().dict(**kwargs)
+        result = super().model_dump(**kwargs)
         result["generator"] = {"name": self.generator.name} | result["generator"]
         return result
 
     def json(self, **kwargs) -> str:
         """handle custom serialization of generators and dataframes"""
-        result = super().json(**kwargs)
+        result = super().to_json(**kwargs)
         dict_result = json.loads(result)
         dict_result["generator"] = {"name": self.generator.name} | dict_result[
             "generator"
