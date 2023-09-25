@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, List, Optional
 
 import torch
@@ -8,6 +9,8 @@ from botorch.sampling import MCSampler
 from botorch.utils import apply_constraints
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
+
+logger = logging.getLogger(__name__)
 
 
 class FeasibilityObjective(GenericMCObjective):
@@ -81,9 +84,17 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             samples = self.get_posterior_samples(posterior)
             obj = self.objective(samples, X=X)
 
-            # multiply the output of the base acquisition function by
-            # the feasibility
-            base_val = torch.nn.functional.softplus(self.base_acqusition(X), beta=10)
+            # check for large negative values of the base acquisition function
+            min_value = -1.0  # softplus(-1.0) = 4.5399e-06
+            base_acq_val = self.base_acqusition(X)
+            if any(base_acq_val < min_value):
+                logger.warning(
+                    f"The base acquisition function has values below {min_value} which may lead to numerical "
+                    f"issues with the applied softplus transformation."
+                )
+
+            # multiply the output of the base acquisition function by the feasibility
+            base_val = torch.nn.functional.softplus(base_acq_val, beta=10)
             return base_val * obj.max(dim=-1)[0].mean(dim=0)
         else:
             return self.base_acqusition(X)
