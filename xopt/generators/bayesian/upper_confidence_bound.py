@@ -19,7 +19,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation = True
-    __doc__ = """Implements Bayeisan Optimization using the Upper Confidence Bound
+    __doc__ = """Implements Bayesian Optimization using the Upper Confidence Bound
     acquisition function"""
 
     @field_validator("vocs", mode='before')
@@ -57,5 +57,5 @@ class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
     name = "time_dependent_upper_confidence_bound"
-    __doc__ = """Implements Time-Dependent Bayeisan Optimization using the Upper
+    __doc__ = """Implements Time-Dependent Bayesian Optimization using the Upper
             Confidence Bound acquisition function"""
