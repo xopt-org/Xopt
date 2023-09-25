@@ -104,6 +104,8 @@ class TestXopt:
         assert "vocs:\n  constants:\n    cnt1: 1.0\n  constraints:\n    c1:\n    - " \
                "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
 
+        print(val)
+
     def test_function_checking(self):
         def f(x, a=True):
             if a:
@@ -262,7 +264,7 @@ class TestXopt:
             index=[0],
         )
         data = explode_all_columns(data)
-        X.add_data(data)
+        X.generator.data = data
         X.dump_state()
 
         import os

@@ -217,8 +217,7 @@ class Xopt(XoptBaseModel):
         """
 
         # get dict minus data
-        config = json.loads(self.json())
-        config.pop("data")
+        config = json.loads(self.json(exclude_data=True))
         return f"""
             Xopt
 ________________________________

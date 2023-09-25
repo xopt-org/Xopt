@@ -175,9 +175,6 @@ class TestHighLevel:
 
         X2.step()
 
-        os.remove("generator_model.pt")
-        os.remove("dump.yml")
-
     def test_restart(self):
         YAML = """
                 dump_file: dump.yml
@@ -221,7 +218,7 @@ class TestHighLevel:
     @pytest.fixture(scope='module', autouse=True)
     def clean_up(self):
         yield
-        files = ['dump.yml', 'mobo_model.pt', 'dump_inline.yml']
+        files = ['dump.yml', 'mobo_model.pt', 'dump_inline.yml', "generator_model.pt"]
         for f in files:
             if os.path.exists(f):
                 os.remove(f)

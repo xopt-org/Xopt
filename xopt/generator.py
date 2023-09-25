@@ -1,3 +1,4 @@
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import ClassVar, Optional
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class Generator(XoptBaseModel, ABC):
     name: ClassVar[str] = Field(description="generator name")
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
-    data: pd.DataFrame = Field(None, description="generator data")
+    data: Optional[pd.DataFrame] = Field(None, description="generator data")
     supports_batch_generation: ClassVar[bool] = Field(
         default=False,
         description="flag that describes if this "
@@ -63,7 +64,6 @@ class Generator(XoptBaseModel, ABC):
 
         """
         pass
-
 
 def _check_vocs(vocs, multi_objective_allowed):
     if vocs.n_objectives != 1 and not multi_objective_allowed:
