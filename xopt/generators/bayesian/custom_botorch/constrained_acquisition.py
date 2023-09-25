@@ -55,7 +55,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
     def __init__(
         self,
         model: Model,
-        base_acqusition: MCAcquisitionFunction,
+        base_acquisition: MCAcquisitionFunction,
         constraints: List[Callable],
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
@@ -72,7 +72,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             posterior_transform=posterior_transform,
             X_pending=X_pending,
         )
-        self.base_acqusition = base_acqusition
+        self.base_acquisition = base_acquisition
 
     @concatenate_pending_points
     @t_batch_mode_transform()
@@ -86,7 +86,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
 
             # check for large negative values of the base acquisition function
             min_value = -1.0  # softplus(-1.0) = 4.5399e-06
-            base_acq_val = self.base_acqusition(X)
+            base_acq_val = self.base_acquisition(X)
             if any(base_acq_val < min_value):
                 logger.warning(
                     f"The base acquisition function has values below {min_value} which may lead to numerical "
@@ -97,4 +97,4 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             base_val = torch.nn.functional.softplus(base_acq_val, beta=10)
             return base_val * obj.max(dim=-1)[0].mean(dim=0)
         else:
-            return self.base_acqusition(X)
+            return self.base_acquisition(X)

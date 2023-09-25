@@ -18,7 +18,7 @@ from pydantic_core.core_schema import FieldValidationInfo
 from torch import Tensor
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
