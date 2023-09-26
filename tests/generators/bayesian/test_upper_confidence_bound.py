@@ -3,6 +3,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import torch
+import pytest
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
@@ -120,3 +121,34 @@ class TestUpperConfidenceBoundGenerator:
         gen.add_data(data)
         candidate = gen.generate(1)[0]
         assert candidate["x1"] == 3
+
+    def test_constraints_warning(self):
+        with pytest.warns(UserWarning):
+            _ = UpperConfidenceBoundGenerator(
+                vocs=TEST_VOCS_BASE,
+            )
+
+    def test_negative_acq_values_warning(self):
+        X = Xopt.from_yaml(
+            """
+            generator:
+              name: upper_confidence_bound
+
+            evaluator:
+              function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
+
+            vocs:
+              variables:
+                x1: [0, 6.28]
+              constraints:
+                c1: [LESS_THAN, 0.0]
+              objectives:
+                y1: 'MAXIMIZE'
+            """
+        )
+        _ = X.random_evaluate(10, seed=0)
+        test_x = torch.linspace(*X.vocs.variables["x1"], 10)
+        model = X.generator.train_model(X.data)
+        acq = X.generator.get_acquisition(model)
+        with pytest.warns(UserWarning):
+            _ = acq(test_x.unsqueeze(1).unsqueeze(1))
