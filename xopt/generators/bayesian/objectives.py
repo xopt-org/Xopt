@@ -5,7 +5,7 @@ from botorch.acquisition import GenericMCObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
 
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     FeasibilityObjective,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
