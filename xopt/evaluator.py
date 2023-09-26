@@ -48,7 +48,7 @@ class Evaluator(XoptBaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     def validate_all(cls, values):
         f = get_function(values["function"])
         kwargs = values.get("function_kwargs", {})

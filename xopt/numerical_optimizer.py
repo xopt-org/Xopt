@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveInt, field_validator
+from pydantic import ConfigDict, Field, field_validator, PositiveInt
 from pydantic_core.core_schema import FieldValidationInfo
 from torch import Tensor
 

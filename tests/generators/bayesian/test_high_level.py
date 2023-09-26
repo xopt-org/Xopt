@@ -125,10 +125,13 @@ class TestHighLevel:
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
         assert np.allclose(
-                X2.generator.data[X2.vocs.all_names].to_numpy(),
-                X.data[X.vocs.all_names].to_numpy()
+            X2.generator.data[X2.vocs.all_names].to_numpy(),
+            X.data[X.vocs.all_names].to_numpy(),
         )
-        assert X.generator.model.state_dict().__str__() == X2.generator.model.state_dict().__str__()
+        assert (
+            X.generator.model.state_dict().__str__()
+            == X2.generator.model.state_dict().__str__()
+        )
 
         X2.step()
 
@@ -171,7 +174,10 @@ class TestHighLevel:
             X2.generator.data[X2.vocs.all_names].to_numpy(),
             X.data[X.vocs.all_names].to_numpy(),
         )
-        assert X.generator.model.state_dict().__str__() == X2.generator.model.state_dict().__str__()
+        assert (
+            X.generator.model.state_dict().__str__()
+            == X2.generator.model.state_dict().__str__()
+        )
 
         X2.step()
 
@@ -218,10 +224,10 @@ class TestHighLevel:
 
         X2.step()
 
-    @pytest.fixture(scope='module', autouse=True)
+    @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
         yield
-        files = ['dump.yml', 'mobo_model.pt', 'dump_inline.yml']
+        files = ["dump.yml", "mobo_model.pt", "dump_inline.yml"]
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
