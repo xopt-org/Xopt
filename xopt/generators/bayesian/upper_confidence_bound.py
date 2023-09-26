@@ -1,4 +1,4 @@
-import logging
+import warnings
 
 import torch
 from botorch.acquisition import (
@@ -12,8 +12,6 @@ from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.utils import set_botorch_weights
 
-logger = logging.getLogger(__name__)
-
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
@@ -25,7 +23,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     @field_validator("vocs", mode='before')
     def validate_vocs_without_constraints(cls, v):
         if v.constraints:
-            logger.warning(
+            warnings.warn(
                 f"Using {cls.__name__} with constraints may lead to numerical issues if the base acquisition "
                 f"function has negative values."
             )
