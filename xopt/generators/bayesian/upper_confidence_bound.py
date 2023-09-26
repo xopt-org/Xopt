@@ -1,10 +1,12 @@
+import warnings
+
 import torch
 from botorch.acquisition import (
     qUpperConfidenceBound,
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
 )
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
@@ -15,8 +17,17 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation = True
-    __doc__ = """Implements Bayeisan Optimization using the Upper Confidence Bound
+    __doc__ = """Implements Bayesian Optimization using the Upper Confidence Bound
     acquisition function"""
+
+    @field_validator("vocs", mode='before')
+    def validate_vocs_without_constraints(cls, v):
+        if v.constraints:
+            warnings.warn(
+                f"Using {cls.__name__} with constraints may lead to numerical issues if the base acquisition "
+                f"function has negative values."
+            )
+        return v
 
     def _get_acquisition(self, model):
         if self.n_candidates > 1:
@@ -44,5 +55,5 @@ class TDUpperConfidenceBoundGenerator(
     TimeDependentBayesianGenerator, UpperConfidenceBoundGenerator
 ):
     name = "time_dependent_upper_confidence_bound"
-    __doc__ = """Implements Time-Dependent Bayeisan Optimization using the Upper
+    __doc__ = """Implements Time-Dependent Bayesian Optimization using the Upper
             Confidence Bound acquisition function"""
