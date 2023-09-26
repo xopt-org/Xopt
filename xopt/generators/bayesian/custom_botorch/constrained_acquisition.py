@@ -84,17 +84,19 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             samples = self.get_posterior_samples(posterior)
             obj = self.objective(samples, X=X)
 
-            # check for large negative values of the base acquisition function
-            min_value = -1.0  # softplus(-1.0) = 4.5399e-06
+            # check base acquisition function for negative values
             base_acq_val = self.base_acquisition(X)
-            if any(base_acq_val < min_value):
+            min_value = torch.min(base_acq_val)
+            if min_value < 0.0:
                 logger.warning(
-                    f"The base acquisition function has values below {min_value} which may lead to numerical "
-                    f"issues with the applied softplus transformation."
+                    "The base acquisition function has negative values. The softplus transformation for the "
+                    "constrained acquisition is omitted to avoid numerical issues."
                 )
+                base_val = base_acq_val
+            else:
+                base_val = torch.nn.functional.softplus(base_acq_val, beta=10)
 
             # multiply the output of the base acquisition function by the feasibility
-            base_val = torch.nn.functional.softplus(base_acq_val, beta=10)
             return base_val * obj.max(dim=-1)[0].mean(dim=0)
         else:
             return self.base_acquisition(X)

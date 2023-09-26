@@ -27,7 +27,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         if v.constraints:
             logger.warning(
                 f"Using {cls.__name__} with constraints may lead to numerical issues if the base acquisition "
-                f"function has large negative values."
+                f"function has negative values."
             )
         return v
 
