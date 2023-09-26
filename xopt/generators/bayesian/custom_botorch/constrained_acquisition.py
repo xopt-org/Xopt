@@ -1,4 +1,4 @@
-import logging
+import warnings
 from typing import Callable, List, Optional
 
 import torch
@@ -9,8 +9,6 @@ from botorch.sampling import MCSampler
 from botorch.utils import apply_constraints
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
-
-logger = logging.getLogger(__name__)
 
 
 class FeasibilityObjective(GenericMCObjective):
@@ -88,9 +86,9 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             base_acq_val = self.base_acquisition(X)
             min_value = torch.min(base_acq_val)
             if min_value < 0.0:
-                logger.warning(
+                warnings.warn(
                     "The base acquisition function has negative values. The softplus transformation for the "
-                    "constrained acquisition is omitted to avoid numerical issues."
+                    "constrained acquisition function is omitted to avoid numerical issues."
                 )
                 base_val = base_acq_val
             else:
