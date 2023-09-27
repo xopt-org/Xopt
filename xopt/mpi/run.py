@@ -17,20 +17,56 @@ comm = MPI.COMM_WORLD
 mpi_rank = comm.Get_rank()
 mpi_size = comm.Get_size()
 
-"""
-Xopt MPI driver
-
-Basic usage:
-
-mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+logger = logging.getLogger("xopt")
 
 
-"""
+def run_mpi(config, verbosity, asynch, logfile):
+    """
+    Xopt MPI driver
+
+    Basic usage:
+
+    mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+
+
+    """
+
+    level = "WARN"
+    if verbosity:
+        iv = verbosity
+        if iv == 1:
+            level = "WARN"
+        elif iv == 2:
+            level = "INFO"
+        elif iv >= 3:
+            level = "DEBUG"
+
+        set_handler_with_logger(level=level)
+
+    if logfile:
+        set_handler_with_logger(file=args.logfile, level=level)
+
+    # logger.info(xopt_logo)
+    # logger.info('_________________________________')
+    logger.info(f"Parallel execution with {mpi_size} workers")
+
+    if asynch:
+        logger.info("Enabling async mode")
+        X = AsynchronousXopt(**config)
+    else:
+        X = Xopt(**config)
+
+    print(X)
+    sys.stdout.flush()
+    with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
+        # with MPIPoolExecutor() as executor:
+
+        X.evaluator.executor = executor
+        X.evaluator.max_workers = mpi_size
+        X.run()
 
 
 if __name__ == "__main__":
-    logger = logging.getLogger("xopt")
-
     # ARGS = 'xopt.in'.split()
 
     parser = argparse.ArgumentParser(description="Configure xopt")
@@ -46,41 +82,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    infile = args.input_file
-    assert os.path.exists(infile), f"Input file does not exist: {infile}"
+    input_file = args.input_file
+    log_file = args.logfile
+    verbosity = args.verbose
+    asynch = args.asynch
 
-    level = "WARN"
-    if args.verbose:
-        iv = args.verbose
-        if iv == 1:
-            level = "WARN"
-        elif iv == 2:
-            level = "INFO"
-        elif iv >= 3:
-            level = "DEBUG"
+    assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
-        set_handler_with_logger(level=level)
-
-    if args.logfile:
-        set_handler_with_logger(file=args.logfile, level=level)
-
-    # logger.info(xopt_logo)
-    # logger.info('_________________________________')
-    logger.info(f"Parallel execution with {mpi_size} workers")
-
-    config = yaml.safe_load(infile)
-
-    if args.asynch:
-        logger.info("Enabling async mode")
-        X = AsynchronousXopt.model_validate(config)
-    else:
-        X = Xopt.model_validate(config)
-
-    print(X)
-    sys.stdout.flush()
-    with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
-        # with MPIPoolExecutor() as executor:
-
-        X.evaluator.executor = executor
-        X.evaluator.max_workers = mpi_size
-        X.run()
+    run_mpi(yaml.safe_load(input_file), verbosity, log_file, asynch)
