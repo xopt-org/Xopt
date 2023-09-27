@@ -1,3 +1,6 @@
+import os
+
+import pytest
 import yaml
 
 from xopt.mpi.run import run_mpi
@@ -34,6 +37,12 @@ class TestMPI:
         # run asynch mode
         run_mpi(yaml.safe_load(YAML), 0, True, None)
 
+        # test with file
+        with open("test.yml", "w") as f:
+            yaml.dump(yaml.safe_load(YAML), f)
+
+        run_mpi(yaml.safe_load(open("test.yml")), 0, False, None)
+
     def test_with_cnsga(self):
         YAML = """
         max_evaluations: 10
@@ -63,3 +72,11 @@ class TestMPI:
 
         # run asynch mode
         run_mpi(yaml.safe_load(YAML), 0, True, None)
+
+    @pytest.fixture(scope="module", autouse=True)
+    def clean_up(self):
+        yield
+        files = ["test.yml"]
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)
