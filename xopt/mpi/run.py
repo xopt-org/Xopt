@@ -89,4 +89,4 @@ if __name__ == "__main__":
 
     assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
-    run_mpi(yaml.safe_load(input_file), verbosity, log_file, asynch)
+    run_mpi(yaml.safe_load(open(input_file)), verbosity, log_file, asynch)
