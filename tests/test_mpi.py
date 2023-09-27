@@ -40,13 +40,13 @@ class TestMPI:
         generator:
             name: cnsga
             population_size: 64
-          
+
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
             function_kwargs:
                 sleep: 0
                 random_sleep: 0.1
-          
+
         vocs:
             variables:
                 x1: [0, 3.14159]
