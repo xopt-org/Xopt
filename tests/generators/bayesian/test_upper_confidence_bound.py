@@ -18,6 +18,9 @@ class TestUpperConfidenceBoundGenerator:
         ucb_gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
         ucb_gen.model_dump_json()
 
+        # test init from dict
+        UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE.dict())
+
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
