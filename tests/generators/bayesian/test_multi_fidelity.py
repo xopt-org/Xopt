@@ -98,7 +98,6 @@ class TestMultiFidelityGenerator:
 
         generator = MultiFidelityGenerator(vocs=vocs)
         generator.numerical_optimizer.n_restarts = 1
-        generator.numerical_optimizer.n_raw_samples = 1
 
         generator.add_data(data)
 

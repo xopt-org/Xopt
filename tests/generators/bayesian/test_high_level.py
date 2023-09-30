@@ -48,7 +48,6 @@ class TestHighLevel:
             numerical_optimizer:
                 name: LBFGS
                 n_restarts: 1
-                n_raw_samples: 2
 
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -74,7 +73,6 @@ class TestHighLevel:
                 numerical_optimizer:
                     name: LBFGS
                     n_restarts: 2
-                    n_raw_samples: 2
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
             vocs:
@@ -100,7 +98,6 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
-                        n_raw_samples: 2
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
                 vocs:
@@ -148,7 +145,6 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
-                        n_raw_samples: 2
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
                 vocs:
@@ -193,7 +189,6 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
-                        n_raw_samples: 2
 
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
