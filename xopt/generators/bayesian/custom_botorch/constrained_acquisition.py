@@ -1,3 +1,4 @@
+import warnings
 from typing import Callable, List, Optional
 
 import torch
@@ -52,7 +53,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
     def __init__(
         self,
         model: Model,
-        base_acqusition: MCAcquisitionFunction,
+        base_acquisition: MCAcquisitionFunction,
         constraints: List[Callable],
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
@@ -69,7 +70,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             posterior_transform=posterior_transform,
             X_pending=X_pending,
         )
-        self.base_acqusition = base_acqusition
+        self.base_acquisition = base_acquisition
 
     @concatenate_pending_points
     @t_batch_mode_transform()
@@ -81,9 +82,19 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             samples = self.get_posterior_samples(posterior)
             obj = self.objective(samples, X=X)
 
-            # multiply the output of the base acquisition function by
-            # the feasibility
-            base_val = torch.nn.functional.softplus(self.base_acqusition(X), beta=10)
+            # check base acquisition function for negative values
+            base_acq_val = self.base_acquisition(X)
+            min_value = torch.min(base_acq_val)
+            if min_value < 0.0:
+                warnings.warn(
+                    "The base acquisition function has negative values and a softplus transformation will be "
+                    "applied. This may cause numerical issues for large negative values."
+                )
+                base_val = torch.nn.functional.softplus(base_acq_val, beta=1)
+            else:
+                base_val = base_acq_val
+
+            # multiply the output of the base acquisition function by the feasibility
             return base_val * obj.max(dim=-1)[0].mean(dim=0)
         else:
-            return self.base_acqusition(X)
+            return self.base_acquisition(X)

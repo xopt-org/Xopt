@@ -11,7 +11,7 @@ from botorch.acquisition import (
 )
 from pydantic import Field, field_validator
 
-from xopt.generators.bayesian.custom_botorch.constrained_acqusition import (
+from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     ConstrainedMCAcquisitionFunction,
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
@@ -33,7 +33,7 @@ class MultiFidelityGenerator(MOBOGenerator):
     supports_multi_objective = True
     supports_batch_generation = True
 
-    __doc__ = """Implements Multi-fidelity Bayeisan optimizationn
+    __doc__ = """Implements Multi-fidelity Bayesian optimization
         Assumes a fidelity parameter [0,1]
         """
 
