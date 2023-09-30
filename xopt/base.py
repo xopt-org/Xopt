@@ -1,13 +1,18 @@
 import json
 import logging
-from typing import Dict, List, Optional, Union, Any
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import Field, field_validator, FieldValidationInfo, SerializeAsAny, \
-    ValidationError, model_validator
+from pydantic import (
+    Field,
+    field_validator,
+    FieldValidationInfo,
+    model_validator,
+    SerializeAsAny,
+)
 
 from xopt import _version
 from xopt.evaluator import Evaluator, validate_outputs
@@ -37,7 +42,7 @@ class Xopt(XoptBaseModel):
     strict: bool = Field(
         True,
         description="flag to indicate if exceptions raised during evaluation "
-                    "should stop Xopt",
+        "should stop Xopt",
     )
     dump_file: Optional[str] = Field(
         None, description="file to dump the results of the evaluations"
@@ -49,12 +54,12 @@ class Xopt(XoptBaseModel):
     serialize_torch: bool = Field(
         False,
         description="flag to indicate that torch models should be serialized "
-                    "when dumping",
+        "when dumping",
     )
     serialize_inline: bool = Field(
         False,
         description="flag to indicate if torch models"
-                    " should be stored inside main config file",
+        " should be stored inside main config file",
     )
 
     @model_validator(mode="before")
@@ -70,11 +75,14 @@ class Xopt(XoptBaseModel):
                 name = data["generator"].pop("name")
                 generator_class = get_generator(name)
                 data["generator"] = generator_class.model_validate(
-                    {**data["generator"], "vocs": data["vocs"]})
+                    {**data["generator"], "vocs": data["vocs"]}
+                )
             elif isinstance(data["generator"], str):
                 generator_class = get_generator(data["generator"])
 
-                data["generator"] = generator_class.model_validate({"vocs": data["vocs"]})
+                data["generator"] = generator_class.model_validate(
+                    {"vocs": data["vocs"]}
+                )
 
         return data
 
@@ -162,13 +170,13 @@ class Xopt(XoptBaseModel):
             self.step()
 
     def evaluate_data(
-            self,
-            input_data: Union[
-                pd.DataFrame,
-                List[Dict[str, float]],
-                Dict[str, List[float]],
-                Dict[str, float],
-            ],
+        self,
+        input_data: Union[
+            pd.DataFrame,
+            List[Dict[str, float]],
+            Dict[str, List[float]],
+            Dict[str, float],
+        ],
     ) -> pd.DataFrame:
         """
         Evaluate data using the evaluator and wait for results.

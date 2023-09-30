@@ -2,7 +2,6 @@ from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.cnsga import CNSGAGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-from xopt.resources.testing import TEST_YAML
 
 
 def test_cnsga():
@@ -23,14 +22,14 @@ def test_cnsga_from_yaml():
     generator:
         name: cnsga
         population_size: 64
-        population_file: null  # Bad
-      
+        population_file: null
+
     evaluator:
         function: xopt.resources.test_functions.tnk.evaluate_TNK
         function_kwargs:
             sleep: 0
             random_sleep: 0.1
-      
+
     vocs:
         variables:
             x1: [0, 3.14159]

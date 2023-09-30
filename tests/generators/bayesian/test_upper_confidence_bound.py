@@ -2,8 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-import torch
 import pytest
+import torch
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
