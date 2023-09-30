@@ -115,7 +115,6 @@ class TestBaxGenerator:
             vocs=test_vocs,
             algorithm=alg,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.data = TEST_VOCS_DATA
 
@@ -128,7 +127,6 @@ class TestBaxGenerator:
             vocs=test_vocs,
             algorithm=alg,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.data = TEST_VOCS_DATA
 
@@ -143,7 +141,6 @@ class TestBaxGenerator:
         )
 
         if torch.cuda.is_available():
-            gen.numerical_optimizer.n_raw_samples = 1
             gen.numerical_optimizer.n_restarts = 1
             gen.data = TEST_VOCS_DATA
 
@@ -158,7 +155,6 @@ class TestBaxGenerator:
             vocs=TEST_VOCS_BASE,
             algorithm=alg,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
 
         xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
@@ -174,7 +170,6 @@ class TestBaxGenerator:
         gen = BaxGenerator(
             vocs=TEST_VOCS_BASE, algorithm=alg, algorithm_results_file="test"
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
 
         xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
