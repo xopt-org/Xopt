@@ -30,10 +30,11 @@ class CNSGAGenerator(Generator):
     mutation_probability: confloat(ge=0, le=1) = Field(
         1.0, description="Mutation probability"
     )
-    population_file: str = Field(
+    population_file: Optional[str] = Field(
         None, description="Population file to load (CSV format)"
     )
-    output_path: str = Field(None, description="Output path for population files")
+    output_path: Optional[str] = Field(None, description="Output path for population "
+                                                      "files")
     _children: List[Dict] = PrivateAttr([])
     _offspring: Optional[pd.DataFrame] = PrivateAttr(None)
     population: Optional[pd.DataFrame] = Field(None)
@@ -81,21 +82,22 @@ class CNSGAGenerator(Generator):
         return inputs.to_dict(orient="records")
 
     def add_data(self, new_data: pd.DataFrame):
-        self._offspring = pd.concat([self._offspring, new_data])
+        if new_data is not None:
+            self._offspring = pd.concat([self._offspring, new_data])
 
-        # Next generation
-        if len(self._offspring) >= self.n_pop:
-            candidates = pd.concat([self.population, self._offspring])
-            self.population = cnsga_select(
-                candidates, self.n_pop, self.vocs, self._toolbox
-            )
+            # Next generation
+            if len(self._offspring) >= self.n_pop:
+                candidates = pd.concat([self.population, self._offspring])
+                self.population = cnsga_select(
+                    candidates, self.n_pop, self.vocs, self._toolbox
+                )
 
-            if self.output_path is not None:
-                self.write_offspring()
-                self.write_population()
+                if self.output_path is not None:
+                    self.write_offspring()
+                    self.write_population()
 
-            self._children = []  # reset children
-            self._offspring = None  # reset offspring
+                self._children = []  # reset children
+                self._offspring = None  # reset offspring
 
     def generate(self, n_candidates) -> list[dict]:
         """

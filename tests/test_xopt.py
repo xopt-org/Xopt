@@ -7,6 +7,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
+
 from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.errors import XoptError
@@ -43,6 +45,8 @@ class TestXopt:
 
         # init with yaml
         YAML = """
+        dump_file: null
+        data: null
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
             function_kwargs:
@@ -73,6 +77,32 @@ class TestXopt:
 
         with pytest.raises(ValueError):
             Xopt(YAML, my_kwarg=1)
+
+    def test_bad_vocs(self):
+        # test with bad vocs
+        YAML = """
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+
+        generator:
+            name: random
+
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: dummy_constant}
+            bad_val: 5
+
+        """
+        with pytest.raises(ValidationError):
+            Xopt(YAML)
 
     def test_evaluate_data(self):
         evaluator = Evaluator(function=xtest_callable)
