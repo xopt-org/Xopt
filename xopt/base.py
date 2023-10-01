@@ -203,7 +203,8 @@ class Xopt(XoptBaseModel):
         self.add_data(new_data)
 
         # dump data to file if specified
-        self.dump_state()
+        if self.dump_file is not None:
+            self.dump()
 
         return new_data
 
@@ -239,19 +240,29 @@ class Xopt(XoptBaseModel):
         result = self.evaluate_data(random_inputs)
         return result
 
-    def dump_state(self, **kwargs):
-        """dump data to file"""
-        if self.dump_file is not None:
-            output = json.loads(
-                self.json(
-                    serialize_torch=self.serialize_torch,
-                    serialize_inline=self.serialize_inline,
-                    **kwargs,
-                )
+    def yaml(self, **kwargs):
+        """serialize first then dump to yaml string"""
+        output = json.loads(
+            self.json(
+                serialize_torch=self.serialize_torch,
+                serialize_inline=self.serialize_inline,
+                **kwargs,
             )
-            with open(self.dump_file, "w") as f:
-                yaml.dump(output, f)
-            logger.debug(f"Dumped state to YAML file: {self.dump_file}")
+        )
+        return yaml.dump(output)
+
+    def dump(self, file: str = None, **kwargs):
+        """dump data to file"""
+        fname = file if file is not None else self.dump_file
+
+        if fname is None:
+            raise ValueError(
+                "no dump file specified via argument or in `dump_file` attribute"
+            )
+        else:
+            with open(fname, "w") as f:
+                f.write(self.yaml(**kwargs))
+            logger.debug(f"Dumped state to YAML file: {fname}")
 
     def dict(self, **kwargs) -> Dict:
         """handle custom dict generation"""

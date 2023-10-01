@@ -304,7 +304,7 @@ class TestXopt:
         )
         data = explode_all_columns(data)
         X.add_data(data)
-        X.dump_state()
+        X.dump()
 
         import os
 

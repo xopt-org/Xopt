@@ -8,6 +8,7 @@ from mpi4py import MPI
 from mpi4py.futures import MPICommExecutor
 
 from xopt import AsynchronousXopt
+
 # from mpi4py.futures import MPIPoolExecutor
 from xopt.base import Xopt
 from xopt.log import set_handler_with_logger
@@ -75,7 +76,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--verbose", "-v", action="count", help="Show more log output")
     parser.add_argument(
-        "--asynch", "-a", action="store_true", help="Use asynchronous execution"
+        "--async", "-a", action="store_true", help="Use asynchronous execution"
     )
 
     args = parser.parse_args()
