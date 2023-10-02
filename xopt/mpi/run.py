@@ -20,7 +20,7 @@ mpi_size = comm.Get_size()
 logger = logging.getLogger("xopt")
 
 
-def run_mpi(config, verbosity, asynch, logfile):
+def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
     """
     Xopt MPI driver
 
@@ -50,7 +50,7 @@ def run_mpi(config, verbosity, asynch, logfile):
     # logger.info('_________________________________')
     logger.info(f"Parallel execution with {mpi_size} workers")
 
-    if asynch:
+    if asynchronous:
         logger.info("Enabling async mode")
         X = AsynchronousXopt(**config)
     else:
@@ -76,17 +76,20 @@ if __name__ == "__main__":
 
     parser.add_argument("--verbose", "-v", action="count", help="Show more log output")
     parser.add_argument(
-        "--asynchronous", "-a", action="store_true", help="Use asynchronous execution"
+        "--asynchronous", "-a", action="store_true", help="Use asynchronous execution",
+        default=True
     )
 
     args = parser.parse_args()
     print(args)
 
     input_file = args.input_file
-    log_file = args.logfile
+    logfile = args.logfile
     verbosity = args.verbose
-    asynch = args.asynch
+    asynchronous = args.asynchronous
 
     assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
-    run_mpi(yaml.safe_load(open(input_file)), verbosity, log_file, asynch)
+    config = yaml.safe_load(open(input_file))
+    
+    run_mpi(config, verbosity=verbosity, logfile=logfile, asynchronous=asynchronous)
