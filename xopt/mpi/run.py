@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--verbose", "-v", action="count", help="Show more log output")
     parser.add_argument(
-        "--async", "-a", action="store_true", help="Use asynchronous execution"
+        "--asynchronous", "-a", action="store_true", help="Use asynchronous execution"
     )
 
     args = parser.parse_args()
