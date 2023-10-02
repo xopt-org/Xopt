@@ -76,8 +76,11 @@ if __name__ == "__main__":
 
     parser.add_argument("--verbose", "-v", action="count", help="Show more log output")
     parser.add_argument(
-        "--asynchronous", "-a", action="store_true", help="Use asynchronous execution",
-        default=True
+        "--asynchronous",
+        "-a",
+        action="store_true",
+        help="Use asynchronous execution",
+        default=True,
     )
 
     args = parser.parse_args()
@@ -91,5 +94,5 @@ if __name__ == "__main__":
     assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
     config = yaml.safe_load(open(input_file))
-    
+
     run_mpi(config, verbosity=verbosity, logfile=logfile, asynchronous=asynchronous)
