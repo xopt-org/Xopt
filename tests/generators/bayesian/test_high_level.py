@@ -1,7 +1,9 @@
+import os
 from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 import yaml
 
@@ -46,7 +48,6 @@ class TestHighLevel:
             numerical_optimizer:
                 name: LBFGS
                 n_restarts: 1
-                n_raw_samples: 2
 
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -72,7 +73,6 @@ class TestHighLevel:
                 numerical_optimizer:
                     name: LBFGS
                     n_restarts: 2
-                    n_raw_samples: 2
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
             vocs:
@@ -86,6 +86,54 @@ class TestHighLevel:
         X.random_evaluate(3)  # generates random data
         X.step()  # actually evaluates mobo
 
+    def test_restart_torch_inline_serialization(self):
+        YAML = """
+                dump_file: dump_inline.yml
+                serialize_torch: True
+                serialize_inline: True
+
+                generator:
+                    name: mobo
+                    reference_point: {y1: 1.5, y2: 1.5}
+                    numerical_optimizer:
+                        name: LBFGS
+                        n_restarts: 1
+                evaluator:
+                    function: xopt.resources.test_functions.tnk.evaluate_TNK
+                vocs:
+                    variables:
+                        x1: [0, 3.14159]
+                        x2: [0, 3.14159]
+                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                    constraints: {}
+                """
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        X.step()
+
+        out = X.json()
+        assert len(out) > 500
+
+        assert not os.path.exists("generator_model.pt")
+        config = yaml.safe_load(open("dump_inline.yml"))
+
+        X2 = Xopt.model_validate(config)
+
+        assert X2.generator.vocs.variable_names == ["x1", "x2"]
+        assert X2.generator.numerical_optimizer.n_restarts == 1
+        assert np.allclose(
+            X2.generator.data[X2.vocs.all_names].to_numpy(),
+            X.data[X.vocs.all_names].to_numpy(),
+        )
+        assert (
+            X.generator.model.state_dict().__str__()
+            == X2.generator.model.state_dict().__str__()
+        )
+
+        X2.step()
+
+        os.remove("dump_inline.yml")
+
     def test_restart_torch_serialization(self):
         YAML = """
                 dump_file: dump.yml
@@ -97,11 +145,8 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
-                        n_raw_samples: 2
-
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
-
                 vocs:
                     variables:
                         x1: [0, 3.14159]
@@ -117,18 +162,20 @@ class TestHighLevel:
         assert config["generator"]["model"] == "generator_model.pt"
 
         # test restart
-        X2 = Xopt.parse_obj(config)
+        X2 = Xopt.model_validate(config)
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
         assert np.allclose(
             X2.generator.data[X2.vocs.all_names].to_numpy(),
-            X.data[X.vocs.all_names].to_numpy()
+            X.data[X.vocs.all_names].to_numpy(),
+        )
+        assert (
+            X.generator.model.state_dict().__str__()
+            == X2.generator.model.state_dict().__str__()
         )
 
         X2.step()
-
-        import os
 
         os.remove("generator_model.pt")
         os.remove("dump.yml")
@@ -142,7 +189,6 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
-                        n_raw_samples: 2
 
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -159,19 +205,24 @@ class TestHighLevel:
         X.step()
 
         config = yaml.safe_load(open("dump.yml"))
+        os.remove("dump.yml")
 
         # test restart
-        X2 = Xopt.parse_obj(config)
+        X2 = Xopt.model_validate(config)
 
         assert X2.generator.vocs.variable_names == ["x1", "x2"]
         assert X2.generator.numerical_optimizer.n_restarts == 1
         assert np.allclose(
             X2.generator.data[X2.vocs.all_names].to_numpy(),
-            X.data[X.vocs.all_names].to_numpy()
+            X.data[X.vocs.all_names].to_numpy(),
         )
 
         X2.step()
 
-        import os
-
-        os.remove("dump.yml")
+    @pytest.fixture(scope="module", autouse=True)
+    def clean_up(self):
+        yield
+        files = ["dump.yml", "mobo_model.pt", "dump_inline.yml"]
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)

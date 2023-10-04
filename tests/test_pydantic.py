@@ -1,8 +1,10 @@
 import json
 from functools import partial
 from types import FunctionType, MethodType
+from typing import Optional, Union
 
 import pytest
+from pydantic import BaseModel, ConfigDict, Field, field_validator, SerializeAsAny
 from pydantic.json import custom_pydantic_encoder
 
 from xopt.pydantic import (
@@ -314,4 +316,61 @@ class TestObjLoader:
 
         json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
         serialized = json.dumps(loader, default=json_encoder)
-        self.misc_class_loader_type.parse_raw(serialized)
+
+        # self.misc_class_loader_type.parse_raw(serialized)
+        # This works in 2.2+ as it should
+        self.misc_class_loader_type.model_validate_json(serialized)
+
+
+# tests to verify v2 behavior remains same (for things that changed from v1)
+
+
+class DummyObj:
+    pass
+
+
+class Dummy(BaseModel):
+    default_obj: DummyObj = Field(DummyObj())
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("default_obj")
+    def validate_obj(cls, value):
+        assert isinstance(value, DummyObj)
+        return value
+
+
+# Test subclass model resolution order
+# we want behavior like v1 had https://github.com/pydantic/pydantic/issues/1932
+class Parent(BaseModel):
+    a1: str = "a1"
+
+
+class Child1(Parent):
+    name: str = "child1"
+
+
+class Child2(Parent):
+    name: str = "child2"
+
+
+class Container(BaseModel):
+    obj: SerializeAsAny[Optional[Parent]] = Field(None)
+    obj2: SerializeAsAny[Optional[Union[Child1, Child2, Parent]]] = Field(None)
+
+
+class TestPydanticInitialization:
+    def test_object_init(self):
+        d = Dummy()
+        assert isinstance(d.default_obj, DummyObj)
+
+    def test_subclass_init(self):
+        c1 = Container()
+        print("c1", c1.model_dump())
+        c2 = Container(obj=Child2())
+        print("c2", c2.model_dump())
+        # doesn't resolve child1
+        c3 = Container(**{"obj": {"a1": "a1", "name": "child1"}})
+        print(type(c3.obj), type(c3.obj2), c3)
+        # works
+        c4 = Container(**{"obj2": {"a1": "a1", "name": "child1"}})
+        print(type(c4.obj), type(c4.obj2), c4)

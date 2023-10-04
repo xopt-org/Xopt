@@ -127,10 +127,7 @@ class TestModelConstructor:
         # test custom covar module
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
         constructor = StandardModelConstructor(covar_modules=custom_covar)
-        constructor.json(serialize_torch=True)
-
-        import os
-
+        constructor.to_json(serialize_torch=True)
         os.remove("covar_modules_y1.pt")
 
     def test_model_saving(self):
@@ -143,9 +140,9 @@ class TestModelConstructor:
         # specify a periodic kernel for each output (objectives and constraints)
         covar_modules = {"y": ScaleKernel(PeriodicKernel())}
 
-        model_constructor = StandardModelConstructor(covar_modules=covar_modules)
+        gp_constructor = StandardModelConstructor(covar_modules=covar_modules)
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+            vocs=my_vocs, gp_constructor=gp_constructor
         )
 
         # define training data to pass to the generator
@@ -160,7 +157,8 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.json(serialize_torch=True))
+        gen_dump = generator.to_json(serialize_torch=True)
+        options = json.loads(gen_dump)
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -170,17 +168,20 @@ class TestModelConstructor:
             saved_options_dict = yaml.safe_load(f)
 
         # create generator from dict
-        saved_options_dict["vocs"] = my_vocs.dict()
-        loaded_generator = ExpectedImprovementGenerator.parse_raw(
-            json.dumps(saved_options_dict)
-        )
+        saved_options_dict["vocs"] = my_vocs.model_dump()
+        dump = json.dumps(saved_options_dict)
+
+        reloaded_json = json.loads(dump)
+        ExpectedImprovementGenerator.model_validate(reloaded_json)
+
+        loaded_generator = ExpectedImprovementGenerator.model_validate_json(dump)
         assert isinstance(
-            loaded_generator.model_constructor.covar_modules["y"], ScaleKernel
+            loaded_generator.gp_constructor.covar_modules["y"], ScaleKernel
         )
 
         # clean up
         os.remove("test.yml")
-        os.remove(options["model_constructor"]["covar_modules"]["y"])
+        os.remove(options["gp_constructor"]["covar_modules"]["y"])
 
         # specify a periodic kernel for each output (objectives and constraints)
         covar_modules = {
@@ -188,9 +189,9 @@ class TestModelConstructor:
             "c": ScaleKernel(PeriodicKernel()),
         }
 
-        model_constructor = StandardModelConstructor(covar_modules=covar_modules)
+        gp_constructor = StandardModelConstructor(covar_modules=covar_modules)
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+            vocs=my_vocs, gp_constructor=gp_constructor
         )
 
         # define training data to pass to the generator
@@ -205,7 +206,7 @@ class TestModelConstructor:
         generator.add_data(training_data)
 
         # save generator config to file
-        options = json.loads(generator.json(serialize_torch=True))
+        options = json.loads(generator.to_json(serialize_torch=True))
 
         with open("test.yml", "w") as f:
             yaml.dump(options, f)
@@ -215,17 +216,17 @@ class TestModelConstructor:
             saved_options = yaml.safe_load(f)
 
         # create generator from file
-        saved_options["vocs"] = my_vocs.dict()
-        loaded_generator = ExpectedImprovementGenerator.parse_raw(
+        saved_options["vocs"] = my_vocs.model_dump()
+        loaded_generator = ExpectedImprovementGenerator.model_validate_json(
             json.dumps(saved_options)
         )
-        for name, val in loaded_generator.model_constructor.covar_modules.items():
+        for name, val in loaded_generator.gp_constructor.covar_modules.items():
             assert isinstance(val, ScaleKernel)
 
         # clean up
         os.remove("test.yml")
         for name in my_vocs.output_names:
-            os.remove(options["model_constructor"]["covar_modules"][name])
+            os.remove(options["gp_constructor"]["covar_modules"][name])
 
     def test_train_model(self):
         # tests to make sure that models created by StandardModelConstructor class
@@ -260,8 +261,8 @@ class TestModelConstructor:
             test_covar2 = deepcopy(test_covar)
 
             # train model with StandardModelConstructor
-            model_constructor = StandardModelConstructor(covar_modules=test_covar1)
-            constructed_model = model_constructor.build_model_from_vocs(
+            gp_constructor = StandardModelConstructor(covar_modules=test_covar1)
+            constructed_model = gp_constructor.build_model_from_vocs(
                 test_vocs, test_data
             ).models[0]
 
@@ -347,11 +348,11 @@ class TestModelConstructor:
 
         # prepare options for Xopt generator
         covar_module_dict = {"y": scaled_covar_module}
-        model_constructor = StandardModelConstructor(covar_modules=covar_module_dict)
+        gp_constructor = StandardModelConstructor(covar_modules=covar_module_dict)
 
         # construct BAX generator
         generator = ExpectedImprovementGenerator(
-            vocs=vocs, model_constructor=model_constructor
+            vocs=vocs, gp_constructor=gp_constructor
         )
 
         # define test points
@@ -388,7 +389,7 @@ class TestModelConstructor:
 
         # construct generator with all points
         generator = ExpectedImprovementGenerator(
-            vocs=vocs, model_constructor=model_constructor
+            vocs=vocs, gp_constructor=gp_constructor
         )
 
         # create  input points
@@ -420,13 +421,13 @@ class TestModelConstructor:
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        model_constructor = StandardModelConstructor()
-        model = model_constructor.build_model_from_vocs(test_vocs, test_data)
+        gp_constructor = StandardModelConstructor()
+        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
         assert isinstance(model.models[0], SingleTaskGP)
 
         # test with variance data
         test_data["y1_var"] = test_data["y1"] * 0.1
-        model = model_constructor.build_model_from_vocs(test_vocs, test_data)
+        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
 
         # validate against botorch HeteroskedasticSingleTaskGP
         train_x, train_y, train_yvar = get_training_data(
@@ -455,3 +456,11 @@ class TestModelConstructor:
         assert torch.allclose(
             posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
         )
+
+    @pytest.fixture(autouse=True)
+    def clean_up(self):
+        yield
+        files = ["test.yml", "covar_modules_y.pt", "covar_modules_c.pt"]
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)

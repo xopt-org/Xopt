@@ -14,13 +14,12 @@ from xopt.vocs import ObjectiveEnum, VOCS
 class TestExpectedImprovement:
     def test_init(self):
         ei_gen = ExpectedImprovementGenerator(vocs=TEST_VOCS_BASE)
-        ei_gen.json()
+        ei_gen.model_dump_json()
 
     def test_generate(self):
         gen = ExpectedImprovementGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
@@ -38,7 +37,6 @@ class TestExpectedImprovement:
         gen = ExpectedImprovementGenerator(
             vocs=test_vocs,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
@@ -51,7 +49,6 @@ class TestExpectedImprovement:
         gen = ExpectedImprovementGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
 

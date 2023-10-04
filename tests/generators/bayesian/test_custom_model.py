@@ -25,9 +25,9 @@ class TestCustomConstructor(TestCase):
             "c": ScaleKernel(PeriodicKernel()),
         }
 
-        model_constructor = StandardModelConstructor(covar_modules=covar_module)
+        gp_constructor = StandardModelConstructor(covar_modules=covar_module)
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+            vocs=my_vocs, gp_constructor=gp_constructor
         )
 
         # define training data to pass to the generator
@@ -52,9 +52,9 @@ class TestCustomConstructor(TestCase):
         # specify a periodic kernel for each output (objectives and constraints)
         covar_module = {"y1": ScaleKernel(PeriodicKernel())}
 
-        model_constructor = StandardModelConstructor(covar_modules=covar_module)
+        gp_constructor = StandardModelConstructor(covar_modules=covar_module)
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+            vocs=my_vocs, gp_constructor=gp_constructor
         )
 
         # define training data to pass to the generator
@@ -80,11 +80,9 @@ class TestCustomConstructor(TestCase):
             def forward(self, X):
                 return X.squeeze(dim=-1) ** 2
 
-        model_constructor = StandardModelConstructor(
-            mean_modules={"c": ConstraintPrior()}
-        )
+        gp_constructor = StandardModelConstructor(mean_modules={"c": ConstraintPrior()})
         generator = ExpectedImprovementGenerator(
-            vocs=my_vocs, model_constructor=model_constructor
+            vocs=my_vocs, gp_constructor=gp_constructor
         )
 
         # define training data to pass to the generator
@@ -117,12 +115,12 @@ class TestCustomConstructor(TestCase):
                 trainable_mean_keys = ["y"]
             else:
                 trainable_mean_keys = []
-            model_constructor = StandardModelConstructor(
+            gp_constructor = StandardModelConstructor(
                 mean_modules={"y": ConstantMean()},
                 trainable_mean_keys=trainable_mean_keys,
             )
             generator = ExpectedImprovementGenerator(
-                vocs=my_vocs, model_constructor=model_constructor
+                vocs=my_vocs, gp_constructor=gp_constructor
             )
 
             # define training data to pass to the generator
