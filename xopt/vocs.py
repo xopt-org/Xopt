@@ -61,7 +61,9 @@ class VOCS(XoptBaseModel):
         description="observation names tracked alongside objectives and constraints",
     )
 
-    model_config = ConfigDict(validate_assignment=True, use_enum_values=True)
+    model_config = ConfigDict(
+        validate_assignment=True, use_enum_values=True, extra="forbid"
+    )
 
     @classmethod
     def from_yaml(cls, yaml_text):

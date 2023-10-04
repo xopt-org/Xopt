@@ -428,8 +428,7 @@ class RCDSGenerator(Generator):
     _rcds: RCDS = None
     _generator = None
 
-    model_config = ConfigDict(arbitrary_types_allowed=True,
-                              validate_assignment=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -80,9 +80,7 @@ class TestCustomConstructor(TestCase):
             def forward(self, X):
                 return X.squeeze(dim=-1) ** 2
 
-        gp_constructor = StandardModelConstructor(
-            mean_modules={"c": ConstraintPrior()}
-        )
+        gp_constructor = StandardModelConstructor(mean_modules={"c": ConstraintPrior()})
         generator = ExpectedImprovementGenerator(
             vocs=my_vocs, gp_constructor=gp_constructor
         )
