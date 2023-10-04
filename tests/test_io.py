@@ -16,7 +16,7 @@ class Test_IO:
         generator = RandomGenerator(vocs=TEST_VOCS_BASE)
         X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
         print(X.model_dump_json())
-        print(X.to_json(base_key='bk'))
+        print(X.to_json(base_key="bk"))
 
     def test_state_to_dict(self):
         evaluator = Evaluator(function=dummy)

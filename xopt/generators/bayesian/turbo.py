@@ -5,8 +5,9 @@ from typing import Dict, Union
 
 import torch
 from botorch.models import ModelListGP
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 from pandas import DataFrame
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
+
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 

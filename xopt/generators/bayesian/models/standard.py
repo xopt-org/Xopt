@@ -11,13 +11,13 @@ from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 from pydantic import ConfigDict, Field, field_validator
+from pydantic_core.core_schema import FieldValidationInfo
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_input_transform, get_training_data
 from xopt.pydantic import decode_torch_module
-from pydantic_core.core_schema import FieldValidationInfo
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
@@ -40,14 +40,14 @@ class StandardModelConstructor(ModelConstructor):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    @field_validator("covar_modules", "mean_modules", mode='before')
+    @field_validator("covar_modules", "mean_modules", mode="before")
     def validate_torch_modules(cls, v):
         if not isinstance(v, dict):
             raise ValueError("must be dict")
         else:
             for key, val in v.items():
                 if isinstance(val, str):
-                    if val.startswith('base64:'):
+                    if val.startswith("base64:"):
                         v[key] = decode_torch_module(val)
                     elif os.path.exists(val):
                         v[key] = torch.load(val)

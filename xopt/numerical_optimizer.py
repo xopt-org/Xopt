@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveInt, field_validator
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic import ConfigDict, Field, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -22,24 +21,12 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
 class LBFGSOptimizer(NumericalOptimizer):
     name: str = Field("LBFGS", frozen=True)
-    n_raw_samples: PositiveInt = Field(
-        20,
-        description="number of raw samples used to seed optimization",
-    )
     n_restarts: PositiveInt = Field(
         20, description="number of restarts during acquistion function optimization"
     )
     max_iter: PositiveInt = Field(2000)
 
     model_config = ConfigDict(validate_assignment=True)
-
-    @field_validator("n_restarts")
-    def validate_num_restarts(cls, v: int, info: FieldValidationInfo):
-        if v > info.data["n_raw_samples"]:
-            raise ValueError(
-                "num_restarts cannot be greater than number of " "raw_samples"
-            )
-        return v
 
     def optimize(self, function, bounds, n_candidates=1):
         assert isinstance(bounds, Tensor)
@@ -49,7 +36,7 @@ class LBFGSOptimizer(NumericalOptimizer):
             acq_function=function,
             bounds=bounds,
             q=n_candidates,
-            raw_samples=self.n_raw_samples,
+            raw_samples=self.n_restarts,
             num_restarts=self.n_restarts,
             options={"maxiter": self.max_iter},
         )

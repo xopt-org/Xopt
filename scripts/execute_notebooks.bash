@@ -2,7 +2,7 @@
 
 NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
 
-SKIP="parallel" 
+SKIP="Xparallel" 
 
 echo $NOTEBOOKS
 
