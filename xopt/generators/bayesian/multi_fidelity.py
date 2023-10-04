@@ -23,9 +23,7 @@ logger = logging.getLogger()
 
 class MultiFidelityGenerator(MOBOGenerator):
     name = "multi_fidelity"
-    fidelity_parameter: Literal["s"] = Field(
-        "s", description="fidelity parameter name"
-    )
+    fidelity_parameter: Literal["s"] = Field("s", description="fidelity parameter name")
     cost_function: Callable = Field(
         lambda x: x + 1.0,
         description="callable function that describes the cost "
@@ -39,7 +37,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         Assumes a fidelity parameter [0,1]
         """
 
-    @field_validator("vocs", mode='before')
+    @field_validator("vocs", mode="before")
     def validate_vocs(cls, v: VOCS):
         v.variables["s"] = [0, 1]
         v.objectives["s"] = ObjectiveEnum("MAXIMIZE")

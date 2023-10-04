@@ -17,7 +17,7 @@ from xopt.utils import (
 
 
 class MockBaseModel(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     device: torch.device
 

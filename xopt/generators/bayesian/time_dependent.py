@@ -5,7 +5,7 @@ from abc import ABC
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from pydantic import Field, PositiveFloat, field_validator
+from pydantic import Field, field_validator, PositiveFloat
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
@@ -24,7 +24,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         description="constructor used to generate model",
     )
 
-    @field_validator("gp_constructor", mode='before')
+    @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(cls, value):
         constructor_dict = {"time_dependent": TimeDependentModelConstructor}
         if value is None:
