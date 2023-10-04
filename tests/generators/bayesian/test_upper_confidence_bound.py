@@ -2,8 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-import torch
 import pytest
+import torch
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
@@ -25,7 +25,6 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
@@ -47,7 +46,6 @@ class TestUpperConfidenceBoundGenerator:
 
         if torch.cuda.is_available():
             gen.use_cuda = True
-            gen.numerical_optimizer.n_raw_samples = 1
             gen.numerical_optimizer.n_restarts = 1
             gen.n_monte_carlo_samples = 1
             gen.data = TEST_VOCS_DATA
@@ -61,7 +59,6 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=test_vocs,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
@@ -74,7 +71,6 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
 

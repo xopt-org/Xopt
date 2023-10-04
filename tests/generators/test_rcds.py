@@ -10,10 +10,10 @@ from xopt.resources.testing import TEST_VOCS_BASE
 def f_RCDS_minimize(input_dict):
     p = []
     for i in range(2):
-        p.append(input_dict[f'p{i}'])
+        p.append(input_dict[f"p{i}"])
 
     obj = np.linalg.norm(p)
-    outcome_dict = {'f': obj}
+    outcome_dict = {"f": obj}
 
     return outcome_dict
 

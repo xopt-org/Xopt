@@ -13,9 +13,10 @@ from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, SerializeAsAny, field_validator
+from pydantic import Field, field_validator, SerializeAsAny
 from pydantic_core.core_schema import FieldValidationInfo
 from torch import Tensor
+
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -80,18 +81,18 @@ class BayesianGenerator(Generator, ABC):
     )
     n_candidates: int = 1
 
-    @field_validator("model",  mode='before')
+    @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
         if isinstance(v, str):
-            if v.startswith('base64:'):
+            if v.startswith("base64:"):
                 v = decode_torch_module(v)
             elif os.path.exists(v):
                 v = torch.load(v)
         return v
 
-    @field_validator("gp_constructor", mode='before')
+    @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(cls, value):
-        print(f'Verifying model {value}')
+        print(f"Verifying model {value}")
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
@@ -111,7 +112,7 @@ class BayesianGenerator(Generator, ABC):
 
         return value
 
-    @field_validator("numerical_optimizer", mode='before')
+    @field_validator("numerical_optimizer", mode="before")
     def validate_numerical_optimizer(cls, value):
         optimizer_dict = {"grid": GridOptimizer, "LBFGS": LBFGSOptimizer}
         if value is None:
@@ -131,7 +132,7 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError(f"{value} not found")
         return value
 
-    @field_validator("turbo_controller", mode='before')
+    @field_validator("turbo_controller", mode="before")
     def validate_turbo_controller(cls, value, info: FieldValidationInfo):
         """note default behavior is no use of turbo"""
         optimizer_dict = {
@@ -163,7 +164,7 @@ class BayesianGenerator(Generator, ABC):
                 )
         return value
 
-    @field_validator("computation_time", mode='before')
+    @field_validator("computation_time", mode="before")
     def validate_computation_time(cls, value):
         if isinstance(value, dict):
             value = pd.DataFrame(value)

@@ -7,6 +7,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
+
 from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.errors import XoptError
@@ -43,6 +45,8 @@ class TestXopt:
 
         # init with yaml
         YAML = """
+        dump_file: null
+        data: null
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
             function_kwargs:
@@ -65,12 +69,47 @@ class TestXopt:
         X = Xopt.from_yaml(YAML)
         assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
 
+        X = Xopt(YAML)
+        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+
+        with pytest.raises(ValueError):
+            Xopt(YAML, 1)
+
+        with pytest.raises(ValueError):
+            Xopt(YAML, my_kwarg=1)
+
+    def test_bad_vocs(self):
+        # test with bad vocs
+        YAML = """
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+
+        generator:
+            name: random
+
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: dummy_constant}
+            bad_val: 5
+
+        """
+        with pytest.raises(ValidationError):
+            Xopt(YAML)
+
     def test_evaluate_data(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
         # test evaluating data w/o constants specified
@@ -101,8 +140,10 @@ class TestXopt:
 
         val = str(xopt)
         assert "Data size: 2" in val
-        assert "vocs:\n  constants:\n    cnt1: 1.0\n  constraints:\n    c1:\n    - " \
-               "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
+        assert (
+            "vocs:\n  constants:\n    cnt1: 1.0\n  constraints:\n    c1:\n    - "
+            "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
+        )
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -115,8 +156,8 @@ class TestXopt:
             return False
 
         vocs = VOCS(
-                variables={"x": [0, 2 * math.pi]},
-                objectives={"f": "MINIMIZE"},
+            variables={"x": [0, 2 * math.pi]},
+            objectives={"f": "MINIMIZE"},
         )
 
         # init with generator and evaluator
@@ -147,9 +188,9 @@ class TestXopt:
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
         )
         with pytest.raises(ValueError):
             X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
@@ -158,15 +199,15 @@ class TestXopt:
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         evaluator = Evaluator(function=xtest_callable)
         X = Xopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
         )
         assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
         assert (
-                len(X.generator.data) == 2
+            len(X.generator.data) == 2
         ), f"len(X.generator.data) = {len(X.generator.data)}"
 
     def test_asynch(self):
@@ -263,9 +304,10 @@ class TestXopt:
         )
         data = explode_all_columns(data)
         X.add_data(data)
-        X.dump_state()
+        X.dump()
 
         import os
+
         os.remove(X.dump_file)
 
     def test_checkpointing(self):
@@ -273,7 +315,7 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
         X.dump_file = "test_checkpointing.yaml"
 
@@ -295,7 +337,7 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
         # fixed seed for deterministic results
@@ -304,10 +346,10 @@ class TestXopt:
         assert np.isclose(xopt.data["x1"].iloc[0], 0.488178)
         assert len(xopt.data) == 3
 
-    @pytest.fixture(scope='module', autouse=True)
+    @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
         yield
-        files = ['test_checkpointing.yaml']
+        files = ["test_checkpointing.yaml"]
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
