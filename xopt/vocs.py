@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import conlist, Field
+from pydantic import ConfigDict, conlist, Field
 
 from xopt.pydantic import XoptBaseModel
 
@@ -40,12 +40,12 @@ class VOCS(XoptBaseModel):
     to describe optimization problems.
     """
 
-    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = Field(
+    variables: Dict[str, conlist(float, min_length=2, max_length=2)] = Field(
         default={},
         description="input variable names with a list of minimum and maximum values",
     )
     constraints: Dict[
-        str, conlist(Union[float, ConstraintEnum], min_items=2, max_items=2)
+        str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
     ] = Field(
         default={},
         description="constraint names with a list of constraint type and value",
@@ -61,16 +61,17 @@ class VOCS(XoptBaseModel):
         description="observation names tracked alongside objectives and constraints",
     )
 
-    class Config:
-        validate_assignment = True  # Not sure this helps in this case
-        use_enum_values = True
+    model_config = ConfigDict(
+        validate_assignment=True, use_enum_values=True, extra="forbid"
+    )
 
     @classmethod
     def from_yaml(cls, yaml_text):
-        return cls.parse_obj(yaml.safe_load(yaml_text))
+        loaded = yaml.safe_load(yaml_text)
+        return cls(**loaded)
 
     def as_yaml(self):
-        return yaml.dump(self.dict(), default_flow_style=None, sort_keys=False)
+        return yaml.dump(self.model_dump(), default_flow_style=None, sort_keys=False)
 
     @property
     def bounds(self):

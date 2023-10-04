@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 from torch import nn
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
@@ -15,11 +15,10 @@ from xopt.utils import (
     has_device_field,
 )
 
-BaseModel.Config.arbitrary_types_allowed = True
-BaseModel.Config.extra = Extra.forbid
-
 
 class MockBaseModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
     device: torch.device
 
 

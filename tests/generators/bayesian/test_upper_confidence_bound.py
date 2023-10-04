@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from xopt.base import Xopt
@@ -15,13 +16,12 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callabl
 class TestUpperConfidenceBoundGenerator:
     def test_init(self):
         ucb_gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
-        ucb_gen.json()
+        ucb_gen.model_dump_json()
 
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
@@ -43,7 +43,6 @@ class TestUpperConfidenceBoundGenerator:
 
         if torch.cuda.is_available():
             gen.use_cuda = True
-            gen.numerical_optimizer.n_raw_samples = 1
             gen.numerical_optimizer.n_restarts = 1
             gen.n_monte_carlo_samples = 1
             gen.data = TEST_VOCS_DATA
@@ -57,7 +56,6 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=test_vocs,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA
@@ -70,7 +68,6 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_raw_samples = 1
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
 
@@ -120,3 +117,34 @@ class TestUpperConfidenceBoundGenerator:
         gen.add_data(data)
         candidate = gen.generate(1)[0]
         assert candidate["x1"] == 3
+
+    def test_constraints_warning(self):
+        with pytest.warns(UserWarning):
+            _ = UpperConfidenceBoundGenerator(
+                vocs=TEST_VOCS_BASE,
+            )
+
+    def test_negative_acq_values_warning(self):
+        X = Xopt.from_yaml(
+            """
+            generator:
+              name: upper_confidence_bound
+
+            evaluator:
+              function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
+
+            vocs:
+              variables:
+                x1: [0, 6.28]
+              constraints:
+                c1: [LESS_THAN, 0.0]
+              objectives:
+                y1: 'MAXIMIZE'
+            """
+        )
+        _ = X.random_evaluate(10, seed=0)
+        test_x = torch.linspace(*X.vocs.variables["x1"], 10)
+        model = X.generator.train_model(X.data)
+        acq = X.generator.get_acquisition(model)
+        with pytest.warns(UserWarning):
+            _ = acq(test_x.unsqueeze(1).unsqueeze(1))

@@ -67,10 +67,10 @@ class TestVOCS(object):
 
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.json()
+        vocs.model_dump_json()
 
         vocs.variables["a"] = np.array([1, 2])
-        vocs.json()
+        vocs.model_dump_json()
 
     def test_properties(self):
         vocs = deepcopy(TEST_VOCS_BASE)

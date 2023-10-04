@@ -6,7 +6,7 @@ from typing import Dict, Union
 import torch
 from botorch.models import ModelListGP
 from pandas import DataFrame
-from pydantic import Field, PositiveFloat, PositiveInt
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -53,9 +53,7 @@ class TurboController(XoptBaseModel, ABC):
 
     tkwargs: Dict[str, Union[torch.dtype, str]] = Field({"dtype": torch.double})
 
-    class Config:
-        validate_assignment = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
 
     def __init__(self, vocs: VOCS, **kwargs):
         dim = vocs.n_variables

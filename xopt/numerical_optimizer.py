@@ -2,17 +2,15 @@ from abc import ABC, abstractmethod
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import Field, PositiveInt, validator
+from pydantic import ConfigDict, Field, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
 
 
 class NumericalOptimizer(XoptBaseModel, ABC):
-    name: str = "base"
-
-    class Config:
-        extra = "forbid"
+    name: str = Field("base_numerical_optimizer", frozen=True)
+    model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
     def optimize(self, function, bounds, n_candidates=1):
@@ -22,26 +20,13 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
 
 class LBFGSOptimizer(NumericalOptimizer):
-    name = "LBFGS"
-    n_raw_samples: PositiveInt = Field(
-        20,
-        description="number of raw samples used to seed optimization",
-    )
+    name: str = Field("LBFGS", frozen=True)
     n_restarts: PositiveInt = Field(
         20, description="number of restarts during acquistion function optimization"
     )
     max_iter: PositiveInt = Field(2000)
 
-    class Config:
-        validate_assignment = True
-
-    @validator("n_restarts")
-    def validate_num_restarts(cls, v: int, values):
-        if v > values["n_raw_samples"]:
-            raise ValueError(
-                "num_restarts cannot be greater than number of " "raw_samples"
-            )
-        return v
+    model_config = ConfigDict(validate_assignment=True)
 
     def optimize(self, function, bounds, n_candidates=1):
         assert isinstance(bounds, Tensor)
@@ -51,7 +36,7 @@ class LBFGSOptimizer(NumericalOptimizer):
             acq_function=function,
             bounds=bounds,
             q=n_candidates,
-            raw_samples=self.n_raw_samples,
+            raw_samples=self.n_restarts,
             num_restarts=self.n_restarts,
             options={"maxiter": self.max_iter},
         )
@@ -70,7 +55,7 @@ class GridOptimizer(NumericalOptimizer):
 
     """
 
-    name = "grid"
+    name: str = Field("grid", frozen=True)
     n_grid_points: PositiveInt = Field(
         10, description="number of grid points per axis used for optimization"
     )
