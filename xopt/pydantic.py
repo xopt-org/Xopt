@@ -213,7 +213,7 @@ class XoptBaseModel(BaseModel):
             raise OSError(f"file {filename} is not found")
 
         with open(filename, "r") as file:
-            return cls.from_yaml(yaml.safe_load(file))
+            return cls.from_yaml(file)
 
     @classmethod
     def from_yaml(cls, yaml_obj: [str, TextIO]):

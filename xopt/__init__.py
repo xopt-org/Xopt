@@ -1,5 +1,3 @@
-import os.path
-
 from xopt import _version
 from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
