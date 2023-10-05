@@ -112,6 +112,17 @@ class TestXopt:
         with pytest.raises(ValidationError):
             Xopt(YAML)
 
+    def test_evaluate(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+
+        out = xopt.evaluate({"x1": 0.4, "x2": 0.3})
+        assert isinstance(out, dict)
+
     def test_evaluate_data(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))

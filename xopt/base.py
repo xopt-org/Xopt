@@ -169,6 +169,11 @@ class Xopt(XoptBaseModel):
 
             self.step()
 
+    def evaluate(self, input_dict: Dict):
+        """evaluate function without storing data"""
+        self.vocs.validate_input_data(DataFrame(input_dict, index=[0]))
+        return self.evaluator.evaluate(input_dict)
+
     def evaluate_data(
         self,
         input_data: Union[
@@ -197,7 +202,7 @@ class Xopt(XoptBaseModel):
             validate_outputs(output_data)
         new_data = pd.concat([input_data, output_data], axis=1)
 
-        # explode any list like results if all of the output names exist
+        # explode any list like results if all the output names exist
         new_data = explode_all_columns(new_data)
 
         self.add_data(new_data)
