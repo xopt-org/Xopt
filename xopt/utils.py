@@ -383,7 +383,7 @@ def visualize_model(
     z = [posterior_mean, prior_mean, posterior_sd, acqf_values]
     labels = ["Posterior Mean", "Prior Mean", "Posterior SD"]
     if dim == 1:
-        labels[2] = "Posterior CL ($\pm 2\,\sigma$)"
+        labels[2] = r"Posterior CL ($\pm 2\,\sigma$)"
     if constrained_acqf:
         labels.append("Constrained Acquisition Function")
     else:
