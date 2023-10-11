@@ -177,6 +177,33 @@ citation to your publications.
 R. Roussel., et al., "Xopt: A simplified framework for optimization of accelerator problems using advanced algorithms", 
 in Proc. IPAC'23, Venezia.doi:https://doi.org/10.18429/JACoW-14th International Particle Accelerator Conference-THPL164
 ```
+
+BibTex entry:
+```bibtex
+@inproceedings{Xopt,
+	title        = {Xopt: A simplified framework for optimization of accelerator problems using advanced algorithms},
+	author       = {R. Roussel and A. Edelen and A. Bartnik and C. Mayes},
+	year         = 2023,
+	month        = {05},
+	booktitle    = {Proc. IPAC'23},
+	publisher    = {JACoW Publishing, Geneva, Switzerland},
+	series       = {IPAC'23 - 14th International Particle Accelerator Conference},
+	number       = 14,
+	pages        = {4796--4799},
+	doi          = {doi:10.18429/jacow-ipac2023-thpl164},
+	isbn         = {978-3-95450-231-8},
+	issn         = {2673-5490},
+	url          = {https://indico.jacow.org/event/41/contributions/2556},
+	paper        = {THPL164},
+	venue        = {Venezia},
+	language     = {english}
+}
+
+```
+
+Particular versions of Xopt can be cited from [Zenodo](https://zenodo.org/record/7983779)
+
+
 Developers
 ==========
 
