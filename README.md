@@ -89,7 +89,6 @@ Configuring an Xopt run
 Xopt runs can be specified via a YAML file or dictonary input.
 
 ```yaml
-max_evaluations: 6400
 generator:
     name: cnsga
     population_size: 64
@@ -110,6 +109,8 @@ vocs:
         c1: [GREATER_THAN, 0]
         c2: [LESS_THAN, 0.5]
     constants: {a: dummy_constant}
+
+max_evaluations: 6400    
 ```
 
 Xopt can also be used through a simple python interface.
