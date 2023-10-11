@@ -86,8 +86,7 @@ conda search xopt --channel conda-forge
 
 Configuring an Xopt run
 ===============
-Xopt runs can be specified via a YAML file or dictonary input.
-
+Xopt runs can be specified via a YAML file or dictonary input. This requires `generator`, `evaluator`, and `vocs` to be specified, along with optional general options such as `max_evaluations`. An example to run a multi-objective optimiation of a user-defined function `my_function` is:
 ```yaml
 generator:
     name: cnsga
@@ -104,7 +103,9 @@ vocs:
     variables:
         x1: [0, 3.14159]
         x2: [0, 3.14159]
-    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+    objectives: 
+        y1: MINIMIZE
+        y2: MINIMIZE
     constraints:
         c1: [GREATER_THAN, 0]
         c2: [LESS_THAN, 0.5]
@@ -113,7 +114,7 @@ vocs:
 max_evaluations: 6400    
 ```
 
-Xopt can also be used through a simple python interface.
+Xopt can also be used through a simple Python interface.
 ```python
 import math
 
