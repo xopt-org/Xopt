@@ -53,7 +53,7 @@ Currenty **Xopt** provides:
   - `rcds` Robust Conjugate Direction Search (RCDS)
   - `neldermead` Nelder-Mead Simplex
 - Sampling algorithms:
-  - `random sampler`
+  - `random` Uniform random sampling
 - Convenient YAML/JSON based input format
 - Driver programs:
   - `xopt.mpi.run` Parallel MPI execution using this input format
