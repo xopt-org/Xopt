@@ -209,11 +209,15 @@ class XoptBaseModel(BaseModel):
 
     @classmethod
     def from_file(cls, filename: str):
-        return cls.from_yaml(open(filename))
+        if not os.path.exists(filename):
+            raise OSError(f"file {filename} is not found")
+
+        with open(filename, "r") as file:
+            return cls.from_yaml(file)
 
     @classmethod
-    def from_yaml(cls, yaml_str: [str, TextIO]):
-        return cls.model_validate(yaml.safe_load(yaml_str))
+    def from_yaml(cls, yaml_obj: [str, TextIO]):
+        return cls.model_validate(yaml.safe_load(yaml_obj))
 
     @classmethod
     def from_dict(cls, config: dict):

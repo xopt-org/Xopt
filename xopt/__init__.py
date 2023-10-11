@@ -17,3 +17,10 @@ def output_notebook(**kwargs):
     Redirects logging to stdout for use in Jupyter notebooks
     """
     configure_logger(**kwargs)
+
+
+def from_file(file_path, asynchronous=False):
+    if asynchronous:
+        return AsynchronousXopt.from_file(file_path)
+    else:
+        return Xopt.from_file(file_path)

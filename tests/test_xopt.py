@@ -7,7 +7,9 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 from pydantic import ValidationError
+from xopt import from_file
 
 from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
@@ -78,6 +80,12 @@ class TestXopt:
         with pytest.raises(ValueError):
             Xopt(YAML, my_kwarg=1)
 
+        # set to file and create from that
+        yaml.dump(yaml.safe_load(YAML), open("test.yml", "w"))
+        for ele in [False, True]:
+            X = from_file("test.yml", ele)
+            assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+
     def test_bad_vocs(self):
         # test with bad vocs
         YAML = """
@@ -103,6 +111,17 @@ class TestXopt:
         """
         with pytest.raises(ValidationError):
             Xopt(YAML)
+
+    def test_evaluate(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+
+        out = xopt.evaluate({"x1": 0.4, "x2": 0.3})
+        assert isinstance(out, dict)
 
     def test_evaluate_data(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -349,7 +368,7 @@ class TestXopt:
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
         yield
-        files = ["test_checkpointing.yaml"]
+        files = ["test_checkpointing.yaml", "test.yml"]
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
