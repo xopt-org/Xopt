@@ -92,7 +92,6 @@ class StandardModelConstructor(ModelConstructor):
 
         # build model
         tkwargs = {"dtype": dtype, "device": device}
-        pd.options.mode.use_inf_as_na = True
         models = []
         input_transform = get_input_transform(input_names, input_bounds).to(**tkwargs)
 
