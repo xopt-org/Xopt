@@ -270,7 +270,7 @@ def visualize_model(
         n_grid: int = 50,
         figsize: tuple[float, float] = None,
         show_samples: bool = True,
-        fading_samples: bool = True,
+        fading_samples: bool = False,
 ) -> tuple:
     """Displays GP model predictions for the selected output.
 
@@ -338,7 +338,7 @@ def visualize_model(
         if constrained_acqf:
             acqf_values = generator.get_acquisition(model)(x.unsqueeze(1))
         else:
-            acqf_values = generator.get_acquisition(model).base_acqusition(x.unsqueeze(1))
+            acqf_values = generator.get_acquisition(model).base_acquisition(x.unsqueeze(1))
 
     # determine feasible and infeasible samples
     max_idx = idx + 1
