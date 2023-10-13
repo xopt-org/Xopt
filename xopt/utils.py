@@ -14,7 +14,6 @@ import yaml
 from pydantic import BaseModel
 
 from xopt.generator import Generator
-from .generators.bayesian.bayesian_generator import BayesianGenerator
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
