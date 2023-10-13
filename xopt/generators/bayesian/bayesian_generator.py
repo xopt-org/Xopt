@@ -33,6 +33,7 @@ from xopt.generators.bayesian.turbo import (
     TurboController,
 )
 from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
+from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
 
@@ -337,6 +338,10 @@ class BayesianGenerator(Generator, ABC):
         )
 
         return self._process_candidates(result)
+
+    def visualize_model(self, **kwargs):
+        """displays the GP models"""
+        return visualize_generator_model(self, **kwargs)
 
     def _process_candidates(self, candidates: Tensor):
         """process pytorch candidates from optimizing the acquisition function"""
