@@ -206,6 +206,9 @@ class XoptBaseModel(BaseModel):
 
     def to_json(self, **kwargs) -> str:
         return orjson_dumps(self, **kwargs)
+
+    def json(self, **kwargs):
+        return self.to_json(**kwargs)
     
     def yaml(self, **kwargs):
         """serialize first then dump to yaml string"""
