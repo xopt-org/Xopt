@@ -206,6 +206,15 @@ class XoptBaseModel(BaseModel):
 
     def to_json(self, **kwargs) -> str:
         return orjson_dumps(self, **kwargs)
+    
+    def yaml(self, **kwargs):
+        """serialize first then dump to yaml string"""
+        output = json.loads(
+            self.to_json(
+                **kwargs,
+            )
+        )
+        return yaml.dump(output)
 
     @classmethod
     def from_file(cls, filename: str):
