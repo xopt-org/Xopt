@@ -20,4 +20,3 @@ class TestRandomGenerator:
         gen = RandomGenerator(vocs=test_vocs)
         out = gen.yaml()
         assert out == "{}\n"
-
