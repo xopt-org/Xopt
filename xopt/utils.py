@@ -14,7 +14,6 @@ import yaml
 from pydantic import BaseModel
 
 from xopt.generator import Generator
-from .generators.bayesian.bayesian_generator import BayesianGenerator
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
@@ -256,74 +255,6 @@ def read_xopt_csv(*files):
         df = pd.read_csv(file, index_col="xopt_index")
         dfs.append(df)
     return pd.concat(dfs)
-
-
-def visualize_model(generator: BayesianGenerator, axes=None):
-    test_x = torch.linspace(*generator.vocs.bounds.flatten(), 50).double()
-
-    vocs = generator.vocs
-
-    model = generator.train_model()
-
-    # get acquisition function from generator
-    acq = generator.get_acquisition(model)
-
-    # calculate model posterior and acquisition function at each test point
-    # NOTE: need to add a dimension to the input tensor for evaluating the
-    # posterior and another for the acquisition function, see
-    # https://botorch.org/docs/batching for details
-    # NOTE: we use the `torch.no_grad()` environment to speed up computation by
-    # skipping calculations for backpropagation
-    with torch.no_grad():
-        posterior = model.posterior(test_x.unsqueeze(1))
-        acq_val = acq(test_x.reshape(-1, 1, 1))
-
-    # get mean function and confidence regions
-    mean = posterior.mean
-    lower, upper = posterior.mvn.confidence_region()
-
-    # plot model and acquisition function
-    n_outputs = vocs.n_outputs
-    if n_outputs == 1:
-        lower = lower.unsqueeze(-1)
-        upper = upper.unsqueeze(-1)
-
-    if axes is None:
-        # Lazy import
-        from matplotlib import pyplot as plt
-
-        fig, ax = plt.subplots(n_outputs + 1, 1, sharex="all")
-        fig.set_size_inches(4, 2 * n_outputs)
-    else:
-        ax = axes
-        fig = axes.gcf()
-
-    # plot model posterior
-    for i in range(n_outputs):
-        ax[i].plot(test_x, mean[:, i], f"C{i}", label=vocs.output_names[i])
-        ax[i].fill_between(test_x, lower[:, i], upper[:, i], alpha=0.25, fc=f"C{i}")
-
-        # add data to model plot
-        ax[i].plot(
-            generator.data[vocs.variable_names],
-            generator.data[vocs.output_names[i]],
-            f"C{i}o",
-            label="Training data",
-        )
-        ax[i].set_ylabel(vocs.output_names[i])
-
-        if vocs.output_names[i] in vocs.constraint_names:
-            ax[i].axhline(
-                vocs.constraints[vocs.output_names[i]][-1], ls="--", c=f"C{i}"
-            )
-
-    # plot acquisition function
-    ax[-1].plot(test_x, acq_val.flatten())
-
-    ax[-1].set_ylabel(r"$\alpha(x)$")
-    ax[-1].set_xlabel("x")
-
-    return fig, ax
 
 
 def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> dict:
