@@ -209,7 +209,7 @@ class XoptBaseModel(BaseModel):
 
     def json(self, **kwargs):
         return self.to_json(**kwargs)
-    
+
     def yaml(self, **kwargs):
         """serialize first then dump to yaml string"""
         output = json.loads(
