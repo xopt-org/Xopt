@@ -300,7 +300,9 @@ def pop_from_data(data, vocs):
     pop = list(map(deap_creator.Individual, v))
     for i, ind in enumerate(pop):
         ind.fitness.values = tuple(o[i, :])
-        ind.fitness.cvalues = tuple(c[i, :])
+        if c.size:
+            ind.fitness.cvalues = tuple(c[i, :])
+
         ind.index = ix[i]
 
     return pop

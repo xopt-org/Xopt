@@ -16,12 +16,12 @@ def test_cnsga():
 
 def test_cnsga_from_yaml():
     YAML = """
-    max_evaluations: 5
+    max_evaluations: 10
     dump_file: null
     data: null
     generator:
         name: cnsga
-        population_size: 64
+        population_size: 8
         population_file: null
 
     evaluator:
@@ -44,5 +44,37 @@ def test_cnsga_from_yaml():
     X = Xopt(YAML)
     # Patch in generator
     X.run()
-    assert len(X.data) == 5
+    assert len(X.data) == 10
+    assert all(~X.data["xopt_error"])
+
+
+def test_cnsga_no_constraints():
+    YAML = """
+    max_evaluations: 10
+    dump_file: null
+    data: null
+    generator:
+        name: cnsga
+        population_size: 8
+        population_file: null
+
+    evaluator:
+        function: xopt.resources.test_functions.tnk.evaluate_TNK
+        function_kwargs:
+            sleep: 0
+            random_sleep: 0.1
+
+    vocs:
+        variables:
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+        constraints: {}
+        constants: {a: dummy_constant}
+    """
+
+    X = Xopt(YAML)
+    # Patch in generator
+    X.run()
+    assert len(X.data) == 10
     assert all(~X.data["xopt_error"])
