@@ -138,3 +138,14 @@ class TestVOCS(object):
             test_vocs.validate_input_data(
                 pd.DataFrame({"x1": [-0.5, 2.5], "x2": [1.0, 11.0]})
             )
+
+    def test_select_best(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = TEST_VOCS_DATA
+
+        # test maximum
+        vocs.objectives[vocs.objective_names[0]] = "MAXIMIZE"
+        idx, val = vocs.select_best(test_data)
+        assert idx == test_data[vocs.objective_names[0]].idxmax()
+        assert val == test_data[vocs.objective_names[0]].max()
+
