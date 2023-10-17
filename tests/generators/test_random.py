@@ -17,4 +17,6 @@ class TestRandomGenerator:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {"y": "MAXIMIZE", "z": "MINIMIZE"}
 
-        RandomGenerator(vocs=test_vocs)
+        gen = RandomGenerator(vocs=test_vocs)
+        out = gen.yaml()
+        assert out == "{}\n"
