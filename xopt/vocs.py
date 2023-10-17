@@ -408,16 +408,19 @@ class VOCS(XoptBaseModel):
             raise RuntimeError("cannot select best point when n_objectives is not 1")
 
         if self.objectives[self.objective_names[0]] == "MINIMIZE":
-            return data[self.objective_names[0]].idxmin(), data[
-                self.objective_names[0]
-            ].min()
+            return (
+                data[self.objective_names[0]].idxmin(),
+                data[self.objective_names[0]].min(),
+            )
         elif self.objectives[self.objective_names[0]] == "MAXIMIZE":
-            return data[self.objective_names[0]].idxmax(), data[
-                self.objective_names[0]
-            ].max()
+            return (
+                data[self.objective_names[0]].idxmax(),
+                data[self.objective_names[0]].max(),
+            )
         else:
-            raise RuntimeError(f"objective {self.objectives[self.objective_names[0]]} "
-                               "not supported")
+            raise RuntimeError(
+                f"objective {self.objectives[self.objective_names[0]]} " "not supported"
+            )
 
 
 # --------------------------------

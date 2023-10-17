@@ -143,9 +143,14 @@ class TestVOCS(object):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = TEST_VOCS_DATA
 
-        # test maximum
+        # test maximization
         vocs.objectives[vocs.objective_names[0]] = "MAXIMIZE"
         idx, val = vocs.select_best(test_data)
         assert idx == test_data[vocs.objective_names[0]].idxmax()
         assert val == test_data[vocs.objective_names[0]].max()
 
+        # test minimization
+        vocs.objectives[vocs.objective_names[0]] = "MINIMIZE"
+        idx, val = vocs.select_best(test_data)
+        assert idx == test_data[vocs.objective_names[0]].idxmin()
+        assert val == test_data[vocs.objective_names[0]].min()
