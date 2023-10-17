@@ -396,6 +396,7 @@ class VOCS(XoptBaseModel):
         """
         get the best value and point for a given data set based on vocs
         - does not work for multi-objective problems
+        - data that violates any constraints is ignored
 
         Args:
             data: dataframe to select best point from
@@ -407,15 +408,16 @@ class VOCS(XoptBaseModel):
         if self.n_objectives != 1:
             raise RuntimeError("cannot select best point when n_objectives is not 1")
 
+        feasible_data = self.feasibility_data(data)
         if self.objectives[self.objective_names[0]] == "MINIMIZE":
             return (
-                data[self.objective_names[0]].idxmin(),
-                data[self.objective_names[0]].min(),
+                data[feasible_data["feasible"]][self.objective_names[0]].idxmin(),
+                data[feasible_data["feasible"]][self.objective_names[0]].min(),
             )
         elif self.objectives[self.objective_names[0]] == "MAXIMIZE":
             return (
-                data[self.objective_names[0]].idxmax(),
-                data[self.objective_names[0]].max(),
+                data[feasible_data["feasible"]][self.objective_names[0]].idxmax(),
+                data[feasible_data["feasible"]][self.objective_names[0]].max(),
             )
         else:
             raise RuntimeError(
