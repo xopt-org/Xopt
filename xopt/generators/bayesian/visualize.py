@@ -231,6 +231,7 @@ def visualize_generator_model(
         if show_feasibility:
             ax[-1].plot(x_axis, predictions["feasibility"], "C0-")
             ax[-1].set_ylabel("Feasibility")
+        ax[-1].set_xlabel(variable_names[0])
 
     else:
         for i in range(nrows):
@@ -239,7 +240,6 @@ def visualize_generator_model(
                     ax[i, j].set_xlabel(variable_names[0])
                 if j == 0:
                     ax[i, j].set_ylabel(variable_names[1])
-                ax[i, j].set_aspect("equal")
                 ax[i, j].locator_params(axis="both", nbins=5)
         for i, output_name in enumerate(output_names):
             for j in range(ncols):
