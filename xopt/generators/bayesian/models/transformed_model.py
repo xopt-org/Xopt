@@ -19,7 +19,9 @@ class TransformedModel(torch.nn.Module):
         input_transformer: Module used to transform inputs.
         outcome_transformer: Module used to transform outcomes.
         fixed_model: If true, the model is put in evaluation mode and
-          gradient computation is deactivated.
+          gradient computation is deactivated. Note that, even if this is set
+          to false, the model will always be called in evaluation mode unless
+          training mode is reactivated in the base model.
         """
         super().__init__()
         self._model = model
@@ -51,8 +53,12 @@ class TransformedModel(torch.nn.Module):
         return self._model(x)
 
     def forward(self, x):
-        # set transformers to eval mode
+        # set transformers in eval mode
         self.set_transformers(eval_mode=True)
+
+        # set model in eval mode otherwise GP training will activate layers like Dropout, BatchNorm etc.
+        # if this behavior is intended, training mode should be reactivated in the base model
+        self._model.eval()
 
         # transform inputs to model space
         x_model = self.input_transformer(x)
