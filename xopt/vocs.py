@@ -392,7 +392,7 @@ class VOCS(XoptBaseModel):
         constraint_data = self.constraint_data(data, "")
         return variable_data, objective_data, constraint_data
 
-    def select_best(self, data: pd.DataFrame):
+    def select_best(self, data: pd.DataFrame, n=1):
         """
         get the best value and point for a given data set based on vocs
         - does not work for multi-objective problems
@@ -400,6 +400,7 @@ class VOCS(XoptBaseModel):
 
         Args:
             data: dataframe to select best point from
+            n: number of best points to return
 
         Returns:
             index: index of best point
@@ -409,20 +410,14 @@ class VOCS(XoptBaseModel):
             raise RuntimeError("cannot select best point when n_objectives is not 1")
 
         feasible_data = self.feasibility_data(data)
-        if self.objectives[self.objective_names[0]] == "MINIMIZE":
-            return (
-                data[feasible_data["feasible"]][self.objective_names[0]].idxmin(),
-                data[feasible_data["feasible"]][self.objective_names[0]].min(),
-            )
-        elif self.objectives[self.objective_names[0]] == "MAXIMIZE":
-            return (
-                data[feasible_data["feasible"]][self.objective_names[0]].idxmax(),
-                data[feasible_data["feasible"]][self.objective_names[0]].max(),
-            )
-        else:
-            raise RuntimeError(
-                f"objective {self.objectives[self.objective_names[0]]} " "not supported"
-            )
+        ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
+        obj = self.objectives[self.objective_names[0]]
+        obj_name = self.objective_names[0]
+        res = data[feasible_data["feasible"]].sort_values(
+            obj_name, ascending=ascending_flag[obj]
+        )[obj_name][:n]
+
+        return res.index.to_numpy(), res.to_numpy()
 
 
 # --------------------------------
