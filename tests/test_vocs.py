@@ -138,3 +138,42 @@ class TestVOCS(object):
             test_vocs.validate_input_data(
                 pd.DataFrame({"x1": [-0.5, 2.5], "x2": [1.0, 11.0]})
             )
+
+    def test_select_best(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.1, 0.1, 0.1],
+                "x2": [0.1, 0.1, 0.1, 0.1],
+                "c1": [1.0, 0.0, 1.0, 0.0],
+                "y1": [0.5, 0.1, 1.0, 1.5],
+            }
+        )
+
+        # test maximization
+        vocs.objectives[vocs.objective_names[0]] = "MAXIMIZE"
+        idx, val = vocs.select_best(test_data)
+        assert idx == [2]
+        assert val == [1.0]
+
+        vocs.constraints = {}
+        idx, val = vocs.select_best(test_data)
+        assert idx == [3]
+        assert val == [1.5]
+
+        # test returning multiple best values -- sorted by best value
+        idx, val = vocs.select_best(test_data, 2)
+        assert np.allclose(idx, np.array([3, 2]))
+        assert np.allclose(val, np.array([1.5, 1.0]))
+
+        # test minimization
+        vocs.objectives[vocs.objective_names[0]] = "MINIMIZE"
+        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
+        idx, val = vocs.select_best(test_data)
+        assert idx == [0]
+        assert val == [0.5]
+
+        vocs.constraints = {}
+        idx, val = vocs.select_best(test_data)
+        assert idx == 1
+        assert val == 0.1
