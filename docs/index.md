@@ -56,11 +56,14 @@ Getting Started
 [Xopt Overview PDF](assets/xopt_overview.pdf) gives an overview of Xopt's design and 
 usage.
 
+
 [Xopt Built-In Generators](algorithms.md) provides a list of available algorithms 
 implemented in the Xopt ```Generator``` framework.
 
 [Simple Bayesian Optimization Example](examples/bayes_opt/bo_tutorial.ipynb) shows 
 Xopt usage for a simple optimization problem.
+
+[Xopt IPAC23 paper](https://accelconf.web.cern.ch/ipac2023/pdf/THPL164.pdf) summarizes the usage of Xopt in particle accelerator physics problems. 
 
 
 Configuring an Xopt run
@@ -179,8 +182,7 @@ BibTex entry:
 	venue        = {Venezia},
 	language     = {english}
 }
-
 ```
 
 Particular versions of Xopt can be cited from [Zenodo](https://zenodo.org/record/7983779)
-```
+
