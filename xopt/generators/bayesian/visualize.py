@@ -140,6 +140,7 @@ def visualize_generator_model(
         figsize = (4 * ncols, 3.2 * nrows)
     # lazy import
     from matplotlib import pyplot as plt
+    from matplotlib.legend_handler import HandlerTuple
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     fig, ax = plt.subplots(
@@ -177,13 +178,13 @@ def visualize_generator_model(
                 f"C{color_idx}-",
                 label="Posterior Mean",
             )
-            ax[i].fill_between(
+            c = ax[i].fill_between(
                 x_axis,
                 predictions[output_name][0] - 2 * predictions[output_name][1],
                 predictions[output_name][0] + 2 * predictions[output_name][1],
                 color=f"C{color_idx}",
                 alpha=0.25,
-                label=r"Posterior CL ($\pm 2\,\sigma$)",
+                label="",
             )
             # data samples
             if show_samples:
@@ -199,6 +200,7 @@ def visualize_generator_model(
                         facecolors="C1",
                         edgecolors="none",
                         zorder=5,
+                        label="Feasible Samples",
                     )
                 if not samples[output_name][2].empty:
                     x_infeasible = samples[output_name][2].to_numpy()
@@ -212,9 +214,19 @@ def visualize_generator_model(
                         facecolors="none",
                         edgecolors="C3",
                         zorder=5,
+                        label="Infeasible Samples",
                     )
             ax[i].set_ylabel(output_name)
-            ax[i].legend()
+            handles, labels = ax[i].get_legend_handles_labels()
+            for j in range(len(labels)):
+                if labels[j] == "Posterior Mean":
+                    labels[j] = r"Posterior Mean $\pm 2\,\sigma$"
+                    handles[j] = (handles[j], c)
+            if all([ele in labels for ele in ["Feasible Samples", "Infeasible Samples"]]):
+                labels[-2] = "In-/Feasible Samples"
+                handles[-2] = [handles[-1], handles[-2]]
+                del labels[-1], handles[-1]
+            ax[i].legend(labels=labels, handles=handles, handler_map={list: HandlerTuple(ndivide=None)})
         # acquisition function
         if predictions["acq"][0] is None:
             ax[len(output_names)].plot(x_axis, predictions["acq"][1], "C0-")
@@ -272,6 +284,7 @@ def visualize_generator_model(
                             facecolors="C1",
                             edgecolors="none",
                             zorder=5,
+                            label="Feasible Samples",
                         )
                     if not samples[output_name][2].empty:
                         x1_infeasible, x2_infeasible = (
@@ -284,7 +297,15 @@ def visualize_generator_model(
                             facecolors="none",
                             edgecolors="C3",
                             zorder=5,
+                            label="Infeasible Samples",
                         )
+                if i == j == 0:
+                    handles, labels = ax[i, j].get_legend_handles_labels()
+                    if all([ele in labels for ele in ["Feasible Samples", "Infeasible Samples"]]):
+                        labels[-2] = "In-/Feasible Samples"
+                        handles[-2] = [handles[-1], handles[-2]]
+                        del labels[-1], handles[-1]
+                    ax[i, j].legend(labels=labels, handles=handles, handler_map={list: HandlerTuple(ndivide=None)})
         # acquisition function
         if predictions["acq"][0] is None:
             pcm = ax[len(output_names), 0].pcolormesh(
