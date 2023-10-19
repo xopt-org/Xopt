@@ -200,7 +200,6 @@ BibTex entry:
 	venue        = {Venezia},
 	language     = {english}
 }
-
 ```
 
 Particular versions of Xopt can be cited from [Zenodo](https://zenodo.org/record/7983779)
