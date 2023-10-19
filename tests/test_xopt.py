@@ -149,9 +149,7 @@ class TestXopt:
         # test one optimization generation
         xopt.step()
 
-        assert np.equal(
-            xopt.data.index.to_numpy(), np.arange(0, len(xopt.data))
-        ).all()
+        assert np.equal(xopt.data.index.to_numpy(), np.arange(0, len(xopt.data))).all()
 
     def test_str_method(self):
         evaluator = Evaluator(function=xtest_callable)
