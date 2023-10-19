@@ -126,10 +126,7 @@ class TestCustomConstructor(TestCase):
             # define training data to pass to the generator
             train_x = torch.tensor((0.2, 0.5))
             train_y = 1.0 * torch.cos(2 * 3.14 * train_x + 0.25)
-
-            training_data = pd.DataFrame({"x": train_x.numpy(), "y": train_y.numpy()})
-
-            generator.add_data(training_data)
+            generator.add_data(pd.DataFrame({"x": train_x.numpy(), "y": train_y.numpy()}))
             model = generator.train_model()
 
             # check for trainable parameters
@@ -138,3 +135,27 @@ class TestCustomConstructor(TestCase):
                 if param.requires_grad:
                     trainable_params_exist = True
             assert trainable_params_exist == trainable
+
+    def test_prior_mean_eval_mode(self):
+        my_vocs = VOCS(
+            variables={"x": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        gp_constructor = StandardModelConstructor(mean_modules={"y": ConstantMean()})
+        generator = ExpectedImprovementGenerator(vocs=my_vocs, gp_constructor=gp_constructor)
+
+        # add some data to the model
+        train_x = torch.tensor((0.2, 0.5))
+        train_y = 1.0 * torch.cos(2 * 3.14 * train_x + 0.25)
+        generator.add_data(pd.DataFrame({"x": train_x.numpy(), "y": train_y.numpy()}))
+        model = generator.train_model()
+
+        # overwrites eval mode of prior mean
+        model.train()
+        custom_mean = model.models[my_vocs.output_names.index(my_vocs.objective_names[0])].mean_module
+        assert custom_mean.training
+
+        # calling the prior mean model should set it back to eval mode
+        x = torch.tensor([[0.5]])
+        _ = custom_mean(x)
+        assert not custom_mean.training
