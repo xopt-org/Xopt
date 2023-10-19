@@ -146,6 +146,13 @@ class TestXopt:
         # test single input
         xopt.evaluate_data({"x1": 0.5, "x2": 0.1})
 
+        # test one optimization generation
+        xopt.step()
+
+        assert np.equal(
+            xopt.data.index.to_numpy(), np.arange(0, len(xopt.data))
+        ).all()
+
     def test_str_method(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))

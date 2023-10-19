@@ -224,7 +224,7 @@ class Xopt(XoptBaseModel):
         if self.data is not None:
             new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
             new_data.index = np.arange(
-                len(self.data) + 1, len(self.data) + len(new_data) + 1
+                len(self.data), len(self.data) + len(new_data)
             )
 
             self.data = pd.concat([self.data, new_data], axis=0)
