@@ -222,11 +222,17 @@ def visualize_generator_model(
                 if labels[j] == "Posterior Mean":
                     labels[j] = r"Posterior Mean $\pm 2\,\sigma$"
                     handles[j] = (handles[j], c)
-            if all([ele in labels for ele in ["Feasible Samples", "Infeasible Samples"]]):
+            if all(
+                [ele in labels for ele in ["Feasible Samples", "Infeasible Samples"]]
+            ):
                 labels[-2] = "In-/Feasible Samples"
                 handles[-2] = [handles[-1], handles[-2]]
                 del labels[-1], handles[-1]
-            ax[i].legend(labels=labels, handles=handles, handler_map={list: HandlerTuple(ndivide=None)})
+            ax[i].legend(
+                labels=labels,
+                handles=handles,
+                handler_map={list: HandlerTuple(ndivide=None)},
+            )
         # acquisition function
         if predictions["acq"][0] is None:
             ax[len(output_names)].plot(x_axis, predictions["acq"][1], "C0-")
@@ -301,11 +307,20 @@ def visualize_generator_model(
                         )
                 if i == j == 0:
                     handles, labels = ax[i, j].get_legend_handles_labels()
-                    if all([ele in labels for ele in ["Feasible Samples", "Infeasible Samples"]]):
+                    if all(
+                        [
+                            ele in labels
+                            for ele in ["Feasible Samples", "Infeasible Samples"]
+                        ]
+                    ):
                         labels[-2] = "In-/Feasible Samples"
                         handles[-2] = [handles[-1], handles[-2]]
                         del labels[-1], handles[-1]
-                    ax[i, j].legend(labels=labels, handles=handles, handler_map={list: HandlerTuple(ndivide=None)})
+                    ax[i, j].legend(
+                        labels=labels,
+                        handles=handles,
+                        handler_map={list: HandlerTuple(ndivide=None)},
+                    )
         # acquisition function
         if predictions["acq"][0] is None:
             pcm = ax[len(output_names), 0].pcolormesh(

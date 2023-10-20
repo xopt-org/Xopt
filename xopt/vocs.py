@@ -407,7 +407,9 @@ class VOCS(XoptBaseModel):
             value: value of best point
         """
         if self.n_objectives != 1:
-            raise NotImplementedError("cannot select best point when n_objectives is not 1")
+            raise NotImplementedError(
+                "cannot select best point when n_objectives is not 1"
+            )
 
         feasible_data = self.feasibility_data(data)
         ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
