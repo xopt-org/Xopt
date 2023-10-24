@@ -67,7 +67,7 @@ class NelderMeadGenerator(Generator):
     y: Optional[float] = None
     is_done_bool: bool = False
 
-    _inputs = None
+    #_inputs = None
     _initial_simplex = None
 
     _saved_options: Dict = None
@@ -107,7 +107,7 @@ class NelderMeadGenerator(Generator):
         ngen = self.current_state.ngen
         if ndata == ngen:
             # just resuming
-            print(f'Resuming with {ngen=}')
+            #print(f'Resuming with {ngen=}')
             return
         else:
             # Must have made at least 1 step, require future_state
@@ -129,10 +129,9 @@ class NelderMeadGenerator(Generator):
                 return
 
             self.y = yt
+            #print(f'Added data {self.y=}')
 
-            print(f'Added data {self.y=}')
-
-    def generate(self, n_candidates: int) -> list[dict]:
+    def generate(self, n_candidates: int) -> Optional[list[dict]]:
         #TODO: fix handling of None in step function
         if self.is_done:
             return None
@@ -153,28 +152,23 @@ class NelderMeadGenerator(Generator):
             else:
                 pass
 
-        try:
-            results = self._call_algorithm()
-            if results is None:
-                self.is_done_bool = True
-                return None
-
-            x, state_extra = results
-            assert len(state_extra) == len(STATE_KEYS)
-            stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
-            print('State:', stateobj)
-            #self.current_state = stateobj
-            self.future_state = stateobj
-
-            inputs = dict(zip(self.vocs.variable_names, x))
-            if self.vocs.constants is not None:
-                inputs.update(self.vocs.constants)
-            self._inputs = [inputs]
-
-        except StopIteration:
+        results = self._call_algorithm()
+        if results is None:
             self.is_done_bool = True
+            return None
 
-        return self._inputs
+        x, state_extra = results
+        assert len(state_extra) == len(STATE_KEYS)
+        stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
+        print('State:', stateobj)
+        #self.current_state = stateobj
+        self.future_state = stateobj
+
+        inputs = dict(zip(self.vocs.variable_names, x))
+        if self.vocs.constants is not None:
+            inputs.update(self.vocs.constants)
+
+        return [inputs]
 
     def _call_algorithm(self):
         results = _neldermead_generator(
