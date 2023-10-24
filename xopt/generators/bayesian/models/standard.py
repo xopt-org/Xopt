@@ -11,7 +11,7 @@ from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 from pydantic import ConfigDict, Field, field_validator
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic_core.core_schema import ValidationInfo
 from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -55,7 +55,7 @@ class StandardModelConstructor(ModelConstructor):
         return v
 
     @field_validator("trainable_mean_keys")
-    def validate_trainable_mean_keys(cls, v, info: FieldValidationInfo):
+    def validate_trainable_mean_keys(cls, v, info: ValidationInfo):
         for name in v:
             assert name in info.data["mean_modules"]
         return v

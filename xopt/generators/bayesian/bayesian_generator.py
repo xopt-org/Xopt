@@ -14,7 +14,7 @@ from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import Field, field_validator, SerializeAsAny
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
 from xopt.generator import Generator
@@ -134,7 +134,7 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(cls, value, info: FieldValidationInfo):
+    def validate_turbo_controller(cls, value, info: ValidationInfo):
         """note default behavior is no use of turbo"""
         optimizer_dict = {
             "optimize": OptimizeTurboController,
