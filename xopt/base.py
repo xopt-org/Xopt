@@ -98,6 +98,8 @@ class Xopt(XoptBaseModel):
         if isinstance(v, dict):
             try:
                 v = pd.DataFrame(v)
+                v.index = v.index.astype(int)
+                v = v.sort_index()
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
 
