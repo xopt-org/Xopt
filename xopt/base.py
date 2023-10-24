@@ -153,8 +153,9 @@ class Xopt(XoptBaseModel):
         logger.debug(f"Generating {n_generate} candidates")
         new_samples = self.generator.generate(n_generate)
 
-        # Evaluate data
-        self.evaluate_data(new_samples)
+        if new_samples is not None:
+            # Evaluate data
+            self.evaluate_data(new_samples)
 
     def run(self):
         """run until either max_evaluations is reached or the generator is
