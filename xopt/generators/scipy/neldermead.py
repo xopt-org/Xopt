@@ -110,7 +110,7 @@ class NelderMeadGenerator(Generator):
         ngen = self.current_state.ngen
         if ndata == ngen:
             # just resuming
-            print(f'Resuming with data {ngen=} {self.data=}')
+            print(f'Resuming with {ngen=}')
             return
         else:
             # Must have made at least 1 step, require future_state
@@ -133,9 +133,10 @@ class NelderMeadGenerator(Generator):
 
             self.y = yt
 
-            print(f'Added data {self.y=} {self.current_state=}')
+            print(f'Added data {self.y=}')
 
-    def generate(self, n_candidates) -> list[dict]:
+    def generate(self, n_candidates: int) -> list[dict]:
+        #TODO: fix handling of None in step function
         if self.is_done:
             return None
 
@@ -156,7 +157,12 @@ class NelderMeadGenerator(Generator):
                 pass
 
         try:
-            x, state_extra = self._call_algorithm()
+            results = self._call_algorithm()
+            if results is None:
+                self.is_done_bool = True
+                return None
+
+            x, state_extra = results
             assert len(state_extra) == len(STATE_KEYS)
             stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
             print(x)
@@ -184,7 +190,7 @@ class NelderMeadGenerator(Generator):
         else:
             sim = None
 
-        sim, future_state = _neldermead_generator(
+        results = _neldermead_generator(
                 self.func,
                 self.x0,
                 state=self.current_state,
@@ -195,8 +201,10 @@ class NelderMeadGenerator(Generator):
                 initial_simplex=sim,
                 bounds=self.vocs.bounds,
         )
+
+
         self.y = None
-        return sim, future_state
+        return results
 
     def _init_algorithm(self):
         """
