@@ -356,6 +356,20 @@ class VOCS(XoptBaseModel):
         """
         return form_feasibility_data(self.constraints, data, prefix)
 
+    def normalize_inputs(self, input_points: pd.DataFrame) -> pd.DataFrame:
+        """
+        normalize data based on vocs ranges
+        """
+        normed_data = {}
+        for name in input_points.columns:
+            width = self.variables[name][1] - self.variables[name][0]
+            normed_data[name] = (input_points[name] - self.variables[name][0]) / width
+
+        if len(normed_data):
+            return pd.DataFrame(normed_data)
+        else:
+            return pd.DataFrame([])
+
     def validate_input_data(self, input_points: pd.DataFrame) -> None:
         """
         Validates input data. Raises an error if the input data does not satisfy
@@ -428,7 +442,11 @@ class VOCS(XoptBaseModel):
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_variable_data(variables: Dict, data, prefix="variable_"):
+def form_variable_data(
+    variables: Dict,
+    data,
+    prefix="variable_",
+):
     """
     Use variables dict to form a dataframe.
     """
@@ -437,6 +455,7 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
 
     data = pd.DataFrame(data)
     vdata = pd.DataFrame()
+
     for k in sorted(list(variables)):
         vdata[prefix + k] = data[k]
 

@@ -177,3 +177,18 @@ class TestVOCS(object):
         idx, val = vocs.select_best(test_data)
         assert idx == 1
         assert val == 0.1
+
+    def test_normalize_inputs(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75]})
+        normed_data = vocs.normalize_inputs(test_data)
+        assert normed_data["x1"].to_list() == [0.5, 0.2]
+        assert normed_data["x2"].to_list() == [0.05, 0.075]
+
+        test_data.pop("x1")
+        normed_data = vocs.normalize_inputs(test_data)
+        assert normed_data["x2"].to_list() == [0.05, 0.075]
+
+        test_data = pd.DataFrame({"x1": 0.5}, index=[0])
+        normed_data = vocs.normalize_inputs(test_data)
+        assert normed_data["x1"].to_list() == [0.5]
