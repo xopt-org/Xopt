@@ -179,7 +179,7 @@ class NelderMeadGenerator(Generator):
         x, state_extra = results
         assert len(state_extra) == len(STATE_KEYS)
         stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
-        #print("State:", stateobj)
+        # print("State:", stateobj)
         self.future_state = stateobj
 
         inputs = dict(zip(self.vocs.variable_names, x))

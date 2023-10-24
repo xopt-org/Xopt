@@ -173,11 +173,17 @@ class TestNelderMeadGenerator:
             compare(X, X3)
             print('====================')
 
-        data = X2.vocs.variable_data(X2.data).to_numpy()
+        data = X.vocs.variable_data(X.data).to_numpy()
+        assert data.shape == scipy_data.shape
         assert np.array_equal(data, scipy_data)
 
+        data = X2.vocs.variable_data(X2.data).to_numpy()
+        assert data.shape == scipy_data.shape
+        # Numerical precision issues with using strings for floats
+        assert np.allclose(data, scipy_data, rtol=0, atol=1e-10)
+
         # Results should be the same
-        xbest = X2.data.iloc[X2.data["y"].argmin()]
+        xbest = X.data.iloc[X.data["y"].argmin()]
         assert (
                 xbest["x0"] == result[0] and xbest["x1"] == result[1]
         ), "Xopt Simplex does not match the vanilla one"
