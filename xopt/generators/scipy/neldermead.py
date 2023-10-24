@@ -59,16 +59,14 @@ class NelderMeadGenerator(Generator):
     adaptive: bool = True
     xatol: float = Field(1e-4, description="Tolerance in x value")
     fatol: float = Field(1e-4, description="Tolerance in function value")
-    #simplex_stage: int = Field(-1, description="Stage of simplex state machine")
     current_state: SimplexState = SimplexState()
     future_state: Optional[SimplexState] = None
 
     # Internal data structures
     x: Optional[np.ndarray] = None
     y: Optional[float] = None
-    _algorithm = None  # Will initialize on first generate
-    _state = None
     _inputs = None
+    _initial_simplex = None
 
     is_done_bool: bool = False
     _saved_options: Dict = None
@@ -79,9 +77,12 @@ class NelderMeadGenerator(Generator):
         # Initialize the first candidate if not given
         if self.initial_point is None:
             self.initial_point = self.vocs.random_inputs()[0]
+
         self._saved_options = (
-            self.model_dump().copy()
+            self.model_dump(exclude={'current_state', 'future_state'}).copy()
         )  # Used to keep track of changed options
+
+        self._init_algorithm()
 
     # Wrapper to refer to internal data
     def func(self, x):
@@ -165,12 +166,9 @@ class NelderMeadGenerator(Generator):
             x, state_extra = results
             assert len(state_extra) == len(STATE_KEYS)
             stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
-            print(x)
             print('State:', stateobj)
             #self.current_state = stateobj
             self.future_state = stateobj
-            #self.simplex_stage = stateobj.astg
-            #x = stateobj.x
 
             inputs = dict(zip(self.vocs.variable_names, x))
             if self.vocs.constants is not None:
@@ -183,13 +181,6 @@ class NelderMeadGenerator(Generator):
         return self._inputs
 
     def _call_algorithm(self):
-        if self.initial_simplex:
-            sim = np.array(
-                    [self.initial_simplex[k] for k in self.vocs.variable_names]
-            ).T
-        else:
-            sim = None
-
         results = _neldermead_generator(
                 self.func,
                 self.x0,
@@ -198,7 +189,7 @@ class NelderMeadGenerator(Generator):
                 adaptive=self.adaptive,
                 xatol=self.xatol,
                 fatol=self.fatol,
-                initial_simplex=sim,
+                initial_simplex=self._initial_simplex,
                 bounds=self.vocs.bounds,
         )
 
@@ -212,18 +203,18 @@ class NelderMeadGenerator(Generator):
         """
 
         if self.initial_simplex:
-            sim = np.array(
+            self._initial_simplex = np.array(
                     [self.initial_simplex[k] for k in self.vocs.variable_names]
             ).T
         else:
-            sim = None
+            self._initial_simplex = None
 
     @property
     def simplex(self):
         """
         Returns the simplex in the current state.
         """
-        sim = self._state
+        sim = self.current_state.sim
         return dict(zip(self.vocs.variable_names, sim.T))
 
 
@@ -292,6 +283,7 @@ def _neldermead_generator(
     # 1-5 during loop
 
     def log(s):
+        pass
         print(s)
 
     astg = 0
