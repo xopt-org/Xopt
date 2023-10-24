@@ -56,7 +56,7 @@ class NelderMeadGenerator(Generator):
         str, Union[List[float], np.ndarray]
     ]] = None  # This overrides the use of initial_point
     # Same as scipy.optimize._optimize._minimize_neldermead
-    adaptive: bool = True
+    adaptive: bool = Field(True, description="Change parameters based on dimensionality")
     xatol: float = Field(1e-4, description="Tolerance in x value")
     fatol: float = Field(1e-4, description="Tolerance in function value")
     current_state: SimplexState = SimplexState()
@@ -65,10 +65,11 @@ class NelderMeadGenerator(Generator):
     # Internal data structures
     x: Optional[np.ndarray] = None
     y: Optional[float] = None
+    is_done_bool: bool = False
+
     _inputs = None
     _initial_simplex = None
 
-    is_done_bool: bool = False
     _saved_options: Dict = None
 
     def __init__(self, **kwargs):
@@ -83,11 +84,6 @@ class NelderMeadGenerator(Generator):
         )  # Used to keep track of changed options
 
         self._init_algorithm()
-
-    # Wrapper to refer to internal data
-    def func(self, x):
-        # assert np.array_equal(x, self.x), f"{x} should equal {self.x}"
-        return self.y
 
     @property
     def x0(self):
@@ -182,7 +178,6 @@ class NelderMeadGenerator(Generator):
 
     def _call_algorithm(self):
         results = _neldermead_generator(
-                self.func,
                 self.x0,
                 state=self.current_state,
                 lastval=self.y,
@@ -219,7 +214,6 @@ class NelderMeadGenerator(Generator):
 
 
 def _neldermead_generator(
-        func,
         x0,
         state,
         lastval=None,
