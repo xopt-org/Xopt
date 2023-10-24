@@ -33,7 +33,7 @@ class SimplexState(XoptBaseModel):
     ngen: int = 0
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator('fsim', 'sim', 'x', mode='before')
+    @field_validator('ind', 'fsim', 'sim', 'x', 'xr', 'xe', 'xc', 'xcc', 'xbar', mode='before')
     def to_numpy(cls, v):
         return np.array(v, dtype=np.float64)
 
