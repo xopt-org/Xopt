@@ -57,6 +57,7 @@ class StandardModelConstructor(ModelConstructor):
         Build the mean module for the output specified by name.
 
     """
+
     name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"

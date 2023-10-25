@@ -57,7 +57,6 @@ class Generator(XoptBaseModel, ABC):
 
     @abstractmethod
     def generate(self, n_candidates) -> list[dict]:
-
         pass
 
     def add_data(self, new_data: pd.DataFrame):
