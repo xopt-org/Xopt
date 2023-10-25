@@ -24,6 +24,39 @@ MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
 class StandardModelConstructor(ModelConstructor):
+    """
+    A class for constructing independent models for each objective and constraint.
+
+    Attributes
+    ----------
+    name : str
+        The name of the model (frozen).
+
+    use_low_noise_prior : bool
+        Specify if the model should assume a low noise environment.
+
+    covar_modules : Dict[str, Kernel]
+        Covariance modules for GP models.
+
+    mean_modules : Dict[str, Module]
+        Prior mean modules for GP models.
+
+    trainable_mean_keys : List[str]
+        List of prior mean modules that can be trained.
+
+
+    Methods
+    -------
+    likelihood
+        Get the likelihood for the model, considering the low noise prior.
+
+    build_model(input_names, outcome_names, data, input_bounds, dtype, device)
+        Construct independent models for each objective and constraint.
+
+    build_mean_module(name, input_transform, outcome_transform)
+        Build the mean module for the output specified by name.
+
+    """
     name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
         True, description="specify if model should assume a low noise environment"
@@ -62,6 +95,15 @@ class StandardModelConstructor(ModelConstructor):
 
     @property
     def likelihood(self):
+        """
+        Get the likelihood for the model, considering the low noise prior.
+
+        Returns
+        -------
+        GaussianLikelihood
+            The likelihood for the model.
+
+        """
         if self.use_low_noise_prior:
             return GaussianLikelihood(
                 noise_prior=GammaPrior(1.0, 100.0),
@@ -88,8 +130,30 @@ class StandardModelConstructor(ModelConstructor):
         dtype: torch.dtype = torch.double,
         device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
-        """construct independent model for each objective and constraint"""
+        """
+        Construct independent models for each objective and constraint.
 
+        Parameters
+        ----------
+        input_names : List[str]
+            Names of input variables.
+        outcome_names : List[str]
+            Names of outcome variables.
+        data : pd.DataFrame
+            Data used for training the model.
+        input_bounds : Dict[str, List], optional
+            Bounds for input variables.
+        dtype : torch.dtype, optional
+            Data type for the model (default is torch.double).
+        device : Union[torch.device, str], optional
+            Device on which to perform computations (default is "cpu").
+
+        Returns
+        -------
+        ModelListGP
+            A list of trained botorch models.
+
+        """
         # build model
         tkwargs = {"dtype": dtype, "device": device}
         models = []
@@ -137,7 +201,24 @@ class StandardModelConstructor(ModelConstructor):
     def build_mean_module(
         self, name, input_transform, outcome_transform
     ) -> Optional[CustomMean]:
-        """Builds the mean module for the output specified by name."""
+        """
+        Build the mean module for the output specified by name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the output.
+        input_transform : InputTransform
+            Transform for input variables.
+        outcome_transform : OutcomeTransform
+            Transform for outcome variables.
+
+        Returns
+        -------
+        Optional[CustomMean]
+            The mean module for the output, or None if not specified.
+
+        """
         mean_module = self._get_module(self.mean_modules, name)
         if mean_module is not None:
             fixed_model = False if name in self.trainable_mean_keys else True
@@ -148,6 +229,22 @@ class StandardModelConstructor(ModelConstructor):
 
     @staticmethod
     def _get_module(base, name):
+        """
+        Get the module for a given name.
+
+        Parameters
+        ----------
+        base : Union[Module, Dict[str, Module]]
+            The base module or a dictionary of modules.
+        name : str
+            The name of the module.
+
+        Returns
+        -------
+        Module
+            The retrieved module.
+
+        """
         if isinstance(base, Module):
             return deepcopy(base)
         elif isinstance(base, dict):
