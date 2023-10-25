@@ -93,7 +93,6 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(cls, value):
-        print(f"Verifying model {value}")
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
