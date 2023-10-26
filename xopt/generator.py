@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Literal, Optional
 
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
@@ -89,3 +89,24 @@ class Generator(XoptBaseModel, ABC):
             self.data = pd.concat([self.data, new_data], axis=0)
         else:
             self.data = new_data
+
+    def model_dump(
+        self,
+        *,
+        mode: Literal["json", "python"] | str = "python",
+        include=None,
+        exclude=None,
+        by_alias: bool = False,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        round_trip: bool = False,
+        warnings: bool = True,
+    ) -> dict[str, Any]:
+        """overwrite model dump to remove faux class attrs"""
+
+        res = super().model_dump()
+        res.pop("supports_batch_generation")
+        res.pop("supports_multi_objective")
+
+        return res
