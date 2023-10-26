@@ -1,7 +1,7 @@
 import logging
 import warnings
 from abc import abstractmethod
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -21,9 +21,9 @@ class ScipyOptimizeGenerator(Generator):
 
     name = "scipy_optimize"
     initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
-    initial_simplex: Optional[Dict[
-        str, Union[List[float], np.ndarray]
-    ]] = None  # This overrides the use of initial_point
+    initial_simplex: Optional[
+        Dict[str, Union[List[float], np.ndarray]]
+    ] = None  # This overrides the use of initial_point
     # Same as scipy.optimize._optimize._minimize_neldermead
     adaptive: Optional[bool] = True
     xatol: float = 1e-4
