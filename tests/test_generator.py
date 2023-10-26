@@ -2,8 +2,8 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from xopt.generator import Generator
-from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.generators import generators, get_generator, get_generator_defaults
+from xopt.resources.testing import TEST_VOCS_BASE
 
 
 class TestGenerator:

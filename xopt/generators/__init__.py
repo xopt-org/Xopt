@@ -84,7 +84,7 @@ def get_generator_defaults(name: str) -> dict:
     defaults = {}
     generator_class = get_generator(name)
     for k in generator_class.model_fields:
-        if k in ['vocs', 'data']:
+        if k in ["vocs", "data"]:
             continue
 
         v = generator_class.model_fields[k]
@@ -94,6 +94,7 @@ def get_generator_defaults(name: str) -> dict:
             defaults[k] = v.default
 
     return defaults
+
 
 #
 # def get_generator_help(name):
