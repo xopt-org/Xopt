@@ -28,7 +28,7 @@ class SimplexState(XoptBaseModel):
     xc: Optional[np.ndarray] = None
     xcc: Optional[np.ndarray] = None
     xbar: Optional[np.ndarray] = None
-    doshrink: bool = False
+    doshrink: int = 0
     ngen: int = 0
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -151,7 +151,6 @@ class NelderMeadGenerator(Generator):
             # print(f'Added data {self.y=}')
 
     def generate(self, n_candidates: int) -> Optional[list[dict]]:
-        # TODO: fix handling of None in step function
         if self.is_done:
             return None
 
@@ -290,10 +289,12 @@ def _neldermead_generator(
         pass
         print(s)
 
+    # active stage
     astg = 0
+    # internal simplex variables
     ind = fxr = xr = xbar = x = xe = xc = xcc = None
     kend = jend = ngen = 0
-    doshrink = False
+    doshrink = 0
 
     def save_state():
         nonlocal ngen
@@ -390,16 +391,15 @@ def _neldermead_generator(
 
     for k in range(kend, N + 1):
         if stage == -1:
-            x = sim[k]
+            #x = sim[k]
             state = save_state()
-            log(f"Stage 0 yield {x=} {stage=} {state=}")
-            return x, state
+            log(f"Stage 0 yield {sim[k]=} {stage=} {state=}")
+            return sim[k], state
         else:
-            log(f"Stage 0 resume {x=} {stage=} {state=} {lastval=}")
+            log(f"Stage 0 resume {sim[k]=} {stage=} {state=} {lastval=}")
             stage = -1
             fsim[k] = lastval
             lastval = None
-            # fsim[k] = func(x)
             kend += 1
 
     if stage == -1:
@@ -453,7 +453,7 @@ def _neldermead_generator(
             pass
 
         if stage == -1:
-            doshrink = False
+            doshrink = 0
 
         if fxr < fsim[0] or stage == 2:
             astg = 2
@@ -470,8 +470,7 @@ def _neldermead_generator(
                 fxe = lastval
                 lastval = None
             else:
-                raise Exception
-            # fxe = func(xe)
+                raise Exception(f'Simplex state is wrong')
 
             if fxe < fxr:
                 sim[-1] = xe
@@ -501,14 +500,13 @@ def _neldermead_generator(
                         fxc = lastval
                         lastval = None
                     else:
-                        raise
-                    # fxc = func(xc)
+                        raise Exception(f'Simplex state is wrong')
 
                     if fxc <= fxr:
                         sim[-1] = xc
                         fsim[-1] = fxc
                     else:
-                        doshrink = True
+                        doshrink = 1
                 elif stage == -1 or stage == 4:
                     astg = 4
                     if stage == -1:
@@ -519,18 +517,19 @@ def _neldermead_generator(
                         state = save_state()
                         log(f"Stage 4 yield {xcc=} {stage=} {state=}")
                         return xcc, state
-                    else:
+                    elif stage == 4:
                         log(f"Stage 4 resume {xcc=} {stage=} {state=}")
                         stage = -1
                         fxcc = lastval
                         lastval = None
-                    # fxcc = func(xcc)
+                    else:
+                        raise Exception(f'Simplex state is wrong')
 
                     if fxcc < fsim[-1]:
                         sim[-1] = xcc
                         fsim[-1] = fxcc
                     else:
-                        doshrink = True
+                        doshrink = 1
                 else:
                     assert stage == 5
 
@@ -543,7 +542,6 @@ def _neldermead_generator(
                             sim[j] = sim[0] + sigma * (sim[j] - sim[0])
                             if bounds is not None:
                                 sim[j] = np.clip(sim[j], lower_bound, upper_bound)
-                            # x = sim[j]
                             state = save_state()
                             log(f"Stage 5 yield {sim[j]=} {stage=} {state=}")
                             return sim[j], state
@@ -552,7 +550,6 @@ def _neldermead_generator(
                             stage = -1
                             fsim[j] = lastval
                             lastval = None
-                        # fsim[j] = func(x)
                         jend += 1
                     jend = 0
 
