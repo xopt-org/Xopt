@@ -1,15 +1,10 @@
 import json
 import warnings
-from functools import partial
-
-from orjson import orjson
-from pydantic.deprecated.json import custom_pydantic_encoder
 
 from xopt.errors import XoptError
 from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
 from xopt.generators.random import RandomGenerator
 from xopt.generators.rcds.rcds import RCDSGenerator
-from xopt.pydantic import JSON_ENCODERS
 
 # add generators here to be registered
 registered_generators = [
@@ -84,18 +79,21 @@ def get_generator(name: str):
         )
 
 
-def get_generator_defaults(name: str, ) -> dict:
+def get_generator_defaults(
+    name: str,
+) -> dict:
     defaults = {}
     generator_class = get_generator(name)
     for k in generator_class.model_fields:
-        if k in ["vocs", "data", "supports_batch_generation",
-                 "supports_multi_objective"]:
+        if k in [
+            "vocs",
+            "data",
+            "supports_batch_generation",
+            "supports_multi_objective",
+        ]:
             continue
 
         v = generator_class.model_fields[k]
-
-        # TODO: move away from borrowing pydantic v1 encoder preset
-        json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
 
         if v.exclude:
             continue
@@ -114,6 +112,7 @@ def get_generator_defaults(name: str, ) -> dict:
                     defaults[k] = v.default
 
     return defaults
+
 
 #
 # def get_generator_help(name):

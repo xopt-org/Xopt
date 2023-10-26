@@ -21,14 +21,14 @@ class Generator(XoptBaseModel, ABC):
         "generator can generate "
         "batches of points",
         frozen=True,
-        exclude=True
+        exclude=True,
     )
     supports_multi_objective: bool = Field(
         default=False,
         description="flag that describes if this generator can solve multi-objective "
         "problems",
         frozen=True,
-        exclude=True
+        exclude=True,
     )
 
     vocs: VOCS = Field(description="generator VOCS", exclude=True)

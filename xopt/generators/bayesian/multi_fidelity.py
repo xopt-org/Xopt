@@ -23,12 +23,14 @@ logger = logging.getLogger()
 
 class MultiFidelityGenerator(MOBOGenerator):
     name = "multi_fidelity"
-    fidelity_parameter: Literal["s"] = Field("s", description="fidelity parameter "
-                                                              "name", exclude=True)
+    fidelity_parameter: Literal["s"] = Field(
+        "s", description="fidelity parameter " "name", exclude=True
+    )
     cost_function: Callable = Field(
         lambda x: x + 1.0,
         description="callable function that describes the cost "
-        "of evaluating the objective function", exclude=True
+        "of evaluating the objective function",
+        exclude=True,
     )
     reference_point: Optional[Dict[str, float]] = None
     supports_multi_objective: bool = True

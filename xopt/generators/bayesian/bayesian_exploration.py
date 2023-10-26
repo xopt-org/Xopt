@@ -5,6 +5,8 @@ from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
+from pydantic import field_validator
+from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
@@ -14,6 +16,12 @@ from xopt.generators.bayesian.objectives import create_exploration_objective
 class BayesianExplorationGenerator(BayesianGenerator):
     name = "bayesian_exploration"
     supports_batch_generation: bool = True
+
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_objectives != 0:
+            raise ValueError("this generator only supports zero objectives only")
+        return v
 
     def _get_acquisition(self, model):
         sampler = self._get_sampler(model)
