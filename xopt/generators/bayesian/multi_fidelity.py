@@ -63,7 +63,8 @@ class MultiFidelityGenerator(MOBOGenerator):
                         reference_point.update({name: -100.0})
                     else:
                         reference_point.update({name: 100.0})
-            reference_point.update({"s": 0.0})
+
+        reference_point.update({"s": 0.0})
 
         super(MultiFidelityGenerator, self).__init__(
             **kwargs, reference_point=reference_point
