@@ -1,5 +1,8 @@
+import json
 from copy import deepcopy
 from unittest.mock import patch
+
+import pytest
 
 from xopt.generator import Generator
 from xopt.generators import generators, get_generator, get_generator_defaults
@@ -10,6 +13,11 @@ class TestGenerator:
     @patch.multiple(Generator, __abstractmethods__=set())
     def test_init(self):
         Generator(vocs=TEST_VOCS_BASE)
+
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives.update({"y2": "MINIMIZE"})
+        with pytest.raises(ValueError):
+            Generator(vocs=test_vocs)
 
     def test_all_serialization_loading(self):
         # test generator serialization and loading with default values
@@ -22,10 +30,15 @@ class TestGenerator:
 
             if name in ["mobo", "cnsga", "mggpo"]:
                 gen_config["reference_point"] = {"y1": 10.0}
+                json.dumps(gen_config)
+
                 gen_class(vocs=TEST_VOCS_BASE, **gen_config)
             elif name in ["multi_fidelity"]:
                 test_vocs = deepcopy(TEST_VOCS_BASE)
                 test_vocs.constraints = {}
+                json.dumps(gen_config)
+
                 gen_class(vocs=test_vocs, **gen_config)
             else:
+                json.dumps(gen_config)
                 gen_class(vocs=TEST_VOCS_BASE, **gen_config)
