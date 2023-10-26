@@ -88,7 +88,8 @@ def get_generator_defaults(name: str, ) -> dict:
     defaults = {}
     generator_class = get_generator(name)
     for k in generator_class.model_fields:
-        if k in ["vocs", "data"]:
+        if k in ["vocs", "data", "supports_batch_generation",
+                 "supports_multi_objective"]:
             continue
 
         v = generator_class.model_fields[k]

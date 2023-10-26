@@ -3,6 +3,7 @@ from copy import deepcopy
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from xopt.generator import Generator
 from xopt.generators import generators, get_generator, get_generator_defaults
@@ -16,7 +17,8 @@ class TestGenerator:
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives.update({"y2": "MINIMIZE"})
-        with pytest.raises(ValueError):
+
+        with pytest.raises(ValidationError):
             Generator(vocs=test_vocs)
 
     def test_all_serialization_loading(self):

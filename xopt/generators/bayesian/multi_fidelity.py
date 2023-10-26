@@ -31,8 +31,8 @@ class MultiFidelityGenerator(MOBOGenerator):
         "of evaluating the objective function", exclude=True
     )
     reference_point: Optional[Dict[str, float]] = None
-    supports_multi_objective = True
-    supports_batch_generation = True
+    supports_multi_objective: bool = True
+    supports_batch_generation: bool = True
 
     __doc__ = """Implements Multi-fidelity Bayesian optimization
         Assumes a fidelity parameter [0,1]

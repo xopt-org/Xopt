@@ -13,7 +13,7 @@ from xopt.generators.bayesian.objectives import create_exploration_objective
 
 class BayesianExplorationGenerator(BayesianGenerator):
     name = "bayesian_exploration"
-    supports_batch_generation = True
+    supports_batch_generation: bool = True
 
     def _get_acquisition(self, model):
         sampler = self._get_sampler(model)

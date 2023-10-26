@@ -497,7 +497,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         "optimization",
     )
 
-    supports_multi_objective = True
+    supports_multi_objective: bool = True
 
     @field_validator("reference_point")
     def validate_reference_point(cls, v, info: ValidationInfo):
