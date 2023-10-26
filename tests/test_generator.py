@@ -41,6 +41,13 @@ class TestGenerator:
                 json.dumps(gen_config)
 
                 gen_class(vocs=test_vocs, **gen_config)
+            elif name in ["bayesian_exploration"]:
+                test_vocs = deepcopy(TEST_VOCS_BASE)
+                test_vocs.objectives = {}
+                test_vocs.observables = ["f"]
+                json.dumps(gen_config)
+
+                gen_class(vocs=test_vocs, **gen_config)
             else:
                 json.dumps(gen_config)
                 gen_class(vocs=TEST_VOCS_BASE, **gen_config)
