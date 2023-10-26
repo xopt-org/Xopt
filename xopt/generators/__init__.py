@@ -1,3 +1,4 @@
+import json
 import warnings
 
 from xopt.errors import XoptError
@@ -78,6 +79,21 @@ def get_generator(name: str):
             f"No generator named {name}, available generators are {list(generators.keys())}"
         )
 
+
+def get_generator_defaults(name: str) -> dict:
+    defaults = {}
+    generator_class = get_generator(name)
+    for k in generator_class.model_fields:
+        if k in ['vocs', 'data']:
+            continue
+
+        v = generator_class.model_fields[k]
+        try:
+            defaults[k] = json.loads(v.default.json())
+        except AttributeError:
+            defaults[k] = v.default
+
+    return defaults
 
 #
 # def get_generator_help(name):
