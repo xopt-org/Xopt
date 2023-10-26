@@ -13,7 +13,7 @@ from .bayesian_generator import MultiObjectiveBayesianGenerator
 class MGGPOGenerator(MultiObjectiveBayesianGenerator):
     name = "mggpo"
     population_size: int = Field(64, description="population size for ga")
-    supports_batch_generation = True
+    supports_batch_generation: bool = True
 
     ga_generator: Optional[CNSGAGenerator] = Field(
         None, description="CNSGA generator used to " "generate candidates"
