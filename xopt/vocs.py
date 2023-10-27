@@ -358,7 +358,26 @@ class VOCS(XoptBaseModel):
 
     def normalize_inputs(self, input_points: pd.DataFrame) -> pd.DataFrame:
         """
-        normalize data based on vocs ranges
+        Normalize input data (transform data into the range [0,1]) based on the
+        variable ranges defined in the VOCS.
+
+        Parameters
+        ----------
+        input_points : pd.DataFrame
+            A DataFrame containing input data to be normalized.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with input data in the range [0,1] corresponding to the
+            specified variable ranges.
+
+        Notes
+        -----
+
+        If the input DataFrame is empty or no variable information is available in
+        the VOCS, an empty DataFrame is returned.
+
         """
         normed_data = {}
         for name in input_points.columns:
