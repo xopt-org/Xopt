@@ -185,15 +185,35 @@ class TestVOCS(object):
         assert normed_data["x1"].to_list() == [0.5, 0.2]
         assert normed_data["x2"].to_list() == [0.05, 0.075]
 
+        assert np.equal(
+            vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
+            test_data[vocs.variable_names].to_numpy()
+        ).all()
+
         test_data.pop("x1")
         normed_data = vocs.normalize_inputs(test_data)
         assert normed_data["x2"].to_list() == [0.05, 0.075]
+
+        assert np.equal(
+            vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
+            test_data[test_data.columns].to_numpy()
+        ).all()
 
         test_data = pd.DataFrame({"x1": 0.5}, index=[0])
         normed_data = vocs.normalize_inputs(test_data)
         assert normed_data["x1"].to_list() == [0.5]
 
+        assert np.equal(
+            vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
+            test_data[test_data.columns].to_numpy()
+        ).all()
+
         # test with extra data
-        test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75], "a":[1,1]})
+        test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75], "a": [1, 1]})
         normed_data = vocs.normalize_inputs(test_data)
-        assert {"x1","x2"} == set(normed_data.columns)
+        assert {"x1", "x2"} == set(normed_data.columns)
+
+        assert np.equal(
+            vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
+            test_data[vocs.variable_names].to_numpy()
+        ).all()
