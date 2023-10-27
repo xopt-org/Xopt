@@ -4,7 +4,7 @@ import pytest
 import scipy
 import yaml
 from pydantic import ValidationError
-from scipy.optimize import fmin
+from scipy.optimize import minimize
 
 from xopt import Xopt
 from xopt.generators.scipy.neldermead import NelderMeadGenerator
@@ -59,7 +59,8 @@ class TestNelderMeadGenerator:
         """Compare between Vanilla Simplex and Xopt Simplex"""
 
         # Scipy Simplex
-        result = fmin(rosenbrock, [-1, -1])
+        result = minimize(rosenbrock, [-1, -1], method="Nelder-Mead", options={"adaptive": True})
+        result = result.x
 
         # Xopt Simplex
         YAML = """
@@ -87,7 +88,7 @@ class TestNelderMeadGenerator:
         ), "Xopt Simplex does not match the vanilla one"
 
     @pytest.mark.parametrize("fun,fstring,x0,v",
-                             [#(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
+                             [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
                               (ackley, "ackley_20.evaluate_ackley_np", [4]*20, ackleyvocs)])
     def test_simplex_agreement_steps(self, fun, fstring, x0, v):
         inputs = []
@@ -96,9 +97,7 @@ class TestNelderMeadGenerator:
             inputs.append(x)
             return fun(x)
 
-        from scipy.optimize import minimize
         result = minimize(wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True})
-        #result = fmin(wrap, x0)
         scipy_data = np.array(inputs)
 
         x0dict = ",".join([f"x{i}: {x0[i]} " for i in range(len(x0))])
@@ -138,7 +137,8 @@ class TestNelderMeadGenerator:
             inputs.append(x)
             return fun(x)
 
-        result = fmin(wrap, x0)
+        result = minimize(wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True})
+        # result = fmin(wrap, x0)
         scipy_data = np.array(inputs)
 
         x0dict = ",".join([f"x{i}: {x0[i]} " for i in range(len(x0))])
