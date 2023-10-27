@@ -27,7 +27,7 @@ from pydantic import (
     model_validator,
 )
 from pydantic.v1.json import custom_pydantic_encoder
-from pydantic_core.core_schema import FieldValidationInfo, SerializationInfo
+from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
@@ -189,7 +189,7 @@ class XoptBaseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @field_validator("*", mode="before")
-    def validate_files(cls, value, info: FieldValidationInfo):
+    def validate_files(cls, value, info: ValidationInfo):
         if isinstance(value, str):
             if os.path.exists(value):
                 extension = value.split(".")[-1]
@@ -563,7 +563,7 @@ class NormalExecutor(
 
     # TODO: check if validate_default is sufficient
     @field_validator("executor")
-    def validate_executor(cls, v, info: FieldValidationInfo):
+    def validate_executor(cls, v, info: ValidationInfo):
         if v is None:
             v = info.data["loader"].load()
 

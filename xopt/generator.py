@@ -59,9 +59,6 @@ class Generator(XoptBaseModel, ABC):
         """
         Initialize the generator.
 
-        Args:
-            vocs: The vocs to use.
-            options: The options to use.
         """
         super().__init__(**kwargs)
         logger.info(f"Initialized generator {self.name}")
@@ -72,10 +69,6 @@ class Generator(XoptBaseModel, ABC):
 
     @abstractmethod
     def generate(self, n_candidates) -> list[dict]:
-        """
-        generate `n_candidates` candidates
-
-        """
         pass
 
     def add_data(self, new_data: pd.DataFrame):

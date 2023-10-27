@@ -356,6 +356,76 @@ class VOCS(XoptBaseModel):
         """
         return form_feasibility_data(self.constraints, data, prefix)
 
+    def normalize_inputs(self, input_points: pd.DataFrame) -> pd.DataFrame:
+        """
+        Normalize input data (transform data into the range [0,1]) based on the
+        variable ranges defined in the VOCS.
+
+        Parameters
+        ----------
+        input_points : pd.DataFrame
+            A DataFrame containing input data to be normalized.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with input data in the range [0,1] corresponding to the
+            specified variable ranges. Contains columns equal to the intersection
+            between `input_points` and `vocs.variable_names`.
+
+        Notes
+        -----
+
+        If the input DataFrame is empty or no variable information is available in
+        the VOCS, an empty DataFrame is returned.
+
+        """
+        normed_data = {}
+        for name in self.variable_names:
+            if name in input_points.columns:
+                width = self.variables[name][1] - self.variables[name][0]
+                normed_data[name] = (input_points[name] - self.variables[name][0]) / width
+
+        if len(normed_data):
+            return pd.DataFrame(normed_data)
+        else:
+            return pd.DataFrame([])
+
+    def denormalize_inputs(self, input_points: pd.DataFrame) -> pd.DataFrame:
+        """
+        Denormalize input data (transform data from the range [0,1]) based on the
+        variable ranges defined in the VOCS.
+
+        Parameters
+        ----------
+        input_points : pd.DataFrame
+            A DataFrame containing normalized input data in the range [0,1].
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with denormalized input data corresponding to the
+            specified variable ranges. Contains columns equal to the intersection
+            between `input_points` and `vocs.variable_names`.
+
+        Notes
+        -----
+
+        If the input DataFrame is empty or no variable information is available in
+        the VOCS, an empty DataFrame is returned.
+
+        """
+        denormed_data = {}
+        for name in self.variable_names:
+            if name in input_points.columns:
+                width = self.variables[name][1] - self.variables[name][0]
+                denormed_data[name] = input_points[name]*width + self.variables[name][0]
+
+        if len(denormed_data):
+            return pd.DataFrame(denormed_data)
+        else:
+            return pd.DataFrame([])
+
     def validate_input_data(self, input_points: pd.DataFrame) -> None:
         """
         Validates input data. Raises an error if the input data does not satisfy
@@ -428,7 +498,11 @@ class VOCS(XoptBaseModel):
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_variable_data(variables: Dict, data, prefix="variable_"):
+def form_variable_data(
+    variables: Dict,
+    data,
+    prefix="variable_",
+):
     """
     Use variables dict to form a dataframe.
     """
@@ -437,6 +511,7 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
 
     data = pd.DataFrame(data)
     vdata = pd.DataFrame()
+
     for k in sorted(list(variables)):
         vdata[prefix + k] = data[k]
 
