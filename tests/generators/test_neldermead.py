@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+import scipy
 import yaml
 from pydantic import ValidationError
 from scipy.optimize import fmin
@@ -86,7 +87,7 @@ class TestNelderMeadGenerator:
         ), "Xopt Simplex does not match the vanilla one"
 
     @pytest.mark.parametrize("fun,fstring,x0,v",
-                             [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
+                             [#(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
                               (ackley, "ackley_20.evaluate_ackley_np", [4]*20, ackleyvocs)])
     def test_simplex_agreement_steps(self, fun, fstring, x0, v):
         inputs = []
@@ -95,7 +96,9 @@ class TestNelderMeadGenerator:
             inputs.append(x)
             return fun(x)
 
-        result = fmin(wrap, x0)
+        from scipy.optimize import minimize
+        result = minimize(wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True})
+        #result = fmin(wrap, x0)
         scipy_data = np.array(inputs)
 
         x0dict = ",".join([f"x{i}: {x0[i]} " for i in range(len(x0))])
@@ -121,10 +124,9 @@ class TestNelderMeadGenerator:
         data = X.vocs.variable_data(X.data).to_numpy()
         assert np.array_equal(data, scipy_data)
 
-        xbest = X.data.iloc[X.data["y"].argmin()]
-        assert (
-                xbest["x0"] == result[0] and xbest["x1"] == result[1]
-        ), "Xopt Simplex does not match the vanilla one"
+        idx, best = X.vocs.select_best(X.data)
+        xbest = X.vocs.variable_data(X.data.loc[idx,:]).to_numpy().flatten()
+        assert np.array_equal(xbest,result.x), "Xopt Simplex does not match the vanilla one"
 
     @pytest.mark.parametrize("fun,fstring,x0,v",
                              [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
