@@ -17,6 +17,7 @@ from pydantic import Field, field_validator, SerializeAsAny
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
+from xopt.errors import XoptError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -38,6 +39,7 @@ from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOpt
 from xopt.pydantic import decode_torch_module
 
 logger = logging.getLogger()
+
 
 # It seems pydantic v2 does not auto-register models anymore
 # So one option is to have explicit unions for model subclasses
@@ -153,7 +155,6 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(cls, value):
-        print(f"Verifying model {value}")
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
@@ -659,17 +660,31 @@ class BayesianGenerator(Generator, ABC):
 
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
-    reference_point: Dict[str, float] = Field(
-        description="dict specifying reference point for multi-objective optimization"
+    reference_point: dict[str, float] = Field(
+        description="dict specifying reference point for multi-objective "
+        "optimization",
     )
 
-    supports_multi_objective = True
+    supports_multi_objective: bool = True
+
+    @field_validator("reference_point")
+    def validate_reference_point(cls, v, info: ValidationInfo):
+        objective_names = info.data["vocs"].objective_names
+        assert set(v.keys()) == set(objective_names)
+
+        return v
 
     @property
     def torch_reference_point(self):
         pt = []
         for name in self.vocs.objective_names:
-            ref_val = self.reference_point[name]
+            try:
+                ref_val = self.reference_point[name]
+            except KeyError:
+                raise XoptError(
+                    "need to specify reference point for the following "
+                    f"objective {name}"
+                )
             if self.vocs.objectives[name] == "MINIMIZE":
                 pt += [-ref_val]
             elif self.vocs.objectives[name] == "MAXIMIZE":

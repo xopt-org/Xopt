@@ -2,6 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import pytest
+from pydantic import ValidationError
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
@@ -18,18 +20,20 @@ class TestMOBOGenerator:
 
         MOBOGenerator(vocs=vocs, reference_point=reference_point)
 
+        # test bad reference point
+        with pytest.raises(ValidationError):
+            MOBOGenerator(vocs=vocs, reference_point={})
+
     def test_script(self):
         evaluator = Evaluator(function=evaluate_TNK)
         reference_point = {"y1": 1.5, "y2": 1.5}
 
         gen = MOBOGenerator(vocs=tnk_vocs, reference_point=reference_point)
-        print(gen.model_dump())
         gen = deepcopy(gen)
         gen.n_monte_carlo_samples = 20
 
         for ele in [gen]:
             dump = ele.model_dump()
-            print(dump)
             generator = MOBOGenerator(vocs=tnk_vocs, **dump)
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
             X.random_evaluate(3)

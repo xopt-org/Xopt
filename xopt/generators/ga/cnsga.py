@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class CNSGAGenerator(Generator):
     name = "cnsga"
-    supports_multi_objective = True
+    supports_multi_objective: bool = True
     population_size: int = Field(64, description="Population size")
     crossover_probability: confloat(ge=0, le=1) = Field(
         0.9, description="Crossover probability"
