@@ -1,6 +1,7 @@
 import time
 import warnings
 from abc import ABC
+from typing import Optional
 
 import pandas as pd
 import torch
@@ -13,9 +14,9 @@ from xopt.generators.bayesian.models.time_dependent import TimeDependentModelCon
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     name = "time_dependent_bayesian_generator"
-    target_prediction_time: PositiveFloat = Field(None)
+    target_prediction_time: Optional[PositiveFloat] = Field(None)
     added_time: PositiveFloat = Field(
-        0.0,
+        0.1,
         description="time added to current time to get target predcition time",
     )
 

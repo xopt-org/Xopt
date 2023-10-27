@@ -16,7 +16,7 @@ from xopt.generators.bayesian.utils import set_botorch_weights
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
-    supports_batch_generation = True
+    supports_batch_generation: bool = True
     __doc__ = """Implements Bayesian Optimization using the Upper Confidence Bound
     acquisition function"""
 
