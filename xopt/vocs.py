@@ -370,7 +370,8 @@ class VOCS(XoptBaseModel):
         -------
         pd.DataFrame
             A DataFrame with input data in the range [0,1] corresponding to the
-            specified variable ranges.
+            specified variable ranges. Contains columns equal to the intersection
+            between `input_points` and `vocs.variable_names`.
 
         Notes
         -----
@@ -380,7 +381,7 @@ class VOCS(XoptBaseModel):
 
         """
         normed_data = {}
-        for name in input_points.columns:
+        for name in list(set(self.variable_names) & set(input_points.columns)):
             width = self.variables[name][1] - self.variables[name][0]
             normed_data[name] = (input_points[name] - self.variables[name][0]) / width
 
