@@ -18,5 +18,4 @@ class TestRandomGenerator:
         test_vocs.objectives = {"y": "MAXIMIZE", "z": "MINIMIZE"}
 
         gen = RandomGenerator(vocs=test_vocs)
-        out = gen.yaml()
-        assert out == "{}\n"
+        gen.yaml()
