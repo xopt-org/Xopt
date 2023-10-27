@@ -192,3 +192,8 @@ class TestVOCS(object):
         test_data = pd.DataFrame({"x1": 0.5}, index=[0])
         normed_data = vocs.normalize_inputs(test_data)
         assert normed_data["x1"].to_list() == [0.5]
+
+        # test with extra data
+        test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75], "a":[1,1]})
+        normed_data = vocs.normalize_inputs(test_data)
+        assert {"x1","x2"} == set(normed_data.columns)
