@@ -27,6 +27,8 @@ jobs:
           use-mamba: true
           python-version: ${{ matrix.python-version }}
 
+      - uses: actions/checkout@v3
+
       - name: Get Date
         id: get-date
         run: echo "today=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
@@ -43,8 +45,6 @@ jobs:
         env:
           CACHE_NUMBER: 0
         id: cache
-
-      - uses: actions/checkout@v3
 
       - name: Update environment if not cached
         run:
