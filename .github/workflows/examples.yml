@@ -35,8 +35,8 @@ jobs:
           path: ${{ env.CONDA }}/envs
           key:
             conda-${{ runner.os }}--${{ runner.arch }}--${{ github.workflow }}--${{
-            steps.get-date.outputs.today }}-${{
-            hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}-${{ matrix.python-version }}
+            steps.get-date.outputs.today }}--${{
+            hashFiles('environment.yml') }}--${{ env.CACHE_NUMBER }}--${{ matrix.python-version }}
         env:
           CACHE_NUMBER: 0
         id: cache
@@ -52,7 +52,7 @@ jobs:
           environment-file: environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
-      - name: Create environment
+      - name: Install extra packages
         shell: bash -l {0}
         run: |
           mamba install nbformat nbconvert ipython matplotlib
