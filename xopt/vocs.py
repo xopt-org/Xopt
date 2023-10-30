@@ -384,7 +384,9 @@ class VOCS(XoptBaseModel):
         for name in self.variable_names:
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
-                normed_data[name] = (input_points[name] - self.variables[name][0]) / width
+                normed_data[name] = (
+                    input_points[name] - self.variables[name][0]
+                ) / width
 
         if len(normed_data):
             return pd.DataFrame(normed_data)
@@ -419,7 +421,9 @@ class VOCS(XoptBaseModel):
         for name in self.variable_names:
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
-                denormed_data[name] = input_points[name]*width + self.variables[name][0]
+                denormed_data[name] = (
+                    input_points[name] * width + self.variables[name][0]
+                )
 
         if len(denormed_data):
             return pd.DataFrame(denormed_data)
@@ -515,7 +519,7 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
 
 
 def form_objective_data(
-        objectives: Dict, data, prefix="objective_", return_raw: bool = False
+    objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
@@ -547,7 +551,9 @@ def form_objective_data(
 
         oarr = data.loc[:, objectives_names].to_numpy() * weights
         oarr[np.isnan(oarr)] = np.inf
-        odata = pd.DataFrame(oarr, columns=[prefix + k for k in objectives_names], index=data.index)
+        odata = pd.DataFrame(
+            oarr, columns=[prefix + k for k in objectives_names], index=data.index
+        )
     else:
         # have to do this way because of missing objectives, even if slow
         # TODO: pre-allocate 2D array
@@ -566,8 +572,11 @@ def form_objective_data(
             arr[np.isnan(arr)] = np.inf
             array_list.append(arr)
 
-        odata = pd.DataFrame(np.hstack(array_list), columns=[prefix + k for k in objectives_names],
-                             index=data.index)
+        odata = pd.DataFrame(
+            np.hstack(array_list),
+            columns=[prefix + k for k in objectives_names],
+            index=data.index,
+        )
 
     return odata
 
@@ -681,5 +690,5 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
 
     if any_bad:
         raise ValueError(
-                f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
+            f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
         )
