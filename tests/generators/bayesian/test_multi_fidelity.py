@@ -5,6 +5,7 @@ import torch
 from pandas import Series
 
 from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
+from xopt.resources.test_functions.tnk import tnk_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
@@ -111,3 +112,10 @@ class TestMultiFidelityGenerator:
         # test getting the best point at max fidelity
         # get optimal value at max fidelity
         generator.get_optimum()
+
+    def test_multi_objective(self):
+        my_vocs = deepcopy(tnk_vocs)
+        my_vocs.constraints = {}
+        MultiFidelityGenerator(
+            vocs=my_vocs, reference_point={"y1": 1.5, "y2": 1.5}
+        )

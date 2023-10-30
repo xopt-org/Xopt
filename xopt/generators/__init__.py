@@ -1,3 +1,4 @@
+import json
 import warnings
 
 from xopt.errors import XoptError
@@ -66,7 +67,6 @@ try:
 except ModuleNotFoundError:
     warnings.warn("WARNING: `scipy` not found, NelderMeadGenerator is not available")
 
-
 generators = {gen.name: gen for gen in registered_generators}
 
 
@@ -77,6 +77,41 @@ def get_generator(name: str):
         raise XoptError(
             f"No generator named {name}, available generators are {list(generators.keys())}"
         )
+
+
+def get_generator_defaults(
+    name: str,
+) -> dict:
+    defaults = {}
+    generator_class = get_generator(name)
+    for k in generator_class.model_fields:
+        if k in [
+            "vocs",
+            "data",
+            "supports_batch_generation",
+            "supports_multi_objective",
+        ]:
+            continue
+
+        v = generator_class.model_fields[k]
+
+        if v.exclude:
+            continue
+
+        if v.is_required():
+            defaults[k] = None
+        else:
+            if v.default is None:
+                defaults[k] = None
+            else:
+                try:
+                    # handles pydantic models as defaults
+                    defaults[k] = json.loads(v.default.json())
+                except AttributeError:
+                    # handles everything else
+                    defaults[k] = v.default
+
+    return defaults
 
 
 #

@@ -14,9 +14,10 @@ from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import Field, field_validator, SerializeAsAny
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
+from xopt.errors import XoptError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -39,6 +40,7 @@ from xopt.pydantic import decode_torch_module
 
 logger = logging.getLogger()
 
+
 # It seems pydantic v2 does not auto-register models anymore
 # So one option is to have explicit unions for model subclasses
 # The other is to define a descriminated union with name as key, but that stops name field from
@@ -51,6 +53,66 @@ logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
+    """
+    Bayesian Generator for Bayesian Optimization.
+
+    Attributes:
+    -----------
+    name : str
+        The name of the Bayesian Generator.
+
+    model : Optional[Model]
+        The BoTorch model used by the generator to perform optimization.
+
+    n_monte_carlo_samples : int
+        The number of Monte Carlo samples to use in the optimization process.
+
+    turbo_controller : SerializeAsAny[Optional[TurboController]]
+        The Turbo Controller for trust-region Bayesian Optimization.
+
+    use_cuda : bool
+        A flag to enable or disable CUDA usage if available.
+
+    gp_constructor : SerializeAsAny[ModelConstructor]
+        The constructor used to generate the model for Bayesian Optimization.
+
+    numerical_optimizer : SerializeAsAny[NumericalOptimizer]
+        The optimizer used to optimize the acquisition function in Bayesian Optimization.
+
+    max_travel_distances : Optional[List[float]]
+        The limits for travel distances between points in normalized space.
+
+    fixed_features : Optional[Dict[str, float]]
+        The fixed features used in Bayesian Optimization.
+
+    computation_time : Optional[pd.DataFrame]
+        A data frame tracking computation time in seconds.
+
+    n_candidates : int
+        The number of candidates to generate in each optimization step.
+
+    Methods:
+    --------
+    generate(self, n_candidates: int) -> List[Dict]:
+        Generate candidates for Bayesian Optimization.
+
+    add_data(self, new_data: pd.DataFrame):
+        Add new data to the generator for Bayesian Optimization.
+
+    train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
+        Train a Bayesian model for Bayesian Optimization.
+
+    propose_candidates(self, model, n_candidates=1) -> Tensor:
+        Propose candidates for Bayesian Optimization.
+
+    get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
+        Get input data in torch.Tensor format.
+
+    get_acquisition(self, model) -> AcquisitionFunction:
+        Get the acquisition function for Bayesian Optimization.
+
+    """
+
     name = "base_bayesian_generator"
     model: Optional[Model] = Field(
         None, description="botorch model used by the generator to perform optimization"
@@ -93,7 +155,6 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(cls, value):
-        print(f"Verifying model {value}")
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
@@ -134,7 +195,7 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(cls, value, info: FieldValidationInfo):
+    def validate_turbo_controller(cls, value, info: ValidationInfo):
         """note default behavior is no use of turbo"""
         optimizer_dict = {
             "optimize": OptimizeTurboController,
@@ -176,6 +237,37 @@ class BayesianGenerator(Generator, ABC):
         self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> list[dict]:
+        """
+        Generate candidates using Bayesian Optimization.
+
+        Parameters:
+        -----------
+        n_candidates : int
+            The number of candidates to generate in each optimization step.
+
+        Returns:
+        --------
+        List[Dict]
+            A list of dictionaries containing the generated candidates.
+
+        Raises:
+        -------
+        NotImplementedError
+            If the number of candidates is greater than 1, and the generator does not
+            support batch candidate generation.
+
+        RuntimeError
+            If no data is contained in the generator, the 'add_data' method should be
+            called to add data before generating candidates.
+
+        Notes:
+        ------
+        This method generates candidates for Bayesian Optimization based on the
+        provided number of candidates. It updates the internal model with the current
+        data and calculates the candidates by optimizing the acquisition function.
+        The method returns the generated candidates in the form of a list of dictionaries.
+        """
+
         self.n_candidates = n_candidates
         if n_candidates > 1 and not self.supports_batch_generation:
             raise NotImplementedError(
@@ -280,12 +372,47 @@ class BayesianGenerator(Generator, ABC):
         candidates = self.numerical_optimizer.optimize(acq_funct, bounds, n_candidates)
         return candidates
 
-    def get_input_data(self, data):
+    def get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
+        """
+        Convert input data to a torch tensor.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            The input data in the form of a pandas DataFrame.
+
+        Returns:
+        --------
+        torch.Tensor
+            A torch tensor containing the input data.
+
+        Notes:
+        ------
+        This method takes a pandas DataFrame as input data and converts it into a
+        torch tensor. It specifically selects columns corresponding to the model's
+        input names (variables), and the resulting tensor is configured with the data
+        type and device settings from the generator.
+        """
         return torch.tensor(data[self.model_input_names].to_numpy(), **self._tkwargs)
 
     def get_acquisition(self, model):
         """
-        Returns a function that can be used to evaluate the acquisition function
+        Define the acquisition function based on the given GP model.
+
+        Parameters:
+        -----------
+        model : Model
+            The BoTorch model to be used for generating the acquisition function.
+
+        Returns:
+        --------
+        acqusition_function : AcqusitionFunction
+
+        Raises:
+        -------
+        ValueError
+            If the provided 'model' is None. A valid model is required to create the
+            acquisition function.
         """
         if model is None:
             raise ValueError("model cannot be None")
@@ -425,9 +552,23 @@ class BayesianGenerator(Generator, ABC):
 
     def _get_optimization_bounds(self):
         """
-        gets optimization bounds based on the union of several domains
-        - if use_turbo is True include trust region
-        - if max_travel_distances is not None limit max travel distance
+        Get optimization bounds based on the union of several domains.
+
+        Returns:
+        --------
+        torch.Tensor
+            Tensor containing the optimized bounds.
+
+        Notes:
+        ------
+        This method calculates the optimization bounds based on several factors:
+
+        - If 'max_travel_distances' is specified, the bounds are modified to limit
+            the maximum travel distances between points in normalized space.
+        - If 'turbo_controller' is not None, the bounds are updated according to the
+            trust region specified by the controller.
+        - If 'fixed_features' are included in the variable names from the VOCS,
+            the bounds associated with those features are removed.
 
         """
         bounds = deepcopy(self._get_bounds())
@@ -458,7 +599,35 @@ class BayesianGenerator(Generator, ABC):
         return bounds
 
     def _get_max_travel_distances_region(self, bounds):
-        """get region based on max travel distances and last observation"""
+        """
+        Calculate the region for maximum travel distances based on the current bounds
+        and the last observation.
+
+        Parameters:
+        -----------
+        bounds : torch.Tensor
+            The optimization bounds based on the union of several domains.
+
+        Returns:
+        --------
+        torch.Tensor
+            The bounds for the maximum travel distances region.
+
+        Raises:
+        -------
+        ValueError
+            If the length of max_travel_distances does not match the number of
+            variables in bounds.
+
+        Notes:
+        ------
+        This method calculates the region in which the next candidates for
+        optimization should be generated based on the maximum travel distances
+        specified. The region is centered around the last observation in the
+        optimization space. The `max_travel_distances` parameter should be a list of
+        maximum travel distances for each variable.
+
+        """
         if len(self.max_travel_distances) != bounds.shape[-1]:
             raise ValueError(
                 f"length of max_travel_distances must match the number of "
@@ -491,17 +660,31 @@ class BayesianGenerator(Generator, ABC):
 
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
-    reference_point: Dict[str, float] = Field(
-        description="dict specifying reference point for multi-objective optimization"
+    reference_point: dict[str, float] = Field(
+        description="dict specifying reference point for multi-objective "
+        "optimization",
     )
 
-    supports_multi_objective = True
+    supports_multi_objective: bool = True
+
+    @field_validator("reference_point")
+    def validate_reference_point(cls, v, info: ValidationInfo):
+        objective_names = info.data["vocs"].objective_names
+        assert set(v.keys()) == set(objective_names)
+
+        return v
 
     @property
     def torch_reference_point(self):
         pt = []
         for name in self.vocs.objective_names:
-            ref_val = self.reference_point[name]
+            try:
+                ref_val = self.reference_point[name]
+            except KeyError:
+                raise XoptError(
+                    "need to specify reference point for the following "
+                    f"objective {name}"
+                )
             if self.vocs.objectives[name] == "MINIMIZE":
                 pt += [-ref_val]
             elif self.vocs.objectives[name] == "MAXIMIZE":
