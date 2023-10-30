@@ -112,6 +112,35 @@ class TestVOCS(object):
         assert vocs.output_names == ["d1", "y1", "c1"]
         assert vocs.n_outputs == 3
 
+    def test_variable_data(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = TEST_VOCS_DATA
+
+        res = vocs.variable_data(test_data)
+        assert np.array_equal(res.to_numpy(), test_data.loc[:, ["x1", "x2"]].to_numpy())
+
+    def test_objective_data(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = TEST_VOCS_DATA
+        test_data["y2"] = 1.0
+
+        res = vocs.objective_data(test_data)
+        assert np.array_equal(res.to_numpy(), test_data.loc[:, ["y1"]].to_numpy())
+
+        vocs.objectives.update({"y2": "MAXIMIZE"})
+        res = vocs.objective_data(test_data)
+        assert np.array_equal(
+            res.to_numpy(),
+            test_data.loc[:, ["y1", "y2"]].to_numpy() * np.array([1, -1]),
+        )
+
+        test_data2 = test_data.drop(columns=["y1"])
+        res = vocs.objective_data(test_data2)
+        assert np.array_equal(
+            res.to_numpy(),
+            test_data.loc[:, ["y1", "y2"]].to_numpy() * np.array([np.inf, -1]),
+        )
+
     def test_convert_dataframe_to_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = TEST_VOCS_DATA
@@ -187,7 +216,7 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
-            test_data[vocs.variable_names].to_numpy()
+            test_data[vocs.variable_names].to_numpy(),
         ).all()
 
         test_data.pop("x1")
@@ -196,7 +225,7 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
-            test_data[test_data.columns].to_numpy()
+            test_data[test_data.columns].to_numpy(),
         ).all()
 
         test_data = pd.DataFrame({"x1": 0.5}, index=[0])
@@ -205,7 +234,7 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
-            test_data[test_data.columns].to_numpy()
+            test_data[test_data.columns].to_numpy(),
         ).all()
 
         # test with extra data
@@ -215,5 +244,5 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
-            test_data[vocs.variable_names].to_numpy()
+            test_data[vocs.variable_names].to_numpy(),
         ).all()
