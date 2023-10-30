@@ -670,18 +670,16 @@ def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     return fdata
 
 
-def validate_input_data(vocs, data):
-    for name in vocs.variable_names:
-        lower = vocs.variables[name][0]
-        upper = vocs.variables[name][1]
+def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
+    variable_data = data.loc[:, vocs.variable_names].values
+    bounds = vocs.bounds
 
-        d = data[name]
+    is_out_of_bounds_lower = variable_data < bounds[0, :]
+    is_out_of_bounds_upper = variable_data > bounds[1, :]
+    bad_mask = np.logical_or(is_out_of_bounds_upper, is_out_of_bounds_lower)
+    any_bad = bad_mask.any()
 
-        # see if points violate limits
-        is_out_of_bounds = pd.DataFrame((d < lower, d > upper)).any(axis=0)
-        is_out_of_bounds_idx = list(is_out_of_bounds[is_out_of_bounds].index)
-
-        if len(is_out_of_bounds_idx):
-            raise ValueError(
-                f"input points at indices {is_out_of_bounds_idx} are not valid for {name} range in VOCS!"
-            )
+    if any_bad:
+        raise ValueError(
+                f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
+        )
