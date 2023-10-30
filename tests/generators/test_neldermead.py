@@ -8,20 +8,23 @@ from scipy.optimize import minimize
 from xopt import Xopt
 from xopt.generators.scipy.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
-from xopt.resources.test_functions.rosenbrock import rosenbrock, rosenbrock2_vocs as rbvocs
+from xopt.resources.test_functions.rosenbrock import (
+    rosenbrock,
+    rosenbrock2_vocs as rbvocs,
+)
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
 def compare(X, X2):
-    """ Compare two Xopt objects """
+    """Compare two Xopt objects"""
     y = yaml.safe_load(X.yaml())
     y2 = yaml.safe_load(X2.yaml())
-    y.pop('data')
-    y2.pop('data')
+    y.pop("data")
+    y2.pop("data")
     assert y == y2
     # For unclear reasons, column order changes on reload....
-    data = X.data.drop(['xopt_runtime', 'xopt_error'], axis=1)
-    data2 = X2.data.drop(['xopt_runtime', 'xopt_error'], axis=1)
+    data = X.data.drop(["xopt_runtime", "xopt_error"], axis=1)
+    data2 = X2.data.drop(["xopt_runtime", "xopt_error"], axis=1)
     # On reload, index is not a range index anymore!
     pd.testing.assert_frame_equal(data, data2, check_index_type=False)
 
@@ -61,7 +64,9 @@ class TestNelderMeadGenerator:
         """Compare between Vanilla Simplex and Xopt Simplex in full auto run mode"""
 
         # Scipy Simplex
-        result = minimize(rosenbrock, [-1, -1], method="Nelder-Mead", options={"adaptive": True})
+        result = minimize(
+            rosenbrock, [-1, -1], method="Nelder-Mead", options={"adaptive": True}
+        )
         result = result.x
 
         # Xopt Simplex
@@ -86,12 +91,16 @@ class TestNelderMeadGenerator:
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
         assert (
-                xbest["x0"] == result[0] and xbest["x1"] == result[1]
+            xbest["x0"] == result[0] and xbest["x1"] == result[1]
         ), "Xopt Simplex does not match the vanilla one"
 
-    @pytest.mark.parametrize("fun,fstring,x0,v",
-                             [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
-                              (ackley, "ackley_20.evaluate_ackley_np", [4] * 20, ackleyvocs)])
+    @pytest.mark.parametrize(
+        "fun,fstring,x0,v",
+        [
+            (rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
+            (ackley, "ackley_20.evaluate_ackley_np", [4] * 20, ackleyvocs),
+        ],
+    )
     def test_simplex_agreement_steps(self, fun, fstring, x0, v):
         """Compare between Vanilla Simplex and Xopt Simplex step by step"""
 
@@ -101,22 +110,28 @@ class TestNelderMeadGenerator:
             inputs.append(x)
             return fun(x)
 
-        result = minimize(wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True})
+        result = minimize(
+            wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True}
+        )
         scipy_data = np.array(inputs)
-        print(f'Have {scipy_data.shape[0]} steps')
+        print(f"Have {scipy_data.shape[0]} steps")
 
-        config = {'generator': {'name': 'neldermead',
-                                'initial_point': {f"x{i}": x0[i] for i in range(len(x0))},
-                                'adaptive': True, 'xatol': 1e-4, 'fatol': 1e-4
-                                },
-                  'evaluator': {'function': f"xopt.resources.test_functions.{fstring}"},
-                  'vocs': v.model_dump()
-                  }
+        config = {
+            "generator": {
+                "name": "neldermead",
+                "initial_point": {f"x{i}": x0[i] for i in range(len(x0))},
+                "adaptive": True,
+                "xatol": 1e-4,
+                "fatol": 1e-4,
+            },
+            "evaluator": {"function": f"xopt.resources.test_functions.{fstring}"},
+            "vocs": v.model_dump(),
+        }
         X = Xopt.from_dict(config)
         for i in range(scipy_data.shape[0]):
             X.step()
             data = X.vocs.variable_data(X.data).to_numpy()
-            if not np.array_equal(data, scipy_data[:i + 1, :]):
+            if not np.array_equal(data, scipy_data[: i + 1, :]):
                 raise Exception
 
         data = X.vocs.variable_data(X.data).to_numpy()
@@ -124,29 +139,41 @@ class TestNelderMeadGenerator:
 
         idx, best = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert np.array_equal(xbest, result.x), "Xopt Simplex does not match the vanilla one"
+        assert np.array_equal(
+            xbest, result.x
+        ), "Xopt Simplex does not match the vanilla one"
 
-    @pytest.mark.parametrize("fun,fstring,x0,v,cstep",
-                             [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs, 10),
-                              (ackley, "ackley_20.evaluate_ackley_np", [4] * 20, ackleyvocs, 200)])
+    @pytest.mark.parametrize(
+        "fun,fstring,x0,v,cstep",
+        [
+            (rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs, 10),
+            (ackley, "ackley_20.evaluate_ackley_np", [4] * 20, ackleyvocs, 200),
+        ],
+    )
     def test_resume_consistency(self, fun, fstring, x0, v, cstep):
-        """ Compare between Vanilla Simplex and Xopt Simplex while deserializing at every step """
+        """Compare between Vanilla Simplex and Xopt Simplex while deserializing at every step"""
         inputs = []
 
         def wrap(x):
             inputs.append(x)
             return fun(x)
 
-        result = minimize(wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True})
+        result = minimize(
+            wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True}
+        )
         scipy_data = np.array(inputs)
 
-        config = {'generator': {'name': 'neldermead',
-                                'initial_point': {f"x{i}": x0[i] for i in range(len(x0))},
-                                'adaptive': True, 'xatol': 1e-4, 'fatol': 1e-4
-                                },
-                  'evaluator': {'function': f"xopt.resources.test_functions.{fstring}"},
-                  'vocs': v.model_dump()
-                  }
+        config = {
+            "generator": {
+                "name": "neldermead",
+                "initial_point": {f"x{i}": x0[i] for i in range(len(x0))},
+                "adaptive": True,
+                "xatol": 1e-4,
+                "fatol": 1e-4,
+            },
+            "evaluator": {"function": f"xopt.resources.test_functions.{fstring}"},
+            "vocs": v.model_dump(),
+        }
         X = Xopt.from_dict(config)
         X.step()
 
@@ -190,4 +217,6 @@ class TestNelderMeadGenerator:
 
         idx, best = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert np.array_equal(xbest, result.x), "Xopt Simplex does not match the vanilla one"
+        assert np.array_equal(
+            xbest, result.x
+        ), "Xopt Simplex does not match the vanilla one"
