@@ -13,14 +13,37 @@ jobs:
         os: [ubuntu-latest]
         python-version: [3.9]
     steps:
-      - uses: actions/checkout@v3
-      - uses: conda-incubator/setup-miniconda@v2
+      - name: Setup Mambaforge
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: ${{ matrix.python-version }}
           miniforge-variant: Mambaforge
-          channels: conda-forge
+          miniforge-version: latest
           activate-environment: xopt-dev
-          environment-file: environment.yml
+          use-mamba: true
+
+      - name: Get Date
+        id: get-date
+        run: echo "today=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Cache Conda env
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.CONDA }}/envs
+          key:
+            conda-${{ runner.os }}--${{ runner.arch }}--${{
+            steps.get-date.outputs.today }}-${{
+            hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER}}
+        env:
+          CACHE_NUMBER: 0
+        id: cache
+
+      - uses: actions/checkout@v3
+
+      - name: Update environment if not cached
+        run:
+          mamba env update -n xopt-dev -f environment.yml
+        if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Create environment
         shell: bash -l {0}
