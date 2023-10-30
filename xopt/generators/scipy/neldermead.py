@@ -469,7 +469,7 @@ def _neldermead_generator(
                 fxe = lastval
                 lastval = None
             else:
-                raise Exception(f"Simplex state is wrong")
+                raise Exception("Simplex state is wrong")
 
             if fxe < fxr:
                 sim[-1] = xe
@@ -501,7 +501,7 @@ def _neldermead_generator(
                         fxc = lastval
                         lastval = None
                     else:
-                        raise Exception(f"Simplex state is wrong")
+                        raise Exception("Simplex state is wrong")
 
                     if fxc <= fxr:
                         sim[-1] = xc
@@ -526,7 +526,7 @@ def _neldermead_generator(
                         fxcc = lastval
                         lastval = None
                     else:
-                        raise Exception(f"Simplex state is wrong")
+                        raise Exception("Simplex state is wrong")
 
                     if fxcc < fsim[-1]:
                         sim[-1] = xcc
