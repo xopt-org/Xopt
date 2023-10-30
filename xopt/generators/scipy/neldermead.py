@@ -393,10 +393,12 @@ def _neldermead_generator(
     for k in range(kend, N + 1):
         if stage == -1:
             state = save_state()
-            if TRACE: log(f"Stage 0 yield {sim[k]=} {stage=} {state=}")
+            if TRACE:
+                log(f"Stage 0 yield {sim[k]=} {stage=} {state=}")
             return sim[k], state
         else:
-            if TRACE: log(f"Stage 0 resume {sim[k]=} {stage=} {state=} {lastval=}")
+            if TRACE:
+                log(f"Stage 0 resume {sim[k]=} {stage=} {state=} {lastval=}")
             stage = -1
             fsim[k] = lastval
             lastval = None
@@ -442,10 +444,12 @@ def _neldermead_generator(
                 xr = np.clip(xr, lower_bound, upper_bound)
 
             state = save_state()
-            if TRACE: log(f"Stage 1 yield {xr=} {stage=} {state=}")
+            if TRACE:
+                log(f"Stage 1 yield {xr=} {stage=} {state=}")
             return xr, state
         elif stage == 1:
-            if TRACE: log(f"Stage 1 resume {xr=} {stage=} {state=} {lastval=}")
+            if TRACE:
+                log(f"Stage 1 resume {xr=} {stage=} {state=} {lastval=}")
             stage = -1
             fxr = lastval
             lastval = None
@@ -462,15 +466,17 @@ def _neldermead_generator(
                 if bounds is not None:
                     xe = np.clip(xe, lower_bound, upper_bound)
                 state = save_state()
-                if TRACE: log(f"Stage 2 yield {xe=} {stage=} {state=}")
+                if TRACE:
+                    log(f"Stage 2 yield {xe=} {stage=} {state=}")
                 return xe, state
             elif stage == 2:
-                if TRACE: log(f"Stage 2 resume {xe=} {stage=} {state=}")
+                if TRACE:
+                    log(f"Stage 2 resume {xe=} {stage=} {state=}")
                 stage = -1
                 fxe = lastval
                 lastval = None
             else:
-                raise Exception(f'Simplex state is wrong')
+                raise Exception(f"Simplex state is wrong")
 
             if fxe < fxr:
                 sim[-1] = xe
@@ -492,15 +498,17 @@ def _neldermead_generator(
                         if bounds is not None:
                             xc = np.clip(xc, lower_bound, upper_bound)
                         state = save_state()
-                        if TRACE: log(f"Stage 3 yield {xc=} {stage=} {state=}")
+                        if TRACE:
+                            log(f"Stage 3 yield {xc=} {stage=} {state=}")
                         return xc, state
                     elif stage == 3:
-                        if TRACE: log(f"Stage 3 resume {xc=} {stage=} {state=}")
+                        if TRACE:
+                            log(f"Stage 3 resume {xc=} {stage=} {state=}")
                         stage = -1
                         fxc = lastval
                         lastval = None
                     else:
-                        raise Exception(f'Simplex state is wrong')
+                        raise Exception(f"Simplex state is wrong")
 
                     if fxc <= fxr:
                         sim[-1] = xc
@@ -515,15 +523,17 @@ def _neldermead_generator(
                         if bounds is not None:
                             xcc = np.clip(xcc, lower_bound, upper_bound)
                         state = save_state()
-                        if TRACE: log(f"Stage 4 yield {xcc=} {stage=} {state=}")
+                        if TRACE:
+                            log(f"Stage 4 yield {xcc=} {stage=} {state=}")
                         return xcc, state
                     elif stage == 4:
-                        if TRACE: log(f"Stage 4 resume {xcc=} {stage=} {state=}")
+                        if TRACE:
+                            log(f"Stage 4 resume {xcc=} {stage=} {state=}")
                         stage = -1
                         fxcc = lastval
                         lastval = None
                     else:
-                        raise Exception(f'Simplex state is wrong')
+                        raise Exception(f"Simplex state is wrong")
 
                     if fxcc < fsim[-1]:
                         sim[-1] = xcc
@@ -543,10 +553,12 @@ def _neldermead_generator(
                             if bounds is not None:
                                 sim[j] = np.clip(sim[j], lower_bound, upper_bound)
                             state = save_state()
-                            if TRACE: log(f"Stage 5 yield {sim[j]=} {stage=} {state=}")
+                            if TRACE:
+                                log(f"Stage 5 yield {sim[j]=} {stage=} {state=}")
                             return sim[j], state
                         else:
-                            if TRACE: log(f"Stage 5 resume {sim[j]=} {stage=} {state=}")
+                            if TRACE:
+                                log(f"Stage 5 resume {sim[j]=} {stage=} {state=}")
                             stage = -1
                             fsim[j] = lastval
                             lastval = None
