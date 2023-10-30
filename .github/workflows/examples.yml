@@ -43,7 +43,8 @@ jobs:
 
       - name: Update environment if not cached
         run:
-          mamba env update -n xopt-dev -f environment.yml
+          mamba env remove -n xopt-dev -y
+          mamba env update -n xopt-dev -f environment.yml python=${{ matrix.python-version }}
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Create environment
