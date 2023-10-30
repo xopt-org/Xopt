@@ -103,6 +103,7 @@ class TestNelderMeadGenerator:
 
         result = minimize(wrap, np.array(x0), method="Nelder-Mead", options={"adaptive": True})
         scipy_data = np.array(inputs)
+        print(f'Have {scipy_data.shape[0]} steps')
 
         config = {'generator': {'name': 'neldermead',
                                 'initial_point': {f"x{i}": x0[i] for i in range(len(x0))},
@@ -125,10 +126,10 @@ class TestNelderMeadGenerator:
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
         assert np.array_equal(xbest, result.x), "Xopt Simplex does not match the vanilla one"
 
-    @pytest.mark.parametrize("fun,fstring,x0,v",
-                             [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs),
-                              (ackley, "ackley_20.evaluate_ackley_np", [4] * 20, ackleyvocs)])
-    def test_resume_consistency(self, fun, fstring, x0, v):
+    @pytest.mark.parametrize("fun,fstring,x0,v,cstep",
+                             [(rosenbrock, "rosenbrock.evaluate_rosenbrock", [-1, -1], rbvocs, 10),
+                              (ackley, "ackley_20.evaluate_ackley_np", [4] * 20, ackleyvocs, 200)])
+    def test_resume_consistency(self, fun, fstring, x0, v, cstep):
         """ Compare between Vanilla Simplex and Xopt Simplex while deserializing at every step """
         inputs = []
 
@@ -150,26 +151,29 @@ class TestNelderMeadGenerator:
         X.step()
 
         for i in range(scipy_data.shape[0] - 1):
-            state = X.yaml()
-            X2 = Xopt.from_yaml(state)
-            compare(X, X2)
+            # For performance, only check some steps
+            if i % cstep == 0 or i == scipy_data.shape[0] - 2:
+                state = X.yaml()
+                X2 = Xopt.from_yaml(state)
+                compare(X, X2)
 
-            samples = X.generator.generate(1)
-            samples2 = X2.generator.generate(1)
-            compare(X, X2)
-            # print('>>>>>>>>>>>>>>>')
+                samples = X.generator.generate(1)
+                samples2 = X2.generator.generate(1)
+                assert samples == samples2
+                compare(X, X2)
 
-            state = X.yaml()
-            X3 = Xopt.from_yaml(state)
-            compare(X, X3)
-            # print('>>>>>>>>>>>>>>>')
+                state = X.yaml()
+                X3 = Xopt.from_yaml(state)
+                compare(X, X3)
 
-            X.evaluate_data(samples)
-            X2.evaluate_data(samples2)
-            X3.evaluate_data(samples2)
-            compare(X, X2)
-            compare(X, X3)
-            # print('====================')
+                X.evaluate_data(samples)
+                X2.evaluate_data(samples2)
+                X3.evaluate_data(samples2)
+                compare(X, X2)
+                compare(X, X3)
+            else:
+                samples = X.generator.generate(1)
+                X.evaluate_data(samples)
 
         data = X.vocs.variable_data(X.data).to_numpy()
         assert data.shape == scipy_data.shape
