@@ -23,15 +23,18 @@ logger = logging.getLogger()
 
 class MultiFidelityGenerator(MOBOGenerator):
     name = "multi_fidelity"
-    fidelity_parameter: Literal["s"] = Field("s", description="fidelity parameter name")
+    fidelity_parameter: Literal["s"] = Field(
+        "s", description="fidelity parameter " "name", exclude=True
+    )
     cost_function: Callable = Field(
         lambda x: x + 1.0,
         description="callable function that describes the cost "
         "of evaluating the objective function",
+        exclude=True,
     )
     reference_point: Optional[Dict[str, float]] = None
-    supports_multi_objective = True
-    supports_batch_generation = True
+    supports_multi_objective: bool = True
+    supports_batch_generation: bool = True
 
     __doc__ = """Implements Multi-fidelity Bayesian optimization
         Assumes a fidelity parameter [0,1]
@@ -49,18 +52,23 @@ class MultiFidelityGenerator(MOBOGenerator):
         return v
 
     def __init__(self, **kwargs):
-        super(MultiFidelityGenerator, self).__init__(**kwargs)
-
+        reference_point = kwargs.pop("reference_point", None)
+        vocs = kwargs.get("vocs")
         # set reference point
-        if self.reference_point is None:
-            self.reference_point = {}
-            for name, val in self.vocs.objectives.items():
-                if name != self.fidelity_parameter:
+        if reference_point is None:
+            reference_point = {}
+            for name, val in vocs.objectives.items():
+                if name != "s":
                     if val == "MAXIMIZE":
-                        self.reference_point.update({name: -100.0})
+                        reference_point.update({name: -100.0})
                     else:
-                        self.reference_point.update({name: 100.0})
-        self.reference_point.update({self.fidelity_parameter: 0.0})
+                        reference_point.update({name: 100.0})
+
+        reference_point.update({"s": 0.0})
+
+        super(MultiFidelityGenerator, self).__init__(
+            **kwargs, reference_point=reference_point
+        )
 
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
         """calculate total cost of data samples using the fidelity parameter"""

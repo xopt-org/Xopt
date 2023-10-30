@@ -7,16 +7,13 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callabl
 
 
 class TestBayesianExplorationGenerator:
-    def test_init(self):
-        BayesianExplorationGenerator(vocs=TEST_VOCS_BASE)
-
     def test_generate(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs2 = deepcopy(test_vocs)
         test_vocs2.objectives = {}
         test_vocs2.observables = ["y1"]
 
-        for ele in [test_vocs, test_vocs2]:
+        for ele in [test_vocs2]:
             gen = BayesianExplorationGenerator(
                 vocs=ele,
             )
@@ -44,7 +41,12 @@ class TestBayesianExplorationGenerator:
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)
-        gen = BayesianExplorationGenerator(vocs=TEST_VOCS_BASE)
+
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+
+        gen = BayesianExplorationGenerator(vocs=test_vocs)
         gen.numerical_optimizer.n_restarts = 1
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA

@@ -3,8 +3,8 @@ from xopt.generator import Generator
 
 class RandomGenerator(Generator):
     name = "random"
-    supports_batch_generation = True
-    supports_multi_objective = True
+    supports_batch_generation: bool = True
+    supports_multi_objective: bool = True
 
     def generate(self, n_candidates) -> list[dict]:
         """generate uniform random data points"""
