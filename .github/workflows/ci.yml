@@ -39,7 +39,7 @@ jobs:
         with:
           path: ${{ env.CONDA }}/envs
           key:
-            conda-${{ runner.os }}--${{ runner.arch }}--${{ env.GITHUB_WORKFLOW }}--${{
+            conda-${{ runner.os }}--${{ runner.arch }}--${{ github.workflow }}--${{
             steps.get-date.outputs.today }}-${{
             hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}-${{ matrix.python-version }}
         env:
