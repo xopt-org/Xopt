@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class SimplexState(XoptBaseModel):
+    """Container model for all simplex parameters"""
+
     astg: int = -1
     N: Optional[int] = None
     kend: int = 0
@@ -66,7 +68,6 @@ class NelderMeadGenerator(Generator):
     """
 
     name = "neldermead"
-    supports_batch_generation = False
 
     initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
     initial_simplex: Optional[
@@ -74,7 +75,7 @@ class NelderMeadGenerator(Generator):
     ] = None  # This overrides the use of initial_point
     # Same as scipy.optimize._optimize._minimize_neldermead
     adaptive: bool = Field(
-        True, description="Change parameters based on dimensionality"
+        True, description="Change hyperparameters based on dimensionality"
     )
     xatol: float = Field(1e-4, description="Tolerance in x value")
     fatol: float = Field(1e-4, description="Tolerance in function value")
@@ -86,9 +87,7 @@ class NelderMeadGenerator(Generator):
     y: Optional[float] = None
     is_done_bool: bool = False
 
-    # _inputs = None
     _initial_simplex = None
-
     _saved_options: Dict = None
 
     def __init__(self, **kwargs):
@@ -102,7 +101,12 @@ class NelderMeadGenerator(Generator):
             exclude={"current_state", "future_state"}
         ).copy()  # Used to keep track of changed options
 
-        self._init_algorithm()
+        if self.initial_simplex:
+            self._initial_simplex = np.array(
+                [self.initial_simplex[k] for k in self.vocs.variable_names]
+            ).T
+        else:
+            self._initial_simplex = None
 
     @property
     def x0(self):
@@ -132,12 +136,12 @@ class NelderMeadGenerator(Generator):
             # Must have made at least 1 step, require future_state
             assert self.future_state is not None
 
-            # new data
+            # new data -> advance state machine 1 step
             assert ndata == self.future_state.ngen == ngen + 1
             self.current_state = self.future_state
             self.future_state = None
 
-            # Can have multiple point if resuming from file, grab last one
+            # Can have multiple points if resuming from file, grab last one
             new_data_df = self.vocs.objective_data(new_data)
             res = new_data_df.iloc[-1:, :].to_numpy()
             assert np.shape(res) == (1, 1), f"Bad last point {res}"
@@ -201,18 +205,6 @@ class NelderMeadGenerator(Generator):
 
         self.y = None
         return results
-
-    def _init_algorithm(self):
-        """
-        sets self._algorithm to the generator function (initializing it).
-        """
-
-        if self.initial_simplex:
-            self._initial_simplex = np.array(
-                [self.initial_simplex[k] for k in self.vocs.variable_names]
-            ).T
-        else:
-            self._initial_simplex = None
 
     @property
     def simplex(self):
@@ -285,6 +277,7 @@ def _neldermead_generator(
     # 0 during initial simplex
     # 1-5 during loop
 
+    # TRACE flag is for performance, since it will prevent python message formatting if False
     TRACE = False
 
     def log(s):

@@ -187,7 +187,7 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
-            test_data[vocs.variable_names].to_numpy()
+            test_data[vocs.variable_names].to_numpy(),
         ).all()
 
         test_data.pop("x1")
@@ -196,7 +196,7 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
-            test_data[test_data.columns].to_numpy()
+            test_data[test_data.columns].to_numpy(),
         ).all()
 
         test_data = pd.DataFrame({"x1": 0.5}, index=[0])
@@ -205,7 +205,7 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
-            test_data[test_data.columns].to_numpy()
+            test_data[test_data.columns].to_numpy(),
         ).all()
 
         # test with extra data
@@ -215,5 +215,5 @@ class TestVOCS(object):
 
         assert np.equal(
             vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
-            test_data[vocs.variable_names].to_numpy()
+            test_data[vocs.variable_names].to_numpy(),
         ).all()

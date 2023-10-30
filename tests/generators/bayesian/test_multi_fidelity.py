@@ -116,6 +116,4 @@ class TestMultiFidelityGenerator:
     def test_multi_objective(self):
         my_vocs = deepcopy(tnk_vocs)
         my_vocs.constraints = {}
-        MultiFidelityGenerator(
-            vocs=my_vocs, reference_point={"y1": 1.5, "y2": 1.5}
-        )
+        MultiFidelityGenerator(vocs=my_vocs, reference_point={"y1": 1.5, "y2": 1.5})
