@@ -498,28 +498,24 @@ class VOCS(XoptBaseModel):
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_variable_data(
-    variables: Dict,
-    data,
-    prefix="variable_",
-):
+def form_variable_data(variables: Dict, data, prefix="variable_"):
     """
     Use variables dict to form a dataframe.
     """
     if not variables:
         return pd.DataFrame([])
 
-    data = pd.DataFrame(data)
-    vdata = pd.DataFrame()
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
 
-    for k in sorted(list(variables)):
-        vdata[prefix + k] = data[k]
-
+    variables = sorted(variables)
+    vdata = data.loc[:, variables].copy()
+    vdata.rename({k: prefix + k for k in variables})
     return vdata
 
 
 def form_objective_data(
-    objectives: Dict, data, prefix="objective_", return_raw: bool = False
+        objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
@@ -527,7 +523,7 @@ def form_objective_data(
     Weights are applied to convert all objectives into mimimization form unless
     `return_raw` is True
 
-    Returns a dataframe with the objective data intented to be minimized.
+    Returns a dataframe with the objective data intended to be minimized.
 
     Missing or nan values will be filled with: np.inf
 
@@ -535,22 +531,43 @@ def form_objective_data(
     if not objectives:
         return pd.DataFrame([])
 
-    data = pd.DataFrame(data)
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
 
-    odata = pd.DataFrame(index=data.index)
+    objectives_names = sorted(objectives.keys())
 
-    for k in sorted(list(objectives)):
-        # Protect against missing data
-        if k not in data:
-            odata[prefix + k] = np.inf
-            continue
+    if set(data.columns).issuperset(set(objectives_names)):
+        weights = np.ones(len(objectives_names))
+        for i, k in enumerate(objectives_names):
+            operator = objectives[k].upper()
+            if operator not in OBJECTIVE_WEIGHT:
+                raise ValueError(f"Unknown objective operator: {operator}")
 
-        operator = objectives[k].upper()
-        if operator not in OBJECTIVE_WEIGHT:
-            raise ValueError(f"Unknown objective operator: {operator}")
+            weights[i] = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
 
-        weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
-        odata[prefix + k] = (weight * data[k]).fillna(np.inf)  # Protect against nans
+        oarr = data.loc[:, objectives_names].to_numpy() * weights
+        oarr[np.isnan(oarr)] = np.inf
+        odata = pd.DataFrame(oarr, columns=[prefix + k for k in objectives_names], index=data.index)
+    else:
+        # have to do this way because of missing objectives, even if slow
+        # TODO: pre-allocate 2D array
+        l = data.shape[0]
+        array_list = []
+        for i, k in enumerate(objectives_names):
+            if k not in data:
+                array_list.append(np.full((l, 1), np.inf))
+                continue
+            operator = objectives[k].upper()
+            if operator not in OBJECTIVE_WEIGHT:
+                raise ValueError(f"Unknown objective operator: {operator}")
+
+            weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
+            arr = data.loc[:, [k]].to_numpy() * weight
+            arr[np.isnan(arr)] = np.inf
+            array_list.append(arr)
+
+        odata = pd.DataFrame(np.hstack(array_list), columns=[prefix + k for k in objectives_names],
+                             index=data.index)
 
     return odata
 
