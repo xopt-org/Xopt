@@ -1,8 +1,5 @@
 name: Formatting
 
-concurrency:
-  group: ci-${{ github.ref }}
-
 on:
   push:
   pull_request:
