@@ -384,7 +384,9 @@ class VOCS(XoptBaseModel):
         for name in self.variable_names:
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
-                normed_data[name] = (input_points[name] - self.variables[name][0]) / width
+                normed_data[name] = (
+                    input_points[name] - self.variables[name][0]
+                ) / width
 
         if len(normed_data):
             return pd.DataFrame(normed_data)
@@ -419,7 +421,9 @@ class VOCS(XoptBaseModel):
         for name in self.variable_names:
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
-                denormed_data[name] = input_points[name]*width + self.variables[name][0]
+                denormed_data[name] = (
+                    input_points[name] * width + self.variables[name][0]
+                )
 
         if len(denormed_data):
             return pd.DataFrame(denormed_data)
