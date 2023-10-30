@@ -20,6 +20,7 @@ jobs:
           miniforge-version: latest
           activate-environment: xopt-dev
           use-mamba: true
+          python-version: ${{ matrix.python-version }}
 
       - name: Get Date
         id: get-date
@@ -33,7 +34,7 @@ jobs:
           key:
             conda-${{ runner.os }}--${{ runner.arch }}--${{
             steps.get-date.outputs.today }}-${{
-            hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER}}
+            hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}-${{ matrix.python-version }}
         env:
           CACHE_NUMBER: 0
         id: cache
