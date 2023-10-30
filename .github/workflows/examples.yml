@@ -34,14 +34,14 @@ jobs:
         with:
           path: ${{ env.CONDA }}/envs
           key:
-            conda-${{ runner.os }}--${{ runner.arch }}--${{ env.GITHUB_WORKFLOW }}--${{
+            conda-${{ runner.os }}--${{ runner.arch }}--${{ github.workflow }}--${{
             steps.get-date.outputs.today }}-${{
             hashFiles('environment.yml') }}-${{ env.CACHE_NUMBER }}-${{ matrix.python-version }}
         env:
           CACHE_NUMBER: 0
         id: cache
 
-      - name: Setup Mambaforge for real this time
+      - name: Setup Mambaforge for real if not cached
         uses: conda-incubator/setup-miniconda@v2
         with:
           miniforge-variant: Mambaforge
@@ -60,6 +60,7 @@ jobs:
       - name: Install Xopt
         shell: bash -l {0}
         run: |
+          pip uninstall -y xopt || true
           pip install --no-dependencies .
 
       - name: Run Examples
