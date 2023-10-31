@@ -8,6 +8,7 @@
 import argparse
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -149,6 +150,7 @@ if __name__ == "__main__":
         help="Run all tutorials (incl. ignored).",
     )
     args = parser.parse_args()
+    print(f"Running examples on Python {sys.version}")
     run_tutorials(
         repo_dir=os.path.abspath(args.path),
         include_ignored=args.include_ignored,

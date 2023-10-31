@@ -18,5 +18,5 @@ if __name__ == "__main__":
         args.remove("--show-cov")
 
     print("pytest arguments: {}".format(args))
-
+    print(f"Running tests on Python {sys.version}")
     sys.exit(pytest.main(args))
