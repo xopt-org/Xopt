@@ -557,11 +557,11 @@ def form_objective_data(
     else:
         # have to do this way because of missing objectives, even if slow
         # TODO: pre-allocate 2D array
-        l = data.shape[0]
+        length = data.shape[0]
         array_list = []
         for i, k in enumerate(objectives_names):
             if k not in data:
-                array_list.append(np.full((l, 1), np.inf))
+                array_list.append(np.full((length, 1), np.inf))
                 continue
             operator = objectives[k].upper()
             if operator not in OBJECTIVE_WEIGHT:
