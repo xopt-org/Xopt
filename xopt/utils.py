@@ -283,15 +283,42 @@ def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> d
 
 def explode_all_columns(data: pd.DataFrame):
     """explode all data columns in dataframes that are lists or np.arrays"""
+    # TODO: rework the whole list return type handling - this is really slow
     list_types = []
+    lengths = []
     for name, val in data.iloc[0].items():
-        if isinstance(val, list) or isinstance(val, np.ndarray):
-            list_types += [name]
-
-    if len(list_types):
-        try:
-            return data.explode(list_types, ignore_index=True)
-        except ValueError:
+        if isinstance(val, (list, np.ndarray)):
+            list_types.append(name)
+            lengths.append(len(val))
+    if len(list_types) > 0:
+        if len(set(lengths)) > 1:
             raise ValueError("evaluator outputs that are lists must match in size")
+
+        if data.shape[0] == 1:
+            # Fast path for most common experimental case of 1 candidate per step
+            df = _explode_pandas_modified(data, lengths[0])
+            return df
+        else:
+            if len(list_types):
+                try:
+                    # dtype of return is object, but we have floats...
+                    # https://github.com/pandas-dev/pandas/issues/34923
+                    # also, this method is implemented in Python and uses slow calls
+                    return data.explode(list_types, ignore_index=True)
+                except ValueError:
+                    raise ValueError(
+                        "evaluator outputs that are lists must match in size"
+                    )
     else:
         return data
+
+
+def _explode_pandas_modified(df: pd.DataFrame, l: int):
+    if len(df) != 1:
+        raise NotImplementedError(f"This method only works for single row dataframes")
+    # this is slower somehow
+    # df.to_dict(orient='records')
+    data = {c: df[c].iloc[0] for c in df.columns}
+    result = pd.DataFrame(data, index=np.arange(l))
+
+    return result
