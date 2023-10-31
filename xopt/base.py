@@ -159,9 +159,13 @@ class Xopt(XoptBaseModel):
         if isinstance(v, dict):
             try:
                 v = pd.DataFrame(v)
+                v.index = v.index.astype(np.int64)
+                v = v.sort_index()
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
-
+        elif isinstance(v, DataFrame):
+            if not v.index.is_integer():
+                raise ValueError("dataframe index must be integer")
         # also add data to generator
         # TODO: find a more robust way of doing this
         info.data["generator"].add_data(v)
@@ -235,8 +239,9 @@ class Xopt(XoptBaseModel):
         logger.debug(f"Generating {n_generate} candidates")
         new_samples = self.generator.generate(n_generate)
 
-        # Evaluate data
-        self.evaluate_data(new_samples)
+        if new_samples is not None:
+            # Evaluate data
+            self.evaluate_data(new_samples)
 
     def run(self):
         """

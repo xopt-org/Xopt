@@ -1,43 +1,93 @@
 import logging
 import warnings
-from abc import abstractmethod
 from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-from numpy import asfarray, shape
+from numpy import asfarray
+from pydantic import ConfigDict, Field, field_validator
 
 from xopt.generator import Generator
+from xopt.pydantic import XoptBaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class ScipyOptimizeGenerator(Generator):
-    """
-    Base class for scipy.optimize routines that have been converted to generator form.
+class SimplexState(XoptBaseModel):
+    """Container model for all simplex parameters"""
 
-    These algorithms must be stepped serially.
+    astg: int = -1
+    N: Optional[int] = None
+    kend: int = 0
+    jend: int = 0
+    ind: Optional[np.ndarray] = None
+    sim: Optional[np.ndarray] = None
+    fsim: Optional[np.ndarray] = None
+    fxr: Optional[float] = None
+    x: Optional[np.ndarray] = None
+    xr: Optional[np.ndarray] = None
+    xe: Optional[np.ndarray] = None
+    xc: Optional[np.ndarray] = None
+    xcc: Optional[np.ndarray] = None
+    xbar: Optional[np.ndarray] = None
+    doshrink: int = 0
+    ngen: int = 0
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator(
+        "ind", "fsim", "sim", "x", "xr", "xe", "xc", "xcc", "xbar", mode="before"
+    )
+    def to_numpy(cls, v):
+        return np.array(v, dtype=np.float64)
+
+
+STATE_KEYS = [
+    "astg",
+    "N",
+    "kend",
+    "jend",
+    "ind",
+    "sim",
+    "fsim",
+    "fxr",
+    "x",
+    "xr",
+    "xe",
+    "xc",
+    "xcc",
+    "xbar",
+    "doshrink",
+    "ngen",
+]
+
+
+class NelderMeadGenerator(Generator):
+    """
+    Nelder-Mead algorithm from SciPy in Xopt's Generator form.
+    Converted to use a state machine to resume in exactly the last state.
     """
 
-    name = "scipy_optimize"
+    name = "neldermead"
+
     initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
     initial_simplex: Optional[
         Dict[str, Union[List[float], np.ndarray]]
     ] = None  # This overrides the use of initial_point
     # Same as scipy.optimize._optimize._minimize_neldermead
-    adaptive: Optional[bool] = True
-    xatol: float = 1e-4
-    fatol: float = 1e-4
+    adaptive: bool = Field(
+        True, description="Change hyperparameters based on dimensionality"
+    )
+    xatol: float = Field(1e-4, description="Tolerance in x value")
+    fatol: float = Field(1e-4, description="Tolerance in function value")
+    current_state: SimplexState = SimplexState()
+    future_state: Optional[SimplexState] = None
 
     # Internal data structures
-    _x = None
-    _y = None  # Used to coordinate with func
-    _lock = False  # mechanism to lock function calls
-    _algorithm = None  # Will initialize on first generate
-    _state = None
-    _inputs = None
+    x: Optional[np.ndarray] = None
+    y: Optional[float] = None
+    is_done_bool: bool = False
 
-    _is_done = False
+    _initial_simplex = None
     _saved_options: Dict = None
 
     def __init__(self, **kwargs):
@@ -46,14 +96,17 @@ class ScipyOptimizeGenerator(Generator):
         # Initialize the first candidate if not given
         if self.initial_point is None:
             self.initial_point = self.vocs.random_inputs()[0]
-        self._saved_options = (
-            self.model_dump().copy()
-        )  # Used to keep track of changed options
 
-    # Wrapper to refer to internal data
-    def func(self, x):
-        assert np.array_equal(x, self._x), f"{x} should equal {self._x}"
-        return self._y
+        self._saved_options = self.model_dump(
+            exclude={"current_state", "future_state"}
+        ).copy()  # Used to keep track of changed options
+
+        if self.initial_simplex:
+            self._initial_simplex = np.array(
+                [self.initial_simplex[k] for k in self.vocs.variable_names]
+            ).T
+        else:
+            self._initial_simplex = None
 
     @property
     def x0(self):
@@ -62,124 +115,110 @@ class ScipyOptimizeGenerator(Generator):
 
     @property
     def is_done(self):
-        return self._is_done
-
-    @abstractmethod
-    def _init_algorithm(self):
-        """
-        sets self._algorithm to the generator function (initializing it).
-        """
-        pass
-        # Initialize the generator
-        # self._algorithm = self._generator_function(
-        #    self.func,
-        #    self.x0,
-        #    **kwargs)
-        #
+        return self.is_done_bool
 
     def add_data(self, new_data: pd.DataFrame):
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
-        new_data_df = self.vocs.objective_data(new_data)
-        res = new_data_df.to_numpy()
-        assert shape(res) == (1, 1)
-        y = res[0, 0]
-        if np.isinf(y) or np.isnan(y):
-            self._is_done = True
+        if len(new_data) == 0:
+            # empty data, i.e. no steps yet
+            assert self.future_state is None
             return
 
-        self._y = y  # generator_function accesses this
-        self.data = new_data_df
-        self._lock = False  # unlock
+        self.data = pd.concat([self.data, new_data], axis=0)
 
-    def generate(self, n_candidates) -> list[dict]:
-        # Check if any options were changed from init. If so, reset the algorithm
-        dump = self.model_dump()
-        if dump != self._saved_options:
-            self._algorithm = None
-            self._saved_options = dump.copy()
+        # Complicated part - need to determine if data corresponds to result of last gen
+        ndata = len(self.data)
+        ngen = self.current_state.ngen
+        if ndata == ngen:
+            # just resuming
+            # print(f'Resuming with {ngen=}')
+            return
+        else:
+            # Must have made at least 1 step, require future_state
+            assert self.future_state is not None
 
-        # Actually start the algorithm.
-        if self._algorithm is None:
-            self._init_algorithm()
-            self._is_done = False
+            # new data -> advance state machine 1 step
+            assert ndata == self.future_state.ngen == ngen + 1
+            self.current_state = self.future_state
+            self.future_state = None
 
+            # Can have multiple points if resuming from file, grab last one
+            new_data_df = self.vocs.objective_data(new_data)
+            res = new_data_df.iloc[-1:, :].to_numpy()
+            assert np.shape(res) == (1, 1), f"Bad last point {res}"
+
+            yt = res[0, 0].item()
+            if np.isinf(yt) or np.isnan(yt):
+                self.is_done_bool = True
+                return
+
+            self.y = yt
+            # print(f'Added data {self.y=}')
+
+    def generate(self, n_candidates: int) -> Optional[list[dict]]:
         if self.is_done:
             return None
-
-        if self._lock:
-            raise ValueError(
-                "Generation is locked via ._lock. "
-                "Please call `add_data` before any further generate(1)"
-            )
 
         if n_candidates != 1:
             raise NotImplementedError(
                 "simplex can only produce one candidate at a time"
             )
 
-        try:
-            self._x, self._state = next(
-                self._algorithm
-            )  # raw x point and any state to be passed back
-            self._lock = True
-
-            inputs = dict(zip(self.vocs.variable_names, self._x))
-            if self.vocs.constants is not None:
-                inputs.update(self.vocs.constants)
-            self._inputs = [inputs]
-
-        except StopIteration:
-            self._is_done = True
-
-        return self._inputs
-
-
-class NelderMeadGenerator(ScipyOptimizeGenerator):
-    """
-    Nelder-Mead algorithm from SciPy in Xopt's Generator form.
-    """
-
-    name = "neldermead"
-
-    def _init_algorithm(self):
-        """
-        sets self._algorithm to the generator function (initializing it).
-        """
-
-        if self.initial_simplex:
-            sim = np.array(
-                [self.initial_simplex[k] for k in self.vocs.variable_names]
-            ).T
+        if self.current_state.N is None:
+            # fresh start
+            pass
         else:
-            sim = None
+            n_inputs = len(self.data)
+            if self.current_state.ngen == n_inputs:
+                # We are in a state where result of last point is known
+                pass
+            else:
+                pass
 
-        self._algorithm = _neldermead_generator(  # adapted from scipy.optimize
-            self.func,  # Handled by base class
-            self.x0,  # Handled by base class
+        results = self._call_algorithm()
+        if results is None:
+            self.is_done_bool = True
+            return None
+
+        x, state_extra = results
+        assert len(state_extra) == len(STATE_KEYS)
+        stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
+        # print("State:", stateobj)
+        self.future_state = stateobj
+
+        inputs = dict(zip(self.vocs.variable_names, x))
+        if self.vocs.constants is not None:
+            inputs.update(self.vocs.constants)
+
+        return [inputs]
+
+    def _call_algorithm(self):
+        results = _neldermead_generator(
+            self.x0,
+            state=self.current_state,
+            lastval=self.y,
             adaptive=self.adaptive,
             xatol=self.xatol,
             fatol=self.fatol,
-            initial_simplex=sim,
+            initial_simplex=self._initial_simplex,
             bounds=self.vocs.bounds,
         )
+
+        self.y = None
+        return results
 
     @property
     def simplex(self):
         """
         Returns the simplex in the current state.
         """
-        sim = self._state
+        sim = self.current_state.sim
         return dict(zip(self.vocs.variable_names, sim.T))
 
 
 def _neldermead_generator(
-    func,
     x0,
-    # args=(), callback=None,
-    # maxiter=None, maxfev=None, disp=False,
-    # return_all=False,
+    state,
+    lastval=None,
     initial_simplex=None,
     xatol=1e-4,
     fatol=1e-4,
@@ -190,8 +229,7 @@ def _neldermead_generator(
     Modification of scipy.optimize._optimize._minimize_neldermead
     https://github.com/scipy/scipy/blob/4cf21e753cf937d1c6c2d2a0e372fbc1dbbeea81/scipy/optimize/_optimize.py#L635
 
-    `yield x, sim` is inserted before every call to func(x)
-    This converts this function into a generator.
+    Modified to work in stages, and to return the state at each stage.
 
     Original SciPy docstring:
 
@@ -234,7 +272,140 @@ def _neldermead_generator(
        51:1, pp. 259-277
     """
 
-    x0 = asfarray(x0).flatten()
+    # Stages
+    # -1 - default (normal) state
+    # 0 during initial simplex
+    # 1-5 during loop
+
+    # TRACE flag is for performance, since it will prevent python message formatting if False
+    TRACE = False
+
+    def log(s):
+        print(s)
+
+    # active stage
+    astg = 0
+    # internal simplex variables that will be saved/restored
+    ind = fxr = xr = xbar = x = xe = xc = xcc = None
+    kend = jend = ngen = 0
+    doshrink = 0
+
+    def save_state():
+        nonlocal ngen
+        ngen += 1
+        return (
+            astg,
+            N,
+            kend,
+            jend,
+            ind,
+            sim,
+            fsim,
+            fxr,
+            x,
+            xr,
+            xe,
+            xc,
+            xcc,
+            xbar,
+            doshrink,
+            ngen,
+        )
+
+    (
+        astg,
+        N,
+        kend,
+        jend,
+        ind,
+        sim,
+        fsim,
+        fxr,
+        x,
+        xr,
+        xe,
+        xc,
+        xcc,
+        xbar,
+        doshrink,
+        ngen,
+    ) = (getattr(state, k) for k in STATE_KEYS)
+    stage = state.astg
+    if stage != -1:
+        assert lastval is not None
+    astg = 0
+
+    if bounds is not None:
+        lower_bound, upper_bound = bounds
+        # check bounds
+        if (lower_bound > upper_bound).any():
+            raise ValueError(
+                "Nelder Mead - one of the lower bounds is greater than an upper bound."
+            )
+        if np.any(lower_bound > x0) or np.any(x0 > upper_bound):
+            warnings.warn("Initial guess is not within the specified bounds")
+
+    if stage == -1:
+        x0 = asfarray(x0).flatten()
+
+        nonzdelt = 0.05
+        zdelt = 0.00025
+
+        if bounds is not None:
+            x0 = np.clip(x0, lower_bound, upper_bound)
+
+        if initial_simplex is None:
+            N = len(x0)
+
+            sim = np.empty((N + 1, N), dtype=x0.dtype)
+            sim[0] = x0
+            for k in range(N):
+                y = np.array(x0, copy=True)
+                if y[k] != 0:
+                    y[k] = (1 + nonzdelt) * y[k]
+                else:
+                    y[k] = zdelt
+                sim[k + 1] = y
+        else:
+            sim = np.asfarray(initial_simplex).copy()
+            if sim.ndim != 2 or sim.shape[0] != sim.shape[1] + 1:
+                raise ValueError(
+                    "`initial_simplex` should be an array of shape (N+1,N)"
+                )
+            if len(x0) != sim.shape[1]:
+                raise ValueError(
+                    "Size of `initial_simplex` is not consistent with `x0`"
+                )
+            N = sim.shape[1]
+
+        if bounds is not None:
+            sim = np.clip(sim, lower_bound, upper_bound)
+
+        fsim = np.full((N + 1,), np.nan, dtype=float)
+
+    for k in range(kend, N + 1):
+        if stage == -1:
+            state = save_state()
+            if TRACE:
+                log(f"Stage 0 yield {sim[k]=} {stage=} {state=}")
+            return sim[k], state
+        else:
+            if TRACE:
+                log(f"Stage 0 resume {sim[k]=} {stage=} {state=} {lastval=}")
+            stage = -1
+            fsim[k] = lastval
+            lastval = None
+            kend += 1
+
+    if stage == -1:
+        ind = np.argsort(fsim)
+        sim = np.take(sim, ind, 0)
+        fsim = np.take(fsim, ind, 0)
+
+        ind = np.argsort(fsim)
+        fsim = np.take(fsim, ind, 0)
+        # sort so sim[0,:] has the lowest function value
+        sim = np.take(sim, ind, 0)
 
     if adaptive:
         dim = float(len(x0))
@@ -248,84 +419,57 @@ def _neldermead_generator(
         psi = 0.5
         sigma = 0.5
 
-    nonzdelt = 0.05
-    zdelt = 0.00025
-
-    if bounds is not None:
-        lower_bound, upper_bound = bounds  # was: bounds.lb, bounds.ub
-        # check bounds
-        if (lower_bound > upper_bound).any():
-            raise ValueError(
-                "Nelder Mead - one of the lower bounds is greater than an upper bound."
-            )
-        if np.any(lower_bound > x0) or np.any(x0 > upper_bound):
-            warnings.warn("Initial guess is not within the specified bounds")
-
-    if bounds is not None:
-        x0 = np.clip(x0, lower_bound, upper_bound)
-
-    if initial_simplex is None:
-        N = len(x0)
-
-        sim = np.empty((N + 1, N), dtype=x0.dtype)
-        sim[0] = x0
-        for k in range(N):
-            y = np.array(x0, copy=True)
-            if y[k] != 0:
-                y[k] = (1 + nonzdelt) * y[k]
-            else:
-                y[k] = zdelt
-            sim[k + 1] = y
-    else:
-        sim = np.asfarray(initial_simplex).copy()
-        if sim.ndim != 2 or sim.shape[0] != sim.shape[1] + 1:
-            raise ValueError("`initial_simplex` should be an array of shape (N+1,N)")
-        if len(x0) != sim.shape[1]:
-            raise ValueError("Size of `initial_simplex` is not consistent with `x0`")
-        N = sim.shape[1]
-
-    if bounds is not None:
-        sim = np.clip(sim, lower_bound, upper_bound)
-
     one2np1 = list(range(1, N + 1))
-    fsim = np.full((N + 1,), np.inf, dtype=float)
+    assert stage >= 1 or stage == -1
 
-    for k in range(N + 1):
-        x = sim[k]
-        yield x, sim
-        fsim[k] = func(x)
-
-    ind = np.argsort(fsim)
-    sim = np.take(sim, ind, 0)
-    fsim = np.take(fsim, ind, 0)
-
-    ind = np.argsort(fsim)
-    fsim = np.take(fsim, ind, 0)
-    # sort so sim[0,:] has the lowest function value
-    sim = np.take(sim, ind, 0)
-
-    # while (fcalls[0] < maxfun and iterations < maxiter):
     while True:
-        if (
-            np.max(np.ravel(np.abs(sim[1:] - sim[0]))) <= xatol
-            and np.max(np.abs(fsim[0] - fsim[1:])) <= fatol
-        ):
-            break
+        if stage == -1:
+            astg = 1
+            if (
+                np.max(np.ravel(np.abs(sim[1:] - sim[0]))) <= xatol
+                and np.max(np.abs(fsim[0] - fsim[1:])) <= fatol
+            ):
+                break
 
-        xbar = np.add.reduce(sim[:-1], 0) / N
-        xr = (1 + rho) * xbar - rho * sim[-1]
-        if bounds is not None:
-            xr = np.clip(xr, lower_bound, upper_bound)
-        yield xr, sim
-        fxr = func(xr)
-        doshrink = False
-
-        if fxr < fsim[0]:
-            xe = (1 + rho * chi) * xbar - rho * chi * sim[-1]
+            xbar = np.add.reduce(sim[:-1], 0) / N
+            xr = (1 + rho) * xbar - rho * sim[-1]
             if bounds is not None:
-                xe = np.clip(xe, lower_bound, upper_bound)
-            yield xe, sim
-            fxe = func(xe)
+                xr = np.clip(xr, lower_bound, upper_bound)
+
+            state = save_state()
+            if TRACE:
+                log(f"Stage 1 yield {xr=} {stage=} {state=}")
+            return xr, state
+        elif stage == 1:
+            if TRACE:
+                log(f"Stage 1 resume {xr=} {stage=} {state=} {lastval=}")
+            stage = -1
+            fxr = lastval
+            lastval = None
+        else:
+            pass
+
+        if stage == -1:
+            doshrink = 0
+
+        if fxr < fsim[0] or stage == 2:
+            astg = 2
+            if stage == -1:
+                xe = (1 + rho * chi) * xbar - rho * chi * sim[-1]
+                if bounds is not None:
+                    xe = np.clip(xe, lower_bound, upper_bound)
+                state = save_state()
+                if TRACE:
+                    log(f"Stage 2 yield {xe=} {stage=} {state=}")
+                return xe, state
+            elif stage == 2:
+                if TRACE:
+                    log(f"Stage 2 resume {xe=} {stage=} {state=}")
+                stage = -1
+                fxe = lastval
+                lastval = None
+            else:
+                raise Exception("Simplex state is wrong")
 
             if fxe < fxr:
                 sim[-1] = xe
@@ -333,46 +477,86 @@ def _neldermead_generator(
             else:
                 sim[-1] = xr
                 fsim[-1] = fxr
+
         else:  # fsim[0] <= fxr
-            if fxr < fsim[-2]:
+            if fxr < fsim[-2] and stage == -1:
                 sim[-1] = xr
                 fsim[-1] = fxr
             else:  # fxr >= fsim[-2]
                 # Perform contraction
-                if fxr < fsim[-1]:
-                    xc = (1 + psi * rho) * xbar - psi * rho * sim[-1]
-                    if bounds is not None:
-                        xc = np.clip(xc, lower_bound, upper_bound)
-                    yield xc, sim
-                    fxc = func(xc)
+                if (stage == -1 and fxr < fsim[-1]) or stage == 3:
+                    astg = 3
+                    if stage == -1:
+                        xc = (1 + psi * rho) * xbar - psi * rho * sim[-1]
+                        if bounds is not None:
+                            xc = np.clip(xc, lower_bound, upper_bound)
+                        state = save_state()
+                        if TRACE:
+                            log(f"Stage 3 yield {xc=} {stage=} {state=}")
+                        return xc, state
+                    elif stage == 3:
+                        if TRACE:
+                            log(f"Stage 3 resume {xc=} {stage=} {state=}")
+                        stage = -1
+                        fxc = lastval
+                        lastval = None
+                    else:
+                        raise Exception("Simplex state is wrong")
 
                     if fxc <= fxr:
                         sim[-1] = xc
                         fsim[-1] = fxc
                     else:
-                        doshrink = True
-                else:
-                    # Perform an inside contraction
-                    xcc = (1 - psi) * xbar + psi * sim[-1]
-                    if bounds is not None:
-                        xcc = np.clip(xcc, lower_bound, upper_bound)
-                    yield xcc, sim
-                    fxcc = func(xcc)
+                        doshrink = 1
+                elif stage == -1 or stage == 4:
+                    astg = 4
+                    if stage == -1:
+                        # Perform an inside contraction
+                        xcc = (1 - psi) * xbar + psi * sim[-1]
+                        if bounds is not None:
+                            xcc = np.clip(xcc, lower_bound, upper_bound)
+                        state = save_state()
+                        if TRACE:
+                            log(f"Stage 4 yield {xcc=} {stage=} {state=}")
+                        return xcc, state
+                    elif stage == 4:
+                        if TRACE:
+                            log(f"Stage 4 resume {xcc=} {stage=} {state=}")
+                        stage = -1
+                        fxcc = lastval
+                        lastval = None
+                    else:
+                        raise Exception("Simplex state is wrong")
 
                     if fxcc < fsim[-1]:
                         sim[-1] = xcc
                         fsim[-1] = fxcc
                     else:
-                        doshrink = True
+                        doshrink = 1
+                else:
+                    assert stage == 5
 
-                if doshrink:
-                    for j in one2np1:
-                        sim[j] = sim[0] + sigma * (sim[j] - sim[0])
-                        if bounds is not None:
-                            sim[j] = np.clip(sim[j], lower_bound, upper_bound)
-                        x = sim[j]
-                        yield x, sim
-                        fsim[j] = func(x)
+                assert stage == -1 or stage == 5
+                if (stage == -1 and doshrink) or stage == 5:
+                    astg = 5
+                    for jidx in range(jend, len(one2np1)):
+                        j = one2np1[jidx]
+                        if stage == -1:
+                            sim[j] = sim[0] + sigma * (sim[j] - sim[0])
+                            if bounds is not None:
+                                sim[j] = np.clip(sim[j], lower_bound, upper_bound)
+                            state = save_state()
+                            if TRACE:
+                                log(f"Stage 5 yield {sim[j]=} {stage=} {state=}")
+                            return sim[j], state
+                        else:
+                            if TRACE:
+                                log(f"Stage 5 resume {sim[j]=} {stage=} {state=}")
+                            stage = -1
+                            fsim[j] = lastval
+                            lastval = None
+                        jend += 1
+                    jend = 0
 
         ind = np.argsort(fsim)
         sim = np.take(sim, ind, 0)

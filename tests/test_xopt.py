@@ -86,6 +86,78 @@ class TestXopt:
             X = from_file("test.yml", ele)
             assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
 
+    def test_index_typing(self):
+        evaluator = Evaluator(function=xtest_callable)
+
+        def reload(X):
+            return Xopt.from_yaml(X.yaml())
+
+        def check_index(X, length):
+            if length == 0:
+                assert X.generator.data is None and X.data is None
+            else:
+                assert len(X.generator.data) == len(X.data) == length
+                assert X.data.index.is_integer()
+                assert X.data.index.dtype == np.int64
+
+        def check_all(X, length):
+            check_index(X, length)
+            check_index(reload(X), length)
+
+        test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
+
+        with pytest.raises(ValueError):
+            X1 = Xopt(
+                generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
+                evaluator=evaluator,
+                vocs=deepcopy(TEST_VOCS_BASE),
+                data=pd.DataFrame(test_data, index=["foo", 0.25, 1]),
+            )
+
+        X1 = Xopt(
+            generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
+            data=pd.DataFrame(test_data, index=[1, 2, 3]),
+        )
+        check_all(X1, 3)
+
+        X1 = Xopt(
+            generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
+        )
+        check_all(X1, 0)
+
+        X1.step()
+        npoints = 1
+        check_all(X1, 1)
+
+        X1.evaluate_data(test_data)
+        X1.evaluate_data(pd.DataFrame(test_data, index=["foo", 0.25, 1]))
+        npoints += 6
+        check_all(X1, npoints)
+
+        X1.step()
+        npoints += 1
+        check_all(X1, npoints)
+
+        npoints += 2
+        X1.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=[0, 1]))
+        check_all(X1, npoints)
+
+        npoints += 2
+        X1.add_data(
+            pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=["0", "1"])
+        )
+        check_all(X1, npoints)
+
+        npoints += 2
+        X1.add_data(
+            pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=["foo", "bar"])
+        )
+        check_all(X1, npoints)
+
     def test_bad_vocs(self):
         # test with bad vocs
         YAML = """
