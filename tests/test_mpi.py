@@ -3,11 +3,22 @@ import os
 import pytest
 import yaml
 
-from xopt.mpi.run import run_mpi
+havempi = False
+try:
+    from mpi4py import MPI  # noqa: F401
+
+    havempi = True
+except ImportError:
+    pass
+
+needsmpi = pytest.mark.skipif(not havempi, reason="MPI not available")
 
 
 class TestMPI:
+    @needsmpi
     def test_mpi(self):
+        from xopt.mpi.run import run_mpi
+
         YAML = """
                 max_evaluations: 5
                 evaluator:
@@ -43,7 +54,10 @@ class TestMPI:
 
         run_mpi(yaml.safe_load(open("test.yml")), 0, False, None)
 
+    @needsmpi
     def test_with_cnsga(self):
+        from xopt.mpi.run import run_mpi
+
         YAML = """
         max_evaluations: 10
         generator:
