@@ -296,7 +296,7 @@ def explode_all_columns(data: pd.DataFrame):
 
         if data.shape[0] == 1:
             # Fast path for most common experimental case of 1 candidate per step
-            df = _explode_pandas_modified(data, lengths[0])
+            df = _explode_pandas_modified(data, list_types, lengths[0])
             return df
         else:
             if len(list_types):
@@ -313,12 +313,12 @@ def explode_all_columns(data: pd.DataFrame):
         return data
 
 
-def _explode_pandas_modified(df: pd.DataFrame, length: int):
+def _explode_pandas_modified(df: pd.DataFrame, columns: list[str], length: int):
     if len(df) != 1:
         raise NotImplementedError("This method only works for single row dataframes")
     # this is slower somehow
     # df.to_dict(orient='records')
-    data = {c: df[c].iloc[0] for c in df.columns}
+    data = {c: df[c].iloc[0] if c in columns else [df[c].iloc[0]] for c in df.columns}
     result = pd.DataFrame(data, index=np.arange(length))
 
     return result
