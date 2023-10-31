@@ -130,33 +130,33 @@ class TestXopt:
         check_all(X1, 0)
 
         X1.step()
-        l = 1
+        npoints = 1
         check_all(X1, 1)
 
         X1.evaluate_data(test_data)
         X1.evaluate_data(pd.DataFrame(test_data, index=["foo", 0.25, 1]))
-        l += 6
-        check_all(X1, l)
+        npoints += 6
+        check_all(X1, npoints)
 
         X1.step()
-        l += 1
-        check_all(X1, l)
+        npoints += 1
+        check_all(X1, npoints)
 
-        l += 2
+        npoints += 2
         X1.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=[0, 1]))
-        check_all(X1, l)
+        check_all(X1, npoints)
 
-        l += 2
+        npoints += 2
         X1.add_data(
             pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=["0", "1"])
         )
-        check_all(X1, l)
+        check_all(X1, npoints)
 
-        l += 2
+        npoints += 2
         X1.add_data(
             pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=["foo", "bar"])
         )
-        check_all(X1, l)
+        check_all(X1, npoints)
 
     def test_bad_vocs(self):
         # test with bad vocs
