@@ -330,10 +330,6 @@ class TestXopt:
         X.add_data(data)
         X.dump()
 
-        import os
-
-        os.remove(X.dump_file)
-
     def test_checkpointing(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
