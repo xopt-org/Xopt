@@ -330,6 +330,17 @@ class TestXopt:
         X.add_data(data)
         X.dump()
 
+        data = pd.DataFrame(
+            {
+                "x": [np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0])],
+                "y": [np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0])],
+            },
+            index=[0, 1],
+        )
+        data = explode_all_columns(data)
+        X.add_data(data)
+        X.dump()
+
     def test_checkpointing(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
