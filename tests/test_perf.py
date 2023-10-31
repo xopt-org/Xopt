@@ -25,7 +25,7 @@ class TestPerformance:
             "generator": {
                 "name": "random",
             },
-            "evaluator": {"function": f"xopt.resources.testing.xtest_callable"},
+            "evaluator": {"function": "xopt.resources.testing.xtest_callable"},
             "vocs": VOCS_15D,
         }
         X = Xopt.from_dict(config)

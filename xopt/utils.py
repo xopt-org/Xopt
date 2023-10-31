@@ -313,12 +313,12 @@ def explode_all_columns(data: pd.DataFrame):
         return data
 
 
-def _explode_pandas_modified(df: pd.DataFrame, l: int):
+def _explode_pandas_modified(df: pd.DataFrame, length: int):
     if len(df) != 1:
-        raise NotImplementedError(f"This method only works for single row dataframes")
+        raise NotImplementedError("This method only works for single row dataframes")
     # this is slower somehow
     # df.to_dict(orient='records')
     data = {c: df[c].iloc[0] for c in df.columns}
-    result = pd.DataFrame(data, index=np.arange(l))
+    result = pd.DataFrame(data, index=np.arange(length))
 
     return result
