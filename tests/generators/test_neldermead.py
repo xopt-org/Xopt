@@ -3,7 +3,6 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
 from pydantic import ValidationError
 from scipy.optimize import minimize
 
