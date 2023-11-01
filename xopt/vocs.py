@@ -512,8 +512,10 @@ def form_variable_data(variables: Dict, data, prefix="variable_"):
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
 
+    # Pick out columns in right order
     variables = sorted(variables)
     vdata = data.loc[:, variables].copy()
+    # Rename to add prefix
     vdata.rename({k: prefix + k for k in variables})
     return vdata
 
@@ -524,7 +526,7 @@ def form_objective_data(
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
-    Weights are applied to convert all objectives into mimimization form unless
+    Weights are applied to convert all objectives into minimization form unless
     `return_raw` is True
 
     Returns a dataframe with the objective data intended to be minimized.
@@ -541,6 +543,7 @@ def form_objective_data(
     objectives_names = sorted(objectives.keys())
 
     if set(data.columns).issuperset(set(objectives_names)):
+        # have all objectives, dont need to fill in missing ones
         weights = np.ones(len(objectives_names))
         for i, k in enumerate(objectives_names):
             operator = objectives[k].upper()
@@ -587,7 +590,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
     constraint is satisfied if the evaluation is < 0.
 
     Args:
-        constraints: Dictonary of constraints
+        constraints: Dictionary of constraints
         data: Dataframe with the data to be evaluated
         prefix: Prefix to use for the transformed data in the dataframe
 
