@@ -7,7 +7,7 @@ from xopt import Xopt
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 
-NRUNS = 2000
+NRUNS = 1000
 
 
 class TestPerformance:
@@ -58,5 +58,5 @@ class TestPerformance:
         )
         print(f"Ratio every 100 steps: {ratio_array[::100]}")
 
-        if txopt / tpure > 500:
+        if txopt / tpure > 100:
             raise ValueError("Xopt overhead is too large")
