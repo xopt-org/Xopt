@@ -352,6 +352,8 @@ class Xopt(XoptBaseModel):
 
             self.data = pd.concat([self.data, new_data], axis=0)
         else:
+            if new_data.index.dtype != np.int64:
+                new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
         self.generator.add_data(new_data)
 
