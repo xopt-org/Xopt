@@ -2,81 +2,122 @@ import json
 import warnings
 
 from xopt.errors import XoptError
-from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
-from xopt.generators.random import RandomGenerator
-from xopt.generators.rcds.rcds import RCDSGenerator
 
-# add generators here to be registered
+from xopt.generators.random import RandomGenerator
+
+# by default only load random generator
 registered_generators = [
     RandomGenerator,
-    ExtremumSeekingGenerator,
-    RCDSGenerator,
 ]
 
-# generators needing deap
-try:
-    from xopt.generators.ga import CNSGAGenerator
-
-    registered_generators += [CNSGAGenerator]
-
-except ModuleNotFoundError:
-    warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
-
-# generators needing botorch
-try:
-    from xopt.generators.bayesian.bayesian_exploration import (
-        BayesianExplorationGenerator,
-    )
-    from xopt.generators.bayesian.expected_improvement import (
-        ExpectedImprovementGenerator,
-    )
-    from xopt.generators.bayesian.mobo import MOBOGenerator
-    from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
-    from xopt.generators.bayesian.upper_confidence_bound import (
-        TDUpperConfidenceBoundGenerator,
-        UpperConfidenceBoundGenerator,
-    )
-
-    registered_generators += [
-        UpperConfidenceBoundGenerator,
-        MOBOGenerator,
-        BayesianExplorationGenerator,
-        TDUpperConfidenceBoundGenerator,
-        ExpectedImprovementGenerator,
-        MultiFidelityGenerator,
-    ]
-
-except ModuleNotFoundError:
-    warnings.warn("WARNING: `botorch` not found, Bayesian generators are not available")
-
-# generators requiring deap AND botorch
-try:
-    from xopt.generators.bayesian.mggpo import MGGPOGenerator
-
-    registered_generators += [MGGPOGenerator]
-except ModuleNotFoundError:
-    warnings.warn(
-        "WARNING: `deap` and `botorch` not found, MGGPOGenerator is not " "available"
-    )
-
-try:
-    from xopt.generators.scipy.neldermead import NelderMeadGenerator
-
-    registered_generators += [NelderMeadGenerator]
-
-except ModuleNotFoundError:
-    warnings.warn("WARNING: `scipy` not found, NelderMeadGenerator is not available")
-
 generators = {gen.name: gen for gen in registered_generators}
+
+# This list hardcodes generator names - it is not pretty but helps with import speed A LOT
+
+all_generator_names = {
+    "mggpo": {"mggpo"},
+    "scipy": {"neldermead"},
+    "bo": {
+        "upper_confidence_bound",
+        "mobo",
+        "bayesian_exploration",
+        "time_dependent_upper_confidence_bound",
+        "expected_improvement",
+        "multi_fidelity",
+    },
+    "ga": {"cnsga"},
+    "es": {"extremum_seeking"},
+    "rcds": {"rcds"},
+}
+
+
+def try_load_all_generators():
+    for v in all_generator_names.values():
+        for gn in v:
+            get_generator_dynamic(gn)
+
+
+def get_generator_dynamic(name: str):
+    if name in generators:
+        return generators[name]
+
+    if name in all_generator_names["mggpo"]:
+        try:
+            from xopt.generators.bayesian.mggpo import MGGPOGenerator
+
+            generators[name] = MGGPOGenerator
+            return MGGPOGenerator
+        except ModuleNotFoundError:
+            warnings.warn(
+                "WARNING: `deap` and `botorch` not found, MGGPOGenerator is not "
+                "available"
+            )
+    elif name in all_generator_names["scipy"]:
+        try:
+            from xopt.generators.scipy.neldermead import NelderMeadGenerator
+
+            generators[name] = NelderMeadGenerator
+            return NelderMeadGenerator
+        except ModuleNotFoundError:
+            warnings.warn(
+                "WARNING: `scipy` not found, NelderMeadGenerator is not available"
+            )
+    elif name in all_generator_names["bo"]:
+        try:
+            from xopt.generators.bayesian.bayesian_exploration import (
+                BayesianExplorationGenerator,
+            )
+            from xopt.generators.bayesian.expected_improvement import (
+                ExpectedImprovementGenerator,
+            )
+            from xopt.generators.bayesian.mobo import MOBOGenerator
+            from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
+            from xopt.generators.bayesian.upper_confidence_bound import (
+                TDUpperConfidenceBoundGenerator,
+                UpperConfidenceBoundGenerator,
+            )
+
+            registered_generators = [
+                UpperConfidenceBoundGenerator,
+                MOBOGenerator,
+                BayesianExplorationGenerator,
+                TDUpperConfidenceBoundGenerator,
+                ExpectedImprovementGenerator,
+                MultiFidelityGenerator,
+            ]
+            for gen in registered_generators:
+                generators[gen.name] = gen
+            return generators[name]
+        except ModuleNotFoundError:
+            warnings.warn(
+                "WARNING: `botorch` not found, Bayesian generators are not available"
+            )
+    elif name in all_generator_names["ga"]:
+        try:
+            from xopt.generators.ga import CNSGAGenerator
+
+            generators[name] = CNSGAGenerator
+            return CNSGAGenerator
+        except ModuleNotFoundError:
+            warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
+    elif name in all_generator_names["es"]:
+        from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+
+        generators[name] = ExtremumSeekingGenerator
+        return ExtremumSeekingGenerator
+    elif name in all_generator_names["rcds"]:
+        from xopt.generators.rcds.rcds import RCDSGenerator
+
+        generators[name] = RCDSGenerator
+        return RCDSGenerator
+    raise KeyError
 
 
 def get_generator(name: str):
     try:
-        return generators[name]
+        return get_generator_dynamic(name)
     except KeyError:
-        raise XoptError(
-            f"No generator named {name}, available generators are {list(generators.keys())}"
-        )
+        raise XoptError(f"No generator named {name}")
 
 
 def get_generator_defaults(

@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 
 from xopt import Evaluator, Xopt
-from xopt.generators import BayesianExplorationGenerator
+from xopt.generators.bayesian import BayesianExplorationGenerator
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 

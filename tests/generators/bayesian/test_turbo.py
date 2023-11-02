@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from xopt import Evaluator, VOCS, Xopt
-from xopt.generators import UpperConfidenceBoundGenerator
+from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
