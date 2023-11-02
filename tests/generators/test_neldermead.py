@@ -1,7 +1,8 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
 from pydantic import ValidationError
 from scipy.optimize import minimize
 
@@ -17,8 +18,8 @@ from xopt.resources.testing import TEST_VOCS_BASE
 
 def compare(X, X2):
     """Compare two Xopt objects"""
-    y = yaml.safe_load(X.yaml())
-    y2 = yaml.safe_load(X2.yaml())
+    y = json.loads(X.json())
+    y2 = json.loads(X2.json())
     y.pop("data")
     y2.pop("data")
     assert y == y2
@@ -180,8 +181,8 @@ class TestNelderMeadGenerator:
         for i in range(scipy_data.shape[0] - 1):
             # For performance, only check some steps
             if i % cstep == 0 or i == scipy_data.shape[0] - 2:
-                state = X.yaml()
-                X2 = Xopt.from_yaml(state)
+                state = X.json()
+                X2 = Xopt.model_validate(json.loads(state))
                 compare(X, X2)
 
                 samples = X.generator.generate(1)
@@ -189,8 +190,8 @@ class TestNelderMeadGenerator:
                 assert samples == samples2
                 compare(X, X2)
 
-                state = X.yaml()
-                X3 = Xopt.from_yaml(state)
+                state = X.json()
+                X3 = Xopt.model_validate(json.loads(state))
                 compare(X, X3)
 
                 X.evaluate_data(samples)

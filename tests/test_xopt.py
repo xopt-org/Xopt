@@ -16,6 +16,7 @@ from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
+from xopt.generators import try_load_all_generators
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.utils import explode_all_columns
@@ -157,6 +158,9 @@ class TestXopt:
             pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}, index=["foo", "bar"])
         )
         check_all(X1, npoints)
+
+    def test_gen_load(self):
+        try_load_all_generators()
 
     def test_bad_vocs(self):
         # test with bad vocs
@@ -402,9 +406,16 @@ class TestXopt:
         X.add_data(data)
         X.dump()
 
-        import os
-
-        os.remove(X.dump_file)
+        data = pd.DataFrame(
+            {
+                "x": [np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0])],
+                "y": [np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0])],
+            },
+            index=[0, 1],
+        )
+        data = explode_all_columns(data)
+        X.add_data(data)
+        X.dump()
 
     def test_checkpointing(self):
         evaluator = Evaluator(function=xtest_callable)
