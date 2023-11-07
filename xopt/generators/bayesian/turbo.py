@@ -1,7 +1,7 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Dict, Union
+from typing import Dict, Union, Optional
 
 import torch
 from botorch.models import ModelListGP
@@ -46,7 +46,7 @@ class TurboController(XoptBaseModel, ABC):
         None,
         description="number of successes to trigger a trust region contraction",
     )
-    center_x: Dict[str, float] = Field(None)
+    center_x: Optional[Dict[str, float]] = Field(None)
     scale_factor: float = Field(
         2.0, description="multiplier to increase or decrease trust region", gt=1.0
     )
@@ -114,7 +114,8 @@ class TurboController(XoptBaseModel, ABC):
 
 
 class OptimizeTurboController(TurboController):
-    best_value: float = None
+    name: str = Field("optimize", frozen=True)
+    best_value: Optional[float] = None
 
     @property
     def minimize(self) -> bool:
@@ -200,7 +201,8 @@ class OptimizeTurboController(TurboController):
 
 
 class SafetyTurboController(TurboController):
-    scale_factor: float = float(1.25)
+    name: str = Field("safety", frozen=True)
+    scale_factor: float = 1.25
     min_feasible_fraction: float = 0.75
 
     def update_state(self, data, previous_batch_size: int = 1):
