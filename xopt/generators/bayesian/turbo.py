@@ -1,7 +1,7 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Dict, Union, Optional
+from typing import Dict, Optional, Union
 
 import torch
 from botorch.models import ModelListGP

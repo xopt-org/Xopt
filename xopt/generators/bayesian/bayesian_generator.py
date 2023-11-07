@@ -23,8 +23,9 @@ from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     ConstrainedMCAcquisitionFunction,
 )
-from xopt.generators.bayesian.custom_botorch.log_acquisition_function import \
-    LogAcquisitionFunction
+from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
+    LogAcquisitionFunction,
+)
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
@@ -150,7 +151,7 @@ class BayesianGenerator(Generator, ABC):
     )
     log_transform_acquisition_function: Optional[bool] = Field(
         False,
-        description="flag to log transform the acquisition function before optimization"
+        description="flag to log transform the acquisition function before optimization",
     )
 
     n_candidates: int = 1

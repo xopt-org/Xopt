@@ -20,6 +20,7 @@ def sin_function(input_dict):
     x = input_dict["x"]
     return {"f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x)}
 
+
 class TestTurbo(TestCase):
     def test_turbo_init(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -292,9 +293,7 @@ class TestTurbo(TestCase):
 
         evaluator = Evaluator(function=sin_function)
         for name in ["optimize", "safety"]:
-            generator = UpperConfidenceBoundGenerator(
-                vocs=vocs, turbo_controller=name
-            )
+            generator = UpperConfidenceBoundGenerator(vocs=vocs, turbo_controller=name)
             X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
 
             yaml_str = X.yaml()

@@ -245,6 +245,7 @@ def remove_none_values(d):
         d = [remove_none_values(item) for item in d]
     return d
 
+
 def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
