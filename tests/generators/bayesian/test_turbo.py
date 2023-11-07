@@ -16,6 +16,10 @@ from xopt.generators.bayesian.turbo import (
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
+def sin_function(input_dict):
+    x = input_dict["x"]
+    return {"f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x)}
+
 class TestTurbo(TestCase):
     def test_turbo_init(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -279,3 +283,20 @@ class TestTurbo(TestCase):
         sturbo.update_state(test_data3, previous_batch_size=3)
         assert sturbo.success_counter == 0
         assert sturbo.failure_counter == 1
+
+    def test_serialization(self):
+        vocs = VOCS(
+            variables={"x": [0, 2 * math.pi]},
+            objectives={"f": "MINIMIZE"},
+        )
+
+        evaluator = Evaluator(function=sin_function)
+        for name in ["optimize", "safety"]:
+            generator = UpperConfidenceBoundGenerator(
+                vocs=vocs, turbo_controller=name
+            )
+            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+
+            yaml_str = X.yaml()
+            X2 = Xopt.from_yaml(yaml_str)
+            assert X2.generator.turbo_controller.name == name

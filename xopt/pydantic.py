@@ -229,12 +229,21 @@ class XoptBaseModel(BaseModel):
 
     @classmethod
     def from_yaml(cls, yaml_obj: [str, TextIO]):
-        return cls.model_validate(yaml.safe_load(yaml_obj))
+        return cls.model_validate(remove_none_values(yaml.safe_load(yaml_obj)))
 
     @classmethod
     def from_dict(cls, config: dict):
-        return cls.model_validate(config)
+        return cls.model_validate(remove_none_values(config))
 
+
+def remove_none_values(d):
+    if isinstance(d, dict):
+        # Create a copy of the dictionary to avoid modifying the original while iterating
+        d = {k: remove_none_values(v) for k, v in d.items() if v is not None}
+    elif isinstance(d, list):
+        # If it's a list, recursively process each item in the list
+        d = [remove_none_values(item) for item in d]
+    return d
 
 def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
