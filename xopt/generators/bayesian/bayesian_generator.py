@@ -23,6 +23,9 @@ from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     ConstrainedMCAcquisitionFunction,
 )
+from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
+    LogAcquisitionFunction,
+)
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
@@ -88,6 +91,10 @@ class BayesianGenerator(Generator, ABC):
     computation_time : Optional[pd.DataFrame]
         A data frame tracking computation time in seconds.
 
+    log_transform_acquisition_function: Optional[bool]
+        Flag to determine if final acquisition function value should be
+        log-transformed before optimization.
+
     n_candidates : int
         The number of candidates to generate in each optimization step.
 
@@ -142,6 +149,11 @@ class BayesianGenerator(Generator, ABC):
         None,
         description="data frame tracking computation time in seconds",
     )
+    log_transform_acquisition_function: Optional[bool] = Field(
+        False,
+        description="flag to log transform the acquisition function before optimization",
+    )
+
     n_candidates: int = 1
 
     @field_validator("model", mode="before")
@@ -218,6 +230,10 @@ class BayesianGenerator(Generator, ABC):
                 raise ValueError("turbo input dict needs to have a `name` attribute")
             name = value.pop("name")
             if name in optimizer_dict:
+                # pop unnecessary elements
+                for ele in ["dim"]:
+                    value.pop(ele, None)
+
                 value = optimizer_dict[name](vocs=info.data["vocs"], **value)
             else:
                 raise ValueError(
@@ -446,6 +462,9 @@ class BayesianGenerator(Generator, ABC):
             acq = FixedFeatureAcquisitionFunction(
                 acq_function=acq, d=dim, columns=columns, values=values
             )
+
+        if self.log_transform_acquisition_function:
+            acq = LogAcquisitionFunction(acq)
 
         return acq
 
