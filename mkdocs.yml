@@ -18,6 +18,7 @@ nav:
             - Single Objective Bayesian Optimization:
                 - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
                 - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
+                - Log-transformed optimization: examples/single_objective_bayes_opt/log_transformed_tutorial.ipynb
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
                 - Trust region: examples/single_objective_bayes_opt/turbo_tutorial.ipynb
