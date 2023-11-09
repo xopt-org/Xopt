@@ -3,7 +3,7 @@ from typing import Optional
 
 import torch
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveInt, PositiveFloat
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -26,7 +26,9 @@ class LBFGSOptimizer(NumericalOptimizer):
         20, description="number of restarts during acquistion function optimization"
     )
     max_iter: PositiveInt = Field(2000)
-    max_time: Optional[PositiveFloat] = Field(None, description="maximum time for optimizing")
+    max_time: Optional[PositiveFloat] = Field(
+        None, description="maximum time for optimizing"
+    )
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -34,7 +36,7 @@ class LBFGSOptimizer(NumericalOptimizer):
         assert isinstance(bounds, Tensor)
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
-    
+
         candidates, out = optimize_acqf(
             acq_function=function,
             bounds=bounds,
