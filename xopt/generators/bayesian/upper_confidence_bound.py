@@ -8,7 +8,8 @@ from botorch.acquisition import (
 )
 from pydantic import Field, field_validator
 
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator, \
+    formatted_base_docstring
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.utils import set_botorch_weights
 
@@ -17,8 +18,15 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation: bool = True
-    __doc__ = """Implements Bayesian Optimization using the Upper Confidence Bound
-    acquisition function"""
+    __doc__ = """Bayesian optimization generator using Upper Confidence Bound
+    
+Attributes
+----------
+beta : float, default 2.0
+    Beta parameter for UCB optimization, controlling the trade-off between exploration
+    and exploitation. Higher values of beta prioritize exploration.
+    
+    """ + formatted_base_docstring()
 
     @field_validator("vocs")
     def validate_vocs_without_constraints(cls, v):
