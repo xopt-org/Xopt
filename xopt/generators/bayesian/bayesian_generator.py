@@ -310,7 +310,7 @@ class BayesianGenerator(Generator, ABC):
             start_time = time.perf_counter()
             candidates = self.propose_candidates(model, n_candidates=n_candidates)
             timing_results["acquisition_optimization"] = (
-                    time.perf_counter() - start_time
+                time.perf_counter() - start_time
             )
 
             # post process candidates
@@ -667,7 +667,7 @@ class BayesianGenerator(Generator, ABC):
 
         # get maximum travel distances
         max_travel_distances = (
-                torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
+            torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
         )
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
@@ -680,7 +680,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
     reference_point: dict[str, float] = Field(
         description="dict specifying reference point for multi-objective "
-                    "optimization",
+        "optimization",
     )
 
     supports_multi_objective: bool = True
@@ -742,5 +742,4 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
 
 def formatted_base_docstring():
-    return "\nBase Generator\n---------------\n" + \
-        BayesianGenerator.__doc__
+    return "\nBase Generator\n---------------\n" + BayesianGenerator.__doc__

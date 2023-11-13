@@ -37,7 +37,6 @@ def list_available_generators() -> List[str]:
     return list(generators.keys())
 
 
-
 def try_load_all_generators():
     for v in all_generator_names.values():
         for gn in v:
