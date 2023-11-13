@@ -5,8 +5,10 @@ from botorch.acquisition import (
     ScalarizedPosteriorTransform,
 )
 
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator, \
-    formatted_base_docstring
+from xopt.generators.bayesian.bayesian_generator import (
+    BayesianGenerator,
+    formatted_base_docstring,
+)
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
@@ -14,8 +16,10 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     name = "expected_improvement"
     supports_batch_generation: bool = True
 
-    __doc__ = "Bayesian optimization generator using Expected improvement\n" + \
-              formatted_base_docstring()
+    __doc__ = (
+        "Bayesian optimization generator using Expected improvement\n"
+        + formatted_base_docstring()
+    )
 
     def _get_acquisition(self, model):
         objective_data = self.vocs.objective_data(self.data, "").dropna()
