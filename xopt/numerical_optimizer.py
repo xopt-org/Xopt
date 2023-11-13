@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 import torch
+from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 from torch import Tensor
@@ -14,7 +15,7 @@ class NumericalOptimizer(XoptBaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
-    def optimize(self, function, bounds, n_candidates=1):
+    def optimize(self, function: AcquisitionFunction, bounds: Tensor, n_candidates=1):
         """optimize a function to produce a number of candidate points that
         minimize the function"""
         pass
