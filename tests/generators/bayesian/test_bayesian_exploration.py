@@ -56,3 +56,23 @@ class TestBayesianExplorationGenerator:
         # now use bayes opt
         X.step()
         X.step()
+
+    def test_interpolation(self):
+        evaluator = Evaluator(function=xtest_callable)
+
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+
+        gen = BayesianExplorationGenerator(vocs=test_vocs)
+        gen.numerical_optimizer.n_restarts = 1
+        gen.n_monte_carlo_samples = 1
+        gen.n_interpolate_points = 5
+
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X.add_data(TEST_VOCS_DATA)
+
+        # now use bayes opt
+        X.step()
+        X.step()
+        assert len(X.data) == 20

@@ -1,5 +1,6 @@
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 import torch
 from botorch.models.transforms import Normalize
@@ -83,3 +84,34 @@ def rectilinear_domain_union(A, B):
     )
 
     return out_bounds
+
+
+def interpolate_points(df, num_points=10):
+    """
+    Generates interpolated points between two points specified by a pandas DataFrame.
+
+    Parameters:
+    - df: pandas DataFrame with two rows representing the start and end points.
+    - num_points: Number of points to generate between the start and end points.
+
+    Returns:
+    - pandas DataFrame with the interpolated points.
+    """
+    if df.shape[0] != 2:
+        raise ValueError("Input DataFrame must have exactly two rows.")
+
+    start_point = df.iloc[0]
+    end_point = df.iloc[1]
+
+    # Create an array of num_points equally spaced between 0 and 1
+    interpolation_factors = np.linspace(0, 1, num_points + 1)
+
+    # Interpolate each column independently
+    interpolated_points = pd.DataFrame()
+    for col in df.columns:
+        interpolated_values = np.interp(
+            interpolation_factors, [0, 1], [start_point[col], end_point[col]]
+        )
+        interpolated_points[col] = interpolated_values[1:]
+
+    return interpolated_points
