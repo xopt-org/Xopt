@@ -121,7 +121,9 @@ class Evaluator(XoptBaseModel):
                 kwargs,
             )
 
-        return DataFrame(output_data, index=input_data.index)
+        return pd.concat(
+            [input_data, DataFrame(output_data, index=input_data.index)], axis=1
+        )
 
     def safe_function(self, *args, **kwargs):
         """
