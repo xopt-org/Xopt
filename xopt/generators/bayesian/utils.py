@@ -11,9 +11,34 @@ def get_training_data(
     input_names: List[str], outcome_name: str, data: pd.DataFrame
 ) -> (torch.Tensor, torch.Tensor):
     """
-    Returns (train_X, train_Y, train_Yvar) for the output specified by name.
-    If `<outcome_name>_var` is in the dataframe then this function will also return a
-    tensor for the y variance, else it returns None.
+    Creates training data from input data frame.
+
+    Parameters
+    ----------
+    input_names : List[str]
+        List of input feature names.
+
+    outcome_name : str
+        Name of the outcome variable.
+
+    data : pd.DataFrame
+        DataFrame containing input and outcome data.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        Tuple containing training input tensor (train_X), training outcome tensor (
+        train_Y), and training outcome variance tensor (train_Yvar).
+
+    Notes
+    -----
+
+    The function handles NaN values, removing rows with NaN values in any of the
+    input variables.
+
+    If the DataFrame contains a column named `<outcome_name>_var`, the function
+    returns a tensor for the outcome variance (train_Yvar); otherwise, train_Yvar is
+    None.
 
     """
 
@@ -52,6 +77,39 @@ def set_botorch_weights(weights, vocs: VOCS):
 
 
 def get_input_transform(input_names: List, input_bounds: Dict[str, List] = None):
+    """
+    Create a Botorch normalization transform for input data.
+
+    Parameters
+    ----------
+    input_names : List[str]
+        List of input feature names.
+
+    input_bounds : Optional[Dict[str, List[float]]], optional
+        A dictionary specifying the bounds for each input feature. If None,
+        no normalization is applied. The dictionary should have input feature
+        names as keys, and corresponding bounds as lists [min, max].
+
+    Returns
+    -------
+    Normalize
+        A normalization transform module.
+
+    Notes
+    -----
+    The normalization transform is applied independently to each input feature.
+
+    If `input_bounds` is provided, the transform scales each input feature to the
+    range [0, 1] based on the specified bounds. If `input_bounds` is None,
+    no normalization is applied, and the raw input values are used.
+
+    Examples
+    --------
+    >>> input_names = ['feature1', 'feature2']
+    >>> input_bounds = {'feature1': [0.0, 1.0], 'feature2': [-1.0, 1.0]}
+    >>> transform = get_input_transform(input_names, input_bounds)
+    >>> normalized_data = transform(raw_input_data)
+    """
     if input_bounds is None:
         bounds = None
     else:
@@ -61,25 +119,55 @@ def get_input_transform(input_names: List, input_bounds: Dict[str, List] = None)
     return Normalize(len(input_names), bounds=bounds)
 
 
-def rectilinear_domain_union(A, B):
+def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     """
-    outputs a rectilinear domain that is the union of bounds A/B
+    Calculate the union of two rectilinear domains represented by input bounds A and B.
 
-    A.shape = (2,N)
-    B.shape = (2,N)
+    Parameters
+    ----------
+    A : torch.Tensor
+        Input bounds for domain A. It should have shape (2, N) where N is the number
+        of dimensions. The first row contains the lower bounds, and the second row
+        contains the upper bounds.
+
+    B : torch.Tensor
+        Input bounds for domain B. It should have the same shape as A.
+
+    Returns
+    -------
+    torch.Tensor
+        Output bounds representing the rectilinear domain that is the union of A and B.
+
+    Raises
+    ------
+    AssertionError
+        If the shape of A is not (2, N) or if the shape of A and B are not the same.
+
+    Notes
+    -----
+
+    - The function assumes that the input bounds represent a rectilinear domain in
+    N-dimensional space. - The output bounds represent the rectilinear domain
+    obtained by taking the union of the input domains. - The lower bounds of the
+    output domain are computed as the element-wise maximum of the lower bounds of A
+    and B. - The upper bounds of the output domain are computed as the element-wise
+    minimum of the upper bounds of A and B.
+
+    Examples
+    --------
+    >>> A = torch.tensor([[0.0, 1.0], [2.0, 3.0]])
+    >>> B = torch.tensor([[0.5, 1.5], [2.5, 3.5]])
+    >>> result = rectilinear_domain_union(A, B)
+    >>> print(result)
+    tensor([[0.5, 1.0],
+            [2.5, 3.0]])
     """
-    assert A.shape[0] == 2
-    assert A.shape == B.shape
+    assert A.shape == (2, A.shape[1]), "A should have shape (2, N)"
+    assert A.shape == B.shape, "Shapes of A and B should be the same"
 
     out_bounds = torch.clone(A)
 
-    out_bounds[0, :] = torch.max(
-        A[0, :],
-        B[0, :],
-    )
-    out_bounds[1, :] = torch.min(
-        A[1, :],
-        B[1, :],
-    )
+    out_bounds[0, :] = torch.max(A[0, :], B[0, :])
+    out_bounds[1, :] = torch.min(A[1, :], B[1, :])
 
     return out_bounds

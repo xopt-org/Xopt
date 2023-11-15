@@ -56,8 +56,7 @@ logger = logging.getLogger()
 
 
 class BayesianGenerator(Generator, ABC):
-    """
-    Bayesian Generator for Bayesian Optimization.
+    """Bayesian Generator for Bayesian Optimization.
 
     Attributes:
     -----------
@@ -740,3 +739,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         volume = bd.compute_hypervolume().item()
 
         return volume
+
+
+def formatted_base_docstring():
+    return "\nBase Generator\n---------------\n" + BayesianGenerator.__doc__
