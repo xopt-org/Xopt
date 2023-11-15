@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
+from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveInt
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -13,7 +15,7 @@ class NumericalOptimizer(XoptBaseModel, ABC):
     model_config = ConfigDict(extra="forbid")
 
     @abstractmethod
-    def optimize(self, function, bounds, n_candidates=1):
+    def optimize(self, function: AcquisitionFunction, bounds: Tensor, n_candidates=1):
         """optimize a function to produce a number of candidate points that
         minimize the function"""
         pass
@@ -25,6 +27,9 @@ class LBFGSOptimizer(NumericalOptimizer):
         20, description="number of restarts during acquistion function optimization"
     )
     max_iter: PositiveInt = Field(2000)
+    max_time: Optional[PositiveFloat] = Field(
+        None, description="maximum time for optimizing"
+    )
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -32,12 +37,14 @@ class LBFGSOptimizer(NumericalOptimizer):
         assert isinstance(bounds, Tensor)
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
+
         candidates, out = optimize_acqf(
             acq_function=function,
             bounds=bounds,
             q=n_candidates,
             raw_samples=self.n_restarts,
             num_restarts=self.n_restarts,
+            timeout_sec=self.max_time,
             options={"maxiter": self.max_iter},
         )
         return candidates
