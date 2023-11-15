@@ -22,6 +22,7 @@ nav:
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
                 - Trust region: examples/single_objective_bayes_opt/turbo_tutorial.ipynb
+                - Interpolated optimization: examples/single_objective_bayes_opt/interpolate_tutorial.ipynb
                 - Multi-Fidelity: examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb
                 - Time dependent upper confidence bound: examples/single_objective_bayes_opt/time_dependent_bo.ipynb
                 - Bayesian Algorithm Execution: examples/single_objective_bayes_opt/bax_tutorial.ipynb
