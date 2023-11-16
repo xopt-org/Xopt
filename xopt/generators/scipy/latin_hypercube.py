@@ -24,7 +24,7 @@ class LatinHypercubeGenerator(Generator):
         scheme to improve the quality after sampling. See scipy documentation.")]
     strength: Annotated[Optional[int], Field(1, strict=True, ge=1, le=2, description="Strength of the LHS. \
         strength=1 produces a plain LHS while strength=2 produces an orthogonal array based LHS of strength 2. \
-            See scipy documentation.")]
+        See scipy documentation.")]
     seed: Annotated[Optional[int], Field(None, description="Random seed. See scipy documentation.")]
 
     def __init__(self, **kwargs):
