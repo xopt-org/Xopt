@@ -17,7 +17,7 @@ generators = {gen.name: gen for gen in registered_generators}
 # don't import this directly -- use
 all_generator_names = {
     "mggpo": {"mggpo"},
-    "scipy": {"neldermead"},
+    "scipy": {"neldermead", "latin_hypercube"},
     "bo": {
         "upper_confidence_bound",
         "mobo",
@@ -61,12 +61,19 @@ def get_generator_dynamic(name: str):
     elif name in all_generator_names["scipy"]:
         try:
             from xopt.generators.scipy.neldermead import NelderMeadGenerator
+            from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
 
-            generators[name] = NelderMeadGenerator
-            return NelderMeadGenerator
+            registered_generators = [
+                NelderMeadGenerator,
+                LatinHypercubeGenerator,
+            ]
+
+            for gen in registered_generators:
+                generators[gen.name] = gen
+            return generators[name]
         except ModuleNotFoundError:
             warnings.warn(
-                "WARNING: `scipy` not found, NelderMeadGenerator is not available"
+                "WARNING: `scipy` not found, NelderMeadGenerator and LatinHypercubeGenerator are not available"
             )
     elif name in all_generator_names["bo"]:
         try:
