@@ -34,7 +34,6 @@ class LatinHypercubeGenerator(Generator):
     def generate(self, n_candidate) -> list[dict]:
         ret = []
         while len(ret) < n_candidate:
-            print(len(ret), len(self._samples))
             n_needed = n_candidate - len(ret)
             if n_needed < len(self._samples):
                 ret.extend(self._samples[:n_needed])
