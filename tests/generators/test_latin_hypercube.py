@@ -22,23 +22,28 @@ class TestLatinHypercubeGenerator:
         gen = LatinHypercubeGenerator(vocs=test_vocs)
         gen.yaml()
 
-    def test_scipy_comparison(self, n_samples=128):
-        for dim in range(2, 32):
-            # Get the samples from xopt
-            test_vocs = deepcopy(TEST_VOCS_BASE)
-            test_vocs.variables = {f'x{i+1}': [0, 1] for i in range(dim)}
-            gen = LatinHypercubeGenerator(
-                vocs=test_vocs,
-                seed=1,
-                batch_size=n_samples,
-                optimization=None,
-                scramble=False
-            )
-            samps_xopt = np.array([[x[k] for k in test_vocs.variable_names] for x in gen.generate(n_samples)])
+    def test_scipy_comparison(self, n_samples=128, max_dim_power_two=3):
+        configs = [
+            {'scramble': False, 'optimization': None},
+            {'scramble': True, 'optimization': None},
+            {'scramble': True, 'optimization': 'random-cd'},
+        ]
+        for dim in 2**np.arange(1, max_dim_power_two+1):
+            for config in configs:
+                # Get the samples from xopt
+                test_vocs = deepcopy(TEST_VOCS_BASE)
+                test_vocs.variables = {f'x{i+1}': [0, 1] for i in range(dim)}
+                gen = LatinHypercubeGenerator(
+                    vocs=test_vocs,
+                    seed=1,
+                    batch_size=n_samples,
+                    **config
+                )
+                samps_xopt = np.array([[x[k] for k in test_vocs.variable_names] for x in gen.generate(n_samples)])
 
-            # Get the samples from scipy
-            sampler = qmc.LatinHypercube(d=dim, seed=1, optimization=None, scramble=False)
-            samps_scipy = sampler.random(n=n_samples)
+                # Get the samples from scipy
+                sampler = qmc.LatinHypercube(d=dim, seed=1, **config)
+                samps_scipy = sampler.random(n=n_samples)
 
-            # Compare
-            np.testing.assert_allclose(samps_scipy, samps_xopt)
+                # Compare
+                np.testing.assert_allclose(samps_scipy, samps_xopt)
