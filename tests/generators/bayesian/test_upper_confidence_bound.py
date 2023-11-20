@@ -21,6 +21,11 @@ class TestUpperConfidenceBoundGenerator:
         # test init from dict
         UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE.dict())
 
+        with pytest.raises(ValueError):
+            UpperConfidenceBoundGenerator(
+                vocs=TEST_VOCS_BASE.dict(), log_transform_acquisition_function=True
+            )
+
     def test_generate(self):
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
