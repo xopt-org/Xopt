@@ -1,7 +1,14 @@
+import torch
+from botorch.acquisition import FixedFeatureAcquisitionFunction
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective.logei import (
+    qLogNoisyExpectedHypervolumeImprovement,
+)
+from botorch.sampling import SobolQMCNormalSampler
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from .bayesian_generator import MultiObjectiveBayesianGenerator
+from .custom_botorch.constrained_acquisition import ConstrainedMCAcquisitionFunction
 
 
 class MOBOGenerator(MultiObjectiveBayesianGenerator):
@@ -21,22 +28,49 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
         # get base acquisition function
         acq = self._get_acquisition(model)
+
+        # apply fixed features if specified in the generator
+        if self.fixed_features is not None:
+            # get input dim
+            dim = len(self.model_input_names)
+            columns = []
+            values = []
+            for name, value in self.fixed_features.items():
+                columns += [self.model_input_names.index(name)]
+                values += [value]
+
+            acq = FixedFeatureAcquisitionFunction(
+                acq_function=acq, d=dim, columns=columns, values=values
+            )
+
         return acq
 
     def _get_acquisition(self, model):
         inputs = self.get_input_data(self.data)
         sampler = self._get_sampler(model)
 
-        # fix problem with qNEHVI interpretation with constraints
-        acq = qNoisyExpectedHypervolumeImprovement(
-            model,
-            X_baseline=inputs,
-            constraints=self._get_constraint_callables(),
-            ref_point=self.torch_reference_point,
-            sampler=sampler,
-            objective=self._get_objective(),
-            cache_root=False,
-            prune_baseline=True,
-        )
+        if self.log_transform_acquisition_function:
+            acq = qLogNoisyExpectedHypervolumeImprovement(
+                model,
+                X_baseline=inputs,
+                constraints=self._get_constraint_callables(),
+                ref_point=self.torch_reference_point,
+                sampler=sampler,
+                objective=self._get_objective(),
+                cache_root=False,
+                prune_baseline=True,
+            )
+        else:
+            # fix problem with qNEHVI interpretation with constraints
+            acq = qNoisyExpectedHypervolumeImprovement(
+                model,
+                X_baseline=inputs,
+                constraints=self._get_constraint_callables(),
+                ref_point=self.torch_reference_point,
+                sampler=sampler,
+                objective=self._get_objective(),
+                cache_root=False,
+                prune_baseline=True,
+            )
 
         return acq
