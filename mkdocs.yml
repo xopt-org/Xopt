@@ -36,6 +36,7 @@ nav:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
         - SciPy:
             - Nelder-Mead: examples/scipy/neldermead.ipynb
+            - Latin Hypercube: examples/scipy/latin_hypercube.ipynb
         - Other:
             - Extremum seeking: examples/es/extremum_seeking.ipynb
             - RCDS: examples/rcds/rcds.ipynb

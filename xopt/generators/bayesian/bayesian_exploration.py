@@ -9,13 +9,18 @@ from pydantic import field_validator
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.bayesian_generator import (
+    BayesianGenerator,
+    formatted_base_docstring,
+)
 from xopt.generators.bayesian.objectives import create_exploration_objective
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
     name = "bayesian_exploration"
     supports_batch_generation: bool = True
+
+    __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
