@@ -50,27 +50,19 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         sampler = self._get_sampler(model)
 
         if self.log_transform_acquisition_function:
-            acq = qLogNoisyExpectedHypervolumeImprovement(
-                model,
-                X_baseline=inputs,
-                constraints=self._get_constraint_callables(),
-                ref_point=self.torch_reference_point,
-                sampler=sampler,
-                objective=self._get_objective(),
-                cache_root=False,
-                prune_baseline=True,
-            )
+            acqclass = qLogNoisyExpectedHypervolumeImprovement
         else:
-            # fix problem with qNEHVI interpretation with constraints
-            acq = qNoisyExpectedHypervolumeImprovement(
-                model,
-                X_baseline=inputs,
-                constraints=self._get_constraint_callables(),
-                ref_point=self.torch_reference_point,
-                sampler=sampler,
-                objective=self._get_objective(),
-                cache_root=False,
-                prune_baseline=True,
-            )
+            acqclass = qNoisyExpectedHypervolumeImprovement
+
+        acq = acqclass(
+            model,
+            X_baseline=inputs,
+            constraints=self._get_constraint_callables(),
+            ref_point=self.torch_reference_point,
+            sampler=sampler,
+            objective=self._get_objective(),
+            cache_root=False,
+            prune_baseline=True,
+        )
 
         return acq
