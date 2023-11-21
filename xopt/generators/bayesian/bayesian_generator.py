@@ -437,6 +437,8 @@ class BayesianGenerator(Generator, ABC):
         acq = self._get_acquisition(model)
 
         # apply constraints if specified in vocs
+        # TODO: replace with direct constrainted acquisition function calls
+        # see SampleReducingMCAcquisitionFunction in botorch for rationale
         if len(self.vocs.constraints):
             try:
                 sampler = acq.sampler
