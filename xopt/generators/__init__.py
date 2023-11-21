@@ -1,5 +1,6 @@
 import json
 import warnings
+from typing import List
 
 from xopt.errors import XoptError
 
@@ -13,10 +14,10 @@ registered_generators = [
 generators = {gen.name: gen for gen in registered_generators}
 
 # This list hardcodes generator names - it is not pretty but helps with import speed A LOT
-
+# don't import this directly -- use
 all_generator_names = {
     "mggpo": {"mggpo"},
-    "scipy": {"neldermead"},
+    "scipy": {"neldermead", "latin_hypercube"},
     "bo": {
         "upper_confidence_bound",
         "mobo",
@@ -29,6 +30,11 @@ all_generator_names = {
     "es": {"extremum_seeking"},
     "rcds": {"rcds"},
 }
+
+
+def list_available_generators() -> List[str]:
+    try_load_all_generators()
+    return list(generators.keys())
 
 
 def try_load_all_generators():
@@ -55,12 +61,19 @@ def get_generator_dynamic(name: str):
     elif name in all_generator_names["scipy"]:
         try:
             from xopt.generators.scipy.neldermead import NelderMeadGenerator
+            from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
 
-            generators[name] = NelderMeadGenerator
-            return NelderMeadGenerator
+            registered_generators = [
+                NelderMeadGenerator,
+                LatinHypercubeGenerator,
+            ]
+
+            for gen in registered_generators:
+                generators[gen.name] = gen
+            return generators[name]
         except ModuleNotFoundError:
             warnings.warn(
-                "WARNING: `scipy` not found, NelderMeadGenerator is not available"
+                "WARNING: `scipy` not found, NelderMeadGenerator and LatinHypercubeGenerator are not available"
             )
     elif name in all_generator_names["bo"]:
         try:

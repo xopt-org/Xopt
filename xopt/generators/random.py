@@ -2,6 +2,10 @@ from xopt.generator import Generator
 
 
 class RandomGenerator(Generator):
+    """
+    Random number generator.
+    """
+
     name = "random"
     supports_batch_generation: bool = True
     supports_multi_objective: bool = True

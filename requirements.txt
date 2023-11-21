@@ -9,3 +9,4 @@ pydantic>=2.3
 ipywidgets
 tqdm
 orjson
+scipy>=1.10.1
