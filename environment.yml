@@ -20,6 +20,7 @@ dependencies:
 # Developer
   - pytest
   - pytest-cov
+  - pytest-benchmark
   - jupyterlab>=3
   - matplotlib
   - pygments
