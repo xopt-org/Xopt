@@ -5,12 +5,7 @@ import pandas as pd
 
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import MOBOGenerator
-from xopt.resources.test_functions.dtlz import (
-    dtlz2_reference_point,
-    dtlz2_vocs,
-    evaluate_DTLZ2,
-)
-from xopt.resources.test_functions.quadratic import LinearMO, QuadraticMO
+from xopt.resources.test_functions.multi_objective import DTLZ2, LinearMO, QuadraticMO
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
     tnk_reference_point,
@@ -21,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 quad = QuadraticMO()
 lin = LinearMO()
+dtlz2 = DTLZ2()
 
 
 # Can move into tests, but annoying to run
@@ -28,14 +24,14 @@ lin = LinearMO()
 class BenchMOBO:
     KEYS = ["quad", "linear", "dtlz2", "tnk"]
     FUNCTIONS = {
-        "dtlz2": evaluate_DTLZ2,
+        "dtlz2": dtlz2.evaluate_dict,
         "linear": lin.evaluate_dict,
         "tnk": evaluate_TNK,
         "quad": quad.evaluate_dict,
     }
-    VOCS = {"dtlz2": dtlz2_vocs, "linear": lin.vocs, "tnk": tnk_vocs, "quad": quad.vocs}
+    VOCS = {"dtlz2": dtlz2.vocs, "linear": lin.vocs, "tnk": tnk_vocs, "quad": quad.vocs}
     RPS = {
-        "dtlz2": dtlz2_reference_point,
+        "dtlz2": dtlz2.ref_point_dict,
         "linear": lin.ref_point_dict,
         "tnk": tnk_reference_point,
         "quad": quad.ref_point_dict,
