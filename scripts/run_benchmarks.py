@@ -11,13 +11,13 @@ if __name__ == "__main__":
     if USE_PYTEST:
         # Show output results from every test function
         # Show the message output for skipped and expected failures
-        args = ["-v", "-vrxs", "--benchmark-json=bench_output.json", "tests/benchmarks"]
+        args = ["-v", "-vrxs", "--benchmark-json=scripts/bench_output.json", "tests/benchmarks"]
 
         # Add extra arguments
         if len(sys.argv) > 1:
             args.extend(sys.argv[1:])
 
-        print("pytest arguments: {}".format(args))
+        print("pytest benchmark arguments: {}".format(args))
         print(f"Running benchmarks on Python {sys.version}")
         sys.exit(pytest.main(args))
 
