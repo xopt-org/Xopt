@@ -106,5 +106,5 @@ class BenchMOBO:
         outputs["hv50"] = X.data.loc[2 * self.N_STEPS // 4, "hv"]
         outputs["hv75"] = X.data.loc[3 * self.N_STEPS // 4, "hv"]
         outputs["hvf"] = X.generator.calculate_hypervolume()
-        print(outputs)
+
         return outputs
