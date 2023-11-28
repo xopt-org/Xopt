@@ -71,3 +71,4 @@ jobs:
           output-file-path: scripts/bench_output.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           summary-always: true
+          auto-push: true
