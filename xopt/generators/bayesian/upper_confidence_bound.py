@@ -46,8 +46,8 @@ beta : float, default 2.0
     def validate_log_transform_acquisition_function(cls, v):
         if v:
             raise ValueError(
-                f"Log transform cannot be applied to potentially negative UCB "
-                f"acquisition function."
+                "Log transform cannot be applied to potentially negative UCB "
+                "acquisition function."
             )
 
     def _get_acquisition(self, model):

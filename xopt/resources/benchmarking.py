@@ -22,7 +22,8 @@ dtlz2 = DTLZ2()
 # Can move into tests, but annoying to run
 # benchmark = pytest.mark.skipif('--run-bench' not in sys.argv, reason="No benchmarking requested")
 class BenchMOBO:
-    KEYS = ["quad", "linear", "dtlz2", "tnk"]
+    # tnk
+    KEYS = ["quad", "linear", "dtlz2"]
     FUNCTIONS = {
         "dtlz2": dtlz2.evaluate_dict,
         "linear": lin.evaluate_dict,

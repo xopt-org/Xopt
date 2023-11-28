@@ -1,14 +1,12 @@
-import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
-from botorch.sampling import SobolQMCNormalSampler
+
+from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
-from .bayesian_generator import MultiObjectiveBayesianGenerator
-from .custom_botorch.constrained_acquisition import ConstrainedMCAcquisitionFunction
 
 
 class MOBOGenerator(MultiObjectiveBayesianGenerator):

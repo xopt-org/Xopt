@@ -33,9 +33,9 @@ if __name__ == "__main__":
                 outputs = bmobo.run(row)
                 results.append(outputs)
 
-        #df = pd.concat([df_bench_mobo, pd.json_normalize(df_bench_mobo['opts'])], axis=1)
+        # df = pd.concat([df_bench_mobo, pd.json_normalize(df_bench_mobo['opts'])], axis=1)
         df = pd.DataFrame(results)
-        #df.drop(columns=['rp'], inplace=True)
+        # df.drop(columns=['rp'], inplace=True)
         dfgroup = df.groupby(['k'])
 
         dfsummary = dfgroup.mean(numeric_only=True)
