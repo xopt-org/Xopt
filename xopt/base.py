@@ -180,7 +180,8 @@ class Xopt(XoptBaseModel):
             return len(self.data)
 
     @property
-    def data_opt(self) -> Optional[pd.DataFrame]:
+    def data_with_optimum(self) -> Optional[pd.DataFrame]:
+        """Data with the cumulative optimum added as an extra column"""
         if self.data is not None and self.vocs.objectives:
             if self.data.empty:
                 return pd.DataFrame()
