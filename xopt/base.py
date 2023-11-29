@@ -319,18 +319,17 @@ class Xopt(XoptBaseModel):
 
         if self.strict:
             validate_outputs(output_data)
-        new_data = pd.concat([input_data, output_data], axis=1)
 
         # explode any list like results if all the output names exist
-        new_data = explode_all_columns(new_data)
+        output_data = explode_all_columns(output_data)
 
-        self.add_data(new_data)
+        self.add_data(output_data)
 
         # dump data to file if specified
         if self.dump_file is not None:
             self.dump()
 
-        return new_data
+        return output_data
 
     def add_data(self, new_data: pd.DataFrame):
         """
