@@ -13,7 +13,7 @@ from botorch.models.model import Model
 from botorch.sampling import get_sampler, SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, field_validator, SerializeAsAny
+from pydantic import Field, field_validator, PositiveInt, SerializeAsAny
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
@@ -36,7 +36,11 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
     TurboController,
 )
-from xopt.generators.bayesian.utils import rectilinear_domain_union, set_botorch_weights
+from xopt.generators.bayesian.utils import (
+    interpolate_points,
+    rectilinear_domain_union,
+    set_botorch_weights,
+)
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
@@ -93,6 +97,10 @@ class BayesianGenerator(Generator, ABC):
     log_transform_acquisition_function: Optional[bool]
         Flag to determine if final acquisition function value should be
         log-transformed before optimization.
+
+    n_interpolate_samples: Optional[PositiveInt]
+        Number of interpolation points to generate between last observation and next
+        observation, requires n_candidates to be 1.
 
     n_candidates : int
         The number of candidates to generate in each optimization step.
@@ -152,6 +160,7 @@ class BayesianGenerator(Generator, ABC):
         False,
         description="flag to log transform the acquisition function before optimization",
     )
+    n_interpolate_points: Optional[PositiveInt] = None
 
     n_candidates: int = 1
 
@@ -327,6 +336,23 @@ class BayesianGenerator(Generator, ABC):
                 )
             else:
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
+
+            if self.n_interpolate_points is not None:
+                if self.n_candidates > 1:
+                    raise RuntimeError(
+                        "cannot generate interpolated points for "
+                        "multiple candidate generation"
+                    )
+                else:
+                    assert len(result) == 1
+                    result = interpolate_points(
+                        pd.concat(
+                            (self.data.iloc[-1:][self.vocs.variable_names], result),
+                            axis=0,
+                            ignore_index=True,
+                        ),
+                        num_points=self.n_interpolate_points,
+                    )
 
             return result.to_dict("records")
 
