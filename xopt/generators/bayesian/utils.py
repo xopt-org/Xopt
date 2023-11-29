@@ -90,12 +90,17 @@ def interpolate_points(df, num_points=10):
     """
     Generates interpolated points between two points specified by a pandas DataFrame.
 
-    Parameters:
-    - df: pandas DataFrame with two rows representing the start and end points.
-    - num_points: Number of points to generate between the start and end points.
+    Parameters
+    ----------
+    df: DataFrame
+        with two rows representing the start and end points.
+    num_points: int
+        Number of points to generate between the start and end points.
 
-    Returns:
-    - pandas DataFrame with the interpolated points.
+    Returns
+    -------
+    result: DataFrame
+        DataFrame with the interpolated points.
     """
     if df.shape[0] != 2:
         raise ValueError("Input DataFrame must have exactly two rows.")
