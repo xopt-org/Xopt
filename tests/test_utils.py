@@ -84,8 +84,8 @@ class TestUtils(TestCase):
         assert has_device_field(module, torch.device("cuda")) is False
 
     def test_get_cumulative_optimum(self):
-        df = pd.DataFrame({"f": [0.0, -0.4, 0.6]})
+        df = pd.DataFrame({"f": [0.0, -0.4, 0.6, np.nan]})
         cum_max = get_cumulative_optimum(df, objective_name="f", maximize=True)
         cum_min = get_cumulative_optimum(df, objective_name="f", maximize=False)
-        assert np.array_equal(cum_max, np.array([0.0, 0.0, 0.6]))
-        assert np.array_equal(cum_min, np.array([0.0, -0.4, -0.4]))
+        assert np.array_equal(cum_max, np.array([0.0, 0.0, 0.6, 0.6]))
+        assert np.array_equal(cum_min, np.array([0.0, -0.4, -0.4, -0.4]))

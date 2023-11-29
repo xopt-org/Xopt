@@ -342,5 +342,5 @@ def get_cumulative_optimum(data: pd.DataFrame, objective_name: str, maximize: bo
         Cumulative optimum for the given data.
 
     """
-    get_opt = np.max if maximize else np.min
+    get_opt = np.nanmax if maximize else np.nanmin
     return np.array([get_opt(data[objective_name].iloc[:i + 1]) for i in range(len(data))])
