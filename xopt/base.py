@@ -401,8 +401,9 @@ class Xopt(XoptBaseModel):
 
         Returns
         -------
-        pd.DataFrame, optional
-            The results of the evaluations added to the internal DataFrame.
+        pd.DataFrame or None
+            A copy of the internal DataFrame with the specified rows removed
+            or None if inplace is True.
 
         """
         new_data = self.data.drop(labels=indices)
