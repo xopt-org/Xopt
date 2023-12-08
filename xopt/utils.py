@@ -322,25 +322,3 @@ def _explode_pandas_modified(df: pd.DataFrame, columns: list[str], length: int):
     result = pd.DataFrame(data, index=np.arange(length))
 
     return result
-
-
-def get_cumulative_optimum(data: pd.DataFrame, objective_name: str, maximize: bool) -> np.ndarray:
-    """Returns the cumulative optimum for the given data and objective.
-
-    Parameters
-    ----------
-    data: pd.DataFrame
-        Data for which the cumulative optimum shall be calculated.
-    objective_name: str
-        Name of the data column containing the objective values.
-    maximize: bool
-        If True, consider the problem a maximization problem (minimization otherwise).
-
-    Returns
-    -------
-    np.ndarray
-        Cumulative optimum for the given data.
-
-    """
-    get_opt = np.nanmax if maximize else np.nanmin
-    return np.array([get_opt(data[objective_name].iloc[:i + 1]) for i in range(len(data))])

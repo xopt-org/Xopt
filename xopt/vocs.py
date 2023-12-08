@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -494,6 +494,46 @@ class VOCS(XoptBaseModel):
         )[obj_name][:n]
 
         return res.index.to_numpy(), res.to_numpy()
+
+    def add_cumulative_optimum(self, data: pd.DataFrame, inplace: bool = True) -> Optional[pd.DataFrame]:
+        """
+        Adds the cumulative optimum as an extra column to the given data frame.
+
+        Parameters
+        ----------
+        data: pd.DataFrame
+            Data for which the cumulative optimum shall be calculated.
+        inplace: bool, optional
+            Whether to update data inplace. If False, returns a copy.
+
+        Returns
+        -------
+        pd.DataFrame or None
+            A copy of the DataFrame with the cumulative optimum added as an extra column
+            or None if inplace is True.
+
+        """
+        if not self.objectives:
+            raise RuntimeError("No objectives defined.")
+        if data.empty:
+            return None if inplace else data
+        obj_name = self.objective_names[0]
+        obj = self.objectives[obj_name]
+        get_opt = np.nanmax if obj == "MAXIMIZE" else np.nanmin
+        feasible = self.feasibility_data(data)["feasible"]
+        feasible_obj_values = [
+            data[obj_name].values[i] if feasible[i] else np.nan for i in range(len(data))
+        ]
+        cumulative_optimum = np.array(
+            [get_opt(feasible_obj_values[:i + 1]) for i in range(len(data))]
+        )
+        new_data = data if inplace else data.copy()
+        new_data.insert(
+            loc=data.columns.get_loc(obj_name) + 1,
+            column=f"best_{obj_name}",
+            value=cumulative_optimum,
+        )
+        return None if inplace else new_data
 
 
 # --------------------------------
