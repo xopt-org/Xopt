@@ -19,7 +19,7 @@ from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
 from xopt.pydantic import XoptBaseModel
-from xopt.utils import explode_all_columns, get_cumulative_optimum
+from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
 __version__ = _version.get_versions()["version"]
@@ -178,29 +178,6 @@ class Xopt(XoptBaseModel):
             return 0
         else:
             return len(self.data)
-
-    @property
-    def data_with_optimum(self) -> Optional[pd.DataFrame]:
-        """Data with the cumulative optimum added as an extra column"""
-        if self.data is not None and self.vocs.objectives:
-            if self.data.empty:
-                return pd.DataFrame()
-            else:
-                data = pd.DataFrame(self.data, copy=True)
-                objective_name = self.vocs.objective_names[0]
-                opt = get_cumulative_optimum(
-                    data=self.data,
-                    objective_name=objective_name,
-                    maximize=self.vocs.objectives[objective_name].upper() == "MAXIMIZE",
-                )
-                data.insert(
-                    loc=self.data.columns.get_loc(objective_name) + 1,
-                    column=f"best_{objective_name}",
-                    value=opt,
-                )
-                return data
-        else:
-            return None
 
     def __init__(self, *args, **kwargs):
         """

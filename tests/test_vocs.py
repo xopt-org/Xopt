@@ -207,6 +207,36 @@ class TestVOCS(object):
         assert idx == 1
         assert val == 0.1
 
+    @pytest.mark.filterwarnings("ignore: All-NaN axis encountered")
+    def test_add_cumulative_optimum(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        obj_name = vocs.objective_names[0]
+        test_data = pd.DataFrame({
+            obj_name: [np.nan, 0.0, -0.4, 0.6, np.nan, -0.7],
+            vocs.constraint_names[0]: [1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+        })
+        vocs.objectives = {}
+        with pytest.raises(RuntimeError):
+            vocs.add_cumulative_optimum(test_data)
+        vocs.objectives = {obj_name: "MINIMIZE"}
+        assert vocs.add_cumulative_optimum(pd.DataFrame(), inplace=False).empty
+        new_data = vocs.add_cumulative_optimum(test_data, inplace=False)
+        assert np.array_equal(
+            new_data[f"best_{obj_name}"].values,
+            np.array([np.nan, np.nan, -0.4, -0.4, -0.4, -0.7]),
+            equal_nan=True,
+        )
+        vocs.objectives[obj_name] = "MAXIMIZE"
+        empty_data = pd.DataFrame()
+        vocs.add_cumulative_optimum(empty_data, inplace=True)
+        assert empty_data.empty
+        vocs.add_cumulative_optimum(test_data, inplace=True)
+        assert np.array_equal(
+            test_data[f"best_{obj_name}"].values,
+            np.array([np.nan, np.nan, -0.4, 0.6, 0.6, 0.6]),
+            equal_nan=True,
+        )
+
     def test_normalize_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75]})
