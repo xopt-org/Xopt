@@ -208,7 +208,7 @@ class TestVOCS(object):
         assert val == 0.1
 
     @pytest.mark.filterwarnings("ignore: All-NaN axis encountered")
-    def test_add_cumulative_optimum(self):
+    def test_cumulative_optimum(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         obj_name = vocs.objective_names[0]
         test_data = pd.DataFrame({
