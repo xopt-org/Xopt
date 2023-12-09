@@ -495,28 +495,25 @@ class VOCS(XoptBaseModel):
 
         return res.index.to_numpy(), res.to_numpy()
 
-    def add_cumulative_optimum(self, data: pd.DataFrame, inplace: bool = True) -> Optional[pd.DataFrame]:
+    def cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Adds the cumulative optimum as an extra column to the given data frame.
+        Returns the cumulative optimum for the given DataFrame.
 
         Parameters
         ----------
         data: pd.DataFrame
             Data for which the cumulative optimum shall be calculated.
-        inplace: bool, optional
-            Whether to update data inplace. If False, returns a copy.
 
         Returns
         -------
-        pd.DataFrame or None
-            A copy of the DataFrame with the cumulative optimum added as an extra column
-            or None if inplace is True.
+        pd.DataFrame
+            Cumulative optimum for the given DataFrame.
 
         """
         if not self.objectives:
             raise RuntimeError("No objectives defined.")
         if data.empty:
-            return None if inplace else data
+            return pd.DataFrame()
         obj_name = self.objective_names[0]
         obj = self.objectives[obj_name]
         get_opt = np.nanmax if obj == "MAXIMIZE" else np.nanmin
@@ -527,13 +524,7 @@ class VOCS(XoptBaseModel):
         cumulative_optimum = np.array(
             [get_opt(feasible_obj_values[:i + 1]) for i in range(len(data))]
         )
-        new_data = data if inplace else data.copy()
-        new_data.insert(
-            loc=data.columns.get_loc(obj_name) + 1,
-            column=f"best_{obj_name}",
-            value=cumulative_optimum,
-        )
-        return None if inplace else new_data
+        return pd.DataFrame({f"best_{obj_name}": cumulative_optimum}, index=data.index)
 
 
 # --------------------------------

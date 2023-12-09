@@ -217,22 +217,19 @@ class TestVOCS(object):
         })
         vocs.objectives = {}
         with pytest.raises(RuntimeError):
-            vocs.add_cumulative_optimum(test_data)
+            _ = vocs.cumulative_optimum(test_data)
         vocs.objectives = {obj_name: "MINIMIZE"}
-        assert vocs.add_cumulative_optimum(pd.DataFrame(), inplace=False).empty
-        new_data = vocs.add_cumulative_optimum(test_data, inplace=False)
+        assert vocs.cumulative_optimum(pd.DataFrame()).empty
+        cumulative_minimum = vocs.cumulative_optimum(test_data)
         assert np.array_equal(
-            new_data[f"best_{obj_name}"].values,
+            cumulative_minimum[f"best_{obj_name}"].values,
             np.array([np.nan, np.nan, -0.4, -0.4, -0.4, -0.7]),
             equal_nan=True,
         )
         vocs.objectives[obj_name] = "MAXIMIZE"
-        empty_data = pd.DataFrame()
-        vocs.add_cumulative_optimum(empty_data, inplace=True)
-        assert empty_data.empty
-        vocs.add_cumulative_optimum(test_data, inplace=True)
+        cumulative_maximum = vocs.cumulative_optimum(test_data)
         assert np.array_equal(
-            test_data[f"best_{obj_name}"].values,
+            cumulative_maximum[f"best_{obj_name}"].values,
             np.array([np.nan, np.nan, -0.4, 0.6, 0.6, 0.6]),
             equal_nan=True,
         )
