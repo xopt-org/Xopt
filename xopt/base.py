@@ -1,5 +1,6 @@
 import json
 import logging
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -275,7 +276,13 @@ class Xopt(XoptBaseModel):
             The result of the evaluation.
 
         """
-        self.vocs.validate_input_data(DataFrame(input_dict, index=[0]))
+        inputs = deepcopy(input_dict)
+
+        # add constants to input data
+        for name, value in self.vocs.constants.items():
+            inputs[name] = value
+
+        self.vocs.validate_input_data(DataFrame(inputs, index=[0]))
         return self.evaluator.evaluate(input_dict)
 
     def evaluate_data(
@@ -309,12 +316,17 @@ class Xopt(XoptBaseModel):
         # translate input data into pandas dataframes
         if not isinstance(input_data, DataFrame):
             try:
-                input_data = DataFrame(input_data)
+                input_data = DataFrame(deepcopy(input_data))
             except ValueError:
-                input_data = DataFrame(input_data, index=[0])
+                input_data = DataFrame(deepcopy(input_data), index=[0])
 
         logger.debug(f"Evaluating {len(input_data)} inputs")
         self.vocs.validate_input_data(input_data)
+
+        # add constants to input data
+        for name, value in self.vocs.constants.items():
+            input_data[name] = value
+
         output_data = self.evaluator.evaluate_data(input_data)
 
         if self.strict:
