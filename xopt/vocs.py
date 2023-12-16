@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 import pandas as pd
 import yaml
+from pandas import DataFrame
 from pydantic import ConfigDict, conlist, Field
 
 from xopt.pydantic import XoptBaseModel
@@ -502,14 +503,14 @@ class VOCS(XoptBaseModel):
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_variable_data(variables: Dict, data, prefix="variable_"):
+def form_variable_data(variables: Union[Dict, DataFrame], data, prefix="variable_"):
     """
     Use variables dict to form a dataframe.
     """
     if not variables:
         return pd.DataFrame([])
 
-    if not isinstance(data, pd.DataFrame):
+    if not isinstance(data, DataFrame):
         data = pd.DataFrame(data)
 
     # Pick out columns in right order
