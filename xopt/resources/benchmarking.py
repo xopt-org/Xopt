@@ -16,33 +16,45 @@ logger = logging.getLogger(__name__)
 
 quad = QuadraticMO()
 lin = LinearMO()
-dtlz2 = DTLZ2()
+dtlz2_3d = DTLZ2()
+dtlz2_20d = DTLZ2(n_var=20)
 
 
 # Can move into tests, but annoying to run
 # benchmark = pytest.mark.skipif('--run-bench' not in sys.argv, reason="No benchmarking requested")
 class BenchMOBO:
-    # tnk
-    KEYS = ["quad", "linear", "dtlz2"]
+    """
+    Benchmark class for running various configurations either directly or through the pytest interface
+    """
+
+    KEYS = ["quad", "linear", "dtlz2_d3", "dtlz2_d20"]
     FUNCTIONS = {
-        "dtlz2": dtlz2.evaluate_dict,
+        "dtlz2_d3": dtlz2_3d.evaluate_dict,
+        "dtlz2_d20": dtlz2_20d.evaluate_dict,
         "linear": lin.evaluate_dict,
         "tnk": evaluate_TNK,
         "quad": quad.evaluate_dict,
     }
-    VOCS = {"dtlz2": dtlz2.vocs, "linear": lin.vocs, "tnk": tnk_vocs, "quad": quad.vocs}
+    VOCS = {
+        "dtlz2_d3": dtlz2_3d.vocs,
+        "dtlz2_d20": dtlz2_20d.vocs,
+        "linear": lin.vocs,
+        "tnk": tnk_vocs,
+        "quad": quad.vocs,
+    }
     RPS = {
-        "dtlz2": dtlz2.ref_point_dict,
+        "dtlz2_d3": dtlz2_3d.ref_point_dict,
+        "dtlz2_d20": dtlz2_20d.ref_point_dict,
         "linear": lin.ref_point_dict,
         "tnk": tnk_reference_point,
         "quad": quad.ref_point_dict,
     }
-    REPEATS = {"dtlz2": 1, "linear": 1, "tnk": 1, "quad": 1}
-    N_STEPS = 4
+    REPEATS = {"dtlz2_d3": 1, "dtlz2_d20": 1, "linear": 1, "tnk": 1, "quad": 1}
+    N_STEPS = 5
 
     OPTS = [
         dict(n_monte_carlo_samples=8, log_transform_acquisition_function=False),
-        dict(n_monte_carlo_samples=16, log_transform_acquisition_function=False),
+        dict(n_monte_carlo_samples=32, log_transform_acquisition_function=False),
         dict(n_monte_carlo_samples=128, log_transform_acquisition_function=False),
         dict(n_monte_carlo_samples=8, log_transform_acquisition_function=True),
         dict(n_monte_carlo_samples=32, log_transform_acquisition_function=True),
@@ -59,7 +71,6 @@ class BenchMOBO:
         X.data.loc[:, "gen_time"] = 0.0
         X.data.loc[:, "hv"] = 0.0
         for i in range(n_evals):
-            # TODO: add internal timing to Xopt generators directly
             t1 = time.perf_counter()
             X.step()
             t2 = time.perf_counter()
@@ -74,7 +85,6 @@ class BenchMOBO:
         """Create a table of generator parameters to benchmark"""
         rows = []
         for k in cls.KEYS:
-            # for rep in range(self.REPEATS[k]):
             for i, opts in enumerate(cls.OPTS):
                 rows.append(
                     {
@@ -82,7 +92,6 @@ class BenchMOBO:
                         "fname": k,
                         "opts": opts,
                         "rp": cls.RPS[k],
-                        # 'rep': rep,
                         "vocs": cls.VOCS[k],
                     }
                 )
@@ -90,7 +99,6 @@ class BenchMOBO:
         return pd.DataFrame(rows)
 
     def run(self, row):
-        # print(df_bench_mobo.loc[row, :].to_dict())
         evaluator = Evaluator(function=self.FUNCTIONS[self.df.loc[row, "fname"]])
         gen = MOBOGenerator(
             vocs=self.df.loc[row, "vocs"],

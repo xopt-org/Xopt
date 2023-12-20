@@ -37,15 +37,16 @@ class MOProblem(Problem):
 
 
 class QuadraticMO(MOProblem):
+    """ Quadratic multi-objective test problem - by default, finding minima with 1 objective offset """
     _ref_point = np.array([5.0, 5.0])
 
-    def __init__(self, n_var=3, scale=1.0, offset=2.5, negate=False):
+    def __init__(self, n_var=3, scale=1.0, offset=1.5, negate=False):
         # negate -> maximization
         super().__init__(n_var, n_obj=2)
         self.scale = scale
         self.offset = offset
         self.negate = negate
-        self._bounds = [(0, 6.0) for _ in range(n_var)]
+        self._bounds = [(0, 3.0) for _ in range(n_var)]
         self.vocs = self.VOCS
         self.shift = 0
 
@@ -55,7 +56,6 @@ class QuadraticMO(MOProblem):
         rp = rp**self.n_var
         if self.shift:
             rp += self.shift
-        print(f"Quad ref point: {rp}")
         return rp
 
     @property
@@ -99,7 +99,7 @@ class LinearMO(MOProblem):
         if self.shift:
             rp += self.shift
         rp_array = np.array([rp, rp])
-        print(f"Linear ref point: {rp_array}")
+        # print(f"Linear ref point: {rp_array}")
         return rp_array
 
     @property
