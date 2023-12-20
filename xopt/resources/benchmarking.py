@@ -41,9 +41,11 @@ class BenchMOBO:
     N_STEPS = 4
 
     OPTS = [
+        dict(n_monte_carlo_samples=8, log_transform_acquisition_function=False),
         dict(n_monte_carlo_samples=16, log_transform_acquisition_function=False),
         dict(n_monte_carlo_samples=128, log_transform_acquisition_function=False),
-        dict(n_monte_carlo_samples=16, log_transform_acquisition_function=True),
+        dict(n_monte_carlo_samples=8, log_transform_acquisition_function=True),
+        dict(n_monte_carlo_samples=32, log_transform_acquisition_function=True),
         dict(n_monte_carlo_samples=128, log_transform_acquisition_function=True),
     ]
 
