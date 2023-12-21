@@ -121,7 +121,9 @@ class Evaluator(XoptBaseModel):
                 kwargs,
             )
 
-        return DataFrame(output_data, index=input_data.index)
+        return pd.concat(
+            [input_data, DataFrame(output_data, index=input_data.index)], axis=1
+        )
 
     def safe_function(self, *args, **kwargs):
         """
@@ -226,7 +228,7 @@ def validate_outputs(outputs: DataFrame):
         error_string = "Xopt evaluator caught exception(s):\n\n"
         for i in range(len(outputs["xopt_error_str"])):
             error_string += f"Evaluation index {i}:\n"
-            error_string += outputs["xopt_error_str"].iloc[i]
+            error_string += str(outputs["xopt_error_str"].iloc[i])
             error_string += "\n"
 
         raise XoptError(error_string)
