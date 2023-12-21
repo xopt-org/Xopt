@@ -55,9 +55,7 @@ if __name__ == "__main__":
                 outputs = bmobo.run(row)
                 results.append(outputs)
 
-        # df = pd.concat([df_bench_mobo, pd.json_normalize(df_bench_mobo['opts'])], axis=1)
         df = pd.DataFrame(results)
-        # df.drop(columns=['rp'], inplace=True)
         dfgroup = df.groupby(["k"])
 
         dfsummary = dfgroup.mean(numeric_only=True)
@@ -69,7 +67,7 @@ if __name__ == "__main__":
 
         # TODO: add tabulate for pretty-printing
         pd.set_option("display.max_columns", None)
-        print(dfsummary.to_string(max_colwidth=20, float_format="{:.2f}".format))
+        print(dfsummary.to_string(max_colwidth=20, float_format="{:.3f}".format))
 
         if args.dump is not None:
             dfsummary.to_csv(f"{script_folder/args.dump}")

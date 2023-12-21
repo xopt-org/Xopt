@@ -1,7 +1,9 @@
+import math
 from abc import abstractmethod
 from typing import Dict
 
 import numpy as np
+from scipy.special import gamma
 
 from xopt.resources.test_functions.problem import Problem
 
@@ -143,6 +145,18 @@ class DTLZ2(MOProblem):
     @property
     def ref_point(self):
         return np.ones(self.n_var) * 1.1
+
+    @property
+    def _max_hv(self) -> float:
+        # hypercube - volume of hypersphere in R^d such that all coordinates are
+        # positive
+        hypercube_vol = 1.1**self.n_obj
+        pos_hypersphere_vol = (
+            math.pi ** (self.n_obj / 2)
+            / gamma(self.n_obj / 2 + 1)
+            / 2**self.n_obj
+        )
+        return hypercube_vol - pos_hypersphere_vol
 
     def _evaluate(self, X: np.ndarray, **kwargs) -> np.ndarray:
         assert X.shape[1] == self.n_var
