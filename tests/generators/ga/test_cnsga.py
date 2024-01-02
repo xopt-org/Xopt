@@ -1,5 +1,6 @@
-import numpy as np
 from random import random
+
+import numpy as np
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
@@ -18,12 +19,10 @@ def test_cnsga():
 
 
 def test_cnsga_baddf():
-    raise_prob = 0.0
+    # Test that bad dataframes are handled ok
 
     def eval_f(x):
-        # if random() < raise_prob:
-        #    raise ValueError('bad x1')
-        return {'y1': random(), 'y2': random(), 'c1': random(), 'c2': random()}
+        return {"y1": random(), "y2": random(), "c1": random(), "c2": random()}
 
     X = Xopt(
         generator=CNSGAGenerator(vocs=tnk_vocs, population_size=32),
@@ -33,8 +32,6 @@ def test_cnsga_baddf():
     )
 
     X.random_evaluate(12)
-
-    raise_prob = 0.1
 
     for i in range(100):
         new_samples = X.generator.generate(1)
@@ -50,7 +47,6 @@ def test_cnsga_baddf():
 
     assert len(X.generator.population) == 32
 
-    # Add bad data with repeated indices
     for i in range(10):
         X.generator.generate(20)
         bad_df = X.data.iloc[np.random.randint(0, 200, 20), :].copy()
