@@ -208,8 +208,12 @@ Particular versions of Xopt can be cited from [Zenodo](https://zenodo.org/record
 Developers
 ==========
 
+Clone this repository with a truncated git history (recommended):
+```shell
+git clone --depth=1 https://github.com/ChristopherMayes/Xopt.git
+```
 
-Clone this repository:
+Or, clone this repository with the full git history (> 970 MB):
 ```shell
 git clone https://github.com/ChristopherMayes/Xopt.git
 ```
