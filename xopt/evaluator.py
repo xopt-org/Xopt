@@ -184,7 +184,7 @@ def safe_function(function, *args, **kwargs):
 
 def process_safe_outputs(outputs: Dict):
     """
-    Process the outputs of of safe_call, flattening the output.
+    Process the outputs of safe_call, flattening the output.
     """
     o = {}
     error = False

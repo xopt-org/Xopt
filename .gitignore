@@ -28,3 +28,5 @@ site
 *.pt
 *.csv
 *.yml
+
+!.github/workflows/*.yml
