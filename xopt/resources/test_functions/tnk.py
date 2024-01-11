@@ -15,6 +15,10 @@ tnk_vocs = VOCS(
     }
 )
 
+# With constraints, objectives are below ~1.05
+# https://pymoo.org/problems/multi/tnk.html
+tnk_reference_point = {"y1": 2.5, "y2": 2.5}
+
 
 # Pure number version
 def TNK(individual):
@@ -39,7 +43,7 @@ def evaluate_TNK(inputs: Dict, sleep=0, random_sleep=0, raise_probability=0, **p
     time.sleep(r * random_sleep * 2)  # Average should be random_sleep
 
     if r < raise_probability:
-        raise ValueError("intentioal TNK crash")
+        raise ValueError("intentional TNK crash")
 
     outputs = {
         "y1": objectives[0],

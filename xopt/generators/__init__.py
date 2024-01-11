@@ -60,8 +60,8 @@ def get_generator_dynamic(name: str):
             )
     elif name in all_generator_names["scipy"]:
         try:
-            from xopt.generators.scipy.neldermead import NelderMeadGenerator
             from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
+            from xopt.generators.scipy.neldermead import NelderMeadGenerator
 
             registered_generators = [
                 NelderMeadGenerator,
