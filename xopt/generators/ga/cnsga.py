@@ -292,7 +292,6 @@ def pop_from_data(data, vocs):
     """
     Return a list of DEAP deap_creator.Individual from a dataframe
     """
-    ix = data.index.to_numpy()
     v = vocs.variable_data(data).to_numpy()
     o = vocs.objective_data(data).to_numpy()
     c = vocs.constraint_data(data).to_numpy()
@@ -303,7 +302,7 @@ def pop_from_data(data, vocs):
         if c.size:
             ind.fitness.cvalues = tuple(c[i, :])
 
-        ind.index = ix[i]
+        ind.index = i
 
     return pop
 
@@ -317,7 +316,7 @@ def cnsga_select(data, n, vocs, toolbox):
     """
     pop = pop_from_data(data, vocs)
     selected = toolbox.select(pop, n)  # Order(n^2)
-    return data.loc[[ind.index for ind in selected]]
+    return data.iloc[[ind.index for ind in selected]]
 
 
 def cnsga_variation(
