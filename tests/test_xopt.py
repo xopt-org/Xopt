@@ -328,6 +328,23 @@ class TestXopt:
             len(X.generator.data) == 2
         ), f"len(X.generator.data) = {len(X.generator.data)}"
 
+    def test_remove_data(self):
+        generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+        evaluator = Evaluator(function=xtest_callable)
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            vocs=deepcopy(TEST_VOCS_BASE),
+        )
+        X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
+        with pytest.raises(KeyError):
+            X.remove_data([2])
+        new_data = X.remove_data(indices=[0], inplace=False)
+        assert len(new_data) == len(X.data) - 1
+        assert np.array_equal(new_data.index.values, np.arange(len(new_data)))
+        X.remove_data([0])
+        assert X.data.equals(new_data)
+
     def test_asynch(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
