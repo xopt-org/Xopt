@@ -174,7 +174,7 @@ class Xopt(XoptBaseModel):
         return v
 
     @property
-    def n_data(self):
+    def n_data(self) -> int:
         if self.data is None:
             return 0
         else:
@@ -375,6 +375,32 @@ class Xopt(XoptBaseModel):
         """
         self.data = pd.DataFrame()
         self.generator.data = pd.DataFrame()
+
+    def remove_data(self, indices: list[int], inplace: bool = True) -> Optional[pd.DataFrame]:
+        """
+
+        Parameters
+        ----------
+        indices: list of integers
+            List of indices specifying the rows (steps) to remove from data.
+
+        inplace: boolean, optional
+            Whether to update data inplace. If False, returns a copy.
+
+        Returns
+        -------
+        pd.DataFrame or None
+            A copy of the internal DataFrame with the specified rows removed
+            or None if inplace is True.
+
+        """
+        new_data = self.data.drop(labels=indices)
+        new_data.index = np.arange(len(new_data), dtype=np.int64)
+        if inplace:
+            self.data = new_data
+            self.generator.data = new_data
+        else:
+            return new_data
 
     def random_evaluate(self, n_samples=1, seed=None, **kwargs):
         """

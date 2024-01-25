@@ -23,7 +23,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
 
     def _get_acquisition(self, model):
         objective_data = self.vocs.objective_data(self.data, "").dropna()
-        best_f = -torch.tensor(objective_data.min(), **self._tkwargs)
+        best_f = -torch.tensor(objective_data.min().values, **self._tkwargs)
 
         if self.n_candidates > 1:
             # MC sampling for generating multiple candidate points
