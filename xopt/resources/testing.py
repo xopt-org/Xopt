@@ -28,9 +28,12 @@ cnames = (
     + list(TEST_VOCS_BASE.objectives.keys())
     + list(TEST_VOCS_BASE.constraints.keys())
 )
+
+# TODO: figure out why having the range from 0->1 or 0->10 breaks objective test data
+#  test
 test_init_data = {
-    "x1": np.random.rand(10),
-    "x2": np.random.rand(10) * 10.0,
+    "x1": np.linspace(0.01, 1.0, 10),
+    "x2": np.linspace(0.01, 1.0, 10) * 10.0,
     "cnt1": 1.0,
 }
 test_init_data.update(xtest_callable(test_init_data))
