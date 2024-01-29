@@ -443,6 +443,8 @@ class TestModelConstructor:
             outcome_transform=Standardize(1),
         )
         mll = ExactMarginalLogLikelihood(bmodel.likelihood, bmodel)
+
+        # TODO: model fitting fails sometimes
         fit_gpytorch_mll(mll)
 
         assert isinstance(model.models[0], XoptHeteroskedasticSingleTaskGP)
