@@ -34,6 +34,10 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
         covar_module: Optional[Module] = None,
     ) -> None:
         r"""
+        Xopt copy of HeteroskedasticSingleTaskGP from botorch which allows for a user
+        to specify mean and covariance modules.
+
+
         Args:
             train_X: A `batch_shape x n x d` tensor of training features.
             train_Y: A `batch_shape x n x m` tensor of training observations.
