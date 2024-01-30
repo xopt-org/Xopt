@@ -380,6 +380,7 @@ class Xopt(XoptBaseModel):
         self, indices: list[int], inplace: bool = True
     ) -> Optional[pd.DataFrame]:
         """
+        Removes data from the `X.data` data storage attribute.
 
         Parameters
         ----------
