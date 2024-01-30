@@ -7,7 +7,6 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
-from botorch.settings import validate_input_scaling
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
@@ -18,7 +17,7 @@ from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.generators.bayesian.utils import get_input_transform, get_training_data
+from xopt.generators.bayesian.utils import get_training_data
 from xopt.pydantic import decode_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
@@ -282,14 +281,16 @@ class StandardModelConstructor(ModelConstructor):
         # remove input transform if the bool is False or the dict entry is false
         if isinstance(self.transform_inputs, bool):
             if not self.transform_inputs:
-                botorch.settings.validate_input_scaling(False)
                 input_transform = None
         if (
             isinstance(self.transform_inputs, dict)
             and outcome_name in self.transform_inputs
         ):
             if not self.transform_inputs[outcome_name]:
-                botorch.settings.validate_input_scaling(False)
                 input_transform = None
+
+        # remove warnings if input transform is None
+        if input_transform is None:
+            botorch.settings.validate_input_scaling(False)
 
         return input_transform

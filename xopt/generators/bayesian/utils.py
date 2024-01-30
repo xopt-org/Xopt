@@ -1,9 +1,8 @@
-from typing import Dict, List
+from typing import List
 
 import numpy as np
 import pandas as pd
 import torch
-from botorch.models.transforms import Normalize
 
 from xopt.vocs import VOCS
 
