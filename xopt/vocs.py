@@ -520,10 +520,11 @@ class VOCS(XoptBaseModel):
         get_opt = np.nanmax if obj == "MAXIMIZE" else np.nanmin
         feasible = self.feasibility_data(data)["feasible"]
         feasible_obj_values = [
-            data[obj_name].values[i] if feasible[i] else np.nan for i in range(len(data))
+            data[obj_name].values[i] if feasible[i] else np.nan
+            for i in range(len(data))
         ]
         cumulative_optimum = np.array(
-            [get_opt(feasible_obj_values[:i + 1]) for i in range(len(data))]
+            [get_opt(feasible_obj_values[: i + 1]) for i in range(len(data))]
         )
         return pd.DataFrame({f"best_{obj_name}": cumulative_optimum}, index=data.index)
 

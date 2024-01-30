@@ -211,10 +211,12 @@ class TestVOCS(object):
     def test_cumulative_optimum(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         obj_name = vocs.objective_names[0]
-        test_data = pd.DataFrame({
-            obj_name: [np.nan, 0.0, -0.4, 0.6, np.nan, -0.7],
-            vocs.constraint_names[0]: [1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
-        })
+        test_data = pd.DataFrame(
+            {
+                obj_name: [np.nan, 0.0, -0.4, 0.6, np.nan, -0.7],
+                vocs.constraint_names[0]: [1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+            }
+        )
         vocs.objectives = {}
         with pytest.raises(RuntimeError):
             _ = vocs.cumulative_optimum(test_data)

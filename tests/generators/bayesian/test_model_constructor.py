@@ -39,6 +39,25 @@ class TestModelConstructor:
 
         constructor.build_model_from_vocs(test_vocs, test_data)
 
+    def test_transform_inputs(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        # test case where no inputs are transformed
+        constructor = StandardModelConstructor(transform_inputs=False)
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+        assert not hasattr(model.models[0], "input_transform")
+
+        # test case where only one input is transformed
+        constructor = StandardModelConstructor(transform_inputs={"c1": False})
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+        assert hasattr(model.models[0], "input_transform")
+        assert not hasattr(model.models[1], "input_transform")
+
     def test_duplicate_keys(self):
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)
