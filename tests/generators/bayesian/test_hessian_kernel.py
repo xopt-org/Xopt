@@ -27,3 +27,4 @@ class TestHessianKernel:
 
         with torch.no_grad():
             post = model.posterior(pts)
+            post.mean
