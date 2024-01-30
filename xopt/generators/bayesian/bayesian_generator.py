@@ -692,9 +692,9 @@ class BayesianGenerator(Generator, ABC):
         lengths = self.vocs.bounds[1, :] - self.vocs.bounds[0, :]
 
         # get maximum travel distances
-        max_travel_distances = (
-            torch.tensor(self.max_travel_distances, **self._tkwargs) * lengths
-        )
+        max_travel_distances = torch.tensor(
+            self.max_travel_distances, **self._tkwargs
+        ) * torch.tensor(lengths, **self._tkwargs)
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
         )
