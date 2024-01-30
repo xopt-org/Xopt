@@ -12,6 +12,7 @@ def visualize_generator_model(
     show_samples: bool = True,
     show_prior_mean: bool = False,
     show_feasibility: bool = False,
+    show_acquisition: bool = True,
     n_grid: int = 50,
 ) -> tuple:
     """Displays GP model predictions for the selected output(s).
@@ -33,6 +34,7 @@ def visualize_generator_model(
         show_samples: Whether samples are shown.
         show_prior_mean: Whether the prior mean is shown.
         show_feasibility: Whether the feasibility region is shown.
+        show_acquisition: Whether the acquisition function is computed and shown.
         n_grid: Number of grid points per dimension used to display the model predictions.
 
     Returns:
@@ -97,11 +99,12 @@ def visualize_generator_model(
             posterior_sd = torch.sqrt(posterior.mvn.variance).detach().squeeze().numpy()
         predictions[output_name] = [posterior_mean, posterior_sd, prior_mean]
     # acquisition function
-    base_acq = None
-    acq = generator.get_acquisition(model)
-    if hasattr(acq, "base_acquisition"):
-        base_acq = acq.base_acquisition(x.unsqueeze(1)).detach().squeeze().numpy()
-    predictions["acq"] = [base_acq, acq(x.unsqueeze(1)).detach().squeeze().numpy()]
+    if show_acquisition:
+        base_acq = None
+        acq = generator.get_acquisition(model)
+        if hasattr(acq, "base_acquisition"):
+            base_acq = acq.base_acquisition(x.unsqueeze(1)).detach().squeeze().numpy()
+        predictions["acq"] = [base_acq, acq(x.unsqueeze(1)).detach().squeeze().numpy()]
     if show_feasibility:
         predictions["feasibility"] = (
             feasibility(x.unsqueeze(1), model, vocs).detach().squeeze().numpy()
@@ -124,11 +127,13 @@ def visualize_generator_model(
         samples[output_name] = [feasible, feasible_samples, infeasible_samples]
 
     # plot configuration
-    nrows, ncols = 1 + dim_y, dim_x
+    nrows, ncols = dim_y, dim_x
+    if show_acquisition:
+        nrows += 1
     if show_prior_mean and dim_x == 2:
         ncols += 1
     if show_feasibility:
-        if dim_x == 2 and show_prior_mean:
+        if dim_x == 2 and show_acquisition and show_prior_mean:
             pass
         else:
             nrows += 1
@@ -234,17 +239,20 @@ def visualize_generator_model(
                 handler_map={list: HandlerTuple(ndivide=None)},
             )
         # acquisition function
-        if predictions["acq"][0] is None:
-            ax[len(output_names)].plot(x_axis, predictions["acq"][1], "C0-")
+        if not show_acquisition:
+            pass
         else:
-            ax[len(output_names)].plot(
-                x_axis, predictions["acq"][0], "C0--", label="Base Acq. Function"
-            )
-            ax[len(output_names)].plot(
-                x_axis, predictions["acq"][1], "C0-", label="Constrained Acq. Function"
-            )
-            ax[len(output_names)].legend()
-        ax[len(output_names)].set_ylabel(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
+            if predictions["acq"][0] is None:
+                ax[len(output_names)].plot(x_axis, predictions["acq"][1], "C0-")
+            else:
+                ax[len(output_names)].plot(
+                    x_axis, predictions["acq"][0], "C0--", label="Base Acq. Function"
+                )
+                ax[len(output_names)].plot(
+                    x_axis, predictions["acq"][1], "C0-", label="Constrained Acq. Function"
+                )
+                ax[len(output_names)].legend()
+            ax[len(output_names)].set_ylabel(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
         # feasibility
         if show_feasibility:
             ax[-1].plot(x_axis, predictions["feasibility"], "C0-")
@@ -322,35 +330,42 @@ def visualize_generator_model(
                         handler_map={list: HandlerTuple(ndivide=None)},
                     )
         # acquisition function
-        if predictions["acq"][0] is None:
-            pcm = ax[len(output_names), 0].pcolormesh(
-                x_mesh[0].numpy(),
-                x_mesh[1].numpy(),
-                predictions["acq"][1].reshape(n_grid, n_grid),
-            )
-            divider = make_axes_locatable(ax[len(output_names), 0])
-            cax = divider.append_axes("right", size="5%", pad=0.1)
-            cbar = fig.colorbar(pcm, cax=cax)
-            cbar.set_label(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
-            ax[len(output_names), 0].set_title("Acq. Function")
-            ax[len(output_names), 1].axis("off")
+        if not show_acquisition:
+            pass
         else:
-            for j in range(2):
-                pcm = ax[len(output_names), j].pcolormesh(
+            if predictions["acq"][0] is None:
+                pcm = ax[len(output_names), 0].pcolormesh(
                     x_mesh[0].numpy(),
                     x_mesh[1].numpy(),
-                    predictions["acq"][j].reshape(n_grid, n_grid),
+                    predictions["acq"][1].reshape(n_grid, n_grid),
                 )
-                divider = make_axes_locatable(ax[len(output_names), j])
+                divider = make_axes_locatable(ax[len(output_names), 0])
                 cax = divider.append_axes("right", size="5%", pad=0.1)
                 cbar = fig.colorbar(pcm, cax=cax)
                 cbar.set_label(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
-            ax[len(output_names), 0].set_title("Base Acq. Function")
-            ax[len(output_names), 1].set_title("Constrained Acq. Function")
+                ax[len(output_names), 0].set_title("Acq. Function")
+                ax[len(output_names), 1].axis("off")
+            else:
+                for j in range(2):
+                    pcm = ax[len(output_names), j].pcolormesh(
+                        x_mesh[0].numpy(),
+                        x_mesh[1].numpy(),
+                        predictions["acq"][j].reshape(n_grid, n_grid),
+                    )
+                    divider = make_axes_locatable(ax[len(output_names), j])
+                    cax = divider.append_axes("right", size="5%", pad=0.1)
+                    cbar = fig.colorbar(pcm, cax=cax)
+                    cbar.set_label(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
+                ax[len(output_names), 0].set_title("Base Acq. Function")
+                ax[len(output_names), 1].set_title("Constrained Acq. Function")
         # feasibility
         if show_feasibility:
-            if ncols == 3:
+            if ncols == 3 and show_acquisition:
                 ax_feasibility = ax[len(output_names), 2]
+            elif ncols == 3 and not show_acquisition:
+                ax_feasibility = ax[-1, 0]
+                ax[-1, 1].axis("off")
+                ax[-1, 2].axis("off")
             else:
                 ax_feasibility = ax[-1, 0]
                 ax[-1, 1].axis("off")
@@ -365,7 +380,7 @@ def visualize_generator_model(
             cbar.set_label("Feasibility")
             ax_feasibility.set_title("Feasibility")
         else:
-            if ncols == 3:
+            if ncols == 3 and show_acquisition:
                 ax[len(output_names), 2].axis("off")
     fig.tight_layout()
     return fig, ax
