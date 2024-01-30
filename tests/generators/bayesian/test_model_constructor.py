@@ -21,7 +21,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
-from xopt.generators.bayesian.utils import get_input_transform, get_training_data
+from xopt.generators.bayesian.utils import get_training_data
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
@@ -434,13 +434,21 @@ class TestModelConstructor:
         train_x, train_y, train_yvar = get_training_data(
             test_vocs.variable_names, "y1", test_data
         )
+        bounds = torch.vstack(
+            [
+                torch.tensor(test_vocs.variables[name])
+                for name in test_vocs.variable_names
+            ]
+        ).T
+
+        # create transform
+        input_transform = Normalize(len(test_vocs.variable_names), bounds=bounds)
+
         bmodel = HeteroskedasticSingleTaskGP(
             train_x,
             train_y,
             train_yvar,
-            input_transform=get_input_transform(
-                test_vocs.variable_names, test_vocs.variables
-            ),
+            input_transform=input_transform,
             outcome_transform=Standardize(1),
         )
         mll = ExactMarginalLogLikelihood(bmodel.likelihood, bmodel)
