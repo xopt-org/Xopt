@@ -8,9 +8,11 @@ from xopt.generators.bayesian.models.standard import StandardModelConstructor
 
 
 class HessianRBF(RBFKernel):
-    def __init__(self, precision_matrix: Tensor, **kwargs):
+    def __init__(self, hessian_matrix: Tensor, **kwargs):
         super().__init__(**kwargs)
-        self.lower_triangular_decomp = torch.linalg.cholesky(precision_matrix)
+        self.lower_triangular_decomp = torch.linalg.cholesky(
+            torch.linalg.inv(hessian_matrix)
+        )
 
     def forward(self, x1, x2, diag=False, **params):
         x1_star = x1 @ self.lower_triangular_decomp
