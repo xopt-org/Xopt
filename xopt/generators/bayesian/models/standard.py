@@ -2,10 +2,11 @@ import os.path
 from copy import deepcopy
 from typing import Dict, List, Optional, Union
 
+import botorch.settings
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
-from botorch.models.transforms import Standardize
+from botorch.models.transforms import Normalize, Standardize
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood
@@ -16,7 +17,7 @@ from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.generators.bayesian.utils import get_input_transform, get_training_data
+from xopt.generators.bayesian.utils import get_training_data
 from xopt.pydantic import decode_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
@@ -70,6 +71,11 @@ class StandardModelConstructor(ModelConstructor):
     )
     trainable_mean_keys: List[str] = Field(
         [], description="list of prior mean modules that can be trained"
+    )
+    transform_inputs: Union[Dict[str, bool], bool] = Field(
+        True,
+        description="specify if inputs should be transformed inside the gp "
+        "model, can optionally specify a dict of specifications",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
@@ -158,16 +164,22 @@ class StandardModelConstructor(ModelConstructor):
         # build model
         tkwargs = {"dtype": dtype, "device": device}
         models = []
-        input_transform = get_input_transform(input_names, input_bounds).to(**tkwargs)
 
-        for name in outcome_names:
+        for outcome_name in outcome_names:
+            input_transform = self._get_input_transform(
+                outcome_name, input_names, input_bounds, tkwargs
+            )
             outcome_transform = Standardize(1)
-            covar_module = self._get_module(self.covar_modules, name)
+            covar_module = self._get_module(self.covar_modules, outcome_name)
             mean_module = self.build_mean_module(
-                name, input_transform, outcome_transform
+                outcome_name, input_transform, outcome_transform
             )
 
-            train_X, train_Y, train_Yvar = get_training_data(input_names, name, data)
+            # get training data
+            train_X, train_Y, train_Yvar = get_training_data(
+                input_names, outcome_name, data
+            )
+            # collect arguments into a single dict
             kwargs = {
                 "input_transform": input_transform,
                 "outcome_transform": outcome_transform,
@@ -252,3 +264,33 @@ class StandardModelConstructor(ModelConstructor):
             return deepcopy(base.get(name))
         else:
             return None
+
+    def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
+        """get input transform based on the supplied bounds and attributes"""
+        # get input bounds
+        if input_bounds is None:
+            bounds = None
+        else:
+            bounds = torch.vstack(
+                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
+            ).T
+
+        # create transform
+        input_transform = Normalize(len(input_names), bounds=bounds)
+
+        # remove input transform if the bool is False or the dict entry is false
+        if isinstance(self.transform_inputs, bool):
+            if not self.transform_inputs:
+                input_transform = None
+        if (
+            isinstance(self.transform_inputs, dict)
+            and outcome_name in self.transform_inputs
+        ):
+            if not self.transform_inputs[outcome_name]:
+                input_transform = None
+
+        # remove warnings if input transform is None
+        if input_transform is None:
+            botorch.settings.validate_input_scaling(False)
+
+        return input_transform

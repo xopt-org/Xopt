@@ -39,7 +39,8 @@ class MOProblem(Problem):
 
 
 class QuadraticMO(MOProblem):
-    """ Quadratic multi-objective test problem - by default, finding minima with 1 objective offset """
+    """Quadratic multi-objective test problem - by default, finding minima with 1 objective offset"""
+
     _ref_point = np.array([5.0, 5.0])
 
     def __init__(self, n_var=3, scale=1.0, offset=1.5, negate=False):
@@ -152,9 +153,7 @@ class DTLZ2(MOProblem):
         # positive
         hypercube_vol = 1.1**self.n_obj
         pos_hypersphere_vol = (
-            math.pi ** (self.n_obj / 2)
-            / gamma(self.n_obj / 2 + 1)
-            / 2**self.n_obj
+            math.pi ** (self.n_obj / 2) / gamma(self.n_obj / 2 + 1) / 2**self.n_obj
         )
         return hypercube_vol - pos_hypersphere_vol
 
