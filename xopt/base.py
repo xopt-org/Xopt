@@ -376,8 +376,11 @@ class Xopt(XoptBaseModel):
         self.data = pd.DataFrame()
         self.generator.data = pd.DataFrame()
 
-    def remove_data(self, indices: list[int], inplace: bool = True) -> Optional[pd.DataFrame]:
+    def remove_data(
+        self, indices: list[int], inplace: bool = True
+    ) -> Optional[pd.DataFrame]:
         """
+        Removes data from the `X.data` data storage attribute.
 
         Parameters
         ----------

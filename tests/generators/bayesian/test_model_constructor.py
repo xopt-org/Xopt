@@ -21,7 +21,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
-from xopt.generators.bayesian.utils import get_input_transform, get_training_data
+from xopt.generators.bayesian.utils import get_training_data
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
@@ -38,6 +38,25 @@ class TestModelConstructor:
         )
 
         constructor.build_model_from_vocs(test_vocs, test_data)
+
+    def test_transform_inputs(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        # test case where no inputs are transformed
+        constructor = StandardModelConstructor(transform_inputs=False)
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+        assert not hasattr(model.models[0], "input_transform")
+
+        # test case where only one input is transformed
+        constructor = StandardModelConstructor(transform_inputs={"c1": False})
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+        assert hasattr(model.models[0], "input_transform")
+        assert not hasattr(model.models[1], "input_transform")
 
     def test_duplicate_keys(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -434,13 +453,21 @@ class TestModelConstructor:
         train_x, train_y, train_yvar = get_training_data(
             test_vocs.variable_names, "y1", test_data
         )
+        bounds = torch.vstack(
+            [
+                torch.tensor(test_vocs.variables[name])
+                for name in test_vocs.variable_names
+            ]
+        ).T
+
+        # create transform
+        input_transform = Normalize(len(test_vocs.variable_names), bounds=bounds)
+
         bmodel = HeteroskedasticSingleTaskGP(
             train_x,
             train_y,
             train_yvar,
-            input_transform=get_input_transform(
-                test_vocs.variable_names, test_vocs.variables
-            ),
+            input_transform=input_transform,
             outcome_transform=Standardize(1),
         )
         mll = ExactMarginalLogLikelihood(bmodel.likelihood, bmodel)

@@ -1,9 +1,8 @@
-from typing import Dict, List
+from typing import List
 
 import numpy as np
 import pandas as pd
 import torch
-from botorch.models.transforms import Normalize
 
 from xopt.vocs import VOCS
 
@@ -75,49 +74,6 @@ def set_botorch_weights(weights, vocs: VOCS):
             weights[idx] = 1.0
 
     return weights
-
-
-def get_input_transform(input_names: List, input_bounds: Dict[str, List] = None):
-    """
-    Create a Botorch normalization transform for input data.
-
-    Parameters
-    ----------
-    input_names : List[str]
-        List of input feature names.
-
-    input_bounds : Optional[Dict[str, List[float]]], optional
-        A dictionary specifying the bounds for each input feature. If None,
-        no normalization is applied. The dictionary should have input feature
-        names as keys, and corresponding bounds as lists [min, max].
-
-    Returns
-    -------
-    Normalize
-        A normalization transform module.
-
-    Notes
-    -----
-    The normalization transform is applied independently to each input feature.
-
-    If `input_bounds` is provided, the transform scales each input feature to the
-    range [0, 1] based on the specified bounds. If `input_bounds` is None,
-    no normalization is applied, and the raw input values are used.
-
-    Examples
-    --------
-    >>> input_names = ['feature1', 'feature2']
-    >>> input_bounds = {'feature1': [0.0, 1.0], 'feature2': [-1.0, 1.0]}
-    >>> transform = get_input_transform(input_names, input_bounds)
-    >>> normalized_data = transform(raw_input_data)
-    """
-    if input_bounds is None:
-        bounds = None
-    else:
-        bounds = torch.vstack(
-            [torch.tensor(input_bounds[name]) for name in input_names]
-        ).T
-    return Normalize(len(input_names), bounds=bounds)
 
 
 def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
