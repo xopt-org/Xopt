@@ -31,7 +31,7 @@ if __name__ == "__main__":
         args = [
             "-vrxs",
             f"--benchmark-json={script_folder/'bench_output.json'}",
-            f"{script_folder.parent/'tests/benchmarks'}",
+            f"{script_folder.parent/'benchmarks'}",
         ]
 
         # Add extra arguments
