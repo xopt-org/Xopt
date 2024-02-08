@@ -252,10 +252,15 @@ def visualize_generator_model(
                     x_axis, predictions["acq"][0], "C0--", label="Base Acq. Function"
                 )
                 ax[len(output_names)].plot(
-                    x_axis, predictions["acq"][1], "C0-", label="Constrained Acq. Function"
+                    x_axis,
+                    predictions["acq"][1],
+                    "C0-",
+                    label="Constrained Acq. Function",
                 )
                 ax[len(output_names)].legend()
-            ax[len(output_names)].set_ylabel(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
+            ax[len(output_names)].set_ylabel(
+                r"$\alpha\,$[{}]".format(vocs.output_names[0])
+            )
         # feasibility
         if show_feasibility:
             ax[-1].plot(x_axis, predictions["feasibility"], "C0-")
