@@ -329,7 +329,6 @@ class Xopt(XoptBaseModel):
 
         output_data = self.evaluator.evaluate_data(input_data)
 
-
         if self.strict:
             validate_outputs(output_data)
 
