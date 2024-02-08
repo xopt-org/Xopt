@@ -61,5 +61,5 @@ vocs:
         c1: [GREATER_THAN, 0]
         c2: ['LESS_THAN', 0.5]
     constants:
-        constant1: 1   
+        constant1: 1
 """
