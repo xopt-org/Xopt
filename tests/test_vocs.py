@@ -149,7 +149,7 @@ class TestVOCS(object):
             vocs.convert_dataframe_to_inputs(test_data)
 
         res = vocs.convert_dataframe_to_inputs(test_data[vocs.variable_names])
-        assert "cnt1" in res
+        assert "constant1" in res
 
     def test_validate_input_data(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
