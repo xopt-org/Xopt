@@ -208,7 +208,7 @@ class TestXopt:
         xopt = Xopt(generator=generator, evaluator=evaluator, vocs=test_vocs)
 
         test_vocs.variables = {"x2": [0, 1]}
-        test_vocs.constants = {"x1": 2.0}
+        test_vocs.constants["x1"] =  2.0
 
         out = xopt.evaluate({"x2": 0.2})
         assert isinstance(out, dict)
@@ -259,7 +259,7 @@ class TestXopt:
         val = str(xopt)
         assert "Data size: 2" in val
         assert (
-            "vocs:\n  constants:\n    cnt1: 1.0\n  constraints:\n    c1:\n    - "
+            "vocs:\n  constants:\n    constant1: 1.0\n  constraints:\n    c1:\n    - "
             "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
         )
 
