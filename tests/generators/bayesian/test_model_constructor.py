@@ -13,6 +13,7 @@ from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
+from gpytorch.means import ConstantMean
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
 
@@ -436,6 +437,23 @@ class TestModelConstructor:
 
             assert torch.allclose(generated_pred, benchmark_pred, rtol=1e-3)
             assert ~torch.allclose(generated_pred, old_prediction, rtol=1e-3)
+
+    def test_unused_modules_warning(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = deepcopy(TEST_VOCS_DATA)
+
+        # test unused covariance or mean module
+        kwargs_covar = {"covar_modules": {"faulty_output_name": PeriodicKernel()}}
+        kwargs_mean = {"mean_modules": {"faulty_output_name": ConstantMean()}}
+
+        for kwargs in [kwargs_covar, kwargs_mean]:
+            gp_constructor = StandardModelConstructor(**kwargs)
+            generator = ExpectedImprovementGenerator(
+                vocs=test_vocs, gp_constructor=gp_constructor
+            )
+            generator.add_data(test_data)
+            with pytest.warns(UserWarning):
+                _ = generator.train_model()
 
     def test_heteroskedastic(self):
         test_data = deepcopy(TEST_VOCS_DATA)
