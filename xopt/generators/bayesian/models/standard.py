@@ -1,4 +1,5 @@
 import os.path
+import warnings
 from copy import deepcopy
 from typing import Dict, List, Optional, Union
 
@@ -165,14 +166,16 @@ class StandardModelConstructor(ModelConstructor):
         tkwargs = {"dtype": dtype, "device": device}
         models = []
 
+        covar_modules = deepcopy(self.covar_modules)
+        mean_modules = deepcopy(self.mean_modules)
         for outcome_name in outcome_names:
             input_transform = self._get_input_transform(
                 outcome_name, input_names, input_bounds, tkwargs
             )
             outcome_transform = Standardize(1)
-            covar_module = self._get_module(self.covar_modules, outcome_name)
+            covar_module = self._get_module(covar_modules, outcome_name)
             mean_module = self.build_mean_module(
-                outcome_name, input_transform, outcome_transform
+                outcome_name, mean_modules, input_transform, outcome_transform
             )
 
             # get training data
@@ -208,11 +211,22 @@ class StandardModelConstructor(ModelConstructor):
                         **kwargs
                     )
                 )
+        # check all specified modules were added to the model
+        if covar_modules:
+            warnings.warn(
+                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"could not be added to the model."
+            )
+        if mean_modules:
+            warnings.warn(
+                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"could not be added to the model."
+            )
 
         return ModelListGP(*models)
 
     def build_mean_module(
-        self, name, input_transform, outcome_transform
+        self, name, mean_modules, input_transform, outcome_transform
     ) -> Optional[CustomMean]:
         """
         Build the mean module for the output specified by name.
@@ -221,6 +235,8 @@ class StandardModelConstructor(ModelConstructor):
         ----------
         name : str
             The name of the output.
+        mean_modules: dict
+            The dictionary of mean modules.
         input_transform : InputTransform
             Transform for input variables.
         outcome_transform : OutcomeTransform
@@ -232,7 +248,7 @@ class StandardModelConstructor(ModelConstructor):
             The mean module for the output, or None if not specified.
 
         """
-        mean_module = self._get_module(self.mean_modules, name)
+        mean_module = self._get_module(mean_modules, name)
         if mean_module is not None:
             fixed_model = False if name in self.trainable_mean_keys else True
             mean_module = CustomMean(
@@ -261,7 +277,7 @@ class StandardModelConstructor(ModelConstructor):
         if isinstance(base, Module):
             return deepcopy(base)
         elif isinstance(base, dict):
-            return deepcopy(base.get(name))
+            return deepcopy(base.pop(name, None))
         else:
             return None
 
