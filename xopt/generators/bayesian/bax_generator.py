@@ -38,7 +38,7 @@ class BaxGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         bax_model_ids = [
             self.vocs.output_names.index(name)
-            for name in self.algorithm.model_names_ordered
+            for name in self.algorithm.observable_names_ordered
         ]
         bax_model = model.subset_output(bax_model_ids)
         eig = ModelListExpectedInformationGain(

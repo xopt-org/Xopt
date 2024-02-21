@@ -21,9 +21,12 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callabl
 class TestBaxGenerator:
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_init(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
         alg = Algorithm()
         bax_gen = BaxGenerator(
-            vocs=deepcopy(TEST_VOCS_BASE),
+            vocs=test_vocs,
             algorithm=alg,
         )
         bax_gen.model_dump()
@@ -110,6 +113,8 @@ class TestBaxGenerator:
 
         # test w/o constraints
         test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
         test_vocs.constraints = {}
         gen = BaxGenerator(
             vocs=test_vocs,
@@ -123,6 +128,8 @@ class TestBaxGenerator:
 
         # test w/ constraints
         test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
         gen = BaxGenerator(
             vocs=test_vocs,
             algorithm=alg,
@@ -135,8 +142,11 @@ class TestBaxGenerator:
 
     def test_cuda(self):
         alg = GridMinimize()
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE,
+            vocs=test_vocs,
             algorithm=alg,
         )
 
@@ -151,13 +161,16 @@ class TestBaxGenerator:
         evaluator = Evaluator(function=xtest_callable)
         alg = GridMinimize()
 
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
         gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE,
+            vocs=test_vocs,
             algorithm=alg,
         )
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
 
         # initialize with single initial candidate
         xopt.random_evaluate(3)
@@ -167,12 +180,13 @@ class TestBaxGenerator:
         evaluator = Evaluator(function=xtest_callable)
         alg = GridMinimize()
 
-        gen = BaxGenerator(
-            vocs=TEST_VOCS_BASE, algorithm=alg, algorithm_results_file="test"
-        )
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        gen = BaxGenerator(vocs=test_vocs, algorithm=alg, algorithm_results_file="test")
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
 
         # initialize with single initial candidate
         xopt.random_evaluate(3)
