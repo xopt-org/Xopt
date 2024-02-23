@@ -3,7 +3,8 @@ import pickle
 from copy import deepcopy
 from typing import Dict
 
-from pydantic import Field
+from pydantic import Field, field_validator
+from pydantic_core.core_schema import ValidationInfo
 
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm
@@ -24,6 +25,12 @@ class BaxGenerator(BayesianGenerator):
 
     _n_calls: int = 0
 
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_objectives != 0:
+            raise ValueError("this generator only supports observables")
+        return v
+
     def generate(self, n_candidates: int) -> list[dict]:
         self._n_calls += 1
         return super().generate(n_candidates)
@@ -31,7 +38,7 @@ class BaxGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         bax_model_ids = [
             self.vocs.output_names.index(name)
-            for name in self.algorithm.model_names_ordered
+            for name in self.algorithm.observable_names_ordered
         ]
         bax_model = model.subset_output(bax_model_ids)
         eig = ModelListExpectedInformationGain(

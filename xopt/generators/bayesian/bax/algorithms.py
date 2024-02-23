@@ -46,7 +46,7 @@ class GridScanAlgorithm(Algorithm, ABC):
 
 
 class GridMinimize(GridScanAlgorithm):
-    model_names_ordered: List[str] = Field(
+    observable_names_ordered: List[str] = Field(
         default=["y1"],
         description="names of observable/objective models used in this algorithm",
     )
