@@ -25,7 +25,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_objectives != 0:
-            raise ValueError("this generator only supports zero objectives only")
+            raise ValueError("this generator only supports observables")
         return v
 
     def _get_acquisition(self, model):
