@@ -2,10 +2,14 @@ import pickle
 from copy import deepcopy
 from unittest.mock import patch
 
+import pytest
+
 import torch
 from botorch.models import SingleTaskGP
 from botorch.models.model import ModelList
 from botorch.models.transforms import Normalize, Standardize
+
+from pydantic import ValidationError
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
@@ -205,3 +209,10 @@ class TestBaxGenerator:
 
         os.remove("test_1.pkl")
         os.remove("test_2.pkl")
+
+    def test_vocs_validation(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        alg = GridMinimize()
+
+        with pytest.raises(ValidationError):
+            BaxGenerator(vocs=test_vocs, algorithm=alg)
