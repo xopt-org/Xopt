@@ -284,6 +284,7 @@ def visualize_generator_model(
                     x_mesh[0].numpy(),
                     x_mesh[1].numpy(),
                     predictions[output_name][j].reshape(n_grid, n_grid),
+                    rasterized=True
                 )
                 divider = make_axes_locatable(ax_ij)
                 cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -348,6 +349,7 @@ def visualize_generator_model(
                     x_mesh[0].numpy(),
                     x_mesh[1].numpy(),
                     predictions["acq"][1].reshape(n_grid, n_grid),
+                    rasterized=True,
                 )
                 divider = make_axes_locatable(ax[len(output_names), 0])
                 cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -361,6 +363,7 @@ def visualize_generator_model(
                         x_mesh[0].numpy(),
                         x_mesh[1].numpy(),
                         predictions["acq"][j].reshape(n_grid, n_grid),
+                        rasterized=True,
                     )
                     divider = make_axes_locatable(ax[len(output_names), j])
                     cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -383,6 +386,7 @@ def visualize_generator_model(
                 x_mesh[0].numpy(),
                 x_mesh[1].numpy(),
                 predictions["feasibility"].reshape(n_grid, n_grid),
+                rasterized=True,
             )
             divider = make_axes_locatable(ax_feasibility)
             cax = divider.append_axes("right", size="5%", pad=0.1)
