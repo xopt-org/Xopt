@@ -162,7 +162,7 @@ class MultiFidelityGenerator(MOBOGenerator):
             elif self.vocs.objectives[ele] == "MAXIMIZE":
                 weights[idx] = 1.0
 
-        def obj_callable(Z):
+        def obj_callable(Z, X=None):
             return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
         c_posterior_mean = ConstrainedMCAcquisitionFunction(
