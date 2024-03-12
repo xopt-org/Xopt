@@ -67,7 +67,7 @@ def create_mc_objective(vocs, tkwargs):
 
     weights = set_botorch_weights(weights, vocs)
 
-    def obj_callable(Z,X=None):
+    def obj_callable(Z, X=None):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
     return GenericMCObjective(obj_callable)
@@ -78,7 +78,7 @@ def create_exploration_objective(vocs, tkwargs):
     weights = torch.zeros(n_outputs).to(**tkwargs)
     weights[0] = 1.0
 
-    def obj_callable(Z,X=None):
+    def obj_callable(Z, X=None):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
     return GenericMCObjective(obj_callable)
