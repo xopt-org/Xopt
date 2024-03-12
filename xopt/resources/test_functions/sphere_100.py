@@ -10,4 +10,4 @@ vocs = VOCS(variables=variables, objectives=objectives)
 
 def evaluate_sphere(inputs: dict):
     x = torch.tensor([inputs[f"x{i}"] for i in range(100)])
-    return {"f": float((x**2).sum().numpy()*0.1)}
+    return {"f": (x**2).sum().numpy()}
