@@ -18,8 +18,8 @@ class FeasibilityObjective(GenericMCObjective):
         infeasible_cost: float = 0.0,
         eta: float = 1e-3,
     ) -> None:
-        def ones_callable(X):
-            return torch.ones(X.shape[:-1])
+        def ones_callable(Z, X=None):
+            return torch.ones(Z.shape[:-1])
 
         super().__init__(objective=ones_callable)
         self.constraints = constraints
