@@ -140,7 +140,7 @@ class OptimizeTurboController(TurboController):
     def update_state(self, data: DataFrame, previous_batch_size: int = 1) -> None:
         """
         Update turbo state class using min of data points that are feasible.
-        Otherwise raise an error
+        If no points in the data set are feasible raise an error.
 
         NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
         minimization
@@ -164,7 +164,7 @@ class OptimizeTurboController(TurboController):
 
         if len(data[feas_data["feasible"]]) == 0:
             raise RuntimeError(
-                "turbo requires at least one valid point in training " "dataset"
+                "turbo requires at least one valid point in the training dataset"
             )
         else:
             self._set_best_point(data[feas_data["feasible"]])
