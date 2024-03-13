@@ -197,7 +197,7 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         likelihood=self.likelihood,
-                        **kwargs
+                        **kwargs,
                     )
                 )
             else:
@@ -208,7 +208,7 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         train_Yvar.to(**tkwargs),
-                        **kwargs
+                        **kwargs,
                     )
                 )
         # check all specified modules were added to the model
