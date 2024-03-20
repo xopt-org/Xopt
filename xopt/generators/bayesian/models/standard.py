@@ -10,8 +10,8 @@ from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
-from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.priors import GammaPrior
+from gpytorch.likelihoods import GaussianLikelihood, Likelihood
+from gpytorch.priors import GammaPrior, Prior
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 from torch.nn import Module
@@ -78,6 +78,10 @@ class StandardModelConstructor(ModelConstructor):
         description="specify if inputs should be transformed inside the gp "
         "model, can optionally specify a dict of specifications",
     )
+    custom_noise_prior: Optional[Prior] = Field(
+        None, description="specify custom noise prior for the GP likelihood, "
+                          "overwrites value specified by use_low_noise_prior"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
@@ -102,16 +106,22 @@ class StandardModelConstructor(ModelConstructor):
         return v
 
     @property
-    def likelihood(self):
+    def likelihood(self) -> Likelihood:
         """
-        Get the likelihood for the model, considering the low noise prior.
+        Get the likelihood for the model, considering the low noise prior and or a
+        custom noise prior.
 
         Returns
         -------
-        GaussianLikelihood
+        Likelihood
             The likelihood for the model.
 
         """
+        if self.custom_noise_prior is not None:
+            return GaussianLikelihood(
+                noise_prior=self.custom_noise_prior,
+            )
+
         if self.use_low_noise_prior:
             return GaussianLikelihood(
                 noise_prior=GammaPrior(1.0, 100.0),
@@ -197,7 +207,7 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         likelihood=self.likelihood,
-                        **kwargs
+                        **kwargs,
                     )
                 )
             else:
@@ -208,7 +218,7 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         train_Yvar.to(**tkwargs),
-                        **kwargs
+                        **kwargs,
                     )
                 )
         # check all specified modules were added to the model
