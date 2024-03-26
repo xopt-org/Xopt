@@ -161,6 +161,7 @@ class BayesianGenerator(Generator, ABC):
         description="flag to log transform the acquisition function before optimization",
     )
     n_interpolate_points: Optional[PositiveInt] = None
+    memory_length: Optional[PositiveInt] = None
 
     n_candidates: int = 1
 
@@ -312,7 +313,10 @@ class BayesianGenerator(Generator, ABC):
 
             # update internal model with internal data
             start_time = time.perf_counter()
-            model = self.train_model(self.data)
+            if self.memory_length is not None:
+                model = self.train_model(self.data.iloc[-self.memory_length:])
+            else:
+                model = self.train_model(self.data)
             timing_results["training"] = time.perf_counter() - start_time
 
             # propose candidates given model
