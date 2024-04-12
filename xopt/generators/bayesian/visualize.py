@@ -49,7 +49,10 @@ def visualize_generator_model(
         variable_names = vocs.variable_names
     dim_x, dim_y = len(variable_names), len(output_names)
     if dim_x not in [1, 2]:
-        raise ValueError(f"Number of variables should be 1 or 2, not {dim_x}.")
+        raise ValueError(
+            f"Visualization is only supported with respect to 1 or 2 variables, not {dim_x}. "
+            f"Provide a compatible list of variable names to create slice plots at higher dimensions."
+        )
 
     # check names exist in vocs
     for names, s in zip(
