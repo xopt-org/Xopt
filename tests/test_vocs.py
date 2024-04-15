@@ -3,6 +3,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import ObjectiveEnum, VOCS
@@ -25,6 +26,28 @@ class TestVOCS(object):
         VOCS(
             variables={"x": [0, 1]},
         )
+
+    def test_constraint_specification(self):
+        good_constraint_list = [
+            ["LESS_THAN", 0],
+            ["GREATER_THAN", 0],
+            ["less_than", 0],
+            ["greater_than", 0],
+        ]
+
+        for ele in good_constraint_list:
+            VOCS(variables={"x": [0, 1]}, constraints={"c": ele})
+
+        bad_constraint_list = [
+            ["LESS_THAN"],
+            ["GREATER_TAN", 0],
+            [0, "less_than"],
+            ["greater_than", "ahc"],
+        ]
+
+        for ele in bad_constraint_list:
+            with pytest.raises(ValidationError):
+                VOCS(variables={"x": [0, 1]}, constraints={"c": ele})
 
     def test_from_yaml(self):
         Y = """
@@ -63,7 +86,11 @@ class TestVOCS(object):
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
-        TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+        test_inputs = TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+        assert len(test_inputs) == 5
+
+        test_inputs = TEST_VOCS_BASE.random_inputs()
+        assert isinstance(test_inputs[0]["x1"], float)
 
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)

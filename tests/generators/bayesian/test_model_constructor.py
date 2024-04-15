@@ -505,6 +505,22 @@ class TestModelConstructor:
             posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
         )
 
+    def test_custom_noise_prior(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        noise_prior = GammaPrior(1.0, 1000.0)
+
+        gp_constructor = StandardModelConstructor(custom_noise_prior=noise_prior)
+        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+
+        # check if created models have the correct noise priors
+        assert model.models[0].likelihood.noise_covar.noise_prior.rate == 1000.0
+        assert model.models[0].likelihood.noise_covar.noise_prior.concentration == 1.0
+
+        assert model.models[1].likelihood.noise_covar.noise_prior.rate == 1000.0
+        assert model.models[1].likelihood.noise_covar.noise_prior.concentration == 1.0
+
     @pytest.fixture(autouse=True)
     def clean_up(self):
         yield
