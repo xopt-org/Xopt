@@ -55,7 +55,8 @@ class qPosteriorVariance(MCAcquisitionFunction):
         X_pending: Optional[Tensor] = None,
     ) -> None:
         r"""q-Upper Confidence Bound.
-        Args:
+        Parameters
+        ----------
             model: A fitted model.
             sampler: The sampler used to draw base samples. Defaults to
                 `SobolQMCNormalSampler(num_samples=512, collapse_batch_dims=True)`
@@ -79,10 +80,13 @@ class qPosteriorVariance(MCAcquisitionFunction):
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         r"""Evaluate qUpperConfidenceBound on the candidate set `X`.
-        Args:
+        Parameters
+        ----------
             X: A `batch_sahpe x q x d`-dim Tensor of t-batches with `q` `d`-dim design
                 points each.
-        Returns:
+
+        Returns
+        -------
             A `batch_shape'`-dim Tensor of Upper Confidence Bound values at the given
             design points `X`, where `batch_shape'` is the broadcasted batch shape of
             model and input `X`.

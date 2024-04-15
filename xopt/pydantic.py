@@ -600,12 +600,14 @@ def get_callable_from_string(callable: str, bind: Any = None) -> Callable:
     """Get callable from a string. In the case that the callable points to a bound method,
     the function returns a callable taking the bind instance as the first arg.
 
-    Args:
+        Parameters
+        ----------
         callable: String representation of callable abiding convention
              __module__:callable
         bind: Class to bind as self
 
-    Returns:
+    Returns
+    -------
         Callable
     """
     callable_split = callable.rsplit(".", 1)

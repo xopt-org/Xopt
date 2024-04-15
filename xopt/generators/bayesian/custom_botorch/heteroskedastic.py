@@ -38,7 +38,8 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
         to specify mean and covariance modules.
 
 
-        Args:
+        Parameters
+        ----------
             train_X: A `batch_shape x n x d` tensor of training features.
             train_Y: A `batch_shape x n x m` tensor of training observations.
             train_Yvar: A `batch_shape x n x m` tensor of observed measurement

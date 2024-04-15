@@ -173,11 +173,11 @@ class VOCS(XoptBaseModel):
         return len(self.output_names)
 
     def random_inputs(
-        self,
-        n: int = None,
-        custom_bounds: dict = None,
-        include_constants: bool = True,
-        seed: int = None,
+            self,
+            n: int = None,
+            custom_bounds: dict = None,
+            include_constants: bool = True,
+            seed: int = None,
     ) -> list[dict]:
         """
         Uniform sampling of the variables.
@@ -229,7 +229,7 @@ class VOCS(XoptBaseModel):
             return pd.DataFrame(inputs).to_dict("records")
 
     def convert_dataframe_to_inputs(
-        self, data: pd.DataFrame, include_constants=True
+            self, data: pd.DataFrame, include_constants=True
     ) -> pd.DataFrame:
         """
         Extracts only inputs from a dataframe.
@@ -254,7 +254,7 @@ class VOCS(XoptBaseModel):
         return inner_copy
 
     def convert_numpy_to_inputs(
-        self, inputs: np.ndarray, include_constants=True
+            self, inputs: np.ndarray, include_constants=True
     ) -> pd.DataFrame:
         """
         convert 2D numpy array to list of dicts (inputs) for evaluation
@@ -267,93 +267,118 @@ class VOCS(XoptBaseModel):
 
     # Extract optimization data (in correct column order)
     def variable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "variable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing variables according to `vocs.variables` in sorted
         order
 
-        Args:
-            data: Data to be processed.
-            prefix: Prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "objective_",
-        return_raw=False,
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "objective_",
+            return_raw=False,
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
         `vocs.objectives` such that we always assume minimization.
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "constraint_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing constraint data transformed according to
         `vocs.constraints` such that values that satisfy each constraint are negative.
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_constraint_data(self.constraints, data, prefix)
 
     def observable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "observable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "observable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing observable data
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_observable_data(self.observable_names, data, prefix)
 
     def feasibility_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "feasible_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
         not. Returned dataframe also contains a column `feasible` which denotes if
         all constraints are satisfied.
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_feasibility_data(self.constraints, data, prefix)
 
@@ -369,7 +394,7 @@ class VOCS(XoptBaseModel):
 
         Returns
         -------
-        pd.DataFrame
+        result : pd.DataFrame
             A DataFrame with input data in the range [0,1] corresponding to the
             specified variable ranges. Contains columns equal to the intersection
             between `input_points` and `vocs.variable_names`.
@@ -386,8 +411,8 @@ class VOCS(XoptBaseModel):
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
                 normed_data[name] = (
-                    input_points[name] - self.variables[name][0]
-                ) / width
+                                            input_points[name] - self.variables[name][0]
+                                    ) / width
 
         if len(normed_data):
             return pd.DataFrame(normed_data)
@@ -406,7 +431,7 @@ class VOCS(XoptBaseModel):
 
         Returns
         -------
-        pd.DataFrame
+        result : pd.DataFrame
             A DataFrame with denormalized input data corresponding to the
             specified variable ranges. Contains columns equal to the intersection
             between `input_points` and `vocs.variable_names`.
@@ -423,7 +448,7 @@ class VOCS(XoptBaseModel):
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
                 denormed_data[name] = (
-                    input_points[name] * width + self.variables[name][0]
+                        input_points[name] * width + self.variables[name][0]
                 )
 
         if len(denormed_data):
@@ -436,13 +461,17 @@ class VOCS(XoptBaseModel):
         Validates input data. Raises an error if the input data does not satisfy
         requirements given by vocs.
 
-        Args:
-            input_points: input data to be validated.
+        Parameters
+        ----------
+            input_points : DataFrame
+                Input data to be validated.
 
-        Returns:
+        Returns
+        -------
             None
 
-        Raises:
+        Raises
+        ------
             ValueError: if input data does not satisfy requirements.
         """
         validate_input_data(self, input_points)
@@ -453,31 +482,42 @@ class VOCS(XoptBaseModel):
         constraints based on vocs - objective data is transformed based on
         `vocs.objectives` properties
 
-        Args:
-            data: dataframe to be split
-            return_raw: if True, return untransformed objective data
+        Parameters
+        ----------
+            data: DataFrame
+                Dataframe to be split
+            return_raw : bool, optional
+                If True, return untransformed objective data
 
-        Returns:
-            variable_data: dataframe containing variable data
-            objective_data: dataframe containing objective data
-            constraint_data: dataframe containing constraint data
+        Returns
+        -------
+            variable_data : DataFrame
+                Dataframe containing variable data
+            objective_data : DataFrame
+                Dataframe containing objective data
+            constraint_data : DataFrame
+                Dataframe containing constraint data
         """
         variable_data = self.variable_data(data, "")
         objective_data = self.objective_data(data, "", return_raw)
         constraint_data = self.constraint_data(data, "")
         return variable_data, objective_data, constraint_data
 
-    def select_best(self, data: pd.DataFrame, n=1):
+    def select_best(self, data: pd.DataFrame, n: int = 1):
         """
         get the best value and point for a given data set based on vocs
         - does not work for multi-objective problems
         - data that violates any constraints is ignored
 
-        Args:
-            data: dataframe to select best point from
-            n: number of best points to return
+        Parameters
+        ----------
+            data: DataFrame
+                Dataframe to select best point from
+            n: int, optional
+                Number of best points to return
 
-        Returns:
+        Returns
+        -------
             index: index of best point
             value: value of best point
             params: input parameters that give the best point
@@ -507,12 +547,12 @@ class VOCS(XoptBaseModel):
 
         Parameters
         ----------
-        data: pd.DataFrame
+        data: DataFrame
             Data for which the cumulative optimum shall be calculated.
 
         Returns
         -------
-        pd.DataFrame
+        DataFrame
             Cumulative optimum for the given DataFrame.
 
         """
@@ -559,7 +599,7 @@ def form_variable_data(variables: Union[Dict, DataFrame], data, prefix="variable
 
 
 def form_objective_data(
-    objectives: Dict, data, prefix="objective_", return_raw: bool = False
+        objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
@@ -627,10 +667,14 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
     Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
     constraint is satisfied if the evaluation is < 0.
 
-    Args:
-        constraints: Dictionary of constraints
-        data: Dataframe with the data to be evaluated
-        prefix: Prefix to use for the transformed data in the dataframe
+    Parameters
+    ----------
+        constraints: dict
+            Dictionary of constraints
+        data: DataFrame
+            Dataframe with the data to be evaluated
+        prefix: str, optional
+            Prefix to use for the transformed data in the dataframe
 
     Returns a dataframe with the constraint data.
 
@@ -670,10 +714,14 @@ def form_observable_data(observables: List, data: pd.DataFrame, prefix="observab
     Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
     constraint is satisfied if the evaluation is < 0.
 
-    Args:
-        observables: Dictonary of constraints
-        data: Dataframe with the data to be evaluated
-        prefix: Prefix to use for the transformed data in the dataframe
+    Parameters
+    ----------
+        observables: dict
+            Dictionary of observables
+        data: DataFrame
+            Dataframe with the data to be evaluated
+        prefix: str, optional
+            Prefix to use for the transformed data in the dataframe
 
     Returns a dataframe with the constraint data.
 
