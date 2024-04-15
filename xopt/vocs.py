@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import ConfigDict, conlist, Field
+from pydantic import ConfigDict, conlist, Field, field_validator
 
 from xopt.pydantic import XoptBaseModel
 
@@ -30,9 +30,10 @@ class ConstraintEnum(str, Enum):
     # Allow any case
     @classmethod
     def _missing_(cls, name):
-        for member in cls:
-            if member.name.lower() == name.lower():
-                return member
+        if isinstance(name, str):
+            for member in cls:
+                if member.name.lower() == name.lower():
+                    return member
 
 
 class VOCS(XoptBaseModel):
@@ -65,6 +66,24 @@ class VOCS(XoptBaseModel):
     model_config = ConfigDict(
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
+
+    @field_validator("constraints")
+    def coorect_list_types(cls, v):
+        """make sure that constraint list types are correct"""
+        for _, item in v.items():
+            if not isinstance(item[0], str):
+                raise ValueError(
+                    "constraint specification list must have the first "
+                    "element as a string`"
+                )
+
+            if not isinstance(item[1], float):
+                raise ValueError(
+                    "constraint specification list must have the second "
+                    "element as a float"
+                )
+
+        return v
 
     @classmethod
     def from_yaml(cls, yaml_text):
