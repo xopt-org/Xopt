@@ -20,7 +20,8 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         >>> EIG = ExpectedInformationGain(model, algo)
         >>> eig = EIG(test_X)
 
-        Args:
+        Parameters
+        ----------
             model: A fitted independent multi-output (ModelList) model.
     """
 
@@ -62,13 +63,15 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
     def forward(self, X: Tensor) -> Tensor:
         r"""Evaluate Expected Information Gain on the candidate set X.
 
-        Args:
+        Parameters
+        ----------
             X: A `(b1 x ... bk) x 1 x d`-dim batched tensor of `d`-dim design points.
                 Expected Information Gain is computed for each point individually,
                 i.e., what is considered are the marginal posteriors, not the
                 joint.
 
-        Returns:
+        Returns
+        -------
             A `(b1 x ... bk)`-dim tensor of Expected Information Gain values at the
             given design points `X`.
         """

@@ -14,7 +14,8 @@ class CustomMean(Mean):
     ):
         """Custom prior mean for a GP based on an arbitrary model.
 
-        Args:
+        Parameters
+        ----------
             model: Representation of the model.
             input_transformer: Module used to transform inputs in the GP.
             outcome_transformer: Module used to transform outcomes in the GP.
