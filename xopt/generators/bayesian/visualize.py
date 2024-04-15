@@ -27,15 +27,18 @@ def visualize_generator_model(
         generator : Generator
             Bayesian generator object.
         output_names : List[str]
-            Outputs for which the GP models are displayed. Defaults to all outputs in generator.vocs.
+            Outputs for which the GP models are displayed. Defaults to all outputs in
+            generator.vocs.
         variable_names : List[str]
             The variables with respect to which the GP models are displayed (maximum
             of 2). Defaults to generator.vocs.variable_names.
         idx : int
-            Index of the last sample to use. This also selects the point of reference in higher dimensions unless an explicit reference_point is given.
+            Index of the last sample to use. This also selects the point of reference in
+            higher dimensions unless an explicit reference_point is given.
         reference_point : dict
-            Reference point determining the value of variables in generator.vocs.variable_names,
-          but not in variable_names (slice plots in higher dimensions). Defaults to last used sample.
+            Reference point determining the value of variables in
+            generator.vocs.variable_names, but not in variable_names (slice plots in
+            higher dimensions). Defaults to last used sample.
         show_samples : bool, optional
             Whether samples are shown.
         show_prior_mean : bool, optional
