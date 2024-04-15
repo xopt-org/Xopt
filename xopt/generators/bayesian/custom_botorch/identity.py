@@ -11,10 +11,13 @@ class Identity(AcquisitionFunction):
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         r"""Evaluate qUpperConfidenceBound on the candidate set `X`.
-        Args:
+        Parameters
+        ----------
             X: A `batch_sahpe x q x d`-dim Tensor of t-batches with `q` `d`-dim design
                 points each.
-        Returns:
+
+        Returns
+        -------
             A `batch_shape'`-dim Tensor of Upper Confidence Bound values at the given
             design points `X`, where `batch_shape'` is the broadcasted batch shape of
             model and input `X`.

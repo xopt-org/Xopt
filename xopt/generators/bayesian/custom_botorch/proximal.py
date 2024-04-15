@@ -55,7 +55,8 @@ class ProximalAcquisitionFunction(AcquisitionFunction):
         r"""Derived Acquisition Function weighted by proximity to recently
         observed point.
 
-        Args:
+        Parameters
+        ----------
             acq_function: The base acquisition function, operating on input tensors
                 of feature dimension `d`.
             proximal_weights: A `d` dim tensor used to bias locality
@@ -89,10 +90,12 @@ class ProximalAcquisitionFunction(AcquisitionFunction):
     def forward(self, X: Tensor) -> Tensor:
         r"""Evaluate base acquisition function with proximal weighting.
 
-        Args:
+        Parameters
+        ----------
             X: Input tensor of feature dimension `d` .
 
-        Returns:
+        Returns
+        -------
             Base acquisition function evaluated on tensor `X` multiplied by proximal
             weighting.
         """
@@ -143,7 +146,8 @@ def _validate_model(model: Model, proximal_weights: Tensor) -> None:
     Perform vaidation checks on model used in base acquisition function to make sure
     it is compatible with proximal weighting.
 
-    Args:
+    Parameters
+    ----------
         model: Model associated with base acquisition function to be validated.
         proximal_weights: A `d` dim tensor used to bias locality
                 along each axis.
