@@ -155,16 +155,19 @@ def visualize_model(
             for j in range(ncols):
                 ax_ij = ax[i, j] if nrows > 1 else ax[j]
                 if j == 0:
+                    prediction = posterior_mean
                     title = f"Posterior Mean [{output_name}]"
                     cbar_label = output_name
                 elif j == 1:
+                    prediction = posterior_std
                     title = f"Posterior SD [{output_name}]"
                     cbar_label = r"$\sigma\,$[{}]".format(output_name)
                 else:
+                    prediction = prior_mean
                     title = f"Prior Mean [{output_name}]"
                     cbar_label = output_name
                 _plot2d_prediction(
-                    prediction=posterior_mean,
+                    prediction=prediction,
                     output_name=output_name,
                     input_mesh=input_mesh,
                     title=title,
