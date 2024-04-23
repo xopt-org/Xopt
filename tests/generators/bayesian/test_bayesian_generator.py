@@ -239,3 +239,12 @@ class TestBayesianGenerator(TestCase):
             model.models[0].input_transform.bounds,
             torch.tensor(((0, 0), (1, 10))).double(),
         )
+
+        # test bad fixed feature name
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.fixed_features = {"bad_name": 3.0}
+        data = deepcopy(TEST_VOCS_DATA)
+        gen.add_data(data)
+
+        with pytest.raises(KeyError):
+            gen.train_model()
