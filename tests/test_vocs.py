@@ -27,6 +27,14 @@ class TestVOCS(object):
             variables={"x": [0, 1]},
         )
 
+    def test_output_names(self):
+        test_vocs = VOCS(
+            variables={"x": [0, 1]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0]},
+        )
+        assert test_vocs.output_names == ["y1", "c1", "c2"]
+
     def test_constraint_specification(self):
         good_constraint_list = [
             ["LESS_THAN", 0],

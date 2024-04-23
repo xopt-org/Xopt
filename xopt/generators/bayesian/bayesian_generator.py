@@ -375,6 +375,11 @@ class BayesianGenerator(Generator, ABC):
             # get bounds for each fixed_feature (vocs bounds take precedent)
             for key in self.fixed_features:
                 if key not in variable_bounds:
+                    if key not in data:
+                        raise KeyError(
+                            "generator data needs to contain fixed feature "
+                            f"column name `{key}`"
+                        )
                     f_data = data[key]
                     bounds = [f_data.min(), f_data.max()]
                     if bounds[1] - bounds[0] < 1e-8:
