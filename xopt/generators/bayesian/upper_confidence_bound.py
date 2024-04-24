@@ -1,6 +1,5 @@
 import warnings
 
-import torch
 from botorch.acquisition import (
     qUpperConfidenceBound,
     ScalarizedPosteriorTransform,

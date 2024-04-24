@@ -13,7 +13,6 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
-from xopt.generators.bayesian.objectives import create_mc_objective
 
 
 class BayesianExplorationGenerator(BayesianGenerator):

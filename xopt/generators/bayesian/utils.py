@@ -69,7 +69,7 @@ def set_botorch_weights(vocs: VOCS):
     """set weights to multiply xopt objectives or observables for botorch objectives"""
     output_names = vocs.output_names
 
-    weights = torch.zeros(len(output_names))
+    weights = torch.zeros(len(output_names), dtype=torch.double)
 
     if vocs.n_objectives > 0:
         # if objectives exist this is an optimization problem

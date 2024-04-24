@@ -61,7 +61,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         return acq
 
     def _get_objective(self):
-        return create_mobo_objective(self.vocs, self._tkwargs)
+        return create_mobo_objective(self.vocs)
 
     def _get_acquisition(self, model):
         # get reference point from data
