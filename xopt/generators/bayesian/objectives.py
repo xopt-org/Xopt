@@ -70,13 +70,15 @@ def create_mc_objective(vocs, tkwargs):
     return GenericMCObjective(obj_callable)
 
 
-def create_mobo_objective(vocs, tkwargs):
+def create_mobo_objective(vocs):
     """
     botorch assumes maximization so we need to negate any objectives that have
     minimize keyword and zero out anything that is a constraint
     """
-    weights = set_botorch_weights(vocs)
+    output_names = vocs.output_names
+    objective_indicies = [output_names.index(name) for name in vocs.objectives]
+    weights = set_botorch_weights(vocs)[objective_indicies]
 
     return WeightedMCMultiOutputObjective(
-        weights, outcomes=list(range(vocs.n_objectives)), num_outcomes=vocs.n_objectives
+        weights, outcomes=objective_indicies, num_outcomes=vocs.n_objectives
     )

@@ -769,7 +769,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         n_objectives = self.vocs.n_objectives
         weights = torch.zeros(n_objectives)
-        weights = set_botorch_weights(weights, self.vocs)
+        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
         objective_data = objective_data * weights
 
         # compute hypervolume
