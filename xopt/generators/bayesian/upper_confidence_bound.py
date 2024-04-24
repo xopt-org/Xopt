@@ -62,8 +62,7 @@ beta : float, default 2.0
             )
         else:
             # analytic acquisition function for single candidate generation
-            weights = torch.zeros(self.vocs.n_outputs).to(**self._tkwargs)
-            weights = set_botorch_weights(weights, self.vocs)
+            weights = set_botorch_weights(self.vocs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform

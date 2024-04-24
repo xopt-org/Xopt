@@ -13,7 +13,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
-from xopt.generators.bayesian.objectives import create_exploration_objective
+from xopt.generators.bayesian.objectives import create_mc_objective
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
@@ -37,12 +37,6 @@ class BayesianExplorationGenerator(BayesianGenerator):
         )
 
         return qPV
-
-    def _get_objective(self):
-        """return exploration objective, which only captures the output of the first
-        model output"""
-
-        return create_exploration_objective(self.vocs, self._tkwargs)
 
 
 class qPosteriorVariance(MCAcquisitionFunction):

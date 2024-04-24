@@ -65,13 +65,26 @@ def get_training_data(
     return train_X, train_Y, train_Yvar
 
 
-def set_botorch_weights(weights, vocs: VOCS):
-    """set weights to multiply xopt objectives for botorch objectives"""
-    for idx, ele in enumerate(vocs.objective_names):
-        if vocs.objectives[ele] == "MINIMIZE":
-            weights[idx] = -1.0
-        elif vocs.objectives[ele] == "MAXIMIZE":
-            weights[idx] = 1.0
+def set_botorch_weights(vocs: VOCS):
+    """set weights to multiply xopt objectives or observables for botorch objectives"""
+    output_names = vocs.output_names
+
+    weights = torch.zeros(len(output_names))
+
+    if vocs.n_objectives > 0:
+        # if objectives exist this is an optimization problem
+        # set weights according to the index of the models -- corresponds to the
+        # ordering of output names
+        for objective_name in vocs.objective_names:
+            if vocs.objectives[objective_name] == "MINIMIZE":
+                weights[output_names.index(objective_name)] = -1.0
+            elif vocs.objectives[objective_name] == "MAXIMIZE":
+                weights[output_names.index(objective_name)] = 1.0
+    if vocs.n_objectives == 0:
+        # if no objectives exist this may be an exploration problem, weight each
+        # observable by 1.0
+        for observable_name in vocs.observables:
+            weights[output_names.index(observable_name)] = 1.0
 
     return weights
 
