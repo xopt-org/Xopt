@@ -10,7 +10,7 @@ class TestUtils:
     def test_mobo_objective(self):
         test_vocs_copy = deepcopy(TEST_VOCS_BASE)
         test_vocs_copy.objectives["y2"] = "MAXIMIZE"
-        obj = create_mobo_objective(test_vocs_copy, tkwargs={})
+        obj = create_mobo_objective(test_vocs_copy)
 
         # test large sample shape
         test_samples = torch.randn(3, 4, 5, 3).double()

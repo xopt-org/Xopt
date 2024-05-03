@@ -6,8 +6,9 @@ from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from pandas import DataFrame
 
-from .objectives import feasibility
 from xopt.vocs import VOCS
+
+from .objectives import feasibility
 
 
 def visualize_generator_model(generator, **kwargs) -> tuple:
@@ -114,6 +115,7 @@ def visualize_model(
     figure_config = _get_figure_config(min_ncols=dim_x, min_nrows=dim_y, **kwargs)
     if axes is None:
         from matplotlib import pyplot as plt  # lazy import
+
         fig, ax = plt.subplots(**figure_config)
     else:
         fig, ax = _get_figure_from_axes(axes), axes
@@ -131,7 +133,9 @@ def visualize_model(
             )
             ax[i].set_xlabel(None)
         if show_acquisition:
-            plot_acquisition_function(axis=ax[len(output_names)], **(kwargs | {"show_samples": False}))
+            plot_acquisition_function(
+                axis=ax[len(output_names)], **(kwargs | {"show_samples": False})
+            )
             ax[len(output_names)].set_xlabel(None)
         if show_feasibility:
             plot_feasibility(axis=ax[-1], **kwargs)
@@ -188,7 +192,9 @@ def visualize_model(
                 ax_acq = ax[len(output_names), 1]
             else:
                 ax[len(output_names), 1].axis("off")
-            plot_acquisition_function(axis=ax_acq, show_legend=False, **(kwargs | {"show_samples": False}))
+            plot_acquisition_function(
+                axis=ax_acq, show_legend=False, **(kwargs | {"show_samples": False})
+            )
         if show_feasibility:
             if ncols == 3 and show_acquisition:
                 ax_feasibility = ax[len(output_names), 2]
@@ -199,7 +205,11 @@ def visualize_model(
             else:
                 ax_feasibility = ax[-1, 0]
                 ax[-1, 1].axis("off")
-            plot_feasibility(axis=ax_feasibility, show_legend=False, **(kwargs | {"show_samples": False}))
+            plot_feasibility(
+                axis=ax_feasibility,
+                show_legend=False,
+                **(kwargs | {"show_samples": False}),
+            )
         else:
             if ncols == 3 and show_acquisition:
                 ax[len(output_names), 2].axis("off")
@@ -218,21 +228,21 @@ def visualize_model(
 
 
 def plot_model_prediction(
-        model: ModelListGP,
-        vocs: VOCS,
-        data: DataFrame,
-        output_name: str = None,
-        variable_names: list[str] = None,
-        prediction_type: str = None,
-        idx: int = -1,
-        reference_point: dict = None,
-        show_samples: bool = True,
-        show_prior_mean: bool = False,
-        show_legend: bool = True,
-        n_grid: int = 100,
-        color: str = "C0",
-        axis=None,
-        **_,
+    model: ModelListGP,
+    vocs: VOCS,
+    data: DataFrame,
+    output_name: str = None,
+    variable_names: list[str] = None,
+    prediction_type: str = None,
+    idx: int = -1,
+    reference_point: dict = None,
+    show_samples: bool = True,
+    show_prior_mean: bool = False,
+    show_legend: bool = True,
+    n_grid: int = 100,
+    color: str = "C0",
+    axis=None,
+    **_,
 ):
     """Displays the GP model prediction for the selected output.
 
@@ -281,7 +291,9 @@ def plot_model_prediction(
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
     kwargs = locals()
     input_mesh = _generate_input_mesh(**kwargs)
-    requires_prior_mean = prediction_type is not None and prediction_type.lower() == "prior mean"
+    requires_prior_mean = (
+        prediction_type is not None and prediction_type.lower() == "prior mean"
+    )
     posterior_mean, posterior_std, prior_mean = _get_model_predictions(
         input_mesh=input_mesh,
         output_name=output_name,
@@ -290,7 +302,11 @@ def plot_model_prediction(
         include_prior_mean=show_prior_mean or requires_prior_mean,
     )
     if len(variable_names) == 1:
-        x_axis = input_mesh[:, vocs.variable_names.index(variable_names[0])].squeeze().numpy()
+        x_axis = (
+            input_mesh[:, vocs.variable_names.index(variable_names[0])]
+            .squeeze()
+            .numpy()
+        )
         if output_name in vocs.constraint_names:
             axis.axhline(
                 y=vocs.constraints[output_name][1],
@@ -299,8 +315,12 @@ def plot_model_prediction(
                 label="Constraint Threshold",
             )
         if show_prior_mean:
-            axis.plot(x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean")
-        axis.plot(x_axis, posterior_mean, color=color, linestyle="-", label="Posterior Mean")
+            axis.plot(
+                x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean"
+            )
+        axis.plot(
+            x_axis, posterior_mean, color=color, linestyle="-", label="Posterior Mean"
+        )
         c = axis.fill_between(
             x=x_axis,
             y1=posterior_mean - 2 * posterior_std,
@@ -315,18 +335,29 @@ def plot_model_prediction(
         axis.set_xlabel(variable_names[0])
         axis.set_ylabel(output_name)
         if show_legend:
-            handles, labels = _combine_legend_entries_for_samples(*axis.get_legend_handles_labels())
+            handles, labels = _combine_legend_entries_for_samples(
+                *axis.get_legend_handles_labels()
+            )
             for j in range(len(labels)):
                 if labels[j] == "Posterior Mean":
                     labels[j] = r"Posterior Mean $\pm 2\,\sigma$"
                     handles[j] = (handles[j], c)
             from matplotlib.legend_handler import HandlerTuple  # lazy import
-            axis.legend(labels=labels, handles=handles, handler_map={list: HandlerTuple(ndivide=None)})
+
+            axis.legend(
+                labels=labels,
+                handles=handles,
+                handler_map={list: HandlerTuple(ndivide=None)},
+            )
     else:
-        prediction_type = "posterior mean" if prediction_type is None else prediction_type
+        prediction_type = (
+            "posterior mean" if prediction_type is None else prediction_type
+        )
         prediction_types = ["posterior mean", "posterior std", "prior mean"]
         if prediction_type.lower() not in prediction_types:
-            raise ValueError(f"Unrecognized prediction type, must be one of {prediction_types}.")
+            raise ValueError(
+                f"Unrecognized prediction type, must be one of {prediction_types}."
+            )
         if prediction_type.lower() == "posterior mean":
             axis = _plot2d_prediction(
                 prediction=posterior_mean,
@@ -355,18 +386,18 @@ def plot_model_prediction(
 
 
 def plot_acquisition_function(
-        acquisition_function: AcquisitionFunction,
-        vocs: VOCS,
-        data: DataFrame,
-        variable_names: list[str] = None,
-        only_base_acq: bool = False,
-        idx: int = -1,
-        reference_point: dict = None,
-        show_samples: bool = False,
-        show_legend: bool = True,
-        n_grid: int = 100,
-        axis=None,
-        **_,
+    acquisition_function: AcquisitionFunction,
+    vocs: VOCS,
+    data: DataFrame,
+    variable_names: list[str] = None,
+    only_base_acq: bool = False,
+    idx: int = -1,
+    reference_point: dict = None,
+    show_samples: bool = False,
+    show_legend: bool = True,
+    n_grid: int = 100,
+    axis=None,
+    **_,
 ):
     """Displays the given acquisition function.
 
@@ -407,10 +438,19 @@ def plot_acquisition_function(
     kwargs = locals()
     input_mesh = _generate_input_mesh(**kwargs)
     if len(variable_names) == 1:
-        x_axis = input_mesh[:, vocs.variable_names.index(variable_names[0])].squeeze().numpy()
+        x_axis = (
+            input_mesh[:, vocs.variable_names.index(variable_names[0])]
+            .squeeze()
+            .numpy()
+        )
         base_acq = None
         if hasattr(acquisition_function, "base_acquisition"):
-            base_acq = acquisition_function.base_acquisition(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+            base_acq = (
+                acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
+                .detach()
+                .squeeze()
+                .numpy()
+            )
         acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
         if base_acq is None:
             axis.plot(x_axis, acq, "C0-")
@@ -427,10 +467,19 @@ def plot_acquisition_function(
     else:
         if only_base_acq:
             if not hasattr(acquisition_function, "base_acquisition"):
-                raise ValueError("Given acquisition function doesn't have a base_acquisition attribute.")
-            acq = acquisition_function.base_acquisition(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+                raise ValueError(
+                    "Given acquisition function doesn't have a base_acquisition attribute."
+                )
+            acq = (
+                acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
+                .detach()
+                .squeeze()
+                .numpy()
+            )
         else:
-            acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+            acq = (
+                acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+            )
         if only_base_acq:
             title = "Base Acq. Function"
         elif hasattr(acquisition_function, "base_acquisition"):
@@ -449,17 +498,17 @@ def plot_acquisition_function(
 
 
 def plot_feasibility(
-        model: ModelListGP,
-        vocs: VOCS,
-        data: DataFrame,
-        variable_names: list[str] = None,
-        idx: int = -1,
-        reference_point: dict = None,
-        show_samples: bool = False,
-        show_legend: bool = True,
-        n_grid: int = 100,
-        axis=None,
-        **_,
+    model: ModelListGP,
+    vocs: VOCS,
+    data: DataFrame,
+    variable_names: list[str] = None,
+    idx: int = -1,
+    reference_point: dict = None,
+    show_samples: bool = False,
+    show_legend: bool = True,
+    n_grid: int = 100,
+    axis=None,
+    **_,
 ):
     """Displays the feasibility region for the given model.
 
@@ -499,7 +548,11 @@ def plot_feasibility(
     input_mesh = _generate_input_mesh(**kwargs)
     feas = feasibility(input_mesh.unsqueeze(1), model, vocs).detach().squeeze().numpy()
     if len(variable_names) == 1:
-        x_axis = input_mesh[:, vocs.variable_names.index(variable_names[0])].squeeze().numpy()
+        x_axis = (
+            input_mesh[:, vocs.variable_names.index(variable_names[0])]
+            .squeeze()
+            .numpy()
+        )
         axis.plot(x_axis, feas, "C0-")
         axis.set_xlabel(variable_names[0])
         axis.set_ylabel("Feasibility")
@@ -516,13 +569,13 @@ def plot_feasibility(
 
 
 def plot_samples(
-        vocs: VOCS,
-        data: DataFrame,
-        output_name: str = None,
-        variable_names: list[str] = None,
-        idx: int = -1,
-        axis=None,
-        **_,
+    vocs: VOCS,
+    data: DataFrame,
+    output_name: str = None,
+    variable_names: list[str] = None,
+    idx: int = -1,
+    axis=None,
+    **_,
 ):
     """Displays the data samples.
 
@@ -583,19 +636,19 @@ def plot_samples(
 
 
 def _plot2d_prediction(
-        prediction: np.ndarray,
-        vocs: VOCS,
-        data: DataFrame,
-        output_name: str,
-        variable_names: list[str],
-        input_mesh: torch.Tensor,
-        title: str = None,
-        cbar_label: str = None,
-        show_samples: bool = True,
-        show_legend: bool = True,
-        n_grid: int = 100,
-        axis=None,
-        **_,
+    prediction: np.ndarray,
+    vocs: VOCS,
+    data: DataFrame,
+    output_name: str,
+    variable_names: list[str],
+    input_mesh: torch.Tensor,
+    title: str = None,
+    cbar_label: str = None,
+    show_samples: bool = True,
+    show_legend: bool = True,
+    n_grid: int = 100,
+    axis=None,
+    **_,
 ):
     """
 
@@ -641,9 +694,11 @@ def _plot2d_prediction(
         rasterized=True,
     )
     from mpl_toolkits.axes_grid1 import make_axes_locatable  # lazy import
+
     divider = make_axes_locatable(axis)
     cax = divider.append_axes("right", size="5%", pad=0.1)
     from matplotlib import pyplot as plt  # lazy import
+
     cbar = plt.colorbar(pcm, cax=cax)
     axis.set_title(title)
     axis.set_xlabel(variable_names[0])
@@ -652,9 +707,12 @@ def _plot2d_prediction(
     if show_samples:
         axis = plot_samples(**kwargs)
     if show_legend:
-        handles, labels = _combine_legend_entries_for_samples(*axis.get_legend_handles_labels())
+        handles, labels = _combine_legend_entries_for_samples(
+            *axis.get_legend_handles_labels()
+        )
         if handles or labels:
             from matplotlib.legend_handler import HandlerTuple  # lazy import
+
             axis.legend(
                 labels=labels,
                 handles=handles,
@@ -664,11 +722,11 @@ def _plot2d_prediction(
 
 
 def _generate_input_mesh(
-        vocs: VOCS,
-        variable_names: list[str],
-        reference_point: dict[str, Any],
-        n_grid: int,
-        **_,
+    vocs: VOCS,
+    variable_names: list[str],
+    reference_point: dict[str, Any],
+    n_grid: int,
+    **_,
 ) -> torch.Tensor:
     """Generates an input mesh for visualization.
 
@@ -706,10 +764,10 @@ def _generate_input_mesh(
 
 
 def _get_reference_point(
-        reference_point: Optional[dict[str, Any]],
-        vocs: VOCS,
-        data: DataFrame,
-        idx: int = -1,
+    reference_point: Optional[dict[str, Any]],
+    vocs: VOCS,
+    data: DataFrame,
+    idx: int = -1,
 ) -> dict[str, Any]:
     """Returns a valid reference point.
 
@@ -738,12 +796,12 @@ def _get_reference_point(
 
 
 def _get_model_predictions(
-        model: ModelListGP,
-        vocs: VOCS,
-        output_name: str,
-        input_mesh: torch.Tensor,
-        include_prior_mean: bool = True,
-        **_,
+    model: ModelListGP,
+    vocs: VOCS,
+    output_name: str,
+    input_mesh: torch.Tensor,
+    include_prior_mean: bool = True,
+    **_,
 ) -> tuple:
     """Returns the model predictions for the given output name and input mesh.
 
@@ -782,13 +840,13 @@ def _get_model_predictions(
 
 
 def _get_feasible_samples(
-        vocs: VOCS,
-        data: DataFrame,
-        output_name: str,
-        variable_names: list[str],
-        idx: int = -1,
-        reverse: bool = False,
-        **_,
+    vocs: VOCS,
+    data: DataFrame,
+    output_name: str,
+    variable_names: list[str],
+    idx: int = -1,
+    reverse: bool = False,
+    **_,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Returns the feasible samples for the given output.
 
@@ -824,9 +882,9 @@ def _get_feasible_samples(
 
 
 def _validate_names(
-        output_names: list[str],
-        variable_names: list[str],
-        vocs: VOCS,
+    output_names: list[str],
+    variable_names: list[str],
+    vocs: VOCS,
 ) -> tuple[list[str], list[str]]:
     """Verifies that all names are in vocs and that the number of variable_names is valid.
 
@@ -854,7 +912,7 @@ def _validate_names(
             f"Provide a compatible list of variable names to create slice plots at higher dimensions."
         )
     for names, s in zip(
-            [output_names, variable_names], ["output_names", "variable_names"]
+        [output_names, variable_names], ["output_names", "variable_names"]
     ):
         invalid = [name not in getattr(vocs, s) for name in names]
         if any(invalid):
@@ -864,12 +922,12 @@ def _validate_names(
 
 
 def _get_figure_config(
-        min_ncols: int,
-        min_nrows: int,
-        show_acquisition: bool,
-        show_prior_mean: bool,
-        show_feasibility: bool,
-        **_,
+    min_ncols: int,
+    min_nrows: int,
+    show_acquisition: bool,
+    show_prior_mean: bool,
+    show_feasibility: bool,
+    **_,
 ) -> dict[str, Any]:
     """Returns the matching plot configuration for model visualization.
 
@@ -910,7 +968,13 @@ def _get_figure_config(
             figsize = (4 * ncols, 3.7 * nrows)
         else:
             figsize = (4 * ncols, 3.3 * nrows)
-    return {"nrows": nrows, "ncols": ncols, "sharex": sharex, "sharey": sharey, "figsize": figsize}
+    return {
+        "nrows": nrows,
+        "ncols": ncols,
+        "sharex": sharex,
+        "sharey": sharey,
+        "figsize": figsize,
+    }
 
 
 def _get_figure_from_axes(axes):
@@ -927,6 +991,7 @@ def _get_figure_from_axes(axes):
         The figure corresponding to the given axes object.
     """
     from matplotlib.axes import Axes  # lazy import
+
     if isinstance(axes, Axes):
         return axes.get_figure()
     elif isinstance(axes, np.ndarray):
@@ -936,7 +1001,9 @@ def _get_figure_from_axes(axes):
         else:
             raise ValueError("Elements of multi-dimensional axes must be Axes objects.")
     else:
-        raise ValueError(f"Expected Axes or np.ndarray object, but received {type(axes)}.")
+        raise ValueError(
+            f"Expected Axes or np.ndarray object, but received {type(axes)}."
+        )
 
 
 def _get_axis(axis, dim: int = 1):
@@ -957,11 +1024,13 @@ def _get_axis(axis, dim: int = 1):
         A valid axis.
     """
     from matplotlib.axes import Axes  # lazy import
+
     if isinstance(axis, Axes):
         return axis
     elif axis is None:
         figsize = _get_figure_config(dim, 1, False, False, False)["figsize"]
         import matplotlib.pyplot as plt  # lazy import
+
         fig, ax = plt.subplots(figsize=(figsize[0] / dim, figsize[1]))
         return ax
     else:
@@ -981,6 +1050,7 @@ def _verify_axes(axes, nrows: int, ncols: int):
         Expected number of columns.
     """
     from matplotlib.axes import Axes  # lazy import
+
     if not (isinstance(axes, Axes) or isinstance(axes, np.ndarray)):
         raise ValueError(f"Expected Axes or np.ndarray, but received {type(axes)}.")
     axes_shape_is_valid = False
@@ -992,10 +1062,14 @@ def _verify_axes(axes, nrows: int, ncols: int):
         if len(axes.shape) == 2 and axes.shape[0] == nrows and axes.shape[1] == ncols:
             axes_shape_is_valid = True
     if not axes_shape_is_valid:
-        raise ValueError(f"Received Axes object does not match the expected shape ({nrows}, {ncols}).")
+        raise ValueError(
+            f"Received Axes object does not match the expected shape ({nrows}, {ncols})."
+        )
 
 
-def _combine_legend_entries_for_samples(handles: list, labels: list) -> tuple[list, list]:
+def _combine_legend_entries_for_samples(
+    handles: list, labels: list
+) -> tuple[list, list]:
     """Combines legend entries for feasible and infeasible samples.
 
     Parameters
