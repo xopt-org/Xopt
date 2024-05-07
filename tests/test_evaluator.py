@@ -3,7 +3,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import numpy as np
 import pandas as pd
 
-from xopt import Evaluator
+from xopt import Evaluator, Xopt
+from xopt.generators import RandomGenerator
 from xopt.vocs import VOCS
 
 
@@ -135,3 +136,29 @@ class TestEvaluator:
         executor = ProcessPoolExecutor(max_workers=MAX_WORKERS)
         ev = Evaluator(function=self.f, executor=executor, max_workers=MAX_WORKERS)
         ev.evaluate_data(in10)
+
+    def test_evaluate_return_types(self):
+        def a(input):
+            return {"f": 1.0}
+
+        def b(input):
+            return {"f": [1.0]}
+
+        def c(input):
+            return {"f": np.array(1.0)}
+
+        def d(input):
+            return {"f": [1.0, 1.0]}
+
+        def e(input):
+            return {"f": np.ones(3)}
+
+        vocs = VOCS(variables={"x": [0, 1]}, objectives={"f": "MINIMIZE"})
+
+        for func in [a, b, c, d, e]:
+            evaluator = Evaluator(function=func)
+            generator = RandomGenerator(vocs=vocs)
+
+            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+
+            X.random_evaluate(5)

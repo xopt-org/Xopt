@@ -545,7 +545,15 @@ class VOCS(XoptBaseModel):
                 "cannot select best point when n_objectives is not 1"
             )
 
+        if data.empty:
+            raise RuntimeError("cannot select best point if dataframe is empty")
+
         feasible_data = self.feasibility_data(data)
+        if feasible_data.empty:
+            raise RuntimeError(
+                "cannot select best point if no points satisfy the given constraints"
+            )
+
         ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
         obj = self.objectives[self.objective_names[0]]
         obj_name = self.objective_names[0]
