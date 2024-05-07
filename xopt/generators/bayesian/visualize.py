@@ -635,8 +635,8 @@ def _plot2d_prediction(
     kwargs = locals()
     axis.locator_params(axis="both", nbins=5)
     pcm = axis.pcolormesh(
-        input_mesh[:, 0].reshape(n_grid, n_grid).numpy(),
-        input_mesh[:, 1].reshape(n_grid, n_grid).numpy(),
+        input_mesh[:, vocs.variable_names.index(variable_names[0])].reshape(n_grid, n_grid).numpy(),
+        input_mesh[:, vocs.variable_names.index(variable_names[1])].reshape(n_grid, n_grid).numpy(),
         prediction.reshape(n_grid, n_grid),
         rasterized=True,
     )
