@@ -242,6 +242,14 @@ class TestVOCS(object):
         assert idx == 1
         assert val == 0.1
 
+        # test error handling
+        with pytest.raises(RuntimeError):
+            vocs.select_best(pd.DataFrame())
+
+        vocs.constraints = {"c1": ["GREATER_THAN", 10.5]}
+        with pytest.raises(RuntimeError):
+            vocs.select_best(pd.DataFrame())
+
     @pytest.mark.filterwarnings("ignore: All-NaN axis encountered")
     def test_cumulative_optimum(self):
         vocs = deepcopy(TEST_VOCS_BASE)
