@@ -102,7 +102,7 @@ def visualize_virtual_objective(
     # get virtual objective (sample) values
     bounds = generator._get_optimization_bounds()
     kwargs = kwargs if kwargs else {}
-    objective_values = generator.algorithm.evaluate_objective(
+    objective_values = generator.algorithm.evaluate_virtual_objective(
         bax_model, x, bounds, tkwargs=generator._tkwargs, n_samples=n_samples, **kwargs
     )
 
