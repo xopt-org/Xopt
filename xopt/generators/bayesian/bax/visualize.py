@@ -104,7 +104,7 @@ def visualize_virtual_objective(
     kwargs = kwargs if kwargs else {}
     objective_values = generator.algorithm.evaluate_objective(
         bax_model, x, bounds, tkwargs=generator._tkwargs, n_samples=n_samples, **kwargs
-    )[0]
+    )
 
     # get sample stats
     objective_med = objective_values.nanmedian(dim=0)[0].flatten()

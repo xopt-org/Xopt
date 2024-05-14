@@ -78,19 +78,19 @@ class GridMinimize(GridScanAlgorithm):
         test_points = self.create_mesh(bounds).to(model.models[0].train_targets)
 
         # get samples of the model posterior at mesh points
-        objective_values = self.evaluate_objective(
+        posterior_samples = self.evaluate_objective(
             model, test_points, bounds, self.n_samples
         )
 
         # get points that minimize each sample (execution paths)
-        y_min, min_idx = torch.min(objective_values, dim=-2)
+        y_min, min_idx = torch.min(posterior_samples, dim=-2)
         min_idx = min_idx.squeeze()
         x_min = test_points[min_idx]
 
         # collect secondary results in a dict
         results_dict = {
             "test_points": test_points,
-            "objective_values": objective_values,
+            "posterior_samples": posterior_samples,
             "execution_paths": torch.hstack((x_min, y_min)),
         }
 
