@@ -22,7 +22,7 @@ class Algorithm(XoptBaseModel, ABC):
         pass
 
     @abstractmethod
-    def evaluate_objective(
+    def evaluate_virtual_objective(
         self,
         model: Model,
         x: Tensor,
@@ -78,7 +78,7 @@ class GridMinimize(GridScanAlgorithm):
         test_points = self.create_mesh(bounds).to(model.models[0].train_targets)
 
         # get samples of the model posterior at mesh points
-        posterior_samples = self.evaluate_objective(
+        posterior_samples = self.evaluate_virtual_objective(
             model, test_points, bounds, self.n_samples
         )
 
@@ -97,7 +97,7 @@ class GridMinimize(GridScanAlgorithm):
         # return execution paths
         return x_min.unsqueeze(-2), y_min.unsqueeze(-2), results_dict
 
-    def evaluate_objective(
+    def evaluate_virtual_objective(
         self,
         model: Model,
         x: Tensor,
