@@ -6,7 +6,7 @@ repos:
       entry: ufmt format
       language: python
       require_serial: true
-      exclude: "(\\.ipynb|\\.yml)"
+      exclude: "(\\.ipynb|\\.yml|\\.txt)"
 
     - id: flake8
       name: flake8
