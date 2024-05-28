@@ -1,3 +1,5 @@
+import warnings
+from copy import deepcopy
 from enum import Enum
 from typing import Any, Dict, List, Union
 
@@ -67,8 +69,13 @@ class VOCS(XoptBaseModel):
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
 
+    @field_validator("variables")
+    def correct_bounds_specification(cls, v):
+        validate_variable_bounds(v)
+        return v
+
     @field_validator("constraints")
-    def coorect_list_types(cls, v):
+    def correct_list_types(cls, v):
         """make sure that constraint list types are correct"""
         for _, item in v.items():
             if not isinstance(item[0], str):
@@ -192,11 +199,11 @@ class VOCS(XoptBaseModel):
         return len(self.output_names)
 
     def random_inputs(
-        self,
-        n: int = None,
-        custom_bounds: dict = None,
-        include_constants: bool = True,
-        seed: int = None,
+            self,
+            n: int = None,
+            custom_bounds: dict = None,
+            include_constants: bool = True,
+            seed: int = None,
     ) -> list[dict]:
         """
         Uniform sampling of the variables.
@@ -219,16 +226,43 @@ class VOCS(XoptBaseModel):
 
         # get bounds
         # if custom_bounds is specified then they will be clipped inside
-        # vocs variable bounds
+        # vocs variable bounds -- raise a warning in this case
         if custom_bounds is None:
             bounds = self.variables
         else:
             variable_bounds = pd.DataFrame(self.variables)
+
+            # check type
+            if not isinstance(custom_bounds, dict):
+                raise TypeError("`custom_bounds` must be a dict")
+
+            # check custom bounds validity
+            try:
+                validate_variable_bounds(custom_bounds)
+            except ValueError:
+                raise ValueError("specified `custom_bounds` not valid")
+
+            old_custom_bounds = deepcopy(custom_bounds)
+
             custom_bounds = pd.DataFrame(custom_bounds)
             custom_bounds = custom_bounds.clip(
                 variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
             )
             bounds = custom_bounds.to_dict()
+
+            # check to make sure clipped values are not equal -- if not custom_bounds
+            # are not inside vocs bounds
+            for name, value in bounds.items():
+                if value[0] == value[1]:
+                    raise ValueError(f"specified `custom_bounds` for {name} is "
+                                     f"outside vocs domain")
+
+            # if clipping was used then raise a warning
+            if bounds != old_custom_bounds:
+                warnings.warn(
+                    "custom bounds were clipped by vocs bounds", RuntimeWarning
+                )
+
             for k in bounds.keys():
                 bounds[k] = [bounds[k][i] for i in range(2)]
 
@@ -247,7 +281,7 @@ class VOCS(XoptBaseModel):
             return pd.DataFrame(inputs).to_dict("records")
 
     def convert_dataframe_to_inputs(
-        self, data: pd.DataFrame, include_constants=True
+            self, data: pd.DataFrame, include_constants=True
     ) -> pd.DataFrame:
         """
         Extracts only inputs from a dataframe.
@@ -272,7 +306,7 @@ class VOCS(XoptBaseModel):
         return inner_copy
 
     def convert_numpy_to_inputs(
-        self, inputs: np.ndarray, include_constants=True
+            self, inputs: np.ndarray, include_constants=True
     ) -> pd.DataFrame:
         """
         convert 2D numpy array to list of dicts (inputs) for evaluation
@@ -285,9 +319,9 @@ class VOCS(XoptBaseModel):
 
     # Extract optimization data (in correct column order)
     def variable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "variable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing variables according to `vocs.variables` in sorted
@@ -308,10 +342,10 @@ class VOCS(XoptBaseModel):
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "objective_",
-        return_raw=False,
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "objective_",
+            return_raw=False,
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
@@ -332,9 +366,9 @@ class VOCS(XoptBaseModel):
         return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "constraint_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing constraint data transformed according to
@@ -355,9 +389,9 @@ class VOCS(XoptBaseModel):
         return form_constraint_data(self.constraints, data, prefix)
 
     def observable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "observable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "observable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing observable data
@@ -377,9 +411,9 @@ class VOCS(XoptBaseModel):
         return form_observable_data(self.observable_names, data, prefix)
 
     def feasibility_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "feasible_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
@@ -429,8 +463,8 @@ class VOCS(XoptBaseModel):
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
                 normed_data[name] = (
-                    input_points[name] - self.variables[name][0]
-                ) / width
+                                            input_points[name] - self.variables[name][0]
+                                    ) / width
 
         if len(normed_data):
             return pd.DataFrame(normed_data)
@@ -466,7 +500,7 @@ class VOCS(XoptBaseModel):
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
                 denormed_data[name] = (
-                    input_points[name] * width + self.variables[name][0]
+                        input_points[name] * width + self.variables[name][0]
                 )
 
         if len(denormed_data):
@@ -625,7 +659,7 @@ def form_variable_data(variables: Union[Dict, DataFrame], data, prefix="variable
 
 
 def form_objective_data(
-    objectives: Dict, data, prefix="objective_", return_raw: bool = False
+        objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
@@ -807,3 +841,15 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         raise ValueError(
             f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
         )
+
+
+def validate_variable_bounds(variable_dict: Dict[str, List[float]]):
+    """
+    Check to make sure that bounds for variables are specified correctly. Raises
+    ValueError if anything is incorrect
+    """
+
+    for name, value in variable_dict.items():
+        if not value[1] > value[0]:
+            raise ValueError(f"Bounds specified for `{name}` do not satisfy the "
+                             f"condition value[1] > value[0].")
