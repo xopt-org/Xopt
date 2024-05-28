@@ -159,7 +159,7 @@ class TestVOCS(object):
         # test custom bounds entirely outside the vocs domain or specified incorrectly
         bad_custom_bounds = [
             {"x1": [10.0, 10.75], "x2": [7.5, 15.0]},
-            {"x1": [0.75, 0.5], "x2": [7.5, 15.0]}
+            {"x1": [0.75, 0.5], "x2": [7.5, 15.0]},
         ]
         for ele in bad_custom_bounds:
             with pytest.raises(ValueError):
