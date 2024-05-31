@@ -289,7 +289,11 @@ def explode_all_columns(data: pd.DataFrame):
     for name, val in data.iloc[0].items():
         if isinstance(val, (list, np.ndarray)):
             list_types.append(name)
-            lengths.append(len(val))
+            try:
+                lengths.append(len(val))
+            except TypeError:
+                # handle case when a zero length ndarray is passed
+                lengths.append(1)
     if len(list_types) > 0:
         if len(set(lengths)) > 1:
             raise ValueError("evaluator outputs that are lists must match in size")

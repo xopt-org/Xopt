@@ -21,6 +21,24 @@ class Algorithm(XoptBaseModel, ABC):
     ) -> Tuple[Tensor, Tensor, Dict]:
         pass
 
+    @abstractmethod
+    def evaluate_virtual_objective(
+        self,
+        model: Model,
+        x: Tensor,
+        bounds: Tensor,
+        n_samples: int,
+        tkwargs: dict = None,
+    ) -> Tensor:
+        """
+        Evaluates virtual objective at inputs given by x.
+        Inputs:
+            x: tensor, shape `num_points x ndim`
+        Returns:
+            objective_values: tensor, shape `n_samples x num_points x 1`
+        """
+        pass
+
 
 class GridScanAlgorithm(Algorithm, ABC):
     name = "grid_scan_algorithm"
@@ -60,21 +78,40 @@ class GridMinimize(GridScanAlgorithm):
         test_points = self.create_mesh(bounds).to(model.models[0].train_targets)
 
         # get samples of the model posterior at mesh points
-        with torch.no_grad():
-            post = model.posterior(test_points)
-            post_samples = post.rsample(torch.Size([self.n_samples]))
+        posterior_samples = self.evaluate_virtual_objective(
+            model, test_points, bounds, self.n_samples
+        )
 
         # get points that minimize each sample (execution paths)
-        y_min, min_idx = torch.min(post_samples, dim=-2)
+        y_min, min_idx = torch.min(posterior_samples, dim=-2)
         min_idx = min_idx.squeeze()
         x_min = test_points[min_idx]
 
         # collect secondary results in a dict
         results_dict = {
             "test_points": test_points,
-            "posterior_samples": post_samples,
+            "posterior_samples": posterior_samples,
             "execution_paths": torch.hstack((x_min, y_min)),
         }
 
         # return execution paths
         return x_min.unsqueeze(-2), y_min.unsqueeze(-2), results_dict
+
+    def evaluate_virtual_objective(
+        self,
+        model: Model,
+        x: Tensor,
+        bounds: Tensor,
+        n_samples: int,
+        tkwargs: dict = None,
+    ) -> Tensor:
+        """Evaluate virtual objective (samples)"""
+
+        tkwargs = tkwargs if tkwargs else {"dtype": torch.double, "device": "cpu"}
+
+        # get samples of the model posterior at inputs given by x
+        with torch.no_grad():
+            post = model.posterior(x)
+            objective_values = post.rsample(torch.Size([n_samples]))
+
+        return objective_values

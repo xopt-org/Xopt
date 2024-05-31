@@ -60,7 +60,8 @@ usage.
 [Xopt Built-In Generators](algorithms.md) provides a list of available algorithms 
 implemented in the Xopt ```Generator``` framework.
 
-[Simple Bayesian Optimization Example](examples/bayes_opt/bo_tutorial.ipynb) shows 
+[Simple Bayesian Optimization Example](examples/single_objective_bayes_opt/bo_tutorial.ipynb) 
+shows 
 Xopt usage for a simple optimization problem.
 
 [Xopt IPAC23 paper](https://accelconf.web.cern.ch/ipac2023/pdf/THPL164.pdf) summarizes the usage of Xopt in particle accelerator physics problems. 

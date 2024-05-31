@@ -378,6 +378,11 @@ class BayesianGenerator(Generator, ABC):
             # get bounds for each fixed_feature (vocs bounds take precedent)
             for key in self.fixed_features:
                 if key not in variable_bounds:
+                    if key not in data:
+                        raise KeyError(
+                            "generator data needs to contain fixed feature "
+                            f"column name `{key}`"
+                        )
                     f_data = data[key]
                     bounds = [f_data.min(), f_data.max()]
                     if bounds[1] - bounds[0] < 1e-8:
@@ -548,27 +553,20 @@ class BayesianGenerator(Generator, ABC):
         pass
 
     def _get_objective(self):
-        """return default objective (scalar objective) determined by vocs or if defined in custom_objective"""
-        # check to make sure that if we specify a custom objective that no objectives are specified in vocs
-        if self.custom_objective is not None:
-            if self.vocs.n_objectives:
-                raise RuntimeError("cannot specify objectives in VOCS "
-                                   "and a custom objective for the generator at the same time")
+        """
+        return default objective (scalar objective) determined by vocs
 
-            return self.custom_objective
-        else:
-            return create_mc_objective(self.vocs, self._tkwargs)
+        If objectives are specified the returned function will weight model
+        by +/- 1.0 according to MAXIMIZE/MINIMIZE keys in vocs.
 
-    def _calculate_objective(self):
-        """ calculate the objective values for the data set using the botorch objective"""
-        # convert dataframe to pytorch tensor
-        d = torch.tensor(self.vocs.observable_data(self.data).to_numpy("float"))
+        If no objectives are specified, the returned function will weight observable
+        models by +1.0. This is used in Bayesian exploration.
 
-
-
+        """
+        return create_mc_objective(self.vocs, self._tkwargs)
 
     def _get_constraint_callables(self):
-        """return default objective (scalar objective) determined by vocs"""
+        """return constratint callable determined by vocs"""
         constraint_callables = create_constraint_callables(self.vocs)
         if len(constraint_callables) == 0:
             constraint_callables = None
@@ -774,7 +772,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         n_objectives = self.vocs.n_objectives
         weights = torch.zeros(n_objectives)
-        weights = set_botorch_weights(weights, self.vocs)
+        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
         objective_data = objective_data * weights
 
         # compute hypervolume

@@ -13,7 +13,6 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
-from xopt.generators.bayesian.objectives import create_exploration_objective
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
@@ -38,12 +37,6 @@ class BayesianExplorationGenerator(BayesianGenerator):
 
         return qPV
 
-    def _get_objective(self):
-        """return exploration objective, which only captures the output of the first
-        model output"""
-
-        return create_exploration_objective(self.vocs, self._tkwargs)
-
 
 class qPosteriorVariance(MCAcquisitionFunction):
     def __init__(
@@ -55,7 +48,8 @@ class qPosteriorVariance(MCAcquisitionFunction):
         X_pending: Optional[Tensor] = None,
     ) -> None:
         r"""q-Upper Confidence Bound.
-        Args:
+        Parameters
+        ----------
             model: A fitted model.
             sampler: The sampler used to draw base samples. Defaults to
                 `SobolQMCNormalSampler(num_samples=512, collapse_batch_dims=True)`
@@ -79,10 +73,13 @@ class qPosteriorVariance(MCAcquisitionFunction):
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
         r"""Evaluate qUpperConfidenceBound on the candidate set `X`.
-        Args:
+        Parameters
+        ----------
             X: A `batch_sahpe x q x d`-dim Tensor of t-batches with `q` `d`-dim design
                 points each.
-        Returns:
+
+        Returns
+        -------
             A `batch_shape'`-dim Tensor of Upper Confidence Bound values at the given
             design points `X`, where `batch_shape'` is the broadcasted batch shape of
             model and input `X`.

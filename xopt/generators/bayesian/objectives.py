@@ -48,7 +48,7 @@ def constraint_function(Z, vocs, name):
 
 def create_constraint_callables(vocs):
     if vocs.constraints is not None:
-        constraint_names = list(vocs.constraints.keys())
+        constraint_names = vocs.constraint_names
         constraint_callables = []
         for name in constraint_names:
             constraint_callables += [
@@ -69,37 +69,23 @@ def create_mc_objective(vocs, tkwargs):
     create the objective object
 
     """
-    n_outputs = vocs.n_outputs
-    weights = torch.zeros(n_outputs).to(**tkwargs)
+    weights = set_botorch_weights(vocs)
 
-    weights = set_botorch_weights(weights, vocs)
-
-    def obj_callable(Z):
+    def obj_callable(Z, X=None):
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
     return GenericMCObjective(obj_callable)
 
 
-def create_exploration_objective(vocs, tkwargs):
-    n_outputs = vocs.n_outputs
-    weights = torch.zeros(n_outputs).to(**tkwargs)
-    weights[0] = 1.0
-
-    def obj_callable(Z):
-        return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
-
-    return GenericMCObjective(obj_callable)
-
-
-def create_mobo_objective(vocs, tkwargs):
+def create_mobo_objective(vocs):
     """
     botorch assumes maximization so we need to negate any objectives that have
     minimize keyword and zero out anything that is a constraint
     """
-    n_objectives = vocs.n_objectives
-    weights = torch.zeros(n_objectives).to(**tkwargs)
-    weights = set_botorch_weights(weights, vocs)
+    output_names = vocs.output_names
+    objective_indicies = [output_names.index(name) for name in vocs.objectives]
+    weights = set_botorch_weights(vocs)[objective_indicies]
 
     return WeightedMCMultiOutputObjective(
-        weights, outcomes=list(range(vocs.n_objectives)), num_outcomes=vocs.n_objectives
+        weights, outcomes=objective_indicies, num_outcomes=vocs.n_objectives
     )
