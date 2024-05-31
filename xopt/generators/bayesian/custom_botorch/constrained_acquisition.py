@@ -18,8 +18,8 @@ class FeasibilityObjective(GenericMCObjective):
         infeasible_cost: float = 0.0,
         eta: float = 1e-3,
     ) -> None:
-        def ones_callable(X):
-            return torch.ones(X.shape[:-1])
+        def ones_callable(Z, X=None):
+            return torch.ones(Z.shape[:-1])
 
         super().__init__(objective=ones_callable)
         self.constraints = constraints
@@ -29,7 +29,8 @@ class FeasibilityObjective(GenericMCObjective):
     def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate the feasibility-weighted objective on the samples.
 
-        Args:
+        Parameters
+        ----------
             samples: A `sample_shape x batch_shape x q x m`-dim Tensors of
                 samples from a model posterior.
             X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if

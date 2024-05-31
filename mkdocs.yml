@@ -11,7 +11,11 @@ nav:
             - examples/basic/xopt_basic.ipynb
             - examples/basic/xopt_parallel.ipynb
             - examples/basic/xopt_vocs.ipynb
+            - examples/basic/xopt_evaluator.ipynb
+            - examples/basic/xopt_generator.ipynb
         - Bayesian:
+            - Gaussian Process Model Creation:
+                - Basic example: examples/gp_model_creation/model_creation.ipynb
             - Bayesian Exploration:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
