@@ -29,7 +29,7 @@ from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
-    create_mc_objective,
+    create_mc_objective, CustomXoptObjective,
 )
 from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
@@ -159,6 +159,9 @@ class BayesianGenerator(Generator, ABC):
     log_transform_acquisition_function: Optional[bool] = Field(
         False,
         description="flag to log transform the acquisition function before optimization",
+    )
+    custom_objective: Optional[CustomXoptObjective] = Field(
+        None, description="custom objective for optimization, replaces objective specified by VOCS"
     )
     n_interpolate_points: Optional[PositiveInt] = None
 
@@ -545,8 +548,24 @@ class BayesianGenerator(Generator, ABC):
         pass
 
     def _get_objective(self):
-        """return default objective (scalar objective) determined by vocs"""
-        return create_mc_objective(self.vocs, self._tkwargs)
+        """return default objective (scalar objective) determined by vocs or if defined in custom_objective"""
+        # check to make sure that if we specify a custom objective that no objectives are specified in vocs
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
+                raise RuntimeError("cannot specify objectives in VOCS "
+                                   "and a custom objective for the generator at the same time")
+
+            return self.custom_objective
+        else:
+            return create_mc_objective(self.vocs, self._tkwargs)
+
+    def _calculate_objective(self):
+        """ calculate the objective values for the data set using the botorch objective"""
+        # convert dataframe to pytorch tensor
+        d = torch.tensor(self.vocs.observable_data(self.data).to_numpy("float"))
+
+
+
 
     def _get_constraint_callables(self):
         """return default objective (scalar objective) determined by vocs"""

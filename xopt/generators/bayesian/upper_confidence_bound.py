@@ -12,6 +12,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
+from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.utils import set_botorch_weights
 
@@ -51,7 +52,8 @@ beta : float, default 2.0
             )
 
     def _get_acquisition(self, model):
-        if self.n_candidates > 1:
+        objective = self._get_objective()
+        if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
             # MC sampling for generating multiple candidate points
             sampler = self._get_sampler(model)
             acq = qUpperConfidenceBound(
