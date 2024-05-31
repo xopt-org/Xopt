@@ -76,35 +76,31 @@ def get_generator_dynamic(name: str):
                 "WARNING: `scipy` not found, NelderMeadGenerator and LatinHypercubeGenerator are not available"
             )
     elif name in all_generator_names["bo"]:
-        try:
-            from xopt.generators.bayesian.bayesian_exploration import (
-                BayesianExplorationGenerator,
-            )
-            from xopt.generators.bayesian.expected_improvement import (
-                ExpectedImprovementGenerator,
-            )
-            from xopt.generators.bayesian.mobo import MOBOGenerator
-            from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
-            from xopt.generators.bayesian.upper_confidence_bound import (
-                TDUpperConfidenceBoundGenerator,
-                UpperConfidenceBoundGenerator,
-            )
+        from xopt.generators.bayesian.bayesian_exploration import (
+            BayesianExplorationGenerator,
+        )
+        from xopt.generators.bayesian.expected_improvement import (
+            ExpectedImprovementGenerator,
+        )
+        from xopt.generators.bayesian.mobo import MOBOGenerator
+        from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
+        from xopt.generators.bayesian.upper_confidence_bound import (
+            TDUpperConfidenceBoundGenerator,
+            UpperConfidenceBoundGenerator,
+        )
 
-            registered_generators = [
-                UpperConfidenceBoundGenerator,
-                MOBOGenerator,
-                BayesianExplorationGenerator,
-                TDUpperConfidenceBoundGenerator,
-                ExpectedImprovementGenerator,
-                MultiFidelityGenerator,
-            ]
-            for gen in registered_generators:
-                generators[gen.name] = gen
-            return generators[name]
-        except ModuleNotFoundError:
-            warnings.warn(
-                "WARNING: `botorch` not found, Bayesian generators are not available"
-            )
+        registered_generators = [
+            UpperConfidenceBoundGenerator,
+            MOBOGenerator,
+            BayesianExplorationGenerator,
+            TDUpperConfidenceBoundGenerator,
+            ExpectedImprovementGenerator,
+            MultiFidelityGenerator,
+        ]
+        for gen in registered_generators:
+            generators[gen.name] = gen
+        return generators[name]
+
     elif name in all_generator_names["ga"]:
         try:
             from xopt.generators.ga import CNSGAGenerator

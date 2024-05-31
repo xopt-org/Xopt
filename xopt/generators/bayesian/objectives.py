@@ -1,14 +1,21 @@
+from abc import ABC
 from functools import partial
-
 import torch
-from botorch.acquisition import GenericMCObjective
+from botorch.acquisition import GenericMCObjective, MCAcquisitionObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
+from xopt import VOCS
 
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     FeasibilityObjective,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
+
+
+class CustomXoptObjective(MCAcquisitionObjective, ABC):
+    def __init__(self, vocs: VOCS, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.vocs = vocs
 
 
 def feasibility(X, model, vocs, posterior_transform=None):

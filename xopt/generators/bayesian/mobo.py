@@ -1,8 +1,6 @@
 from botorch.acquisition import FixedFeatureAcquisitionFunction
 from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
-from botorch.acquisition.multi_objective.logei import (
-    qLogNoisyExpectedHypervolumeImprovement,
-)
+from botorch.acquisition.multi_objective.logei import qLogNoisyExpectedHypervolumeImprovement
 
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
 

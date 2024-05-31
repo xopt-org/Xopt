@@ -9,6 +9,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
+from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
@@ -24,15 +25,16 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     def _get_acquisition(self, model):
         objective_data = self.vocs.objective_data(self.data, "").dropna()
         best_f = -torch.tensor(objective_data.min().values, **self._tkwargs)
+        objective = self._get_objective()
 
-        if self.n_candidates > 1:
+        if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
             # MC sampling for generating multiple candidate points
             sampler = self._get_sampler(model)
             acq = qExpectedImprovement(
                 model,
                 best_f=best_f,
                 sampler=sampler,
-                objective=self._get_objective(),
+                objective=objective,
             )
         else:
             # analytic acquisition function for single candidate generation
