@@ -40,11 +40,11 @@ class Generator(XoptBaseModel, ABC):
 
     _is_done = False
 
-    #@field_validator("vocs", mode="after")
-    #def validate_vocs(cls, v, info: ValidationInfo):
-    #    if v.n_objectives != 1 and not info.data["supports_multi_objective"]:
-    #        raise ValueError("this generator only supports single objective")
-    #    return v
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+            raise ValueError("this generator only supports single objective")
+        return v
 
     @field_validator("data", mode="before")
     def validate_data(cls, v):

@@ -7,6 +7,7 @@ from botorch.acquisition import ExpectedImprovement
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
+from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 from xopt.vocs import ObjectiveEnum, VOCS
 
@@ -60,6 +61,28 @@ class TestExpectedImprovement:
         # now use bayes opt
         for _ in range(1):
             xopt.step()
+
+    def test_custom_objectives(self):
+        train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
+        train_y = torch.sin(2 * torch.pi * train_x)
+        train_c = torch.cos(2 * torch.pi * train_x)
+        train_data = pd.DataFrame(
+            {"x1": train_x.numpy(), "y1": train_y.numpy(), "c1": train_c.numpy()}
+        )
+        vocs = VOCS(**{"variables": {"x1": [0.0, 1.0]}, "observables": ["y1", "c1"]})
+
+        class MyObjective(CustomXoptObjective):
+            def forward(self, samples, X=None):
+                return samples[..., self.vocs.output_names.index("y1")] ** 2
+
+        generator = ExpectedImprovementGenerator(
+            vocs=vocs, custom_objective=MyObjective(vocs)
+        )
+        generator.add_data(train_data)
+        best_f = generator._get_best_f(generator.data, generator.custom_objective)
+        assert float(best_f) == float(torch.max(train_y**2))
+
+        generator.generate(1)
 
     def test_acquisition_accuracy(self):
         train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
