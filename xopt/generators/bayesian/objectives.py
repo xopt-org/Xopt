@@ -1,9 +1,11 @@
 from abc import ABC
 from functools import partial
+
 import torch
 from botorch.acquisition import GenericMCObjective, MCAcquisitionObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
+
 from xopt import VOCS
 
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
