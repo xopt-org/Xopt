@@ -4,8 +4,8 @@ from xopt import VOCS
 
 """
 C.A. Floudas, P.M. Pardalos
-A Collection of Test Problems for Constrained 
-Global Optimization Algorithms, vol. 455, 
+A Collection of Test Problems for Constrained
+Global Optimization Algorithms, vol. 455,
 Springer Science & Business Media (1990)
 """
 
@@ -18,7 +18,7 @@ variables = {
     "x6": [0, 100],
     "x7": [0, 200],
     "x8": [0, 100],
-    "x9": [0, 200]
+    "x9": [0, 200],
 }
 objectives = {"f": "MAXIMIZE"}
 tol = 0.5
@@ -27,15 +27,11 @@ constraints = {
     "h2": ["LESS_THAN", tol],
     "h3": ["LESS_THAN", tol],
     "h4": ["LESS_THAN", tol],
-    #"g1": ["LESS_THAN", 0.0],
-    #"g2": ["LESS_THAN", 0.0]
+    # "g1": ["LESS_THAN", 0.0],
+    # "g2": ["LESS_THAN", 0.0]
 }
 
-vocs_haverly = VOCS(
-    variables=variables,
-    objectives=objectives,
-    constraints=constraints
-)
+vocs_haverly = VOCS(variables=variables, objectives=objectives, constraints=constraints)
 
 
 def evaluate_haverly(input_dict):
@@ -56,7 +52,7 @@ def evaluate_haverly(input_dict):
         "h3": np.abs(x2 - x6 - x8) / 100,
         "h4": np.abs(x9 * x7 + x9 * x8 - 3 * x3 - x4) / 10000,
         "g1": (x9 * x7 + 2 * x5 - 2.5 * x1) / 1000,
-        "g2": (x9 * x8 + 2 * x6 - 1.5 * x2) / 1000
+        "g2": (x9 * x8 + 2 * x6 - 1.5 * x2) / 1000,
     }
     result["f"] = result["f"] / 1000.0
 
