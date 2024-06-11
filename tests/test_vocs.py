@@ -1,3 +1,4 @@
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -21,6 +22,12 @@ class TestVOCS(object):
         assert vocs.n_inputs == 1
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
+
+    def test_variable_validation(self):
+        with pytest.raises(ValidationError):
+            VOCS(
+                variables={"x": [1, 0]},
+            )
 
     def test_empty_objectives(self):
         VOCS(
@@ -125,17 +132,38 @@ class TestVOCS(object):
         assert vocs.n_outputs == 2
         assert vocs.variable_names == ["x1"]
 
-    def test_custom_bounds(self):
+    def test_random_sampling_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)
 
         custom_bounds = {"x1": [0.5, 0.75], "x2": [7.5, 15.0]}
 
-        random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+        with pytest.warns(RuntimeWarning):
+            random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+
         random_input_data = pd.DataFrame(random_input_data)
         assert all(random_input_data["x1"] < 0.75)
         assert all(random_input_data["x1"] > 0.5)
         assert all(random_input_data["x2"] > 7.5)
         assert all(random_input_data["x2"] < 10.0)
+
+        # test custom bounds within the vocs domain -- no warnings should be raised
+        in_domain_custom_bounds = {"x1": [0.5, 0.75], "x2": [0.5, 0.75]}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            vocs.random_inputs(100, custom_bounds=in_domain_custom_bounds)
+
+        # test wrong type
+        with pytest.raises(TypeError):
+            vocs.random_inputs(100, custom_bounds=1)
+
+        # test custom bounds entirely outside the vocs domain or specified incorrectly
+        bad_custom_bounds = [
+            {"x1": [10.0, 10.75], "x2": [7.5, 15.0]},
+            {"x1": [0.75, 0.5], "x2": [7.5, 15.0]},
+        ]
+        for ele in bad_custom_bounds:
+            with pytest.raises(ValueError):
+                vocs.random_inputs(100, custom_bounds=ele)
 
     def test_duplicate_outputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
