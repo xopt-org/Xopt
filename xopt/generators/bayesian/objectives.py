@@ -1,14 +1,53 @@
+from abc import ABC, abstractmethod
 from functools import partial
+from typing import Optional
 
 import torch
-from botorch.acquisition import GenericMCObjective
+from botorch.acquisition import GenericMCObjective, MCAcquisitionObjective
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
+from torch import Tensor
+
+from xopt import VOCS
 
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     FeasibilityObjective,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
+
+
+class CustomXoptObjective(MCAcquisitionObjective, ABC):
+    """
+    Custom objective function wrapper for use in Bayesian generators
+
+    """
+
+    def __init__(self, vocs: VOCS, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.vocs = vocs
+
+    @abstractmethod
+    def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate the objective on the samples.
+
+        Args:
+            samples: A `sample_shape x batch_shape x q x m`-dim Tensors of
+                samples from a model posterior.
+            X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if
+                the objective depends on the inputs explicitly.
+
+        Returns:
+            Tensor: A `sample_shape x batch_shape x q`-dim Tensor of objective
+            values (assuming maximization).
+
+        This method is usually not called directly, but via the objectives.
+
+        Example:
+            >>> # `__call__` method:
+            >>> samples = sampler(posterior)
+            >>> outcome = mc_obj(samples)
+        """
+        pass
 
 
 def feasibility(X, model, vocs, posterior_transform=None):
