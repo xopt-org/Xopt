@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-from numpy import asfarray
 from pydantic import ConfigDict, Field, field_validator
 
 from xopt.generator import Generator
