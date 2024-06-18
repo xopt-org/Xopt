@@ -346,7 +346,7 @@ def _neldermead_generator(
             warnings.warn("Initial guess is not within the specified bounds")
 
     if stage == -1:
-        x0 = asfarray(x0).flatten()
+        x0 = np.array(x0, dtype=float).flatten()
 
         nonzdelt = 0.05
         zdelt = 0.00025
