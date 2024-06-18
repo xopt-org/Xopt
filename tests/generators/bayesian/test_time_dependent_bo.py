@@ -32,7 +32,7 @@ class TestTimeDependentBO:
         model = gen.train_model(test_data)
 
         # make sure time data is in the last model
-        assert np.alltrue(
+        assert np.all(
             model.models[-1]
             .input_transform.untransform(model.models[-1].train_inputs[0])[:, -1]
             .numpy()
