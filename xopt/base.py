@@ -238,7 +238,7 @@ class Xopt(XoptBaseModel):
 
         # generate samples and submit to evaluator
         logger.debug(f"Generating {n_generate} candidates")
-        new_samples = self.generator.generate(n_generate)
+        new_samples = self.generator.ask(n_generate)
 
         if new_samples is not None:
             # Evaluate data
@@ -366,7 +366,7 @@ class Xopt(XoptBaseModel):
             if new_data.index.dtype != np.int64:
                 new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
-        self.generator.add_data(new_data)
+        self.generator.tell(new_data.to_dict(orient="records"))
 
     def reset_data(self):
         """
