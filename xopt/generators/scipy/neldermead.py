@@ -366,7 +366,7 @@ def _neldermead_generator(
                     y[k] = zdelt
                 sim[k + 1] = y
         else:
-            sim = np.asfarray(initial_simplex).copy()
+            sim = np.array(initial_simplex, dtype=float).copy()
             if sim.ndim != 2 or sim.shape[0] != sim.shape[1] + 1:
                 raise ValueError(
                     "`initial_simplex` should be an array of shape (N+1,N)"
