@@ -46,4 +46,3 @@ class PIDGenerator(Generator):
 
         return [{self.vocs.variable_names[0]: control_value}]
 
-    
