@@ -118,3 +118,37 @@ class GridOptimize(GridScanAlgorithm):
             objective_values = post.rsample(torch.Size([n_samples]))
 
         return objective_values
+
+
+class CurvatureGridOptimize(GridOptimize):
+    use_mean: bool = False
+
+    def evaluate_virtual_objective(
+        self,
+        model: Model,
+        x: Tensor,
+        bounds: Tensor,
+        n_samples: int,
+        tkwargs: dict = None,
+    ) -> Tensor:
+        """Evaluate virtual objective (samples)"""
+
+        # get samples of the model posterior at inputs given by x
+        with torch.no_grad():
+            post = model.posterior(x)
+            if self.use_mean:
+                objective_values = post.mean.unsqueeze(0)
+            else:
+                objective_values = post.rsample(torch.Size([n_samples]))
+
+        # pad sides with a single value on left and right
+        # zero second order gradient at edges
+        padding = (0, 0, 1, 1)  # e.g., padding with 1 value on both left and right
+        objective_values = torch.nn.functional.pad(
+            objective_values, padding, mode="replicate"
+        )
+        objective_values = torch.diff(objective_values, 2, dim=-2)
+        objective_values[:, 0] = 0
+        objective_values[:, -1] = 0
+
+        return objective_values
