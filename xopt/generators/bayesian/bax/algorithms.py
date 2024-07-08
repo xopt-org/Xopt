@@ -63,11 +63,12 @@ class GridScanAlgorithm(Algorithm, ABC):
         return mesh_pts
 
 
-class GridMinimize(GridScanAlgorithm):
+class GridOptimize(GridScanAlgorithm):
     observable_names_ordered: List[str] = Field(
         default=["y1"],
         description="names of observable/objective models used in this algorithm",
     )
+    minimize: bool = True
 
     def get_execution_paths(
         self, model: Model, bounds: Tensor
@@ -83,19 +84,23 @@ class GridMinimize(GridScanAlgorithm):
         )
 
         # get points that minimize each sample (execution paths)
-        y_min, min_idx = torch.min(posterior_samples, dim=-2)
-        min_idx = min_idx.squeeze()
-        x_min = test_points[min_idx]
+        if self.minimize:
+            y_opt, opt_idx = torch.min(posterior_samples, dim=-2)
+        else:
+            y_opt, opt_idx = torch.max(posterior_samples, dim=-2)
+
+        opt_idx = opt_idx.squeeze(dim=[-1])
+        x_opt = test_points[opt_idx]
 
         # collect secondary results in a dict
         results_dict = {
             "test_points": test_points,
             "posterior_samples": posterior_samples,
-            "execution_paths": torch.hstack((x_min, y_min)),
+            "execution_paths": torch.hstack((x_opt, y_opt)),
         }
 
         # return execution paths
-        return x_min.unsqueeze(-2), y_min.unsqueeze(-2), results_dict
+        return x_opt.unsqueeze(-2), y_opt.unsqueeze(-2), results_dict
 
     def evaluate_virtual_objective(
         self,
@@ -106,8 +111,6 @@ class GridMinimize(GridScanAlgorithm):
         tkwargs: dict = None,
     ) -> Tensor:
         """Evaluate virtual objective (samples)"""
-
-        tkwargs = tkwargs if tkwargs else {"dtype": torch.double, "device": "cpu"}
 
         # get samples of the model posterior at inputs given by x
         with torch.no_grad():
