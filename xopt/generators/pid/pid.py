@@ -3,18 +3,17 @@ from pydantic_core.core_schema import ValidationInfo
 from simple_pid import PID
 from xopt.generator import Generator
 
+
 class PIDGenerator(Generator):
-    #inputs when creating generator
+    # inputs when creating generator
     target_value: float
     Kp: float = 1.0
     Ki: float = 0.0
     Kd: float = 0.0
-    sim_time: float = 1.0 #set to 0 if not a simulation
+    sim_time: float = 1.0  # set to 0 if not a simulation
 
-    #internal variables
+    # internal variables
     pid: PID = None
-    time: float = 0 #this variable only used in simulations
-
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
@@ -25,7 +24,6 @@ class PIDGenerator(Generator):
             raise ValueError("this generator only supports one observable")
         return v
 
-
     def generate(self, n_candidates) -> list[dict]:
         if self.pid is None:
             self.pid = PID(self.Kp, self.Ki, self.Kd, self.target_value)
@@ -34,15 +32,13 @@ class PIDGenerator(Generator):
         if n_candidates != 1:
             raise NotImplementedError()
 
-        #get the last value
-        last_value = float(self.data[self.vocs.observable_names].iloc[-1,0])
+        # get the last value
+        last_value = float(self.data[self.vocs.observable_names].iloc[-1, 0])
 
-        #run pid controller
-        if self.sim_time>0:
-            self.time += self.sim_time
-            control_value = self.pid(last_value, self.time)
+        # run pid controller
+        if self.sim_time > 0:
+            control_value = self.pid(last_value, self.sim_time)
         else:
             control_value = self.pid(last_value)
 
         return [{self.vocs.variable_names[0]: control_value}]
-
