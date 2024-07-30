@@ -3,12 +3,16 @@ import pickle
 from copy import deepcopy
 from typing import Dict
 
+import torch
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.turbo import EntropyTurboController
+from xopt.generators.bayesian.utils import rectilinear_domain_union, \
+    validate_turbo_controller_base
 
 logger = logging.getLogger()
 
@@ -22,8 +26,17 @@ class BaxGenerator(BayesianGenerator):
     algorithm_results_file: str = Field(
         None, description="file name to save algorithm results at every step"
     )
-
     _n_calls: int = 0
+
+    @field_validator("turbo_controller", mode="before")
+    def validate_turbo_controller(cls, value, info: ValidationInfo):
+        """note default behavior is no use of turbo"""
+        controller_dict = {
+            "entropy": EntropyTurboController,
+        }
+        value = validate_turbo_controller_base(value, controller_dict, info)
+
+        return value
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
@@ -54,3 +67,4 @@ class BaxGenerator(BayesianGenerator):
                 pickle.dump(results, outfile, protocol=pickle.HIGHEST_PROTOCOL)
 
         return eig
+
