@@ -4,8 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Dict, Optional, Union
 
 import torch
-from botorch.models import ModelListGP
-from pandas import DataFrame
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
 from xopt.pydantic import XoptBaseModel
@@ -79,37 +77,44 @@ class TurboController(XoptBaseModel, ABC):
                 )
             )
 
-    def get_trust_region(self, model: ModelListGP):
-        if not isinstance(model, ModelListGP):
-            raise RuntimeError("getting trust region requires a ModelListGP")
-
-        if self.center_x is None:
-            raise RuntimeError("need to set best point first, call `update_state`")
-
-        # get bounds width
+    def get_trust_region(self, generator):
+        model = generator.model
         bounds = torch.tensor(self.vocs.bounds, **self.tkwargs)
-        bound_widths = bounds[1] - bounds[0]
 
-        # Scale the TR to be proportional to the lengthscales of the objective model
-        x_center = torch.tensor(
-            [self.center_x[ele] for ele in self.vocs.variable_names], **self.tkwargs
-        )
-        lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
+        if self.center_x is not None:
+            # get bounds width
+            bound_widths = bounds[1] - bounds[0]
 
-        # calculate the ratios of lengthscales for each axis
-        weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+            # Scale the TR to be proportional to the lengthscales of the objective model
+            x_center = torch.tensor(
+                [self.center_x[ele] for ele in self.vocs.variable_names], **self.tkwargs
+            )
+            lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
 
-        # calculate the tr bounding box
-        tr_lb = torch.clamp(
-            x_center - weights * self.length * bound_widths / 2.0, *bounds
-        )
-        tr_ub = torch.clamp(
-            x_center + weights * self.length * bound_widths / 2.0, *bounds
-        )
-        return torch.cat((tr_lb, tr_ub), dim=0)
+            # calculate the ratios of lengthscales for each axis
+            weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+
+            # calculate the tr bounding box
+            tr_lb = torch.clamp(
+                x_center - weights * self.length * bound_widths / 2.0, *bounds
+            )
+            tr_ub = torch.clamp(
+                x_center + weights * self.length * bound_widths / 2.0, *bounds
+            )
+            return torch.cat((tr_lb, tr_ub), dim=0)
+        else:
+            return bounds
+
+    def update_trust_region(self):
+        if self.success_counter == self.success_tolerance:  # Expand trust region
+            self.length = min(self.scale_factor * self.length, self.length_max)
+            self.success_counter = 0
+        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
+            self.length = max(self.length / self.scale_factor, self.length_min)
+            self.failure_counter = 0
 
     @abstractmethod
-    def update_state(self, data, previous_batch_size: int = 1) -> None:
+    def update_state(self, generator, previous_batch_size: int = 1) -> None:
         pass
 
 
@@ -137,7 +142,8 @@ class OptimizeTurboController(TurboController):
             variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
         )
 
-    def update_state(self, data: DataFrame, previous_batch_size: int = 1) -> None:
+    def update_state(self, generator, previous_batch_size: int = 1) \
+            -> None:
         """
         Update turbo state class using min of data points that are feasible.
         If no points in the data set are feasible raise an error.
@@ -147,7 +153,7 @@ class OptimizeTurboController(TurboController):
 
         Parameters
         ----------
-        data : DataFrame
+        generator : BayesianGenerator
             Entire data set containing previous measurements. Requires at least one
             valid point.
 
@@ -159,6 +165,8 @@ class OptimizeTurboController(TurboController):
             None
 
         """
+        data = generator.data
+
         # get locations of valid data samples
         feas_data = self.vocs.feasibility_data(data)
 
@@ -192,12 +200,7 @@ class OptimizeTurboController(TurboController):
                 self.success_counter = 0
                 self.failure_counter += 1
 
-        if self.success_counter == self.success_tolerance:  # Expand trust region
-            self.length = min(self.scale_factor * self.length, self.length_max)
-            self.success_counter = 0
-        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
-            self.length = max(self.length / self.scale_factor, self.length_min)
-            self.failure_counter = 0
+        self.update_trust_region()
 
 
 class SafetyTurboController(TurboController):
@@ -205,7 +208,9 @@ class SafetyTurboController(TurboController):
     scale_factor: float = 1.25
     min_feasible_fraction: float = 0.75
 
-    def update_state(self, data, previous_batch_size: int = 1):
+    def update_state(self, generator, previous_batch_size: int = 1):
+        data = generator.data
+
         # set center point to be mean of valid data points
         feas = data[self.vocs.feasibility_data(data)["feasible"]]
         self.center_x = feas[self.vocs.variable_names].mean().to_dict()
@@ -221,9 +226,39 @@ class SafetyTurboController(TurboController):
             self.success_counter = 0
             self.failure_counter += 1
 
-        if self.success_counter == self.success_tolerance:  # expand trust region
-            self.length = min(self.scale_factor * self.length, self.length_max)
-            self.success_counter = 0
-        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
-            self.length = max(self.length / self.scale_factor, self.length_min)
-            self.failure_counter = 0
+        self.update_trust_region()
+
+
+class EntropyTurboController(TurboController):
+    name: str = Field("entropy", frozen=True)
+    _best_entropy: float = None
+
+    def update_state(self, generator, previous_batch_size: int = 1) -> None:
+        if generator.algorithm_results is not None:
+            execution_paths = generator.algorithm_results["execution_paths"]
+
+            # get the center point
+            self.center_x = dict(zip(
+                generator.vocs.variable_names,
+                torch.atleast_1d(execution_paths[:, 0].mean())
+            ))
+
+            # measure entropy by measuring standard deviation
+            entropy = execution_paths[:, 0].std()
+
+            if self._best_entropy is not None:
+                if entropy < self._best_entropy:
+                    self.success_counter += 1
+                    self.failure_counter = 0
+                    self._best_entropy = entropy
+                else:
+                    self.success_counter = 0
+                    self.failure_counter += 1
+
+                self.update_trust_region()
+            else:
+                self._best_entropy = entropy
+
+
+
+
