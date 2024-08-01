@@ -188,8 +188,10 @@ def validate_turbo_controller_base(value, available_controller_types, info):
                 valid_type = True
 
         if not valid_type:
-            raise ValueError(f"turbo controller of type {type(value)} "
-                             f"not allowed for this generator")
+            raise ValueError(
+                f"turbo controller of type {type(value)} "
+                f"not allowed for this generator"
+            )
 
     elif isinstance(value, str):
         # create turbo controller from string input
@@ -217,4 +219,3 @@ def validate_turbo_controller_base(value, available_controller_types, info):
                 f"{available_controller_types.keys()}"
             )
     return value
-

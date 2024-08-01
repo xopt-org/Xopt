@@ -40,7 +40,8 @@ from xopt.generators.bayesian.turbo import (
 from xopt.generators.bayesian.utils import (
     interpolate_points,
     rectilinear_domain_union,
-    set_botorch_weights, validate_turbo_controller_base,
+    set_botorch_weights,
+    validate_turbo_controller_base,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
@@ -292,7 +293,7 @@ class BayesianGenerator(Generator, ABC):
 
             # update internal model with internal data
             start_time = time.perf_counter()
-            model = self.train_model(self.data)
+            model = self.train_model(self.get_training_data(self.data))
             timing_results["training"] = time.perf_counter() - start_time
 
             # propose candidates given model
@@ -343,12 +344,23 @@ class BayesianGenerator(Generator, ABC):
 
         """
         if data is None:
-            data = self.data
+            data = self.get_training_data(self.data)
         if data.empty:
             raise ValueError("no data available to build model")
 
         # get input bounds
         variable_bounds = deepcopy(self.vocs.variables)
+
+        # if turbo restrict points is true then set the bounds to the trust region
+        # bounds
+        if self.turbo_controller is not None:
+            if self.turbo_controller.restrict_model_data:
+                variable_bounds = dict(
+                    zip(
+                        self.vocs.variable_names,
+                        self.turbo_controller.get_trust_region(self).numpy().T,
+                    )
+                )
 
         # add fixed feature bounds if requested
         if self.fixed_features is not None:
@@ -397,6 +409,30 @@ class BayesianGenerator(Generator, ABC):
         # get candidates
         candidates = self.numerical_optimizer.optimize(acq_funct, bounds, n_candidates)
         return candidates
+
+    def get_training_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Get training data used to train the GP model
+
+        If a turbo controller is specified with the flag `restrict_model_data` this
+        will return a subset of data that is inside the trust region.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            The data in the form of a pandas DataFrame.
+
+        Returns:
+        --------
+        data : pd.DataFrame
+            A subset of data used to train the model form of a pandas DataFrame.
+
+        """
+        if self.turbo_controller is not None:
+            if self.turbo_controller.restrict_model_data:
+                data = self.turbo_controller.get_data_in_trust_region(data, self)
+
+        return data
 
     def get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
         """

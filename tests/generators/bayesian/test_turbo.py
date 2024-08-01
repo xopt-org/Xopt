@@ -12,8 +12,9 @@ from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import (
+    EntropyTurboController,
     OptimizeTurboController,
-    SafetyTurboController, EntropyTurboController,
+    SafetyTurboController,
 )
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
@@ -68,8 +69,7 @@ class TestTurbo(TestCase):
         # test not allowed generator type
         with pytest.raises(ValueError):
             BayesianGenerator(
-                vocs=test_vocs,
-                turbo_controller=EntropyTurboController(test_vocs)
+                vocs=test_vocs, turbo_controller=EntropyTurboController(test_vocs)
             )
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
@@ -80,7 +80,7 @@ class TestTurbo(TestCase):
 
         gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
-        model = gen.train_model()
+        gen.train_model()
 
         turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen)
@@ -92,7 +92,7 @@ class TestTurbo(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
-        model = gen.train_model()
+        gen.train_model()
 
         turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen)
@@ -100,6 +100,23 @@ class TestTurbo(TestCase):
 
         assert np.all(tr[0].numpy() >= test_vocs.bounds[0])
         assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
+
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_restrict_data(self):
+        # test in 1D
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        gen = BayesianGenerator(
+            vocs=test_vocs, turbo_controller=OptimizeTurboController(test_vocs)
+        )
+        gen.add_data(TEST_VOCS_DATA)
+        gen.train_model()
+        gen.turbo_controller.update_state(gen)
+
+        restricted_data = gen.get_training_data(gen.data)
+        assert np.allclose(
+            restricted_data["x1"].to_numpy(), np.array([0.45, 0.56, 0.67])
+        )
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_with_constraints(self):
@@ -118,7 +135,7 @@ class TestTurbo(TestCase):
 
         gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(data)
-        model = gen.train_model()
+        gen.train_model()
 
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
         turbo_state.update_state(gen)
@@ -268,6 +285,9 @@ class TestTurbo(TestCase):
         X.generator.turbo_controller.update_state(X.generator)
         X.generator.turbo_controller.get_trust_region(X.generator)
 
+        for i in range(2):
+            X.step()
+
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_safety(self):
         test_vocs = VOCS(
@@ -334,7 +354,6 @@ class TestTurbo(TestCase):
             observables=["y1"],
         )
 
-
         def sin_function(input_dict):
             return {"y1": np.sin(input_dict["x"])}
 
@@ -343,10 +362,11 @@ class TestTurbo(TestCase):
 
         # construct BAX generator
         generator = BaxGenerator(
-            vocs=vocs, algorithm=algorithm,
+            vocs=vocs,
+            algorithm=algorithm,
             turbo_controller=EntropyTurboController(
                 vocs, success_tolerance=2, failure_tolerance=2
-            )
+            ),
         )
 
         # construct evaluator
@@ -363,11 +383,13 @@ class TestTurbo(TestCase):
         # test not allowed generator type
         with pytest.raises(ValueError):
             BaxGenerator(
-                vocs=vocs, algorithm=algorithm,
-                turbo_controller=SafetyTurboController(vocs)
+                vocs=vocs,
+                algorithm=algorithm,
+                turbo_controller=SafetyTurboController(vocs),
             )
         with pytest.raises(ValueError):
             BaxGenerator(
-                vocs=vocs, algorithm=algorithm,
-                turbo_controller=OptimizeTurboController(vocs)
+                vocs=vocs,
+                algorithm=algorithm,
+                turbo_controller=OptimizeTurboController(vocs),
             )
