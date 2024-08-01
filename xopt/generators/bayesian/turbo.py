@@ -3,6 +3,7 @@ import math
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Union
 
+import pandas as pd
 import torch
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
@@ -48,7 +49,9 @@ class TurboController(XoptBaseModel, ABC):
     scale_factor: float = Field(
         2.0, description="multiplier to increase or decrease trust region", gt=1.0
     )
-
+    restrict_model_data: Optional[bool] = Field(
+        True, description="flag to restrict model data to within the trust region"
+    )
     tkwargs: Dict[str, Union[torch.dtype, str]] = Field({"dtype": torch.double})
 
     model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
@@ -113,6 +116,22 @@ class TurboController(XoptBaseModel, ABC):
             self.length = max(self.length / self.scale_factor, self.length_min)
             self.failure_counter = 0
 
+    def get_data_in_trust_region(self, data: pd.DataFrame, generator):
+        """
+        Get subset of data in trust region
+        """
+        variable_data = torch.tensor(self.vocs.variable_data(data).to_numpy())
+
+        bounds = self.get_trust_region(generator)
+
+        mask = torch.ones(len(variable_data), dtype=torch.bool)
+        for dim in range(variable_data.shape[1]):
+            mask &= (variable_data[:, dim] >= bounds[0][dim]) & (
+                variable_data[:, dim] <= bounds[1][dim]
+            )
+
+        return data.iloc[mask.numpy()]
+
     @abstractmethod
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         pass
@@ -142,8 +161,7 @@ class OptimizeTurboController(TurboController):
             variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
         )
 
-    def update_state(self, generator, previous_batch_size: int = 1) \
-            -> None:
+    def update_state(self, generator, previous_batch_size: int = 1) -> None:
         """
         Update turbo state class using min of data points that are feasible.
         If no points in the data set are feasible raise an error.
@@ -238,10 +256,12 @@ class EntropyTurboController(TurboController):
             execution_paths = generator.algorithm_results["execution_paths"]
 
             # get the center point
-            self.center_x = dict(zip(
-                generator.vocs.variable_names,
-                torch.atleast_1d(execution_paths[:, 0].mean())
-            ))
+            self.center_x = dict(
+                zip(
+                    generator.vocs.variable_names,
+                    torch.atleast_1d(execution_paths[:, 0].mean()),
+                )
+            )
 
             # measure entropy by measuring standard deviation
             entropy = execution_paths[:, 0].std()
@@ -258,7 +278,3 @@ class EntropyTurboController(TurboController):
                 self.update_trust_region()
             else:
                 self._best_entropy = entropy
-
-
-
-

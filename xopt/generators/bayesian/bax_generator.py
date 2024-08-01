@@ -3,7 +3,6 @@ import pickle
 from copy import deepcopy
 from typing import Dict
 
-import torch
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
@@ -11,8 +10,9 @@ from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformatio
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController
-from xopt.generators.bayesian.utils import rectilinear_domain_union, \
-    validate_turbo_controller_base
+from xopt.generators.bayesian.utils import (
+    validate_turbo_controller_base,
+)
 
 logger = logging.getLogger()
 
@@ -67,4 +67,3 @@ class BaxGenerator(BayesianGenerator):
                 pickle.dump(results, outfile, protocol=pickle.HIGHEST_PROTOCOL)
 
         return eig
-
