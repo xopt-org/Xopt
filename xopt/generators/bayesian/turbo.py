@@ -12,7 +12,6 @@ from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 
-
 """
 Functions and classes that support TuRBO - an algorithm that fits a collection of
 local models and
@@ -31,7 +30,7 @@ class TurboController(XoptBaseModel, ABC):
         description="base length of trust region",
         ge=0.0,
     )
-    length_min: PositiveFloat = 0.5**7
+    length_min: PositiveFloat = 0.5 ** 7
     length_max: PositiveFloat = Field(
         2.0,
         description="maximum base length of trust region",
@@ -91,11 +90,16 @@ class TurboController(XoptBaseModel, ABC):
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
                 [self.center_x[ele] for ele in self.vocs.variable_names], **self.tkwargs
-            )
-            lengthscales = model.models[0].covar_module.base_kernel.lengthscale.detach()
+            ).unsqueeze(dim=0)
 
-            # calculate the ratios of lengthscales for each axis
-            weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+            if model.models[0].covar_module.base_kernel.lengthscale is not None:
+                lengthscales = model.models[
+                    0].covar_module.base_kernel.lengthscale.detach()
+
+                # calculate the ratios of lengthscales for each axis
+                weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+            else:
+                weights = 1.0
 
             # calculate the tr bounding box
             tr_lb = torch.clamp(
@@ -127,7 +131,7 @@ class TurboController(XoptBaseModel, ABC):
         mask = torch.ones(len(variable_data), dtype=torch.bool)
         for dim in range(variable_data.shape[1]):
             mask &= (variable_data[:, dim] >= bounds[0][dim]) & (
-                variable_data[:, dim] <= bounds[1][dim]
+                    variable_data[:, dim] <= bounds[1][dim]
             )
 
         return data.iloc[mask.numpy()]
@@ -253,18 +257,19 @@ class EntropyTurboController(TurboController):
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         if generator.algorithm_results is not None:
-            execution_paths = generator.algorithm_results["execution_paths"]
 
-            # get the center point
-            self.center_x = dict(
-                zip(
-                    generator.vocs.variable_names,
-                    torch.atleast_1d(execution_paths[:, 0].mean()),
-                )
-            )
+            # check to make sure required keys are in algorithm results
+            for ele in ["solution_center", "solution_entropy"]:
+                if ele not in generator.algorithm_results:
+                    raise RuntimeError(f"algorithm must include `{ele}` in "
+                                       f"`algorithm_results` property to use "
+                                       f"EntropyTurboController")
 
-            # measure entropy by measuring standard deviation
-            entropy = execution_paths[:, 0].std()
+            self.center_x = dict(zip(
+                self.vocs.variable_names,
+                generator.algorithm_results["solution_center"]
+            ))
+            entropy = generator.algorithm_results["solution_entropy"]
 
             if self._best_entropy is not None:
                 if entropy < self._best_entropy:
