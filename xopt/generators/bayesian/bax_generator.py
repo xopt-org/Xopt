@@ -9,7 +9,7 @@ from pydantic_core.core_schema import ValidationInfo
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.turbo import EntropyTurboController
+from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
 from xopt.generators.bayesian.utils import (
     validate_turbo_controller_base,
 )
@@ -33,6 +33,7 @@ class BaxGenerator(BayesianGenerator):
         """note default behavior is no use of turbo"""
         controller_dict = {
             "entropy": EntropyTurboController,
+            "safety": SafetyTurboController
         }
         value = validate_turbo_controller_base(value, controller_dict, info)
 
