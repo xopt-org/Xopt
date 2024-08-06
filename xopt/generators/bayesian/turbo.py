@@ -30,7 +30,7 @@ class TurboController(XoptBaseModel, ABC):
         description="base length of trust region",
         ge=0.0,
     )
-    length_min: PositiveFloat = 0.5 ** 7
+    length_min: PositiveFloat = 0.5**7
     length_max: PositiveFloat = Field(
         2.0,
         description="maximum base length of trust region",
@@ -94,7 +94,8 @@ class TurboController(XoptBaseModel, ABC):
 
             if model.models[0].covar_module.base_kernel.lengthscale is not None:
                 lengthscales = model.models[
-                    0].covar_module.base_kernel.lengthscale.detach()
+                    0
+                ].covar_module.base_kernel.lengthscale.detach()
 
                 # calculate the ratios of lengthscales for each axis
                 weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
@@ -131,7 +132,7 @@ class TurboController(XoptBaseModel, ABC):
         mask = torch.ones(len(variable_data), dtype=torch.bool)
         for dim in range(variable_data.shape[1]):
             mask &= (variable_data[:, dim] >= bounds[0][dim]) & (
-                    variable_data[:, dim] <= bounds[1][dim]
+                variable_data[:, dim] <= bounds[1][dim]
             )
 
         return data.iloc[mask.numpy()]
@@ -257,18 +258,21 @@ class EntropyTurboController(TurboController):
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         if generator.algorithm_results is not None:
-
             # check to make sure required keys are in algorithm results
             for ele in ["solution_center", "solution_entropy"]:
                 if ele not in generator.algorithm_results:
-                    raise RuntimeError(f"algorithm must include `{ele}` in "
-                                       f"`algorithm_results` property to use "
-                                       f"EntropyTurboController")
+                    raise RuntimeError(
+                        f"algorithm must include `{ele}` in "
+                        f"`algorithm_results` property to use "
+                        f"EntropyTurboController"
+                    )
 
-            self.center_x = dict(zip(
-                self.vocs.variable_names,
-                generator.algorithm_results["solution_center"]
-            ))
+            self.center_x = dict(
+                zip(
+                    self.vocs.variable_names,
+                    generator.algorithm_results["solution_center"],
+                )
+            )
             entropy = generator.algorithm_results["solution_entropy"]
 
             if self._best_entropy is not None:
