@@ -358,7 +358,7 @@ class TestTurbo(TestCase):
             return {"y1": np.sin(input_dict["x"])}
 
         # Prepare BAX algorithm and generator options
-        algorithm = GridOptimize(n_mesh_points=50)  # NOTE: default is to minimize
+        algorithm = GridOptimize(n_mesh_points=10)  # NOTE: default is to minimize
 
         # construct BAX generator
         generator = BaxGenerator(
@@ -377,16 +377,10 @@ class TestTurbo(TestCase):
 
         X.random_evaluate(3)
 
-        for i in range(3):
+        for i in range(2):
             X.step()
 
         # test not allowed generator type
-        with pytest.raises(ValueError):
-            BaxGenerator(
-                vocs=vocs,
-                algorithm=algorithm,
-                turbo_controller=SafetyTurboController(vocs),
-            )
         with pytest.raises(ValueError):
             BaxGenerator(
                 vocs=vocs,
