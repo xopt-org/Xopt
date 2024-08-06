@@ -134,8 +134,10 @@ def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
             [2.5, 3.0]])
     """
     assert A.shape == (2, A.shape[1]), "A should have shape (2, N)"
-    assert A.shape == B.shape, "Shapes of A and B should be the same, current shapes " \
-                               f"are {A.shape} and {B.shape}"
+    assert A.shape == B.shape, (
+        "Shapes of A and B should be the same, current shapes "
+        f"are {A.shape} and {B.shape}"
+    )
 
     out_bounds = torch.clone(A)
 

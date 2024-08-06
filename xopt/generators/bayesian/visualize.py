@@ -127,9 +127,9 @@ def visualize_model(
 
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
 
-    figure_title = f"Reference point: " + " ".join([
-        f"{name}: {reference_point[name]:.2}" for name in reference_point_names
-    ])
+    figure_title = "Reference point: " + " ".join(
+        [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
+    )
     fig.suptitle(figure_title)
 
     # create plot
