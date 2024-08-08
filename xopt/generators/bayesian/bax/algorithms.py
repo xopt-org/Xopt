@@ -92,11 +92,18 @@ class GridOptimize(GridScanAlgorithm):
         opt_idx = opt_idx.squeeze(dim=[-1])
         x_opt = test_points[opt_idx]
 
+        # get the solution_center and solution_entropy for Turbo
+        # note: the entropy calc here drops a constant scaling factor
+        solution_center = x_opt.mean(dim=0).numpy()
+        solution_entropy = float(torch.log(x_opt.std(dim=0) ** 2).sum())
+
         # collect secondary results in a dict
         results_dict = {
             "test_points": test_points,
             "posterior_samples": posterior_samples,
             "execution_paths": torch.hstack((x_opt, y_opt)),
+            "solution_center": solution_center,
+            "solution_entropy": solution_entropy,
         }
 
         # return execution paths
