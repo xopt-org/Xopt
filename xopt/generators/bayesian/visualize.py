@@ -107,6 +107,9 @@ def visualize_model(
         The matplotlib figure and axes objects.
     """
     output_names, variable_names = _validate_names(output_names, variable_names, vocs)
+    reference_point_names = [
+        name for name in vocs.variable_names if name not in variable_names
+    ]
     if show_acquisition and acquisition_function is None:
         show_acquisition = False
     kwargs = locals()
@@ -121,6 +124,14 @@ def visualize_model(
         fig, ax = _get_figure_from_axes(axes), axes
     nrows, ncols = figure_config["nrows"], figure_config["ncols"]
     _verify_axes(ax, nrows, ncols)
+
+    reference_point = _get_reference_point(reference_point, vocs, data, idx)
+
+    figure_title = "Reference point: " + " ".join(
+        [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
+    )
+    fig.suptitle(figure_title)
+
     # create plot
     if dim_x == 1:
         for i, output_name in enumerate(output_names):
@@ -143,7 +154,7 @@ def visualize_model(
     else:
         # generate input mesh only once
         input_mesh = _generate_input_mesh(
-            reference_point=_get_reference_point(reference_point, vocs, data, idx),
+            reference_point=reference_point,
             variable_names=variable_names,
             vocs=vocs,
             n_grid=n_grid,

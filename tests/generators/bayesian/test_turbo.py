@@ -8,8 +8,11 @@ import pandas as pd
 import pytest
 from xopt import Evaluator, VOCS, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
+from xopt.generators.bayesian.bax.algorithms import GridOptimize
+from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import (
+    EntropyTurboController,
     OptimizeTurboController,
     SafetyTurboController,
 )
@@ -63,6 +66,12 @@ class TestTurbo(TestCase):
         with pytest.raises(ValueError):
             BayesianGenerator(vocs=test_vocs, turbo_controller="bad_controller")
 
+        # test not allowed generator type
+        with pytest.raises(ValueError):
+            BayesianGenerator(
+                vocs=test_vocs, turbo_controller=EntropyTurboController(test_vocs)
+            )
+
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_trust_region(self):
         # test in 1D
@@ -71,11 +80,11 @@ class TestTurbo(TestCase):
 
         gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
-        model = gen.train_model()
+        gen.train_model()
 
         turbo_state = OptimizeTurboController(gen.vocs)
-        turbo_state.update_state(gen.data)
-        tr = turbo_state.get_trust_region(model)
+        turbo_state.update_state(gen)
+        tr = turbo_state.get_trust_region(gen)
         assert tr[0].numpy() >= test_vocs.bounds[0]
         assert tr[1].numpy() <= test_vocs.bounds[1]
 
@@ -83,18 +92,31 @@ class TestTurbo(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
-        model = gen.train_model()
+        gen.train_model()
 
         turbo_state = OptimizeTurboController(gen.vocs)
-        turbo_state.update_state(gen.data)
-        tr = turbo_state.get_trust_region(model)
+        turbo_state.update_state(gen)
+        tr = turbo_state.get_trust_region(gen)
 
         assert np.all(tr[0].numpy() >= test_vocs.bounds[0])
         assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
 
-        with pytest.raises(RuntimeError):
-            turbo_state = OptimizeTurboController(gen.vocs)
-            turbo_state.get_trust_region(model)
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_restrict_data(self):
+        # test in 1D
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        gen = BayesianGenerator(
+            vocs=test_vocs, turbo_controller=OptimizeTurboController(test_vocs)
+        )
+        gen.add_data(TEST_VOCS_DATA)
+        gen.train_model()
+        gen.turbo_controller.update_state(gen)
+
+        restricted_data = gen.get_training_data(gen.data)
+        assert np.allclose(
+            restricted_data["x1"].to_numpy(), np.array([0.45, 0.56, 0.67])
+        )
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_with_constraints(self):
@@ -113,15 +135,15 @@ class TestTurbo(TestCase):
 
         gen = BayesianGenerator(vocs=test_vocs)
         gen.add_data(data)
-        model = gen.train_model()
+        gen.train_model()
 
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
-        turbo_state.update_state(gen.data)
+        turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
         assert turbo_state.success_counter == 0
         assert turbo_state.failure_counter == 1
 
-        tr = turbo_state.get_trust_region(model)
+        tr = turbo_state.get_trust_region(gen)
         assert tr[0].numpy() >= test_vocs.bounds[0]
         assert tr[1].numpy() <= test_vocs.bounds[1]
 
@@ -130,7 +152,8 @@ class TestTurbo(TestCase):
         n_c = new_data["c1"].to_numpy()
         n_c[-1] = 1.0
         new_data["c1"] = n_c
-        turbo_state.update_state(new_data)
+        gen.add_data(new_data)
+        turbo_state.update_state(gen)
         assert turbo_state.success_counter == 0
         assert turbo_state.failure_counter == 2
 
@@ -146,7 +169,7 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(gen.vocs)
         with pytest.raises(RuntimeError):
-            turbo_state.update_state(gen.data)
+            turbo_state.update_state(gen)
 
         # test best y value violates the constraint
         data = deepcopy(TEST_VOCS_DATA)
@@ -163,7 +186,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
-        turbo_state.update_state(gen.data)
+        turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
 
         # test case where constraint violations give nan values for y
@@ -181,14 +204,18 @@ class TestTurbo(TestCase):
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
-        turbo_state.update_state(gen.data)
+        turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
 
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_set_best_point(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
         turbo_state = OptimizeTurboController(test_vocs)
-        turbo_state.update_state(TEST_VOCS_DATA)
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(TEST_VOCS_DATA)
+
+        turbo_state.update_state(gen)
         best_value = TEST_VOCS_DATA[
             test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
         ].min()[test_vocs.objective_names[0]]
@@ -206,12 +233,16 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(test_vocs)
         assert not turbo_state.minimize
-        turbo_state.update_state(TEST_VOCS_DATA)
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(TEST_VOCS_DATA)
+
+        turbo_state.update_state(gen)
         best_value = TEST_VOCS_DATA[
             test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
         ].max()[test_vocs.objective_names[0]]
         assert turbo_state.best_value == best_value
 
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_batch_turbo(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -224,9 +255,11 @@ class TestTurbo(TestCase):
         data["c1"] = c_data
         y_data = np.ones(10)
         data["y1"] = y_data
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(data)
 
         turbo_state = OptimizeTurboController(test_vocs, failure_tolerance=5)
-        turbo_state.update_state(data, 2)
+        turbo_state.update_state(gen, 2)
         assert turbo_state.success_counter == 1
 
     def test_in_generator(self):
@@ -249,9 +282,13 @@ class TestTurbo(TestCase):
 
         # determine trust region from gathered data
         X.generator.train_model()
-        X.generator.turbo_controller.update_state(X.generator.data)
-        X.generator.turbo_controller.get_trust_region(X.generator.model)
+        X.generator.turbo_controller.update_state(X.generator)
+        X.generator.turbo_controller.get_trust_region(X.generator)
 
+        for i in range(2):
+            X.step()
+
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_safety(self):
         test_vocs = VOCS(
             variables={"x": [0, 2 * math.pi]},
@@ -263,7 +300,10 @@ class TestTurbo(TestCase):
             {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, -1.0, 1.0]}
         )
         sturbo = SafetyTurboController(vocs=test_vocs)
-        sturbo.update_state(test_data)
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(test_data)
+
+        sturbo.update_state(gen)
 
         assert sturbo.center_x == {"x": 0.75}
         assert sturbo.failure_counter == 1
@@ -272,7 +312,11 @@ class TestTurbo(TestCase):
         test_data2 = pd.DataFrame(
             {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, -1.0, -1.0]}
         )
-        sturbo.update_state(test_data2, previous_batch_size=3)
+
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(test_data2)
+
+        sturbo.update_state(gen, previous_batch_size=3)
         assert sturbo.success_counter == 1
         assert sturbo.failure_counter == 0
 
@@ -281,7 +325,10 @@ class TestTurbo(TestCase):
         test_data3 = pd.DataFrame(
             {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, 1.0, -1.0]}
         )
-        sturbo.update_state(test_data3, previous_batch_size=3)
+        gen = BayesianGenerator(vocs=test_vocs)
+        gen.add_data(test_data3)
+
+        sturbo.update_state(gen, previous_batch_size=3)
         assert sturbo.success_counter == 0
         assert sturbo.failure_counter == 1
 
@@ -299,3 +346,44 @@ class TestTurbo(TestCase):
             yaml_str = X.yaml()
             X2 = Xopt.from_yaml(yaml_str)
             assert X2.generator.turbo_controller.name == name
+
+    def test_entropy_turbo(self):
+        # define variables and function objectives
+        vocs = VOCS(
+            variables={"x": [0, 2 * math.pi]},
+            observables=["y1"],
+        )
+
+        def sin_function(input_dict):
+            return {"y1": np.sin(input_dict["x"])}
+
+        # Prepare BAX algorithm and generator options
+        algorithm = GridOptimize(n_mesh_points=10)  # NOTE: default is to minimize
+
+        # construct BAX generator
+        generator = BaxGenerator(
+            vocs=vocs,
+            algorithm=algorithm,
+            turbo_controller=EntropyTurboController(
+                vocs, success_tolerance=2, failure_tolerance=2
+            ),
+        )
+
+        # construct evaluator
+        evaluator = Evaluator(function=sin_function)
+
+        # construct Xopt optimizer
+        X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+
+        X.random_evaluate(3)
+
+        for i in range(2):
+            X.step()
+
+        # test not allowed generator type
+        with pytest.raises(ValueError):
+            BaxGenerator(
+                vocs=vocs,
+                algorithm=algorithm,
+                turbo_controller=OptimizeTurboController(vocs),
+            )

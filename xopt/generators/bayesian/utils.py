@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -133,7 +134,10 @@ def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
             [2.5, 3.0]])
     """
     assert A.shape == (2, A.shape[1]), "A should have shape (2, N)"
-    assert A.shape == B.shape, "Shapes of A and B should be the same"
+    assert A.shape == B.shape, (
+        "Shapes of A and B should be the same, current shapes "
+        f"are {A.shape} and {B.shape}"
+    )
 
     out_bounds = torch.clone(A)
 
@@ -177,3 +181,44 @@ def interpolate_points(df, num_points=10):
         interpolated_points[col] = interpolated_values[1:]
 
     return interpolated_points
+
+
+def validate_turbo_controller_base(value, available_controller_types, info):
+    if isinstance(value, TurboController):
+        valid_type = False
+        for _, controller_type in available_controller_types.items():
+            if isinstance(value, controller_type):
+                valid_type = True
+
+        if not valid_type:
+            raise ValueError(
+                f"turbo controller of type {type(value)} "
+                f"not allowed for this generator"
+            )
+
+    elif isinstance(value, str):
+        # create turbo controller from string input
+        if value in available_controller_types:
+            value = available_controller_types[value](info.data["vocs"])
+        else:
+            raise ValueError(
+                f"{value} not found, available values are "
+                f"{available_controller_types.keys()}"
+            )
+    elif isinstance(value, dict):
+        # create turbo controller from dict input
+        if "name" not in value:
+            raise ValueError("turbo input dict needs to have a `name` attribute")
+        name = value.pop("name")
+        if name in available_controller_types:
+            # pop unnecessary elements
+            for ele in ["dim"]:
+                value.pop(ele, None)
+
+            value = available_controller_types[name](vocs=info.data["vocs"], **value)
+        else:
+            raise ValueError(
+                f"{value} not found, available values are "
+                f"{available_controller_types.keys()}"
+            )
+    return value
