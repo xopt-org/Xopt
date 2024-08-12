@@ -87,13 +87,13 @@ class TestBayesianGenerator(TestCase):
         # try with input data that contains Nans due to xopt raising an error
         # currently we drop all rows containing Nans
         test_data = deepcopy(TEST_VOCS_DATA)
-        test_data["y1"].iloc[5] = np.NaN
+        test_data["y1"].iloc[5] = np.nan
         model = gen.train_model(test_data)
         assert len(model.models[0].train_inputs[0]) == len(test_data) - 1
 
         # test with input data that is only Nans
         test_data = deepcopy(TEST_VOCS_DATA)
-        test_data["y1"].iloc[:] = np.NaN
+        test_data["y1"].iloc[:] = np.nan
         with pytest.raises(ValueError):
             gen.train_model(test_data)
 
@@ -239,3 +239,12 @@ class TestBayesianGenerator(TestCase):
             model.models[0].input_transform.bounds,
             torch.tensor(((0, 0), (1, 10))).double(),
         )
+
+        # test bad fixed feature name
+        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.fixed_features = {"bad_name": 3.0}
+        data = deepcopy(TEST_VOCS_DATA)
+        gen.add_data(data)
+
+        with pytest.raises(KeyError):
+            gen.train_model()

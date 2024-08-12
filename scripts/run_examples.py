@@ -28,6 +28,7 @@ SUB_DIRS = [
     "basic",
     "bayes_exp",
     "cnsga",
+    "gp_model_creation",
     "single_objective_bayes_opt",
     "multi_objective_bayes_opt",
     "es",

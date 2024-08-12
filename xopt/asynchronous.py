@@ -31,7 +31,8 @@ class AsynchronousXopt(Xopt):
         """
         Submit data to evaluator and return futures indexed to internal futures list.
 
-        Args:
+        Parameters
+        ----------
             input_data: dataframe containing input data
 
         """

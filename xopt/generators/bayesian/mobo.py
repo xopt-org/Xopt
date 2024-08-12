@@ -15,7 +15,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
             Hypervolume Improvement acquisition function"""
 
     def _get_objective(self):
-        return create_mobo_objective(self.vocs, self._tkwargs)
+        return create_mobo_objective(self.vocs)
 
     def get_acquisition(self, model):
         """

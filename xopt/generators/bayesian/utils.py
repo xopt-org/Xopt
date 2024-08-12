@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -65,13 +66,26 @@ def get_training_data(
     return train_X, train_Y, train_Yvar
 
 
-def set_botorch_weights(weights, vocs: VOCS):
-    """set weights to multiply xopt objectives for botorch objectives"""
-    for idx, ele in enumerate(vocs.objective_names):
-        if vocs.objectives[ele] == "MINIMIZE":
-            weights[idx] = -1.0
-        elif vocs.objectives[ele] == "MAXIMIZE":
-            weights[idx] = 1.0
+def set_botorch_weights(vocs: VOCS):
+    """set weights to multiply xopt objectives or observables for botorch objectives"""
+    output_names = vocs.output_names
+
+    weights = torch.zeros(len(output_names), dtype=torch.double)
+
+    if vocs.n_objectives > 0:
+        # if objectives exist this is an optimization problem
+        # set weights according to the index of the models -- corresponds to the
+        # ordering of output names
+        for objective_name in vocs.objective_names:
+            if vocs.objectives[objective_name] == "MINIMIZE":
+                weights[output_names.index(objective_name)] = -1.0
+            elif vocs.objectives[objective_name] == "MAXIMIZE":
+                weights[output_names.index(objective_name)] = 1.0
+    if vocs.n_objectives == 0:
+        # if no objectives exist this may be an exploration problem, weight each
+        # observable by 1.0
+        for observable_name in vocs.observables:
+            weights[output_names.index(observable_name)] = 1.0
 
     return weights
 
@@ -120,7 +134,10 @@ def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
             [2.5, 3.0]])
     """
     assert A.shape == (2, A.shape[1]), "A should have shape (2, N)"
-    assert A.shape == B.shape, "Shapes of A and B should be the same"
+    assert A.shape == B.shape, (
+        "Shapes of A and B should be the same, current shapes "
+        f"are {A.shape} and {B.shape}"
+    )
 
     out_bounds = torch.clone(A)
 
@@ -164,3 +181,44 @@ def interpolate_points(df, num_points=10):
         interpolated_points[col] = interpolated_values[1:]
 
     return interpolated_points
+
+
+def validate_turbo_controller_base(value, available_controller_types, info):
+    if isinstance(value, TurboController):
+        valid_type = False
+        for _, controller_type in available_controller_types.items():
+            if isinstance(value, controller_type):
+                valid_type = True
+
+        if not valid_type:
+            raise ValueError(
+                f"turbo controller of type {type(value)} "
+                f"not allowed for this generator"
+            )
+
+    elif isinstance(value, str):
+        # create turbo controller from string input
+        if value in available_controller_types:
+            value = available_controller_types[value](info.data["vocs"])
+        else:
+            raise ValueError(
+                f"{value} not found, available values are "
+                f"{available_controller_types.keys()}"
+            )
+    elif isinstance(value, dict):
+        # create turbo controller from dict input
+        if "name" not in value:
+            raise ValueError("turbo input dict needs to have a `name` attribute")
+        name = value.pop("name")
+        if name in available_controller_types:
+            # pop unnecessary elements
+            for ele in ["dim"]:
+                value.pop(ele, None)
+
+            value = available_controller_types[name](vocs=info.data["vocs"], **value)
+        else:
+            raise ValueError(
+                f"{value} not found, available values are "
+                f"{available_controller_types.keys()}"
+            )
+    return value
