@@ -11,7 +11,11 @@ nav:
             - examples/basic/xopt_basic.ipynb
             - examples/basic/xopt_parallel.ipynb
             - examples/basic/xopt_vocs.ipynb
+            - examples/basic/xopt_evaluator.ipynb
+            - examples/basic/xopt_generator.ipynb
         - Bayesian:
+            - Gaussian Process Model Creation:
+                - Basic example: examples/gp_model_creation/model_creation.ipynb
             - Bayesian Exploration:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
@@ -27,6 +31,7 @@ nav:
                 - Time dependent upper confidence bound: examples/single_objective_bayes_opt/time_dependent_bo.ipynb
                 - Bayesian Algorithm Execution: examples/single_objective_bayes_opt/bax_tutorial.ipynb
                 - Bayesian Optimization with fixed features: examples/single_objective_bayes_opt/fixed_features.ipynb
+                - Custom objectives: examples/single_objective_bayes_opt/custom_objective.ipynb
                 - Heteroskedastic modeling: examples/single_objective_bayes_opt/heteroskedastic_noise_tutorial.ipynb
 
             - Multi-Objective Bayesian Optimization:

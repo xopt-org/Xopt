@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-from numpy import asfarray
 from pydantic import ConfigDict, Field, field_validator
 
 from xopt.generator import Generator
@@ -346,7 +345,7 @@ def _neldermead_generator(
             warnings.warn("Initial guess is not within the specified bounds")
 
     if stage == -1:
-        x0 = asfarray(x0).flatten()
+        x0 = np.array(x0, dtype=float).flatten()
 
         nonzdelt = 0.05
         zdelt = 0.00025
@@ -367,7 +366,7 @@ def _neldermead_generator(
                     y[k] = zdelt
                 sim[k + 1] = y
         else:
-            sim = np.asfarray(initial_simplex).copy()
+            sim = np.array(initial_simplex, dtype=float).copy()
             if sim.ndim != 2 or sim.shape[0] != sim.shape[1] + 1:
                 raise ValueError(
                     "`initial_simplex` should be an array of shape (N+1,N)"

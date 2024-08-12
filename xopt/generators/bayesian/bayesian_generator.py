@@ -30,6 +30,7 @@ from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
+    CustomXoptObjective,
 )
 from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
@@ -40,6 +41,7 @@ from xopt.generators.bayesian.utils import (
     interpolate_points,
     rectilinear_domain_union,
     set_botorch_weights,
+    validate_turbo_controller_base,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
@@ -160,6 +162,10 @@ class BayesianGenerator(Generator, ABC):
         False,
         description="flag to log transform the acquisition function before optimization",
     )
+    custom_objective: Optional[CustomXoptObjective] = Field(
+        None,
+        description="custom objective for optimization, replaces objective specified by VOCS",
+    )
     n_interpolate_points: Optional[PositiveInt] = None
     memory_length: Optional[PositiveInt] = None
 
@@ -218,37 +224,12 @@ class BayesianGenerator(Generator, ABC):
     @field_validator("turbo_controller", mode="before")
     def validate_turbo_controller(cls, value, info: ValidationInfo):
         """note default behavior is no use of turbo"""
-        optimizer_dict = {
+        controller_dict = {
             "optimize": OptimizeTurboController,
             "safety": SafetyTurboController,
         }
-        if isinstance(value, TurboController):
-            pass
-        elif isinstance(value, str):
-            # create turbo controller from string input
-            if value in optimizer_dict:
-                value = optimizer_dict[value](info.data["vocs"])
-            else:
-                raise ValueError(
-                    f"{value} not found, available values are "
-                    f"{optimizer_dict.keys()}"
-                )
-        elif isinstance(value, dict):
-            # create turbo controller from dict input
-            if "name" not in value:
-                raise ValueError("turbo input dict needs to have a `name` attribute")
-            name = value.pop("name")
-            if name in optimizer_dict:
-                # pop unnecessary elements
-                for ele in ["dim"]:
-                    value.pop(ele, None)
+        value = validate_turbo_controller_base(value, controller_dict, info)
 
-                value = optimizer_dict[name](vocs=info.data["vocs"], **value)
-            else:
-                raise ValueError(
-                    f"{value} not found, available values are "
-                    f"{optimizer_dict.keys()}"
-                )
         return value
 
     @field_validator("computation_time", mode="before")
@@ -313,10 +294,7 @@ class BayesianGenerator(Generator, ABC):
 
             # update internal model with internal data
             start_time = time.perf_counter()
-            if self.memory_length is not None:
-                model = self.train_model(self.data.iloc[-self.memory_length:])
-            else:
-                model = self.train_model(self.data)
+            model = self.train_model(self.get_training_data(self.data))
             timing_results["training"] = time.perf_counter() - start_time
 
             # propose candidates given model
@@ -367,18 +345,34 @@ class BayesianGenerator(Generator, ABC):
 
         """
         if data is None:
-            data = self.data
+            data = self.get_training_data(self.data)
         if data.empty:
             raise ValueError("no data available to build model")
 
         # get input bounds
         variable_bounds = deepcopy(self.vocs.variables)
 
+        # if turbo restrict points is true then set the bounds to the trust region
+        # bounds
+        if self.turbo_controller is not None:
+            if self.turbo_controller.restrict_model_data:
+                variable_bounds = dict(
+                    zip(
+                        self.vocs.variable_names,
+                        self.turbo_controller.get_trust_region(self).numpy().T,
+                    )
+                )
+
         # add fixed feature bounds if requested
         if self.fixed_features is not None:
             # get bounds for each fixed_feature (vocs bounds take precedent)
             for key in self.fixed_features:
                 if key not in variable_bounds:
+                    if key not in data:
+                        raise KeyError(
+                            "generator data needs to contain fixed feature "
+                            f"column name `{key}`"
+                        )
                     f_data = data[key]
                     bounds = [f_data.min(), f_data.max()]
                     if bounds[1] - bounds[0] < 1e-8:
@@ -405,7 +399,7 @@ class BayesianGenerator(Generator, ABC):
         """
         # update TurBO state if used with the last `n_candidates` points
         if self.turbo_controller is not None:
-            self.turbo_controller.update_state(self.data, n_candidates)
+            self.turbo_controller.update_state(self, n_candidates)
 
         # calculate optimization bounds
         bounds = self._get_optimization_bounds()
@@ -416,6 +410,30 @@ class BayesianGenerator(Generator, ABC):
         # get candidates
         candidates = self.numerical_optimizer.optimize(acq_funct, bounds, n_candidates)
         return candidates
+
+    def get_training_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Get training data used to train the GP model
+
+        If a turbo controller is specified with the flag `restrict_model_data` this
+        will return a subset of data that is inside the trust region.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            The data in the form of a pandas DataFrame.
+
+        Returns:
+        --------
+        data : pd.DataFrame
+            A subset of data used to train the model form of a pandas DataFrame.
+
+        """
+        if self.turbo_controller is not None:
+            if self.turbo_controller.restrict_model_data:
+                data = self.turbo_controller.get_data_in_trust_region(data, self)
+
+        return data
 
     def get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
         """
@@ -549,11 +567,24 @@ class BayesianGenerator(Generator, ABC):
         pass
 
     def _get_objective(self):
-        """return default objective (scalar objective) determined by vocs"""
-        return create_mc_objective(self.vocs, self._tkwargs)
+        """return default objective (scalar objective) determined by vocs or if
+        defined in custom_objective"""
+        # check to make sure that if we specify a custom objective that no objectives
+        # are specified in vocs
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
+                raise RuntimeError(
+                    "cannot specify objectives in VOCS "
+                    "and a custom objective for the generator at the "
+                    "same time"
+                )
+
+            return self.custom_objective
+        else:
+            return create_mc_objective(self.vocs, self._tkwargs)
 
     def _get_constraint_callables(self):
-        """return default objective (scalar objective) determined by vocs"""
+        """return constratint callable determined by vocs"""
         constraint_callables = create_constraint_callables(self.vocs)
         if len(constraint_callables) == 0:
             constraint_callables = None
@@ -629,7 +660,7 @@ class BayesianGenerator(Generator, ABC):
         # if using turbo, update turbo state and set bounds according to turbo state
         if self.turbo_controller is not None:
             # set the best value
-            turbo_bounds = self.turbo_controller.get_trust_region(self.model)
+            turbo_bounds = self.turbo_controller.get_trust_region(self)
             bounds = rectilinear_domain_union(bounds, turbo_bounds)
 
         # if fixed features key is in vocs then we need to remove the bounds
@@ -759,7 +790,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         n_objectives = self.vocs.n_objectives
         weights = torch.zeros(n_objectives)
-        weights = set_botorch_weights(weights, self.vocs)
+        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
         objective_data = objective_data * weights
 
         # compute hypervolume

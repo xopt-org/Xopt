@@ -1,3 +1,5 @@
+import warnings
+from copy import deepcopy
 from enum import Enum
 from typing import Any, Dict, List, Union
 
@@ -5,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import ConfigDict, conlist, Field
+from pydantic import ConfigDict, conlist, Field, field_validator
 
 from xopt.pydantic import XoptBaseModel
 
@@ -30,9 +32,10 @@ class ConstraintEnum(str, Enum):
     # Allow any case
     @classmethod
     def _missing_(cls, name):
-        for member in cls:
-            if member.name.lower() == name.lower():
-                return member
+        if isinstance(name, str):
+            for member in cls:
+                if member.name.lower() == name.lower():
+                    return member
 
 
 class VOCS(XoptBaseModel):
@@ -65,6 +68,29 @@ class VOCS(XoptBaseModel):
     model_config = ConfigDict(
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
+
+    @field_validator("variables")
+    def correct_bounds_specification(cls, v):
+        validate_variable_bounds(v)
+        return v
+
+    @field_validator("constraints")
+    def correct_list_types(cls, v):
+        """make sure that constraint list types are correct"""
+        for _, item in v.items():
+            if not isinstance(item[0], str):
+                raise ValueError(
+                    "constraint specification list must have the first "
+                    "element as a string`"
+                )
+
+            if not isinstance(item[1], float):
+                raise ValueError(
+                    "constraint specification list must have the second "
+                    "element as a float"
+                )
+
+        return v
 
     @classmethod
     def from_yaml(cls, yaml_text):
@@ -200,22 +226,50 @@ class VOCS(XoptBaseModel):
 
         # get bounds
         # if custom_bounds is specified then they will be clipped inside
-        # vocs variable bounds
+        # vocs variable bounds -- raise a warning in this case
         if custom_bounds is None:
             bounds = self.variables
         else:
             variable_bounds = pd.DataFrame(self.variables)
+
+            # check type
+            if not isinstance(custom_bounds, dict):
+                raise TypeError("`custom_bounds` must be a dict")
+
+            # check custom bounds validity
+            try:
+                validate_variable_bounds(custom_bounds)
+            except ValueError:
+                raise ValueError("specified `custom_bounds` not valid")
+
+            old_custom_bounds = deepcopy(custom_bounds)
+
             custom_bounds = pd.DataFrame(custom_bounds)
             custom_bounds = custom_bounds.clip(
                 variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
             )
             bounds = custom_bounds.to_dict()
+
+            # check to make sure clipped values are not equal -- if not custom_bounds
+            # are not inside vocs bounds
+            for name, value in bounds.items():
+                if value[0] == value[1]:
+                    raise ValueError(
+                        f"specified `custom_bounds` for {name} is "
+                        f"outside vocs domain"
+                    )
+
+            # if clipping was used then raise a warning
+            if bounds != old_custom_bounds:
+                warnings.warn(
+                    "custom bounds were clipped by vocs bounds", RuntimeWarning
+                )
+
             for k in bounds.keys():
                 bounds[k] = [bounds[k][i] for i in range(2)]
 
         for key, val in bounds.items():  # No need to sort here
             a, b = val
-            n = n if n is not None else 1
             x = rng_sample_function(n)
             inputs[key] = x * a + (1 - x) * b
 
@@ -223,7 +277,7 @@ class VOCS(XoptBaseModel):
         if include_constants and self.constants is not None:
             inputs.update(self.constants)
 
-        if n == 1:
+        if n is None:
             return [inputs]
         else:
             return pd.DataFrame(inputs).to_dict("records")
@@ -275,12 +329,17 @@ class VOCS(XoptBaseModel):
         Returns a dataframe containing variables according to `vocs.variables` in sorted
         order
 
-        Args:
-            data: Data to be processed.
-            prefix: Prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_variable_data(self.variables, data, prefix=prefix)
 
@@ -294,12 +353,17 @@ class VOCS(XoptBaseModel):
         Returns a dataframe containing objective data transformed according to
         `vocs.objectives` such that we always assume minimization.
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_objective_data(self.objectives, data, prefix, return_raw)
 
@@ -312,12 +376,17 @@ class VOCS(XoptBaseModel):
         Returns a dataframe containing constraint data transformed according to
         `vocs.constraints` such that values that satisfy each constraint are negative.
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_constraint_data(self.constraints, data, prefix)
 
@@ -329,12 +398,17 @@ class VOCS(XoptBaseModel):
         """
         Returns a dataframe containing observable data
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_observable_data(self.observable_names, data, prefix)
 
@@ -348,12 +422,17 @@ class VOCS(XoptBaseModel):
         not. Returned dataframe also contains a column `feasible` which denotes if
         all constraints are satisfied.
 
-        Args:
-            data: data to be processed.
-            prefix: prefix added to column names.
+        Parameters
+        ----------
+            data: DataFrame
+                Data to be processed.
+            prefix: str, optional
+                Prefix added to column names.
 
-        Returns:
-            result: processed Dataframe
+        Returns
+        -------
+            result: DataFrame
+                Processed Dataframe
         """
         return form_feasibility_data(self.constraints, data, prefix)
 
@@ -369,7 +448,7 @@ class VOCS(XoptBaseModel):
 
         Returns
         -------
-        pd.DataFrame
+        result : pd.DataFrame
             A DataFrame with input data in the range [0,1] corresponding to the
             specified variable ranges. Contains columns equal to the intersection
             between `input_points` and `vocs.variable_names`.
@@ -406,7 +485,7 @@ class VOCS(XoptBaseModel):
 
         Returns
         -------
-        pd.DataFrame
+        result : pd.DataFrame
             A DataFrame with denormalized input data corresponding to the
             specified variable ranges. Contains columns equal to the intersection
             between `input_points` and `vocs.variable_names`.
@@ -436,13 +515,17 @@ class VOCS(XoptBaseModel):
         Validates input data. Raises an error if the input data does not satisfy
         requirements given by vocs.
 
-        Args:
-            input_points: input data to be validated.
+        Parameters
+        ----------
+            input_points : DataFrame
+                Input data to be validated.
 
-        Returns:
+        Returns
+        -------
             None
 
-        Raises:
+        Raises
+        ------
             ValueError: if input data does not satisfy requirements.
         """
         validate_input_data(self, input_points)
@@ -453,40 +536,60 @@ class VOCS(XoptBaseModel):
         constraints based on vocs - objective data is transformed based on
         `vocs.objectives` properties
 
-        Args:
-            data: dataframe to be split
-            return_raw: if True, return untransformed objective data
+        Parameters
+        ----------
+            data: DataFrame
+                Dataframe to be split
+            return_raw : bool, optional
+                If True, return untransformed objective data
 
-        Returns:
-            variable_data: dataframe containing variable data
-            objective_data: dataframe containing objective data
-            constraint_data: dataframe containing constraint data
+        Returns
+        -------
+            variable_data : DataFrame
+                Dataframe containing variable data
+            objective_data : DataFrame
+                Dataframe containing objective data
+            constraint_data : DataFrame
+                Dataframe containing constraint data
         """
         variable_data = self.variable_data(data, "")
         objective_data = self.objective_data(data, "", return_raw)
         constraint_data = self.constraint_data(data, "")
         return variable_data, objective_data, constraint_data
 
-    def select_best(self, data: pd.DataFrame, n=1):
+    def select_best(self, data: pd.DataFrame, n: int = 1):
         """
         get the best value and point for a given data set based on vocs
         - does not work for multi-objective problems
         - data that violates any constraints is ignored
 
-        Args:
-            data: dataframe to select best point from
-            n: number of best points to return
+        Parameters
+        ----------
+            data: DataFrame
+                Dataframe to select best point from
+            n: int, optional
+                Number of best points to return
 
-        Returns:
+        Returns
+        -------
             index: index of best point
             value: value of best point
+            params: input parameters that give the best point
         """
         if self.n_objectives != 1:
             raise NotImplementedError(
                 "cannot select best point when n_objectives is not 1"
             )
 
+        if data.empty:
+            raise RuntimeError("cannot select best point if dataframe is empty")
+
         feasible_data = self.feasibility_data(data)
+        if feasible_data.empty:
+            raise RuntimeError(
+                "cannot select best point if no points satisfy the given constraints"
+            )
+
         ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
         obj = self.objectives[self.objective_names[0]]
         obj_name = self.objective_names[0]
@@ -494,7 +597,11 @@ class VOCS(XoptBaseModel):
             obj_name, ascending=ascending_flag[obj]
         )[obj_name][:n]
 
-        return res.index.to_numpy(), res.to_numpy()
+        params = data.iloc[res.index.to_numpy()][self.variable_names].to_dict(
+            orient="records"
+        )[0]
+
+        return res.index.to_numpy(), res.to_numpy(), params
 
     def cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -502,12 +609,12 @@ class VOCS(XoptBaseModel):
 
         Parameters
         ----------
-        data: pd.DataFrame
+        data: DataFrame
             Data for which the cumulative optimum shall be calculated.
 
         Returns
         -------
-        pd.DataFrame
+        DataFrame
             Cumulative optimum for the given DataFrame.
 
         """
@@ -622,10 +729,14 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
     Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
     constraint is satisfied if the evaluation is < 0.
 
-    Args:
-        constraints: Dictionary of constraints
-        data: Dataframe with the data to be evaluated
-        prefix: Prefix to use for the transformed data in the dataframe
+    Parameters
+    ----------
+        constraints: dict
+            Dictionary of constraints
+        data: DataFrame
+            Dataframe with the data to be evaluated
+        prefix: str, optional
+            Prefix to use for the transformed data in the dataframe
 
     Returns a dataframe with the constraint data.
 
@@ -665,10 +776,14 @@ def form_observable_data(observables: List, data: pd.DataFrame, prefix="observab
     Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
     constraint is satisfied if the evaluation is < 0.
 
-    Args:
-        observables: Dictonary of constraints
-        data: Dataframe with the data to be evaluated
-        prefix: Prefix to use for the transformed data in the dataframe
+    Parameters
+    ----------
+        observables: dict
+            Dictionary of observables
+        data: DataFrame
+            Dataframe with the data to be evaluated
+        prefix: str, optional
+            Prefix to use for the transformed data in the dataframe
 
     Returns a dataframe with the constraint data.
 
@@ -728,3 +843,17 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         raise ValueError(
             f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
         )
+
+
+def validate_variable_bounds(variable_dict: Dict[str, List[float]]):
+    """
+    Check to make sure that bounds for variables are specified correctly. Raises
+    ValueError if anything is incorrect
+    """
+
+    for name, value in variable_dict.items():
+        if not value[1] > value[0]:
+            raise ValueError(
+                f"Bounds specified for `{name}` do not satisfy the "
+                f"condition value[1] > value[0]."
+            )

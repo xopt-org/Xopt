@@ -1,8 +1,10 @@
+import warnings
 from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import ObjectiveEnum, VOCS
@@ -21,10 +23,46 @@ class TestVOCS(object):
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
 
+    def test_variable_validation(self):
+        with pytest.raises(ValidationError):
+            VOCS(
+                variables={"x": [1, 0]},
+            )
+
     def test_empty_objectives(self):
         VOCS(
             variables={"x": [0, 1]},
         )
+
+    def test_output_names(self):
+        test_vocs = VOCS(
+            variables={"x": [0, 1]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0]},
+        )
+        assert test_vocs.output_names == ["y1", "c1", "c2"]
+
+    def test_constraint_specification(self):
+        good_constraint_list = [
+            ["LESS_THAN", 0],
+            ["GREATER_THAN", 0],
+            ["less_than", 0],
+            ["greater_than", 0],
+        ]
+
+        for ele in good_constraint_list:
+            VOCS(variables={"x": [0, 1]}, constraints={"c": ele})
+
+        bad_constraint_list = [
+            ["LESS_THAN"],
+            ["GREATER_TAN", 0],
+            [0, "less_than"],
+            ["greater_than", "ahc"],
+        ]
+
+        for ele in bad_constraint_list:
+            with pytest.raises(ValidationError):
+                VOCS(variables={"x": [0, 1]}, constraints={"c": ele})
 
     def test_from_yaml(self):
         Y = """
@@ -63,7 +101,11 @@ class TestVOCS(object):
         data = pd.DataFrame(vocs.random_inputs(n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
-        TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+        test_inputs = TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+        assert len(test_inputs) == 5
+
+        test_inputs = TEST_VOCS_BASE.random_inputs()
+        assert isinstance(test_inputs[0]["x1"], float)
 
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -90,17 +132,38 @@ class TestVOCS(object):
         assert vocs.n_outputs == 2
         assert vocs.variable_names == ["x1"]
 
-    def test_custom_bounds(self):
+    def test_random_sampling_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)
 
         custom_bounds = {"x1": [0.5, 0.75], "x2": [7.5, 15.0]}
 
-        random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+        with pytest.warns(RuntimeWarning):
+            random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+
         random_input_data = pd.DataFrame(random_input_data)
         assert all(random_input_data["x1"] < 0.75)
         assert all(random_input_data["x1"] > 0.5)
         assert all(random_input_data["x2"] > 7.5)
         assert all(random_input_data["x2"] < 10.0)
+
+        # test custom bounds within the vocs domain -- no warnings should be raised
+        in_domain_custom_bounds = {"x1": [0.5, 0.75], "x2": [0.5, 0.75]}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            vocs.random_inputs(100, custom_bounds=in_domain_custom_bounds)
+
+        # test wrong type
+        with pytest.raises(TypeError):
+            vocs.random_inputs(100, custom_bounds=1)
+
+        # test custom bounds entirely outside the vocs domain or specified incorrectly
+        bad_custom_bounds = [
+            {"x1": [10.0, 10.75], "x2": [7.5, 15.0]},
+            {"x1": [0.75, 0.5], "x2": [7.5, 15.0]},
+        ]
+        for ele in bad_custom_bounds:
+            with pytest.raises(ValueError):
+                vocs.random_inputs(100, custom_bounds=ele)
 
     def test_duplicate_outputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -181,31 +244,39 @@ class TestVOCS(object):
 
         # test maximization
         vocs.objectives[vocs.objective_names[0]] = "MAXIMIZE"
-        idx, val = vocs.select_best(test_data)
+        idx, val, _ = vocs.select_best(test_data)
         assert idx == [2]
         assert val == [1.0]
 
         vocs.constraints = {}
-        idx, val = vocs.select_best(test_data)
+        idx, val, _ = vocs.select_best(test_data)
         assert idx == [3]
         assert val == [1.5]
 
         # test returning multiple best values -- sorted by best value
-        idx, val = vocs.select_best(test_data, 2)
+        idx, val, _ = vocs.select_best(test_data, 2)
         assert np.allclose(idx, np.array([3, 2]))
         assert np.allclose(val, np.array([1.5, 1.0]))
 
         # test minimization
         vocs.objectives[vocs.objective_names[0]] = "MINIMIZE"
         vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
-        idx, val = vocs.select_best(test_data)
+        idx, val, _ = vocs.select_best(test_data)
         assert idx == [0]
         assert val == [0.5]
 
         vocs.constraints = {}
-        idx, val = vocs.select_best(test_data)
+        idx, val, _ = vocs.select_best(test_data)
         assert idx == 1
         assert val == 0.1
+
+        # test error handling
+        with pytest.raises(RuntimeError):
+            vocs.select_best(pd.DataFrame())
+
+        vocs.constraints = {"c1": ["GREATER_THAN", 10.5]}
+        with pytest.raises(RuntimeError):
+            vocs.select_best(pd.DataFrame())
 
     @pytest.mark.filterwarnings("ignore: All-NaN axis encountered")
     def test_cumulative_optimum(self):

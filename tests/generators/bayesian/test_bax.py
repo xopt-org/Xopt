@@ -15,7 +15,7 @@ from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax.algorithms import (
     Algorithm,
-    GridMinimize,
+    GridOptimize,
     GridScanAlgorithm,
 )
 from xopt.generators.bayesian.bax_generator import BaxGenerator
@@ -63,7 +63,7 @@ class TestBaxGenerator:
         # test grid scan minimize
         for ndim in [1, 3]:
             bounds = torch.stack([torch.zeros(ndim), torch.ones(ndim)])
-            alg = GridMinimize()
+            alg = GridOptimize()
 
             # create a ModelList with a single output
             train_X = torch.rand(10, ndim)
@@ -113,7 +113,7 @@ class TestBaxGenerator:
                 )
 
     def test_generate(self):
-        alg = GridMinimize()
+        alg = GridOptimize()
 
         # test w/o constraints
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -145,7 +145,7 @@ class TestBaxGenerator:
         assert len(candidate) == 1
 
     def test_cuda(self):
-        alg = GridMinimize()
+        alg = GridOptimize()
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
         test_vocs.observables = ["y1"]
@@ -163,7 +163,7 @@ class TestBaxGenerator:
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridMinimize()
+        alg = GridOptimize()
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
@@ -182,7 +182,7 @@ class TestBaxGenerator:
 
     def test_file_saving(self):
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridMinimize()
+        alg = GridOptimize()
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
@@ -212,7 +212,7 @@ class TestBaxGenerator:
 
     def test_vocs_validation(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        alg = GridMinimize()
+        alg = GridOptimize()
 
         with pytest.raises(ValidationError):
             BaxGenerator(vocs=test_vocs, algorithm=alg)

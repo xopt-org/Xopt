@@ -29,7 +29,8 @@ class FeasibilityObjective(GenericMCObjective):
     def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate the feasibility-weighted objective on the samples.
 
-        Args:
+        Parameters
+        ----------
             samples: A `sample_shape x batch_shape x q x m`-dim Tensors of
                 samples from a model posterior.
             X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if

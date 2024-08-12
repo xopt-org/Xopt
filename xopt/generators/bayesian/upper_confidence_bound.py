@@ -1,6 +1,5 @@
 import warnings
 
-import torch
 from botorch.acquisition import (
     qUpperConfidenceBound,
     ScalarizedPosteriorTransform,
@@ -12,6 +11,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
+from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.utils import set_botorch_weights
 
@@ -51,7 +51,8 @@ beta : float, default 2.0
             )
 
     def _get_acquisition(self, model):
-        if self.n_candidates > 1:
+        objective = self._get_objective()
+        if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
             # MC sampling for generating multiple candidate points
             sampler = self._get_sampler(model)
             acq = qUpperConfidenceBound(
@@ -62,8 +63,7 @@ beta : float, default 2.0
             )
         else:
             # analytic acquisition function for single candidate generation
-            weights = torch.zeros(self.vocs.n_outputs).to(**self._tkwargs)
-            weights = set_botorch_weights(weights, self.vocs)
+            weights = set_botorch_weights(self.vocs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
