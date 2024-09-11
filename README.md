@@ -210,12 +210,12 @@ Developers
 
 Clone this repository with a truncated git history (recommended):
 ```shell
-git clone --depth=1 https://github.com/ChristopherMayes/Xopt.git
+git clone --depth=1 https://github.com/xopt-org/xopt.git
 ```
 
 Or, clone this repository with the full git history (> 970 MB):
 ```shell
-git clone https://github.com/ChristopherMayes/Xopt.git
+git clone https://github.com/xopt-org/xopt.git
 ```
 
 Create an environment `xopt-dev` with all the dependencies:
