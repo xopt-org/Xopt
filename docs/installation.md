@@ -27,7 +27,7 @@ Developers
 
 Clone this repository:
 ```shell
-git clone https://github.com/ChristopherMayes/Xopt.git
+git clone https://github.com/xopt-org/xopt.git
 ```
 
 Create an environment `xopt-dev` with all the dependencies:

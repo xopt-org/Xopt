@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    if: ${{ github.repository == 'ChristopherMayes/Xopt' }}
+    if: ${{ github.repository == 'xopt-org/xopt' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
