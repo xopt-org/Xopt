@@ -69,5 +69,5 @@ class TDExpectedImprovementGenerator(
     TimeDependentBayesianGenerator, ExpectedImprovementGenerator
 ):
     name = "time_dependent_expected_improvement"
-    __doc__ = """Implements Time-Dependent Bayesian Optimization using the Expected 
+    __doc__ = """Implements Time-Dependent Bayesian Optimization using the Expected
     Improvement acquisition function"""
