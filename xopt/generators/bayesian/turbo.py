@@ -287,4 +287,3 @@ class EntropyTurboController(TurboController):
                 self.update_trust_region()
             else:
                 self._best_entropy = entropy
-
