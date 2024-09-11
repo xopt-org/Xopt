@@ -16,7 +16,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(),
     package_dir={"xopt": "xopt"},
-    url="https://github.com/ChristopherMayes/xopt",
+    url="https://github.com/xopt-org/xopt",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     install_requires=requirements,
