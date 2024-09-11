@@ -1,6 +1,7 @@
 import time
 import warnings
 from abc import ABC
+from copy import copy, deepcopy
 from typing import Optional
 
 import pandas as pd
@@ -10,6 +11,7 @@ from pydantic import Field, field_validator, PositiveFloat
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
+from xopt.generators.bayesian.utils import rectilinear_domain_union
 
 
 class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
@@ -23,6 +25,10 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     gp_constructor: TimeDependentModelConstructor = Field(
         TimeDependentModelConstructor(),
         description="constructor used to generate model",
+    )
+    forgetting_time: Optional[PositiveFloat] = Field(
+        None,
+        description="time period to forget historical data in seconds"
     )
 
     @field_validator("gp_constructor", mode="before")
@@ -46,10 +52,15 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
         return value
 
-    def get_input_data(self, data: pd.DataFrame):
-        return torch.tensor(
-            data[self.vocs.variable_names + ["time"]].to_numpy(), **self._tkwargs
-        )
+    def get_training_data(self, data: pd.DataFrame):
+        """ window data based on the forgetting time """
+        new_data = copy(data)
+        if self.forgetting_time is not None:
+            new_data = new_data[
+                data["time"] > time.time() - self.forgetting_time
+                ]
+
+        return new_data
 
     def generate(self, n_candidates: int) -> list[dict]:
         self.target_prediction_time = time.time() + self.added_time

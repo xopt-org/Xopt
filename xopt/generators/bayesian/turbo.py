@@ -46,7 +46,7 @@ class TurboController(XoptBaseModel, ABC):
     )
     center_x: Optional[Dict[str, float]] = Field(None)
     scale_factor: float = Field(
-        2.0, description="multiplier to increase or decrease trust region", gt=1.0
+        2.0, description="multiplier to increase or decrease trust region", ge=1.0
     )
     restrict_model_data: Optional[bool] = Field(
         True, description="flag to restrict model data to within the trust region"
@@ -150,7 +150,7 @@ class OptimizeTurboController(TurboController):
     def minimize(self) -> bool:
         return self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE"
 
-    def _set_best_point(self, data):
+    def _set_best_point_value(self, data):
         # get location of best point so far
         variable_data = self.vocs.variable_data(data, "")
         objective_data = self.vocs.objective_data(data, "", return_raw=True)
@@ -198,7 +198,7 @@ class OptimizeTurboController(TurboController):
                 "turbo requires at least one valid point in the training dataset"
             )
         else:
-            self._set_best_point(data[feas_data["feasible"]])
+            self._set_best_point_value(data[feas_data["feasible"]])
 
         # get feasibility of last `n_candidates`
         recent_data = data.iloc[-previous_batch_size:]
@@ -287,3 +287,4 @@ class EntropyTurboController(TurboController):
                 self.update_trust_region()
             else:
                 self._best_entropy = entropy
+
