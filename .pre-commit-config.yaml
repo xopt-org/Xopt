@@ -14,7 +14,7 @@ repos:
       - id: check-symlinks
       - id: check-xml
       - id: check-yaml
-        exclude: "^(python/versioneer.py|python/src/_version.py)$"
+        exclude: "^(python/versioneer.py|python/xopt/_version.py)$"
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.5.0
