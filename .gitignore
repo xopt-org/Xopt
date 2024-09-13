@@ -119,8 +119,7 @@ venv.bak/
 
 # pytorch modules
 *.pt
-*.csv
-*.yml
+dump.yml
 
 # python files in examples
 examples/*.py
