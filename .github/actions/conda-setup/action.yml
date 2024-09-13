@@ -20,11 +20,11 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup Mambaforge
+    - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
-        miniforge-variant: Mambaforge
         activate-environment: ${{ inputs.env_name }}
+        miniforge-version: latest
         use-mamba: true
         channels: conda-forge
     - name: Update Python version in environment.yml
