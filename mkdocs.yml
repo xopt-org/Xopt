@@ -1,6 +1,6 @@
 site_name: Xopt
-repo_url: https://github.com/ChristopherMayes/Xopt
-repo_name: ChristopherMayes/Xopt
+repo_url: https://github.com/xopt-org/Xopt
+repo_name: xopt-org/Xopt
 
 nav:
     - Home: index.md
