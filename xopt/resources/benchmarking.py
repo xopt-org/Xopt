@@ -75,9 +75,9 @@ class BenchMOBO:
             X.step()
             t2 = time.perf_counter()
             X.data.iloc[-1, X.data.columns.get_loc("gen_time")] = t2 - t1
-            X.data.iloc[
-                -1, X.data.columns.get_loc("hv")
-            ] = X.generator.calculate_hypervolume()
+            X.data.iloc[-1, X.data.columns.get_loc("hv")] = (
+                X.generator.calculate_hypervolume()
+            )
         return X
 
     @classmethod

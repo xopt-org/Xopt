@@ -18,21 +18,22 @@ dependencies:
   - mpi4py
   - dask
 # Developer
+  - ffmpeg
   - pytest
   - pytest-cov
-  - pytest-benchmark
   - jupyterlab>=3
+  - jupyterlab-lsp
+  - python-lsp-server
   - matplotlib
   - pygments
   - mkdocs
   - mkdocstrings
   - mkdocs-material
-  - mkdocs-jupyter
+  # NOTE: we are installing mkdocs-jupyter with pip for now
+  # due to the following: https://github.com/conda-forge/mkdocs-jupyter-feedstock/issues/31
+  # - mkdocs-jupyter
   - mkdocstrings-python
-  - pre-commit
-  - flake8
-  - pip
+  - ruff
+  - typing-extensions
   - pip:
-    - ufmt
-#  - pip:
-#    - git+git://github.com/some/repo
+      - mkdocs-jupyter>=0.24.7

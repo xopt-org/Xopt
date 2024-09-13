@@ -1,7 +1,0 @@
-pygments
-mkdocs
-mkdocstrings[python-legacy]>=0.18
-mkdocs-material
-mkdocs-jupyter
-livereload
-pytkdocs[numpy-style]
