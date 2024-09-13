@@ -1,0 +1,36 @@
+name: Run tests
+
+on:
+  pull_request:
+  push:
+  release:
+    types:
+      - published
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    name: Test Suite
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/conda-setup
+        with:
+          python-version: ${{ matrix.python-version }}
+          extras: "dev"
+      - name: Test environment conda package list
+        shell: bash -l {0}
+        run: |
+          conda list
+      - name: Run unit tests
+        shell: bash -l {0}
+        run: |
+          echo -e '## Test results\n\n```' >> "$GITHUB_STEP_SUMMARY"
+          pytest -v 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
