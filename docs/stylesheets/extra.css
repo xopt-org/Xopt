@@ -9,14 +9,14 @@ https://oceanumeric.github.io/blog/2022/jupyter-style/
 
 .jp-InputArea-prompt {
     visibility: hidden;
-} 
+}
 
 .jp-OutputArea-prompt {
     visibility: hidden;  /* disable this to tune the position */
-    background-color:red; 
+    background-color:red;
     position:absolute;
     right: 0;
-    
+
 }
 
 .jp-CodeCell > .jp-Cell-outputWrapper {
@@ -29,4 +29,3 @@ https://oceanumeric.github.io/blog/2022/jupyter-style/
     /* background-color:red; */
     margin-top: -17px;
 }
-

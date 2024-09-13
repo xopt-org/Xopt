@@ -20,8 +20,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation: bool = True
-    __doc__ = (
-        """Bayesian optimization generator using Upper Confidence Bound
+    __doc__ = """Bayesian optimization generator using Upper Confidence Bound
 
 Attributes
 ----------
@@ -29,9 +28,7 @@ beta : float, default 2.0
     Beta parameter for UCB optimization, controlling the trade-off between exploration
     and exploitation. Higher values of beta prioritize exploration.
 
-    """
-        + formatted_base_docstring()
-    )
+    """ + formatted_base_docstring()
 
     @field_validator("vocs")
     def validate_vocs_without_constraints(cls, v):
