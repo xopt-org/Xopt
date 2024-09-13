@@ -64,7 +64,7 @@ class RCDS:
         else:
             Dmat = np.matrix(np.identity(self.Nvar))
         while True:
-            logger.debug("iteration {}".format(it))
+            logger.debug(f"iteration {it}")
             it += 1
             # step /=1.2
 
