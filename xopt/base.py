@@ -15,15 +15,12 @@ from pydantic import (
     ValidationInfo,
 )
 
-from xopt import _version
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
-
-__version__ = _version.get_versions()["version"]
 
 logger = logging.getLogger(__name__)
 
@@ -551,6 +548,8 @@ class Xopt(XoptBaseModel):
             A string representation of the Xopt object.
 
         """
+        # lazy import to avoid circular import
+        from xopt import __version__
 
         # get dict minus data
         config = json.loads(self.json())

@@ -538,7 +538,7 @@ class BayesianGenerator(Generator, ABC):
 
     def _process_candidates(self, candidates: Tensor):
         """process pytorch candidates from optimizing the acquisition function"""
-        logger.debug("Best candidate from optimize", candidates)
+        logger.debug(f"Best candidate from optimize {candidates}")
 
         if self.fixed_features is not None:
             results = pd.DataFrame(
