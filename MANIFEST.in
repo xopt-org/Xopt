@@ -1,4 +1,1 @@
-include requirements.txt
 include LICENSE
-include versioneer.py
-include xopt/_version.py

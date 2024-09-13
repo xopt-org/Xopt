@@ -1,6 +1,6 @@
 site_name: Xopt
-repo_url: https://github.com/ChristopherMayes/Xopt
-repo_name: ChristopherMayes/Xopt
+repo_url: https://github.com/xopt-org/Xopt
+repo_name: xopt-org/Xopt
 
 nav:
     - Home: index.md
@@ -63,7 +63,7 @@ theme:
     repo: fontawesome/brands/github
   name: material
 
-  custom_dir: overrides
+  custom_dir: docs/overrides
   features:
     - navigation.top
     - navigation.tabs
@@ -85,39 +85,67 @@ theme:
 markdown_extensions:
   - pymdownx.highlight
   - pymdownx.superfences
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  # The following are for mathjax rendering of LaTeX formulas:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 extra:
   generator: false
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/ChristopherMayes/Xopt
+      link: https://github.com/xopt-org/xopt
       name: Xopt
 
 extra_css:
   - stylesheets/extra.css
 
 plugins:
-    - search
+  - search
 
-    - mkdocs-jupyter:
-        include_source: True
+  - mkdocs-jupyter:
+      include_source: True
 
-    - mkdocstrings:
-        default_handler: python
-        handlers:
-          python:
-            selection:
-              docstring_style: "numpy"
-              inherited_members: false
-              filters:
-                - "!^_"  # exclude all members starting with _
-                - "^__init__$"  # but always include __init__ modules and methods
-            rendering:
-              show_source: true
-              show_root_heading: true
-
-
-
-
-
-
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            filters:
+              - "!^_" # exclude all members starting with _
+              - "^__init__$" # but always include __init__ modules and methods
+            docstring_style: numpy
+            docstring_options:
+              ignore_init_summary: false
+            heading_level: 3
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_root_full_path: true
+            show_root_members_full_path: false
+            show_object_full_path: true
+            show_category_heading: true
+            show_if_no_docstring: false
+            show_signature: true
+            signature_crossrefs: true
+            show_signature_annotations: false
+            separate_signature: true
+            line_length: 100
+            merge_init_into_class: true
+            show_source: true
+            show_bases: true
+            show_submodules: false
+            group_by_category: true
+            unwrap_annotated: true
+            import:
+              - https://docs.python.org/3/objects.inv
+              - https://docs.h5py.org/en/stable/objects.inv
+              - https://slaclab.github.io/lume-base/objects.inv
+              - https://lark-parser.readthedocs.io/en/latest/objects.inv
+          rendering:
+            show_source: true
+            show_root_heading: true
