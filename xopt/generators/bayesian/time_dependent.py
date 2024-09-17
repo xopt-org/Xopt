@@ -1,6 +1,7 @@
 import time
 import warnings
 from abc import ABC
+from copy import copy
 from typing import Optional
 
 import pandas as pd
@@ -24,6 +25,9 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         TimeDependentModelConstructor(),
         description="constructor used to generate model",
     )
+    forgetting_time: Optional[PositiveFloat] = Field(
+        None, description="time period to forget historical data in seconds"
+    )
 
     @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(cls, value):
@@ -46,10 +50,13 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
         return value
 
-    def get_input_data(self, data: pd.DataFrame):
-        return torch.tensor(
-            data[self.vocs.variable_names + ["time"]].to_numpy(), **self._tkwargs
-        )
+    def get_training_data(self, data: pd.DataFrame):
+        """window data based on the forgetting time"""
+        new_data = copy(data)
+        if self.forgetting_time is not None:
+            new_data = new_data[data["time"] > time.time() - self.forgetting_time]
+
+        return new_data
 
     def generate(self, n_candidates: int) -> list[dict]:
         self.target_prediction_time = time.time() + self.added_time
@@ -65,6 +72,31 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
             time.sleep(0.001)
 
         return output
+
+    def get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
+        """
+        Convert input data to a torch tensor.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            The input data in the form of a pandas DataFrame.
+
+        Returns:
+        --------
+        torch.Tensor
+            A torch tensor containing the input data.
+
+        Notes:
+        ------
+        This method takes a pandas DataFrame as input data and converts it into a
+        torch tensor. It specifically selects columns corresponding to the model's
+        input names (variables), and the resulting tensor is configured with the data
+        type and device settings from the generator.
+        """
+        return torch.tensor(
+            data[self.model_input_names + ["time"]].to_numpy(), **self._tkwargs
+        )
 
     def get_acquisition(self, model):
         acq = super().get_acquisition(model)

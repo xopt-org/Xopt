@@ -53,6 +53,21 @@ class TestTimeDependentBO:
             time.sleep(0.01)
 
         test_data["time"] = np.array(time_array)
+        gen.add_data(test_data)
+        gen.generate(1)
+
+        # test without constraints
+        test_vocs.constraints = {}
+        gen.added_time = 5.0
+        gen.n_monte_carlo_samples = 1
+
+        test_data = deepcopy(TEST_VOCS_DATA)
+        time_array = []
+        for i in range(len(test_data)):
+            time_array.append(time.time())
+            time.sleep(0.01)
+
+        test_data["time"] = np.array(time_array)
 
         gen.add_data(test_data)
         gen.generate(1)

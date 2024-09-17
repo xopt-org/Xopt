@@ -167,6 +167,7 @@ class BayesianGenerator(Generator, ABC):
         description="custom objective for optimization, replaces objective specified by VOCS",
     )
     n_interpolate_points: Optional[PositiveInt] = None
+    memory_length: Optional[PositiveInt] = None
 
     n_candidates: int = 1
 
