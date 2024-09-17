@@ -10,6 +10,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     formatted_base_docstring,
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
+from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
@@ -62,3 +63,11 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             )
 
         return best_f
+
+
+class TDExpectedImprovementGenerator(
+    TimeDependentBayesianGenerator, ExpectedImprovementGenerator
+):
+    name = "time_dependent_expected_improvement"
+    __doc__ = """Implements Time-Dependent Bayesian Optimization using the Expected
+    Improvement acquisition function"""
