@@ -99,6 +99,31 @@ class TestMOBOGenerator:
             torch.tensor([[1.0, 2.0, 0.0], [0.5, 0.1, 1.5]], dtype=torch.double).T, pfy
         )
 
+        # test with constraints
+        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
+        test_data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.4, 0.4],
+                "x2": [0.1, 0.2, 0.3, 0.2],
+                "y1": [1.0, 2.0, 1.0, 0.0],
+                "y2": [0.5, 0.1, 1.0, 1.5],
+                "c1": [1.0, 1.0, 1.0, 0.0],
+            }
+        )
+        gen = MOBOGenerator(
+            vocs=vocs,
+            reference_point=reference_point,
+            use_pf_as_initial_points=True,
+        )
+        gen.add_data(test_data)
+        pfx, pfy = gen.get_pareto_front()
+        assert torch.allclose(
+            torch.tensor([[0.1, 0.2], [0.1, 0.2]], dtype=torch.double).T, pfx
+        )
+        assert torch.allclose(
+            torch.tensor([[1.0, 2.0], [0.5, 0.1]], dtype=torch.double).T, pfy
+        )
+
     def test_hypervolume_calculation(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.objectives.update({"y2": "MINIMIZE"})
@@ -168,7 +193,7 @@ class TestMOBOGenerator:
         gen.generate(1)
 
         # test with constraints
-        vocs.constraints = {"c1": ["GREATER_THAN", 0.1]}
+        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
         test_data = pd.DataFrame(
             {
                 "x1": [0.1, 0.2, 0.4, 0.4],
