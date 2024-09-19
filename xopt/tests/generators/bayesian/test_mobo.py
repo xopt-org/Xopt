@@ -159,6 +159,14 @@ class TestMOBOGenerator:
         assert len(initial_points) == 1
         gen.generate(1)
 
+        # try with no points on the pareto front
+        gen.reference_point = {"y1": 0.0, "y2": 0.0}
+        gen.numerical_optimizer.n_restarts = 20
+
+        initial_points = gen._get_initial_conditions()
+        assert initial_points is None
+        gen.generate(1)
+
     def test_log_mobo(self):
         evaluator = Evaluator(function=evaluate_TNK)
         reference_point = tnk_reference_point
@@ -175,6 +183,7 @@ class TestMOBOGenerator:
             dump = ele.model_dump()
             generator = MOBOGenerator(vocs=tnk_vocs, **dump)
             X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+            X.generator.numerical_optimizer.max_iter = 1
             X.random_evaluate(3)
             X.step()
 
