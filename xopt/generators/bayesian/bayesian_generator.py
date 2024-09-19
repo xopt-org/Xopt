@@ -796,7 +796,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
         objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
-        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
+        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)[
+            : self.vocs.n_objectives
+        ]
         return variable_data, objective_data * weights
 
     def calculate_hypervolume(self):
@@ -824,7 +826,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         )
         non_dominated = is_non_dominated(obj_data)
 
-        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
+        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)[
+            : self.vocs.n_objectives
+        ]
 
         # note need to undo weights for real number output
         # only return values if non nan values exist
