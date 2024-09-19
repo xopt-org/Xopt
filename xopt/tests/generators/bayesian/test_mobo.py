@@ -167,6 +167,26 @@ class TestMOBOGenerator:
         assert initial_points is None
         gen.generate(1)
 
+        # test with constraints
+        vocs.constraints = {"c1": ["GREATER_THAN", 0.1]}
+        test_data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.4, 0.4],
+                "x2": [0.1, 0.2, 0.3, 0.2],
+                "y1": [1.0, 2.0, 1.0, 0.0],
+                "y2": [0.5, 0.1, 1.0, 1.5],
+                "c1": [1.0, 1.0, 1.0, 1.0],
+            }
+        )
+        gen = MOBOGenerator(
+            vocs=vocs,
+            reference_point=reference_point,
+            use_pf_as_initial_points=True,
+        )
+        gen.add_data(test_data)
+        gen._get_initial_conditions()
+        gen.generate(1)
+
     def test_log_mobo(self):
         evaluator = Evaluator(function=evaluate_TNK)
         reference_point = tnk_reference_point
