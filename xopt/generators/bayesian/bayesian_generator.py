@@ -817,13 +817,21 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             (self.torch_reference_point.unsqueeze(0), objective_data)
         )
         var_data = torch.vstack(
-            (torch.zeros_like(variable_data[0]).unsqueeze(0), variable_data)
+            (
+                torch.full_like(variable_data[0], float("Nan")).unsqueeze(0),
+                variable_data,
+            )
         )
         non_dominated = is_non_dominated(obj_data)
+
         weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
 
         # note need to undo weights for real number output
-        return var_data[non_dominated], obj_data[non_dominated] / weights
+        # only return values if non nan values exist
+        if torch.all(torch.isnan(var_data[non_dominated])):
+            return None, None
+        else:
+            return var_data[non_dominated], obj_data[non_dominated] / weights
 
 
 def formatted_base_docstring():

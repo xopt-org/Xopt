@@ -93,6 +93,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
                 num_restarts = self.numerical_optimizer.n_restarts
 
                 pf_locations, _ = self.get_pareto_front()
+
+                # if there is no pareto front just return None to revert back to
+                # default behavior
+                if pf_locations is None:
+                    return None
+
                 initial_points = torch.clone(pf_locations)
 
                 # add the q dimension
