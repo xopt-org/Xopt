@@ -52,10 +52,10 @@ runs:
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
           mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
-          sudo apt-get install libopenmpi-dev
         fi
       if: steps.cache.outputs.cache-hit != 'true'
     - name: Setup the  environment
       shell: bash -l {0}
       run: |
+        sudo apt install libopenmpi-dev
         python -m pip install .[${{ inputs.extras }}]
