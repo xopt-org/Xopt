@@ -54,8 +54,13 @@ runs:
           mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
         fi
       if: steps.cache.outputs.cache-hit != 'true'
+    - name: Install required binaries for MPI
+      shell: bash -l {0}
+      run: |
+        if ![ -f "${{ inputs.filename }}" ]; then
+          sudo apt install libopenmpi-dev
+        fi
     - name: Setup the  environment
       shell: bash -l {0}
       run: |
-        sudo apt install libopenmpi-dev
         python -m pip install .[${{ inputs.extras }}]
