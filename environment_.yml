@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python>=3.9
   - deap
-  - numpy>=2.1.0
+  - numpy
   - pydantic>=2.3
   - pyyaml
   - botorch>=0.9.2,<=0.10.0
