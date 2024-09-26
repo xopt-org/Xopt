@@ -27,7 +27,6 @@ runs:
         miniforge-version: latest
         use-mamba: true
         channels: conda-forge
-        python-version: 3.9
     - name: Update Python version in environment.yml
       shell: bash -l {0}
       run: |
@@ -52,7 +51,7 @@ runs:
     - name: Update environment
       shell: bash -l {0}
       run: |
-        if [ -f "${{ inputs.filename }}" ] && steps.cache.outputs.cache-hit != 'true' ; then
+        if [ -f "${{ inputs.filename }}" ] && ! [ "${{ steps.cache.outputs.cache-hit }}" ] ; then
           mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
