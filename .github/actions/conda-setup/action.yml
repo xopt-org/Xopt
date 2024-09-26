@@ -39,11 +39,11 @@ runs:
       shell: bash -l {0}
       run: |
         echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-    - uses: actions/cache@v4
-      with:
-        path: ${{ env.CONDA }}/envs
-        key: conda-${{ hashFiles(inputs.filename) }}-${{ env.DATE }}
-      id: cache
+#    - uses: actions/cache@v4
+#      with:
+#        path: ${{ env.CONDA }}/envs
+#        key: conda-${{ hashFiles(inputs.filename) }}-${{ env.DATE }}
+#      id: cache
     - name: Update environment
       shell: bash -l {0}
       run: |
