@@ -52,13 +52,13 @@ runs:
     - name: Update environment
       shell: bash -l {0}
       run: |
-        if [ -f "${{ inputs.filename }}" ]; then
+        if [ -f "${{ inputs.filename }}" ] && steps.cache.outputs.cache-hit != 'true' ; then
           mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
           mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
         fi
-      if: steps.cache.outputs.cache-hit != 'true'
+      #if: steps.cache.outputs.cache-hit != 'true'
     - name: Test environment conda package list
       shell: bash -l {0}
       run: |
