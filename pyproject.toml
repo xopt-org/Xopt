@@ -48,8 +48,7 @@ dev = [
   "python-lsp-server",
   "pygments",
   "dask",
-  "mpi4py",
-  "libopenmpi-dev"
+  "mpi4py"
 ]
 doc = [
   "mkdocs",
