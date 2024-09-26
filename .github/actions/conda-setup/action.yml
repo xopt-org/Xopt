@@ -47,7 +47,7 @@ runs:
     - name: Update environment
       shell: bash -l {0}
       run: |
-        if [ -f "${{ inputs.filename }}" ]; then
+        if  grep -q ${{ inputs.filename }}; then
           mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
