@@ -57,7 +57,7 @@ runs:
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
           mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
         fi
-      #if: steps.cache.outputs.cache-hit != 'true'
+      if: steps.cache.outputs.cache-hit != 'true'
     - name: Test environment conda package list
       shell: bash -l {0}
       run: |
