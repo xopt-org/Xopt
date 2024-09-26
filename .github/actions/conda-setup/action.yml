@@ -52,9 +52,12 @@ runs:
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
           mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
-          conda list
         fi
       if: steps.cache.outputs.cache-hit != 'true'
+    - name: Test environment conda package list
+      shell: bash -l {0}
+      run: |
+        conda list
     - name: Install required binaries for MPI
       shell: bash -l {0}
       run: |
