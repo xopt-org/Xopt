@@ -57,7 +57,7 @@ runs:
     - name: Install required binaries for MPI
       shell: bash -l {0}
       run: |
-        if ![ -f "${{ inputs.filename }}" ]; then
+        if ! grep -q ${{ inputs.filename }} ; then
           sudo apt install libopenmpi-dev
         fi
     - name: Setup the  environment
