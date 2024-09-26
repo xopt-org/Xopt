@@ -19,6 +19,9 @@ inputs:
     default: "dev"
 runs:
   using: "composite"
+  defaults:
+    run:
+      shell: bash -el {0}
   steps:
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
@@ -29,7 +32,7 @@ runs:
         channels: conda-forge
         python-version: ${{ inputs.python-version }}
     - name: Update Python version in environment.yml
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         if [ -f "${{ inputs.filename }}" ]; then
           sed -i -e "s/- python>=.*/- python=${{ inputs.python-version }}/" ${{ inputs.filename }}
@@ -37,7 +40,7 @@ runs:
           grep "python=" ${{ inputs.filename }}
         fi
     - name: Set cache date
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
     - uses: actions/cache@v4
@@ -46,34 +49,34 @@ runs:
         key: conda-${{ hashFiles(inputs.filename) }}-${{ env.DATE }}
       id: cache
     - name: Test environment conda package list
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         conda list
     - name: Update environment
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
-        if grep -q ${{ inputs.filename }}; then
-          mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
-        else
+        if ! grep -q ${{ inputs.filename }} ; then
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
-          conda install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
+          mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
+        else
+          mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
         fi
       if: steps.cache.outputs.cache-hit != 'true'
     - name: Dump Python version
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         echo "Python version ${{ inputs.python-version }}"
     - name: Test environment conda package list
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         conda list
     - name: Install required binaries for MPI
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         if ! grep -q ${{ inputs.filename }} ; then
           sudo apt install libopenmpi-dev
         fi
     - name: Setup the  environment
-      shell: bash -l {0}
+      #shell: bash -l {0}
       run: |
         python -m pip install .[${{ inputs.extras }}]
