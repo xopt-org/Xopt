@@ -27,6 +27,7 @@ runs:
         miniforge-version: latest
         use-mamba: true
         channels: conda-forge
+        python-version: ${{ inputs.python-version }}
     - name: Update Python version in environment.yml
       shell: bash -l {0}
       run: |
@@ -47,13 +48,18 @@ runs:
     - name: Update environment
       shell: bash -l {0}
       run: |
-        if  grep -q ${{ inputs.filename }}; then
+        if grep -q ${{ inputs.filename }}; then
           mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
           mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
         fi
       if: steps.cache.outputs.cache-hit != 'true'
+    - name: Dump Python version
+      shell: bash -l {0}
+      PYTHON_VERSION: ${{ inputs.python-version }}
+      run: |
+        echo "$PYTHON_VERSION"
     - name: Test environment conda package list
       shell: bash -l {0}
       run: |
