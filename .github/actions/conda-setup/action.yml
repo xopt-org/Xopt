@@ -57,9 +57,8 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
     - name: Dump Python version
       shell: bash -l {0}
-      PYTHON_VERSION: ${{ inputs.python-version }}
       run: |
-        echo "$PYTHON_VERSION"
+        echo "Python version ${{ inputs.python-version }}"
     - name: Test environment conda package list
       shell: bash -l {0}
       run: |
