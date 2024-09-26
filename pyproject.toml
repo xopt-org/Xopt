@@ -17,8 +17,17 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-  # All core dependencies must be sourced from conda (conda-forge).
-  # See ``environment.yml`` for further information.
+  "deap",
+  "numpy",
+  "pydantic>=2.3",
+  "pyyaml",
+  "botorch>=0.9.2,<=0.10.0",
+  "scipy>=1.10.1",
+  "pandas",
+  "ipywidgets",
+  "tqdm",
+  "orjson",
+  "matplotlib"
 ]
 description = "Flexible optimization of arbitrary problems in Python."
 dynamic = [ "version" ]
@@ -31,6 +40,15 @@ requires-python = ">=3.9"
 dev = [
   "pytest",
   "pytest-cov",
+  "ffmpeg",
+  "pytest",
+  "pytest-cov",
+  "jupyterlab>=3",
+  "jupyterlab-lsp",
+  "python-lsp-server",
+  "pygments",
+  "dask",
+  "mpi4py"
 ]
 doc = [
   "mkdocs",
