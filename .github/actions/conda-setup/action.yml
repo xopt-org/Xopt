@@ -45,6 +45,10 @@ runs:
         path: ${{ env.CONDA }}/envs
         key: conda-${{ hashFiles(inputs.filename) }}-${{ env.DATE }}
       id: cache
+    - name: Test environment conda package list
+      shell: bash -l {0}
+      run: |
+        conda list
     - name: Update environment
       shell: bash -l {0}
       run: |
@@ -52,7 +56,7 @@ runs:
           mamba env update -n ${{ inputs.env_name }} -f ${{ inputs.filename }}
         else
           echo "No conda environment file found; skipping. Path: ${{ inputs.filename }}"
-          mamba install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
+          conda install -n ${{ inputs.env_name }} python=${{ inputs.python-version }}
         fi
       if: steps.cache.outputs.cache-hit != 'true'
     - name: Dump Python version
