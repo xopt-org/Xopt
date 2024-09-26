@@ -40,11 +40,11 @@ runs:
       shell: bash -l {0}
       run: |
         echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-    - uses: actions/cache@v4
-      with:
-        path: ${{ env.CONDA }}/envs
-        key: conda-${{ hashFiles(inputs.filename) }}-${{ env.DATE }}
-      id: cache
+#    - uses: actions/cache@v4
+#      with:
+#        path: ${{ env.CONDA }}/envs
+#        key: conda-${{ hashFiles(inputs.filename) }}-${{ env.DATE }}
+#      id: cache
     - name: Test environment conda package list
       shell: bash -l {0}
       run: |
@@ -59,10 +59,6 @@ runs:
           mamba install -n ${{ inputs.env_name }} -y python=${{ inputs.python-version }}
         fi
       #if: steps.cache.outputs.cache-hit != 'true'
-    - name: Dump Python version
-      shell: bash -l {0}
-      run: |
-        echo "Python version ${{ inputs.python-version }}"
     - name: Test environment conda package list
       shell: bash -l {0}
       run: |
