@@ -92,7 +92,7 @@ class Xopt(XoptBaseModel):
     """
 
     vocs: VOCS = Field(description="VOCS object for Xopt")
-    generator: SerializeAsAny[Generator] = Field(
+    generator: Union[SerializeAsAny[Generator], Any] = Field(
         description="generator object for Xopt"
     )
     evaluator: SerializeAsAny[Evaluator] = Field(
