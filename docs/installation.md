@@ -27,7 +27,7 @@ Developers
 
 Clone this repository:
 ```shell
-git clone https://github.com/ChristopherMayes/Xopt.git
+git clone https://github.com/xopt-org/xopt.git
 ```
 
 Create an environment `xopt-dev` with all the dependencies:
@@ -55,6 +55,4 @@ Note that there is a bug in Jupyterhub terminals. Type:
 ```
 module swap PrgEnv-gnu PrgEnv-gnu
 ```
-to get the C compiler activated. 
-
-
+to get the C compiler activated.
