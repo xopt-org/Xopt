@@ -83,6 +83,11 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         generate initial candidates for optimizing the acquisition function based on
         the pareto front
 
+        If `use_pf_as_initial_points` flag is set to true then the current
+        Pareto-optimal set is used as initial points for optimizing the acquisition
+        function instead of randomly selected points (random points fill in the set
+        if `num_restarts` is greater than the number of points in the Pareto set).
+
         Returns:
             A `num_restarts x q x d` tensor of initial conditions.
 
