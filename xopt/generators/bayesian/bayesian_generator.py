@@ -418,10 +418,7 @@ class BayesianGenerator(Generator, ABC):
             )
         else:
             candidates = self.numerical_optimizer.optimize(
-                acq_funct,
-                bounds,
-                n_candidates,
-                batch_initial_conditions=initial_points
+                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
             )
         return candidates
 

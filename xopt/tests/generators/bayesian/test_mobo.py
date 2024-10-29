@@ -216,9 +216,9 @@ class TestMOBOGenerator:
         ic = gen._get_initial_conditions()
         assert not torch.allclose(
             ic[:4],
-            torch.tensor(
-                ((0.1, 0.1), (0.2, 0.2), (0.4, 0.2), (0.15, 0.15))
-            ).reshape(4, 1, 2).double()
+            torch.tensor(((0.1, 0.1), (0.2, 0.2), (0.4, 0.2), (0.15, 0.15)))
+            .reshape(4, 1, 2)
+            .double(),
         )
 
         gen.generate(1)
