@@ -411,10 +411,18 @@ class BayesianGenerator(Generator, ABC):
         # get initial candidates to start acquisition function optimization
         initial_points = self._get_initial_conditions(n_candidates)
 
-        # get candidates
-        candidates = self.numerical_optimizer.optimize(
-            acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
-        )
+        # get candidates -- grid optimizer does not support batch_initial_conditions
+        if isinstance(self.numerical_optimizer, GridOptimizer):
+            candidates = self.numerical_optimizer.optimize(
+                acq_funct, bounds, n_candidates
+            )
+        else:
+            candidates = self.numerical_optimizer.optimize(
+                acq_funct,
+                bounds,
+                n_candidates,
+                batch_initial_conditions=initial_points
+            )
         return candidates
 
     def get_training_data(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -799,7 +807,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         weights = set_botorch_weights(self.vocs).to(**self._tkwargs)[
             : self.vocs.n_objectives
         ]
-        return variable_data, objective_data * weights
+        return variable_data, objective_data * weights, weights
 
     def calculate_hypervolume(self):
         """compute hypervolume given data"""
@@ -814,7 +822,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
     def get_pareto_front(self):
         """compute the pareto front x/y values given data"""
-        variable_data, objective_data = self._get_scaled_data()
+        variable_data, objective_data, weights = self._get_scaled_data()
         obj_data = torch.vstack(
             (self.torch_reference_point.unsqueeze(0), objective_data)
         )
@@ -825,10 +833,6 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             )
         )
         non_dominated = is_non_dominated(obj_data)
-
-        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)[
-            : self.vocs.n_objectives
-        ]
 
         # note need to undo weights for real number output
         # only return values if non nan values exist

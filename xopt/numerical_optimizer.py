@@ -70,7 +70,7 @@ class GridOptimizer(NumericalOptimizer):
         10, description="number of grid points per axis used for optimization"
     )
 
-    def optimize(self, function, bounds, n_candidates=1, **kwargs):
+    def optimize(self, function, bounds, n_candidates=1):
         assert isinstance(bounds, Tensor)
         # create mesh
         if len(bounds) != 2:

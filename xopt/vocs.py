@@ -561,12 +561,12 @@ class VOCS(XoptBaseModel):
         observable_data = self.observable_data(data, "")
 
         if return_valid:
-            feasable_status = self.feasibility_data(data)["feasible"]
+            feasible_status = self.feasibility_data(data)["feasible"]
             return (
-                variable_data[feasable_status],
-                objective_data[feasable_status],
-                constraint_data[feasable_status],
-                observable_data[feasable_status],
+                variable_data[feasible_status],
+                objective_data[feasible_status],
+                constraint_data[feasible_status],
+                observable_data[feasible_status],
             )
 
         return variable_data, objective_data, constraint_data, observable_data

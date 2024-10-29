@@ -21,7 +21,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     supports_batch_generation: bool = True
     use_pf_as_initial_points: bool = Field(
         False,
-        description="flag to specify if pf front points are to be used during "
+        description="flag to specify if pareto front points are to be used during "
         "optimization of the acquisition function",
     )
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Expected
