@@ -168,6 +168,7 @@ class TestMOBOGenerator:
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
+        gen.numerical_optimizer.max_time = 1.0
         gen.add_data(test_data)
         initial_points = gen._get_initial_conditions()
 
@@ -196,11 +197,11 @@ class TestMOBOGenerator:
         vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
         test_data = pd.DataFrame(
             {
-                "x1": [0.1, 0.2, 0.4, 0.4],
-                "x2": [0.1, 0.2, 0.3, 0.2],
-                "y1": [1.0, 2.0, 1.0, 0.0],
-                "y2": [0.5, 0.1, 1.0, 1.5],
-                "c1": [1.0, 1.0, 1.0, 1.0],
+                "x1": [0.1, 0.2, 0.4, 0.4, 0.15],
+                "x2": [0.1, 0.2, 0.3, 0.2, 0.15],
+                "y1": [1.0, 2.0, 1.0, 0.0, 1.5],
+                "y2": [0.5, 0.1, 1.0, 1.5, 0.25],
+                "c1": [1.0, 1.0, 1.0, 1.0, 0.0],
             }
         )
         gen = MOBOGenerator(
@@ -209,7 +210,17 @@ class TestMOBOGenerator:
             use_pf_as_initial_points=True,
         )
         gen.add_data(test_data)
-        gen._get_initial_conditions()
+        gen.numerical_optimizer.max_time = 1.0
+
+        # make sure that no invalid points make it into the initial conditions
+        ic = gen._get_initial_conditions()
+        assert not torch.allclose(
+            ic[:4],
+            torch.tensor(
+                ((0.1, 0.1), (0.2, 0.2), (0.4, 0.2), (0.15, 0.15))
+            ).reshape(4, 1, 2).double()
+        )
+
         gen.generate(1)
 
     def test_log_mobo(self):
