@@ -141,6 +141,7 @@ class CNSGAGenerator(Generator):
         if filename is None:
             filename = f"{self.name}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
             filename = os.path.join(self.output_path, filename)
+            filename = filename.replace(":", "_")
 
         self.population.to_csv(filename, index_label="xopt_index")
 
