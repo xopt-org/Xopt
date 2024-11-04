@@ -351,8 +351,12 @@ class TestTurbo(TestCase):
         evaluator = Evaluator(function=sin_function)
         for name in ["optimize", "safety"]:
             generator = UpperConfidenceBoundGenerator(vocs=vocs, turbo_controller=name)
-            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs,
-                     dump_file="dump.yml")
+            X = Xopt(
+                evaluator=evaluator,
+                generator=generator,
+                vocs=vocs,
+                dump_file="dump.yml",
+            )
 
             yaml_str = X.yaml()
             X2 = Xopt.from_yaml(yaml_str)

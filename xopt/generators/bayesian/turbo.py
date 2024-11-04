@@ -104,7 +104,8 @@ class TurboController(XoptBaseModel, ABC):
 
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
-                [self.center_x[ele] for ele in self.vocs.variable_names], **generator.tkwargs
+                [self.center_x[ele] for ele in self.vocs.variable_names],
+                **generator.tkwargs,
             ).unsqueeze(dim=0)
 
             # default weights are 1 (if there is no model or a model without
