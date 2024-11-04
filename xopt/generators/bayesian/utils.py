@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import List
 
 import numpy as np
@@ -206,16 +207,19 @@ def validate_turbo_controller_base(value, available_controller_types, info):
                 f"{available_controller_types.keys()}"
             )
     elif isinstance(value, dict):
+        value_copy = deepcopy(value)
         # create turbo controller from dict input
         if "name" not in value:
             raise ValueError("turbo input dict needs to have a `name` attribute")
-        name = value.pop("name")
+        name = value_copy.pop("name")
         if name in available_controller_types:
             # pop unnecessary elements
             for ele in ["dim"]:
-                value.pop(ele, None)
+                value_copy.pop(ele, None)
 
-            value = available_controller_types[name](vocs=info.data["vocs"], **value)
+            value = available_controller_types[name](
+                vocs=info.data["vocs"], **value_copy
+            )
         else:
             raise ValueError(
                 f"{value} not found, available values are "
