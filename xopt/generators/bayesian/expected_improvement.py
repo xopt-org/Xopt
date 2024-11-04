@@ -52,9 +52,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         """get best function value for EI based on the objective"""
         if isinstance(objective, CustomXoptObjective):
             best_f = objective(
-                torch.tensor(
-                    self.vocs.observable_data(data).to_numpy(), **self.tkwargs
-                )
+                torch.tensor(self.vocs.observable_data(data).to_numpy(), **self.tkwargs)
             ).max()
         else:
             # analytic acquisition function for single candidate generation
