@@ -155,7 +155,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         """select the best point at the maximum fidelity"""
 
         # define single objective based on vocs
-        weights = torch.zeros(self.vocs.n_outputs, **self._tkwargs)
+        weights = torch.zeros(self.vocs.n_outputs, **self.tkwargs)
         for idx, ele in enumerate(self.vocs.objective_names):
             if self.vocs.objectives[ele] == "MINIMIZE":
                 weights[idx] = -1.0

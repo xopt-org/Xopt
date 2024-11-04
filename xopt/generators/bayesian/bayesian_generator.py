@@ -385,7 +385,7 @@ class BayesianGenerator(Generator, ABC):
             self.vocs.output_names,
             data,
             {name: variable_bounds[name] for name in self.model_input_names},
-            **self._tkwargs,
+            **self.tkwargs,
         )
 
         if update_internal:
@@ -467,7 +467,7 @@ class BayesianGenerator(Generator, ABC):
         input names (variables), and the resulting tensor is configured with the data
         type and device settings from the generator.
         """
-        return torch.tensor(data[self.model_input_names].to_numpy(), **self._tkwargs)
+        return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
 
     def get_acquisition(self, model):
         """
@@ -597,7 +597,7 @@ class BayesianGenerator(Generator, ABC):
 
             return self.custom_objective
         else:
-            return create_mc_objective(self.vocs, self._tkwargs)
+            return create_mc_objective(self.vocs, self.tkwargs)
 
     def _get_constraint_callables(self):
         """return constratint callable determined by vocs"""
@@ -607,7 +607,7 @@ class BayesianGenerator(Generator, ABC):
         return constraint_callables
 
     @property
-    def _tkwargs(self):
+    def tkwargs(self):
         # set device and data type for generator
         device = "cpu"
         if self.use_cuda:
@@ -643,7 +643,7 @@ class BayesianGenerator(Generator, ABC):
 
     def _get_bounds(self):
         """convert bounds from vocs to torch tensors"""
-        return torch.tensor(self.vocs.bounds, **self._tkwargs)
+        return torch.tensor(self.vocs.bounds, **self.tkwargs)
 
     def _get_optimization_bounds(self):
         """
@@ -736,7 +736,7 @@ class BayesianGenerator(Generator, ABC):
                 "from, add data first to use during BO"
             )
         last_point = torch.tensor(
-            self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self._tkwargs
+            self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self.tkwargs
         )
 
         # bound lengths based on vocs for normalization
@@ -744,8 +744,8 @@ class BayesianGenerator(Generator, ABC):
 
         # get maximum travel distances
         max_travel_distances = torch.tensor(
-            self.max_travel_distances, **self._tkwargs
-        ) * torch.tensor(lengths, **self._tkwargs)
+            self.max_travel_distances, **self.tkwargs
+        ) * torch.tensor(lengths, **self.tkwargs)
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
         )
@@ -790,7 +790,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     supported"
                 )
 
-        return torch.tensor(pt, **self._tkwargs)
+        return torch.tensor(pt, **self.tkwargs)
 
     def _get_scaled_data(self):
         """get scaled input/objective data for use with botorch logic which assumes
@@ -801,7 +801,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
         objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
-        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)[
+        weights = set_botorch_weights(self.vocs).to(**self.tkwargs)[
             : self.vocs.n_objectives
         ]
         return variable_data, objective_data * weights, weights

@@ -32,7 +32,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         ga_candidates = self.ga_generator.generate(n_candidates * 10)
         ga_candidates = pd.DataFrame(ga_candidates)[self.vocs.variable_names].to_numpy()
         ga_candidates = torch.unique(
-            torch.tensor(ga_candidates, **self._tkwargs), dim=0
+            torch.tensor(ga_candidates, **self.tkwargs), dim=0
         ).reshape(-1, 1, self.vocs.n_variables)
 
         if ga_candidates.shape[0] < n_candidates:
