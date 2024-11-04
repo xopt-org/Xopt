@@ -40,7 +40,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             # analytic acquisition function for single candidate generation with
             # basic objective
             # note that the analytic version cannot handle custom objectives
-            weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
+            weights = set_botorch_weights(self.vocs).to(**self.tkwargs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
             acq = ExpectedImprovement(
                 model, best_f=best_f, posterior_transform=posterior_transform
@@ -53,13 +53,13 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         if isinstance(objective, CustomXoptObjective):
             best_f = objective(
                 torch.tensor(
-                    self.vocs.observable_data(data).to_numpy(), **self._tkwargs
+                    self.vocs.observable_data(data).to_numpy(), **self.tkwargs
                 )
             ).max()
         else:
             # analytic acquisition function for single candidate generation
             best_f = -torch.tensor(
-                self.vocs.objective_data(data).min().values, **self._tkwargs
+                self.vocs.objective_data(data).min().values, **self.tkwargs
             )
 
         return best_f

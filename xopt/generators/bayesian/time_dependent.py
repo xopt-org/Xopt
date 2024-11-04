@@ -95,7 +95,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         type and device settings from the generator.
         """
         return torch.tensor(
-            data[self.model_input_names + ["time"]].to_numpy(), **self._tkwargs
+            data[self.model_input_names + ["time"]].to_numpy(), **self.tkwargs
         )
 
     def get_acquisition(self, model):
@@ -103,7 +103,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
         # identify which column has the `time` attribute
         column = [-1]
-        value = torch.tensor(self.target_prediction_time, **self._tkwargs).unsqueeze(0)
+        value = torch.tensor(self.target_prediction_time, **self.tkwargs).unsqueeze(0)
         fixed_acq = FixedFeatureAcquisitionFunction(
             acq, self.vocs.n_variables + 1, column, value
         )
