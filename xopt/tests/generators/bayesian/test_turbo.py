@@ -369,7 +369,7 @@ class TestTurbo(TestCase):
 
             # test restart
             X3 = Xopt.model_validate(config)
-            X3.generator.train_model()
+            X3.random_evaluate(3)
             X3.step()
 
     def test_entropy_turbo(self):
