@@ -37,10 +37,10 @@ class ModelConstructor(XoptBaseModel, ABC):
         Convenience wrapper around `build_model` for use with VOCs (Variables, Objectives,
         Constraints, Statics).
 
-    build_single_task_gp(train_X, train_Y, **kwargs)
+    build_single_task_gp(X, Y, train=True, **kwargs)
         Utility method for creating and training simple SingleTaskGP models.
 
-    build_heteroskedastic_gp(train_X, train_Y, train_Yvar, **kwargs)
+    build_heteroskedastic_gp(X, Y, Yvar, train=True, **kwargs)
         Utility method for creating and training heteroskedastic SingleTaskGP models.
 
     """
@@ -122,16 +122,18 @@ class ModelConstructor(XoptBaseModel, ABC):
         )
 
     @staticmethod
-    def build_single_task_gp(train_X: Tensor, train_Y: Tensor, **kwargs) -> Model:
+    def build_single_task_gp(X: Tensor, Y: Tensor, train=True, **kwargs) -> Model:
         """
         Utility method for creating and training simple SingleTaskGP models.
 
         Parameters
         ----------
-        train_X : Tensor
+        X : Tensor
             Training data for input variables.
-        train_Y : Tensor
+        Y : Tensor
             Training data for outcome variables.
+        train : bool, True
+            Flag to specify if hyperparameter training should take place
         **kwargs
             Additional keyword arguments for model configuration.
 
@@ -141,29 +143,32 @@ class ModelConstructor(XoptBaseModel, ABC):
             The trained SingleTaskGP model.
 
         """
-        if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
+        if X.shape[0] == 0 or Y.shape[0] == 0:
             raise ValueError("no data found to train model!")
-        model = SingleTaskGP(train_X, train_Y, **kwargs)
+        model = SingleTaskGP(X, Y, **kwargs)
 
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_mll(mll)
+        if train:
+            mll = ExactMarginalLogLikelihood(model.likelihood, model)
+            fit_gpytorch_mll(mll)
         return model
 
     @staticmethod
     def build_heteroskedastic_gp(
-        train_X: Tensor, train_Y: Tensor, train_Yvar: Tensor, **kwargs
+        X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs
     ) -> Model:
         """
         Utility method for creating and training heteroskedastic SingleTaskGP models.
 
         Parameters
         ----------
-        train_X : Tensor
+        X : Tensor
             Training data for input variables.
-        train_Y : Tensor
+        Y : Tensor
             Training data for outcome variables.
-        train_Yvar : Tensor
+        Yvar : Tensor
             Training data for outcome variable variances.
+        train : bool, True
+            Flag to specify if hyperparameter training should take place
         **kwargs
             Additional keyword arguments for model configuration.
 
@@ -182,15 +187,10 @@ class ModelConstructor(XoptBaseModel, ABC):
 
         warnings.filterwarnings("ignore")
 
-        if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
+        if X.shape[0] == 0 or Y.shape[0] == 0:
             raise ValueError("no data found to train model!")
-        model = XoptHeteroskedasticSingleTaskGP(
-            train_X,
-            train_Y,
-            train_Yvar,
-            **kwargs,
-        )
-
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_mll(mll)
+        model = XoptHeteroskedasticSingleTaskGP(X, Y, Yvar, **kwargs)
+        if train:
+            mll = ExactMarginalLogLikelihood(model.likelihood, model)
+            fit_gpytorch_mll(mll)
         return model
