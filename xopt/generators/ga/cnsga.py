@@ -123,7 +123,8 @@ class CNSGAGenerator(Generator):
             return
 
         if filename is None:
-            filename = f"{self.name}_offspring_{xopt.utils.isotime(include_microseconds=True)}.csv"
+            timestamp = xopt.utils.isotime(include_microseconds=True).replace(":", "_")
+            filename = f"{self.name}_offspring_{timestamp}.csv"
             filename = os.path.join(self.output_path, filename)
 
         self._offspring.to_csv(filename, index_label="xopt_index")
@@ -139,7 +140,8 @@ class CNSGAGenerator(Generator):
             return
 
         if filename is None:
-            filename = f"{self.name}_population_{xopt.utils.isotime(include_microseconds=True)}.csv"
+            timestamp = xopt.utils.isotime(include_microseconds=True).replace(":", "_")
+            filename = f"{self.name}_population_{timestamp}.csv"
             filename = os.path.join(self.output_path, filename)
 
         self.population.to_csv(filename, index_label="xopt_index")

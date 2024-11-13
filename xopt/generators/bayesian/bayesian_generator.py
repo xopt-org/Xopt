@@ -4,13 +4,14 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
+from botorch.utils.multi_objective import is_non_dominated
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import Field, field_validator, PositiveInt, SerializeAsAny
@@ -384,7 +385,7 @@ class BayesianGenerator(Generator, ABC):
             self.vocs.output_names,
             data,
             {name: variable_bounds[name] for name in self.model_input_names},
-            **self._tkwargs,
+            **self.tkwargs,
         )
 
         if update_internal:
@@ -407,8 +408,18 @@ class BayesianGenerator(Generator, ABC):
         # get acquisition function
         acq_funct = self.get_acquisition(model)
 
-        # get candidates
-        candidates = self.numerical_optimizer.optimize(acq_funct, bounds, n_candidates)
+        # get initial candidates to start acquisition function optimization
+        initial_points = self._get_initial_conditions(n_candidates)
+
+        # get candidates -- grid optimizer does not support batch_initial_conditions
+        if isinstance(self.numerical_optimizer, GridOptimizer):
+            candidates = self.numerical_optimizer.optimize(
+                acq_funct, bounds, n_candidates
+            )
+        else:
+            candidates = self.numerical_optimizer.optimize(
+                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
+            )
         return candidates
 
     def get_training_data(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -456,7 +467,7 @@ class BayesianGenerator(Generator, ABC):
         input names (variables), and the resulting tensor is configured with the data
         type and device settings from the generator.
         """
-        return torch.tensor(data[self.model_input_names].to_numpy(), **self._tkwargs)
+        return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
 
     def get_acquisition(self, model):
         """
@@ -536,6 +547,11 @@ class BayesianGenerator(Generator, ABC):
         """displays the GP models"""
         return visualize_generator_model(self, **kwargs)
 
+    def _get_initial_conditions(self, n_candidates=1) -> Union[Tensor, None]:
+        """overwrite if algorithm should specifiy initial candidates for optimizing
+        the acquisition function"""
+        return None
+
     def _process_candidates(self, candidates: Tensor):
         """process pytorch candidates from optimizing the acquisition function"""
         logger.debug(f"Best candidate from optimize {candidates}")
@@ -581,7 +597,7 @@ class BayesianGenerator(Generator, ABC):
 
             return self.custom_objective
         else:
-            return create_mc_objective(self.vocs, self._tkwargs)
+            return create_mc_objective(self.vocs, self.tkwargs)
 
     def _get_constraint_callables(self):
         """return constratint callable determined by vocs"""
@@ -591,7 +607,7 @@ class BayesianGenerator(Generator, ABC):
         return constraint_callables
 
     @property
-    def _tkwargs(self):
+    def tkwargs(self):
         # set device and data type for generator
         device = "cpu"
         if self.use_cuda:
@@ -627,7 +643,7 @@ class BayesianGenerator(Generator, ABC):
 
     def _get_bounds(self):
         """convert bounds from vocs to torch tensors"""
-        return torch.tensor(self.vocs.bounds, **self._tkwargs)
+        return torch.tensor(self.vocs.bounds, **self.tkwargs)
 
     def _get_optimization_bounds(self):
         """
@@ -720,7 +736,7 @@ class BayesianGenerator(Generator, ABC):
                 "from, add data first to use during BO"
             )
         last_point = torch.tensor(
-            self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self._tkwargs
+            self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self.tkwargs
         )
 
         # bound lengths based on vocs for normalization
@@ -728,8 +744,8 @@ class BayesianGenerator(Generator, ABC):
 
         # get maximum travel distances
         max_travel_distances = torch.tensor(
-            self.max_travel_distances, **self._tkwargs
-        ) * torch.tensor(lengths, **self._tkwargs)
+            self.max_travel_distances, **self.tkwargs
+        ) * torch.tensor(lengths, **self.tkwargs)
         max_travel_bounds = torch.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
         )
@@ -774,32 +790,53 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     supported"
                 )
 
-        return torch.tensor(pt, **self._tkwargs)
+        return torch.tensor(pt, **self.tkwargs)
+
+    def _get_scaled_data(self):
+        """get scaled input/objective data for use with botorch logic which assumes
+        maximization for each objective"""
+        var_df, obj_df, _, _ = self.vocs.extract_data(
+            self.data, return_valid=True, return_raw=True
+        )
+
+        variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
+        objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
+        weights = set_botorch_weights(self.vocs).to(**self.tkwargs)[
+            : self.vocs.n_objectives
+        ]
+        return variable_data, objective_data * weights, weights
 
     def calculate_hypervolume(self):
         """compute hypervolume given data"""
-        objective_data = torch.tensor(
-            self.vocs.objective_data(self.data, return_raw=True).to_numpy()
-        )
-
-        # hypervolume must only take into account feasible data points
-        if self.vocs.n_constraints > 0:
-            objective_data = objective_data[
-                self.vocs.feasibility_data(self.data)["feasible"].to_list()
-            ]
-
-        n_objectives = self.vocs.n_objectives
-        weights = torch.zeros(n_objectives)
-        weights = set_botorch_weights(self.vocs).to(**self._tkwargs)
-        objective_data = objective_data * weights
 
         # compute hypervolume
         bd = DominatedPartitioning(
-            ref_point=self.torch_reference_point, Y=objective_data
+            ref_point=self.torch_reference_point, Y=self._get_scaled_data()[1]
         )
         volume = bd.compute_hypervolume().item()
 
         return volume
+
+    def get_pareto_front(self):
+        """compute the pareto front x/y values given data"""
+        variable_data, objective_data, weights = self._get_scaled_data()
+        obj_data = torch.vstack(
+            (self.torch_reference_point.unsqueeze(0), objective_data)
+        )
+        var_data = torch.vstack(
+            (
+                torch.full_like(variable_data[0], float("Nan")).unsqueeze(0),
+                variable_data,
+            )
+        )
+        non_dominated = is_non_dominated(obj_data)
+
+        # note need to undo weights for real number output
+        # only return values if non nan values exist
+        if torch.all(torch.isnan(var_data[non_dominated])):
+            return None, None
+        else:
+            return var_data[non_dominated], obj_data[non_dominated] / weights
 
 
 def formatted_base_docstring():

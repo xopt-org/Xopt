@@ -1,11 +1,12 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 
 import pandas as pd
 import torch
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
+from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -51,7 +52,6 @@ class TurboController(XoptBaseModel, ABC):
     restrict_model_data: Optional[bool] = Field(
         True, description="flag to restrict model data to within the trust region"
     )
-    tkwargs: Dict[str, Union[torch.dtype, str]] = Field({"dtype": torch.double})
 
     model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
 
@@ -79,9 +79,24 @@ class TurboController(XoptBaseModel, ABC):
                 )
             )
 
-    def get_trust_region(self, generator):
+    def get_trust_region(self, generator) -> Tensor:
+        """
+
+        Return the trust region based on the generator. The trust region is a
+        rectangular region around a center point. The sides of the trust region are
+        given by the `length` parameter and are scaled according to the generator
+        model lengthscales (if available).
+
+        Parameters
+        ----------
+        generator : BayesianGenerator
+            Generator object used to supply the model and datatypes for the returned
+            trust region.
+
+        """
+
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds, **self.tkwargs)
+        bounds = torch.tensor(self.vocs.bounds, **generator.tkwargs)
 
         if self.center_x is not None:
             # get bounds width
@@ -89,18 +104,22 @@ class TurboController(XoptBaseModel, ABC):
 
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
-                [self.center_x[ele] for ele in self.vocs.variable_names], **self.tkwargs
+                [self.center_x[ele] for ele in self.vocs.variable_names],
+                **generator.tkwargs,
             ).unsqueeze(dim=0)
 
-            if model.models[0].covar_module.base_kernel.lengthscale is not None:
-                lengthscales = model.models[
-                    0
-                ].covar_module.base_kernel.lengthscale.detach()
+            # default weights are 1 (if there is no model or a model without
+            # lengthscales)
+            weights = 1.0
 
-                # calculate the ratios of lengthscales for each axis
-                weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
-            else:
-                weights = 1.0
+            if model is not None:
+                if model.models[0].covar_module.base_kernel.lengthscale is not None:
+                    lengthscales = model.models[
+                        0
+                    ].covar_module.base_kernel.lengthscale.detach()
+
+                    # calculate the ratios of lengthscales for each axis
+                    weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
 
             # calculate the tr bounding box
             tr_lb = torch.clamp(

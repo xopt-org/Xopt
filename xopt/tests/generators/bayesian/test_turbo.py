@@ -1,11 +1,15 @@
 import math
+import os
 from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import patch
+import json
 
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
+
 from xopt import Evaluator, VOCS, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
@@ -71,6 +75,12 @@ class TestTurbo(TestCase):
             BayesianGenerator(
                 vocs=test_vocs, turbo_controller=EntropyTurboController(test_vocs)
             )
+
+        # test validation from serialized turbo controller
+        gen = BayesianGenerator(vocs=test_vocs, turbo_controller=turbo_controller)
+        gen.add_data(TEST_VOCS_DATA)
+        gen_dict = json.loads(gen.to_json())
+        gen.from_dict(gen_dict | {"vocs": test_vocs})
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_get_trust_region(self):
@@ -341,11 +351,26 @@ class TestTurbo(TestCase):
         evaluator = Evaluator(function=sin_function)
         for name in ["optimize", "safety"]:
             generator = UpperConfidenceBoundGenerator(vocs=vocs, turbo_controller=name)
-            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+            X = Xopt(
+                evaluator=evaluator,
+                generator=generator,
+                vocs=vocs,
+                dump_file="dump.yml",
+            )
 
             yaml_str = X.yaml()
             X2 = Xopt.from_yaml(yaml_str)
             assert X2.generator.turbo_controller.name == name
+
+            X2.random_evaluate(3)
+            X2.step()
+
+            config = yaml.safe_load(open("dump.yml"))
+
+            # test restart
+            X3 = Xopt.model_validate(config)
+            X3.random_evaluate(3)
+            X3.step()
 
     def test_entropy_turbo(self):
         # define variables and function objectives
@@ -354,7 +379,7 @@ class TestTurbo(TestCase):
             observables=["y1"],
         )
 
-        def sin_function(input_dict):
+        def basic_sin_function(input_dict):
             return {"y1": np.sin(input_dict["x"])}
 
         # Prepare BAX algorithm and generator options
@@ -370,7 +395,7 @@ class TestTurbo(TestCase):
         )
 
         # construct evaluator
-        evaluator = Evaluator(function=sin_function)
+        evaluator = Evaluator(function=basic_sin_function)
 
         # construct Xopt optimizer
         X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
@@ -387,3 +412,11 @@ class TestTurbo(TestCase):
                 algorithm=algorithm,
                 turbo_controller=OptimizeTurboController(vocs),
             )
+
+    @pytest.fixture(scope="module", autouse=True)
+    def clean_up(self):
+        yield
+        files = ["dump.yml"]
+        for f in files:
+            if os.path.exists(f):
+                os.remove(f)
