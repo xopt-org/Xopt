@@ -77,15 +77,15 @@ class Generator(XoptBaseModel, StandardGenerator, ABC):
     supports_batch_generation: bool = Field(
         default=False,
         description="flag that describes if this "
-                    "generator can generate "
-                    "batches of points",
+        "generator can generate "
+        "batches of points",
         frozen=True,
         exclude=True,
     )
     supports_multi_objective: bool = Field(
         default=False,
         description="flag that describes if this generator can solve multi-objective "
-                    "problems",
+        "problems",
         frozen=True,
         exclude=True,
     )
