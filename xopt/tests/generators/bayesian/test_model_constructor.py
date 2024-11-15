@@ -563,6 +563,16 @@ class TestModelConstructor:
                 new_model.models[i].covar_module.base_kernel.lengthscale,
             )
 
+        # test error handling - should raise a warning that hyperparameters were not
+        # used
+        constructor = StandardModelConstructor()
+        constructor.use_cached_hyperparameters = True
+
+        with pytest.raises(RuntimeWarning):
+            constructor.build_model(
+                test_vocs.variable_names, test_vocs.output_names, test_data
+            )
+
     @pytest.fixture(autouse=True)
     def clean_up(self):
         yield
