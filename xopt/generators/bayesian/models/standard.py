@@ -187,7 +187,7 @@ class StandardModelConstructor(ModelConstructor):
         if self.use_cached_hyperparameters:
             if self._hyperparameter_store is None:
                 raise RuntimeWarning(
-                    "cannot use cached hyperparameters, " "hyperparameter store empty"
+                    "cannot use cached hyperparameters, hyperparameter store empty"
                 )
 
         covar_modules = deepcopy(self.covar_modules)
