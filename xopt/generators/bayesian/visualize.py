@@ -13,11 +13,6 @@ from xopt.vocs import VOCS
 
 from .objectives import feasibility
 
-import logging
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
 
 def visualize_generator_model(generator, **kwargs) -> tuple:
     """Displays GP model predictions for the selected output(s).
@@ -146,10 +141,6 @@ def visualize_model(
     if dim_x == 1:
         for i, output_name in enumerate(output_names):
             color_idx = 2 * i if i < 2 else i + 2
-            logger.debug(f"axis: {ax}")
-            logger.debug(f"axis type: {type(ax)}")
-            logger.debug(f"ax[i]: {ax[i,0]}")
-            logger.debug(f"ax[i] type: {type(ax[i,0])}")
             plot_model_prediction(
                 output_name=output_name,
                 color=f"C{color_idx}",
@@ -182,13 +173,7 @@ def visualize_model(
                 include_prior_mean=show_prior_mean,
             )
             for j in range(ncols):
-                logger.debug(f"i: {i}, j: {j}")
-                logger.debug(f"axis: {ax}")
-                logger.debug(f"axis type: {type(ax)}")
-                logger.debug(f"ax[i,j]: {ax[i,j]}")
                 ax_ij: Axes = ax[i, j] if nrows > 1 else ax[0, j]
-                logger.debug(f"axis: {ax_ij}")
-                logger.debug(f"axis type: {type(ax_ij)}")
                 if j == 0:
                     prediction = posterior_mean
                     title = f"Posterior Mean [{output_name}]"
