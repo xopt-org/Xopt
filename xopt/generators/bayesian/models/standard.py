@@ -254,7 +254,8 @@ class StandardModelConstructor(ModelConstructor):
 
         # if specified, use cached model hyperparameters
         if self.use_cached_hyperparameters:
-            full_model.load_state_dict(self._hyperparameter_store)
+            store = {name: ele.to(**tkwargs) for name, ele in self._hyperparameter_store.items()}
+            full_model.load_state_dict(store)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()

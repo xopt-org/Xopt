@@ -556,12 +556,27 @@ class TestModelConstructor:
             )
         )
 
+        def compare_dicts_with_tensors(dict1, dict2):
+            # Check if both have the same keys
+            if dict1.keys() != dict2.keys():
+                return False
+
+            # Compare each value
+            for key in dict1:
+                val1, val2 = dict1[key], dict2[key]
+                # Check if both are tensors
+                if isinstance(val1, torch.Tensor) and isinstance(val2, torch.Tensor):
+                    if not torch.equal(val1, val2):  # Use torch.equal for tensors
+                        return False
+                else:
+                    # Fall back to standard equality for non-tensors
+                    if val1 != val2:
+                        return False
+
+            return True
+
         new_model = constructor.build_model_from_vocs(test_vocs, test_data)
-        for i in range(2):
-            assert torch.equal(
-                old_model.models[i].covar_module.base_kernel.lengthscale,
-                new_model.models[i].covar_module.base_kernel.lengthscale,
-            )
+        assert compare_dicts_with_tensors(new_model.state_dict(), old_model.state_dict())
 
         # test error handling - should raise a warning that hyperparameters were not
         # used
