@@ -576,7 +576,9 @@ class TestModelConstructor:
             return True
 
         new_model = constructor.build_model_from_vocs(test_vocs, test_data)
-        assert compare_dicts_with_tensors(new_model.state_dict(), old_model.state_dict())
+        assert compare_dicts_with_tensors(
+            new_model.state_dict(), old_model.state_dict()
+        )
 
         # test error handling - should raise a warning that hyperparameters were not
         # used
