@@ -83,6 +83,12 @@ class StandardModelConstructor(ModelConstructor):
         description="specify custom noise prior for the GP likelihood, "
         "overwrites value specified by use_low_noise_prior",
     )
+    use_cached_hyperparameters: Optional[bool] = Field(
+        False,
+        description="flag to specify if cached hyperparameters should be used in "
+        "model creation instead of training",
+    )
+    _hyperparameter_store: Optional[Dict] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
@@ -177,6 +183,14 @@ class StandardModelConstructor(ModelConstructor):
         tkwargs = {"dtype": dtype, "device": device}
         models = []
 
+        # validate if model caching can be used if requested
+        if self.use_cached_hyperparameters:
+            if self._hyperparameter_store is None:
+                raise RuntimeWarning(
+                    "cannot use cached hyperparameters, hyperparameter store empty, "
+                    "training GP model hyperparameters instead"
+                )
+
         covar_modules = deepcopy(self.covar_modules)
         mean_modules = deepcopy(self.mean_modules)
         for outcome_name in outcome_names:
@@ -208,6 +222,7 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         likelihood=self.likelihood,
+                        train=not self.use_cached_hyperparameters,
                         **kwargs,
                     )
                 )
@@ -219,6 +234,7 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         train_Yvar.to(**tkwargs),
+                        train=not self.use_cached_hyperparameters,
                         **kwargs,
                     )
                 )
@@ -234,7 +250,20 @@ class StandardModelConstructor(ModelConstructor):
                 f"could not be added to the model."
             )
 
-        return ModelListGP(*models)
+        full_model = ModelListGP(*models)
+
+        # if specified, use cached model hyperparameters
+        if self.use_cached_hyperparameters:
+            store = {
+                name: ele.to(**tkwargs)
+                for name, ele in self._hyperparameter_store.items()
+            }
+            full_model.load_state_dict(store)
+
+        # cache model hyperparameters
+        self._hyperparameter_store = full_model.state_dict()
+
+        return full_model
 
     def build_mean_module(
         self, name, mean_modules, input_transform, outcome_transform
