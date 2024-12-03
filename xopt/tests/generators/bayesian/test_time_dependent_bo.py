@@ -43,7 +43,7 @@ class TestTimeDependentBO:
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
         gen = TDUpperConfidenceBoundGenerator(vocs=test_vocs)
-        gen.added_time = 5.0
+        gen.added_time = 0.1
         gen.n_monte_carlo_samples = 1
 
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -58,7 +58,7 @@ class TestTimeDependentBO:
 
         # test without constraints
         test_vocs.constraints = {}
-        gen.added_time = 5.0
+        gen.added_time = 0.1
         gen.n_monte_carlo_samples = 1
 
         test_data = deepcopy(TEST_VOCS_DATA)

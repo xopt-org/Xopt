@@ -521,6 +521,75 @@ class TestModelConstructor:
         assert model.models[1].likelihood.noise_covar.noise_prior.rate == 1000.0
         assert model.models[1].likelihood.noise_covar.noise_prior.concentration == 1.0
 
+    def test_model_caching(self):
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        constructor = StandardModelConstructor()
+
+        constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+
+        # cache model
+        old_model = constructor.build_model_from_vocs(test_vocs, test_data)
+
+        state = deepcopy(constructor._hyperparameter_store)
+        assert torch.equal(
+            old_model.models[0].covar_module.base_kernel.raw_lengthscale,
+            state["models.0.covar_module.base_kernel.raw_lengthscale"],
+        )
+
+        # add data and use the cached model hyperparameters
+        constructor.use_cached_hyperparameters = True
+        test_data = pd.concat(
+            (
+                test_data,
+                pd.DataFrame(
+                    {
+                        "x1": [0.2, 0.1],
+                        "x2": [0.2, 0.1],
+                        "y1": [0.2, 0.1],
+                        "y2": [0.2, 0.1],
+                    }
+                ),
+            )
+        )
+
+        def compare_dicts_with_tensors(dict1, dict2):
+            # Check if both have the same keys
+            if dict1.keys() != dict2.keys():
+                return False
+
+            # Compare each value
+            for key in dict1:
+                val1, val2 = dict1[key], dict2[key]
+                # Check if both are tensors
+                if isinstance(val1, torch.Tensor) and isinstance(val2, torch.Tensor):
+                    if not torch.equal(val1, val2):  # Use torch.equal for tensors
+                        return False
+                else:
+                    # Fall back to standard equality for non-tensors
+                    if val1 != val2:
+                        return False
+
+            return True
+
+        new_model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert compare_dicts_with_tensors(
+            new_model.state_dict(), old_model.state_dict()
+        )
+
+        # test error handling - should raise a warning that hyperparameters were not
+        # used
+        constructor = StandardModelConstructor()
+        constructor.use_cached_hyperparameters = True
+
+        with pytest.raises(RuntimeWarning):
+            constructor.build_model(
+                test_vocs.variable_names, test_vocs.output_names, test_data
+            )
+
     @pytest.fixture(autouse=True)
     def clean_up(self):
         yield
