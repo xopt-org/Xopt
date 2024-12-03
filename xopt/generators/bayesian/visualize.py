@@ -6,6 +6,9 @@ from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from pandas import DataFrame
 
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
+
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
@@ -52,13 +55,13 @@ def visualize_model(
     output_names: list[str] = None,
     variable_names: list[str] = None,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: dict[str, float] = None,
     show_samples: bool = True,
     show_prior_mean: bool = False,
     show_feasibility: bool = False,
     show_acquisition: bool = True,
     n_grid: int = 50,
-    axes=None,
+    axes: Optional[Axes] = None,
 ) -> tuple:
     """Displays GP model predictions for the selected output(s).
 
@@ -116,12 +119,14 @@ def visualize_model(
     dim_x, dim_y = len(variable_names), len(output_names)
     # plot configuration
     figure_config = _get_figure_config(min_ncols=dim_x, min_nrows=dim_y, **kwargs)
+    plots: tuple[Figure, Axes | np.ndarray] = None
     if axes is None:
         from matplotlib import pyplot as plt  # lazy import
 
-        fig, ax = plt.subplots(**figure_config)
+        plots = plt.subplots(**figure_config, squeeze=False)
     else:
-        fig, ax = _get_figure_from_axes(axes), axes
+        plots = _get_figure_from_axes(axes), axes
+    fig, ax = plots
     nrows, ncols = figure_config["nrows"], figure_config["ncols"]
     _verify_axes(ax, nrows, ncols)
 
@@ -139,18 +144,18 @@ def visualize_model(
             plot_model_prediction(
                 output_name=output_name,
                 color=f"C{color_idx}",
-                axis=ax[i],
+                axis=ax[i, 0],
                 **kwargs,
             )
-            ax[i].set_xlabel(None)
+            ax[i, 0].set_xlabel(None)
         if show_acquisition:
             plot_acquisition_function(
-                axis=ax[len(output_names)], **(kwargs | {"show_samples": False})
+                axis=ax[len(output_names), 0], **(kwargs | {"show_samples": False})
             )
-            ax[len(output_names)].set_xlabel(None)
+            ax[len(output_names), 0].set_xlabel(None)
         if show_feasibility:
-            plot_feasibility(axis=ax[-1], **kwargs)
-        ax[-1].set_xlabel(variable_names[0])
+            plot_feasibility(axis=ax[-1, 0], **kwargs)
+        ax[-1, 0].set_xlabel(variable_names[0])
     else:
         # generate input mesh only once
         input_mesh = _generate_input_mesh(
@@ -168,7 +173,7 @@ def visualize_model(
                 include_prior_mean=show_prior_mean,
             )
             for j in range(ncols):
-                ax_ij = ax[i, j] if nrows > 1 else ax[j]
+                ax_ij: Axes = ax[i, j] if nrows > 1 else ax[0, j]
                 if j == 0:
                     prediction = posterior_mean
                     title = f"Posterior Mean [{output_name}]"
@@ -227,7 +232,7 @@ def visualize_model(
         # set axis labels
         for i in range(nrows):
             for j in range(ncols):
-                ax_ij = ax[i, j] if nrows > 1 else ax[j]
+                ax_ij = ax[i, j] if nrows > 1 else ax[0, j]
                 ax_ij.set_xlabel(None)
                 ax_ij.set_ylabel(None)
                 if i == nrows - 1:
@@ -658,7 +663,7 @@ def _plot2d_prediction(
     show_samples: bool = True,
     show_legend: bool = True,
     n_grid: int = 100,
-    axis=None,
+    axis: Optional[Axes] = None,
     **_,
 ):
     """
@@ -768,9 +773,11 @@ def _generate_input_mesh(
     x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh]).double()
     x = torch.stack(
         [
-            x_v[:, variable_names.index(k)]
-            if k in variable_names
-            else reference_point[k] * torch.ones(x_v.shape[0])
+            (
+                x_v[:, variable_names.index(k)]
+                if k in variable_names
+                else reference_point[k] * torch.ones(x_v.shape[0])
+            )
             for k in vocs.variable_names
         ],
         dim=-1,
@@ -1021,7 +1028,7 @@ def _get_figure_from_axes(axes):
         )
 
 
-def _get_axis(axis, dim: int = 1):
+def _get_axis(axis: Optional[Axes], dim: int = 1):
     """Returns a valid axis for plotting.
 
     If the given axis is None, a new Axes object is generated.
