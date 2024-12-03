@@ -4,8 +4,11 @@ from typing import Dict, List, Union
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
-from botorch.models.utils.gpytorch_modules import get_matern_kernel_with_gamma_prior
-from gpytorch.kernels import ProductKernel, SpectralMixtureKernel, MaternKernel, ScaleKernel
+from gpytorch.kernels import (
+    ProductKernel,
+    SpectralMixtureKernel,
+    MaternKernel,
+)
 from gpytorch.priors import GammaPrior
 from pydantic import Field
 
@@ -18,13 +21,13 @@ class TimeDependentModelConstructor(StandardModelConstructor):
     use_spectral_mixture_kernel: bool = True
 
     def build_model(
-            self,
-            input_names: List[str],
-            outcome_names: List[str],
-            data: pd.DataFrame,
-            input_bounds: Dict[str, List] = None,
-            dtype: torch.dtype = torch.double,
-            device: Union[torch.device, str] = "cpu",
+        self,
+        input_names: List[str],
+        outcome_names: List[str],
+        data: pd.DataFrame,
+        input_bounds: Dict[str, List] = None,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
         new_input_names = deepcopy(input_names)
         new_input_names += ["time"]
@@ -52,7 +55,7 @@ class TimeDependentModelConstructor(StandardModelConstructor):
 
                 covar_modules[name] = ProductKernel(
                     SpectralMixtureKernel(num_mixtures=5, active_dims=time_dim),
-                    matern_kernel
+                    matern_kernel,
                 )
                 self.covar_modules = covar_modules
 
@@ -61,11 +64,11 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         )
 
     def build_model_from_vocs(
-            self,
-            vocs: VOCS,
-            data: pd.DataFrame,
-            dtype: torch.dtype = torch.double,
-            device: Union[torch.device, str] = "cpu",
+        self,
+        vocs: VOCS,
+        data: pd.DataFrame,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ):
         return self.build_model(
             vocs.variable_names + ["time"],
