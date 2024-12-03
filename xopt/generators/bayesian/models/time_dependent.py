@@ -29,6 +29,7 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         dtype: torch.dtype = torch.double,
         device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
+        # get model input names
         new_input_names = deepcopy(input_names)
         new_input_names += ["time"]
 
