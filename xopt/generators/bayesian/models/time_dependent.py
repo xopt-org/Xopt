@@ -39,6 +39,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         new_input_bounds["time"] = [min_t, max_t]
 
         # set covar modules if not specified -- use SpectralMixtureKernel for time axis
+        # see Kuklev, N., et al. "Online accelerator tuning with adaptive bayesian optimization."
+        # Proc. NAPAC 22 (2022): 842.
         if len(self.covar_modules) == 0 and self.use_spectral_mixture_kernel:
             covar_modules = {}
             for name in outcome_names:
