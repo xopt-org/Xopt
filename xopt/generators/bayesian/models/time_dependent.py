@@ -43,7 +43,6 @@ class TimeDependentModelConstructor(StandardModelConstructor):
                 else:
                     matern_dims = tuple(range(len(input_names)))
                 time_dim = [len(input_names)]
-                print(time_dim)
 
                 matern_kernel = MaternKernel(
                     nu=2.5,
@@ -51,7 +50,6 @@ class TimeDependentModelConstructor(StandardModelConstructor):
                     lengthscale_prior=GammaPrior(3.0, 6.0),
                 )
 
-                # TODO: update botorch utility function in botorch v0.13
                 covar_modules[name] = ProductKernel(
                     SpectralMixtureKernel(num_mixtures=5, active_dims=time_dim),
                     matern_kernel
