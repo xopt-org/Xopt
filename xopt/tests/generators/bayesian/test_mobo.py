@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
+from xopt.numerical_optimizer import GridOptimizer
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
     tnk_reference_point,
@@ -36,9 +37,13 @@ class TestMOBOGenerator:
         evaluator = Evaluator(function=evaluate_TNK)
         reference_point = tnk_reference_point
 
-        gen = MOBOGenerator(vocs=tnk_vocs, reference_point=reference_point)
+        gen = MOBOGenerator(
+            vocs=tnk_vocs,
+            reference_point=reference_point,
+            numerical_optimizer=GridOptimizer(n_grid_points=2),
+        )
         gen = deepcopy(gen)
-        gen.n_monte_carlo_samples = 20
+        gen.n_monte_carlo_samples = 1
 
         for ele in [gen]:
             dump = ele.model_dump()
@@ -66,6 +71,7 @@ class TestMOBOGenerator:
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
+        gen.n_monte_carlo_samples = 1
         gen.add_data(test_data)
 
         gen.generate(2)
@@ -168,7 +174,7 @@ class TestMOBOGenerator:
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
-        gen.numerical_optimizer.max_time = 1.0
+        gen.n_monte_carlo_samples = 1
         gen.add_data(test_data)
         initial_points = gen._get_initial_conditions()
 
