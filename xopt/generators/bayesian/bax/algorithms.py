@@ -76,7 +76,8 @@ class GridOptimize(GridScanAlgorithm):
         """get execution paths that minimize the objective function"""
 
         # build evaluation mesh
-        test_points = self.create_mesh(bounds).to(model.models[0].train_targets)
+        print(5)
+        test_points = self.create_mesh(bounds).to(list(model.modules())[0].train_targets)
 
         # get samples of the model posterior at mesh points
         posterior_samples = self.evaluate_virtual_objective(
