@@ -24,27 +24,27 @@ from torch import Tensor
 
 class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
     r"""
-   Xopt copy of HeteroskedasticSingleTaskGP from botorch which allows for a user
-   to specify mean and covariance modules.
+    Xopt copy of HeteroskedasticSingleTaskGP from botorch which allows for a user
+    to specify mean and covariance modules.
 
-   A single-task exact GP model using a heteroskedastic noise model.
+    A single-task exact GP model using a heteroskedastic noise model.
 
-   This model differs from `SingleTaskGP` with observed observation noise
-   variances (`train_Yvar`) in that it can predict noise levels out of sample.
-   This is achieved by internally wrapping another GP (a `SingleTaskGP`) to model
-   the (log of) the observation noise. Noise levels must be provided to
-   `HeteroskedasticSingleTaskGP` as `train_Yvar`.
+    This model differs from `SingleTaskGP` with observed observation noise
+    variances (`train_Yvar`) in that it can predict noise levels out of sample.
+    This is achieved by internally wrapping another GP (a `SingleTaskGP`) to model
+    the (log of) the observation noise. Noise levels must be provided to
+    `HeteroskedasticSingleTaskGP` as `train_Yvar`.
 
-   Examples of cases in which noise levels are known include online
-   experimentation and simulation optimization.
+    Examples of cases in which noise levels are known include online
+    experimentation and simulation optimization.
 
-   Example:
-       >>> train_X = torch.rand(20, 2)
-       >>> train_Y = torch.sin(train_X).sum(dim=1, keepdim=True)
-       >>> se = torch.linalg.norm(train_X, dim=1, keepdim=True)
-       >>> train_Yvar = 0.1 + se * torch.rand_like(train_Y)
-       >>> model = HeteroskedasticSingleTaskGP(train_X, train_Y, train_Yvar)
-   """
+    Example:
+        >>> train_X = torch.rand(20, 2)
+        >>> train_Y = torch.sin(train_X).sum(dim=1, keepdim=True)
+        >>> se = torch.linalg.norm(train_X, dim=1, keepdim=True)
+        >>> train_Yvar = 0.1 + se * torch.rand_like(train_Y)
+        >>> model = HeteroskedasticSingleTaskGP(train_X, train_Y, train_Yvar)
+    """
 
     def __init__(
         self,
@@ -96,7 +96,7 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
             likelihood=noise_likelihood,
             outcome_transform=Log(),
             mean_module=mean_module,
-            covar_module=covar_module
+            covar_module=covar_module,
         )
         likelihood = _GaussianLikelihoodBase(HeteroskedasticNoise(noise_model))
         # This is hacky -- this class used to inherit from SingleTaskGP, but it
