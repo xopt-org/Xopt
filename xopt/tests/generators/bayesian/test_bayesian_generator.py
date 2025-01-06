@@ -133,7 +133,10 @@ class TestBayesianGenerator(TestCase):
         input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds))
         for inputs in model.train_inputs:
             assert torch.allclose(
-                inputs[0], input_transform(torch.from_numpy(X.data["x1"].to_numpy())).T
+                inputs[0].unsqueeze(-1).T,
+                input_transform(
+                    torch.from_numpy(X.data["x1"].to_numpy()).unsqueeze(-1)
+                ).T,
             )
 
         # test outcome transform(s)
