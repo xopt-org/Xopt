@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import ConfigDict, conlist, Field, field_validator, model_validator
+from pydantic import ConfigDict, conlist, Field, field_validator, model_validator, \
+    ValidationError
 
 from xopt.pydantic import XoptBaseModel
 
@@ -39,24 +40,11 @@ class ConstraintEnum(str, Enum):
                     return member
 
 
-class VariableTypeEnum(str, Enum):
-    CONTINUOUS = "CONTINUOUS"
-    DISCRETE = "DISCRETE"
-    FIDELITY = "FIDELITY"
-
-    @classmethod
-    def _missing_(cls, name):
-        if isinstance(name, str):
-            for member in cls:
-                if member.name.lower() == name.lower():
-                    return member
-
-
-class Variable(XoptBaseModel):
+class BaseVariable(XoptBaseModel):
     default_value: Optional[float] = None
 
 
-class DiscreteVariable(Variable):
+class DiscreteVariable(BaseVariable):
     values: Tuple[float, ...]
 
     @model_validator(mode="after")
@@ -67,7 +55,7 @@ class DiscreteVariable(Variable):
         return self
 
 
-class ContinuousVariable(Variable):
+class ContinuousVariable(BaseVariable):
     domain: conlist(float, min_length=2, max_length=2)
 
     @model_validator(mode="after")
@@ -85,14 +73,61 @@ class FidelityVariable(ContinuousVariable):
     domain: conlist(float, min_length=2, max_length=2) = [0, 1]
 
 
-class VirtualObjective(XoptBaseModel):
-    observables: List[str, ...]
+class BaseConstraint(XoptBaseModel):
+    pass
 
 
-_variable_classes = {
-    "continuous": ContinuousVariable,
-    "discrete": DiscreteVariable,
-    "fidelity": FidelityVariable
+class LessThanConstraint(BaseConstraint):
+    value: float
+
+
+class GreaterThanConstraint(BaseConstraint):
+    value: float
+
+
+class BoundsConstraint(BaseConstraint):
+    range: List[float]
+
+    @field_validator("range")
+    def validate_range(cls, value):
+        if len(value) != 2 or value[0] >= value[1]:
+            raise ValueError("'range' must have two numbers in ascending order.")
+        return value
+
+
+CONSTRAINT_CLASSES = {
+    "LESS_THAN": LessThanConstraint,
+    "GREATER_THAN": GreaterThanConstraint,
+    "BOUNDS": BoundsConstraint,
+}
+
+
+# Base Objective Model
+class BaseObjective(XoptBaseModel):
+    pass
+
+
+class MinimizeObjective(BaseObjective):
+    pass
+
+
+class MaximizeObjective(BaseObjective):
+    pass
+
+
+class CharacterizeObjective(BaseObjective):
+    pass
+
+
+class VirtualObjective(BaseObjective):
+    observables: List[str]
+
+
+OBJECTIVE_CLASSES = {
+    "MINIMIZE": MinimizeObjective,
+    "MAXIMIZE": MaximizeObjective,
+    "CHARACTERIZE": CharacterizeObjective,
+    "VIRTUAL": VirtualObjective
 }
 
 
@@ -104,12 +139,16 @@ class VOCS(XoptBaseModel):
 
     variables: Dict[str, Union[ContinuousVariable, DiscreteVariable, FidelityVariable]]
     constraints: Dict[
-        str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
+        str, Union[LessThanConstraint, GreaterThanConstraint, BoundsConstraint]
     ] = Field(
         default={},
         description="constraint names with a list of constraint type and value",
     )
-    objectives: Dict[str, Union[ObjectiveEnum, VirtualObjective]] = Field(
+    objectives: Dict[
+        str,
+        Union[
+            MinimizeObjective, MaximizeObjective, CharacterizeObjective, VirtualObjective]
+    ] = Field(
         default={}, description="objective names with type of objective"
     )
     constants: Dict[str, Any] = Field(
@@ -128,7 +167,7 @@ class VOCS(XoptBaseModel):
     def validate_variables(cls, v):
         assert isinstance(v, dict)
         for name, val in v.items():
-            if isinstance(val, Variable):
+            if isinstance(val, BaseVariable):
                 v[name] = val
             elif isinstance(val, list):
                 # if the length of the list is 2 we assume a continuous variable,
@@ -139,31 +178,82 @@ class VOCS(XoptBaseModel):
                     v[name] = DiscreteVariable(values=val)
             elif isinstance(val, dict):
                 variable_type = val.pop("type")
-                if variable_type in _variable_classes:
-                    v[name] = _variable_classes[variable_type](**val)
-                else:
-                    raise ValueError(f"variable type {variable_type} not supported, "
-                                     f"possible values are {_variable_classes.keys()}")
+                try:
+                    class_ = globals()[variable_type]
+                except KeyError:
+                    raise ValueError(f"constraint type {variable_type} is not "
+                                     f"available")
+                v[name] = class_(**val)
+
             else:
-                raise TypeError(f"variable input type {type(val)} not supported")
+                raise ValueError(f"variable input type {type(val)} not supported")
 
         return v
 
-    @field_validator("constraints")
-    def correct_list_types(cls, v):
-        """make sure that constraint list types are correct"""
-        for _, item in v.items():
-            if not isinstance(item[0], str):
-                raise ValueError(
-                    "constraint specification list must have the first "
-                    "element as a string`"
-                )
+    @field_validator("constraints", mode="before")
+    def validate_constraints(cls, v):
+        assert isinstance(v, dict)
+        for name, val in v.items():
+            if isinstance(val, BaseConstraint):
+                v[name] = val
+            elif isinstance(val, dict):
+                constraint_type = val.pop("type")
+                try:
+                    class_ = globals()[constraint_type]
+                except KeyError:
+                    raise ValueError(f"constraint type {constraint_type} is not "
+                                     f"available")
+                v[name] = class_(**val)
+            elif isinstance(val, list):
+                if not isinstance(val[0], str):
+                    raise ValueError(f"constraint type {val[0]} must be a string if "
+                                     f"specified by a list")
 
-            if not isinstance(item[1], float):
-                raise ValueError(
-                    "constraint specification list must have the second "
-                    "element as a float"
-                )
+                constraint_type = val[0].upper()
+                if constraint_type not in CONSTRAINT_CLASSES:
+                    raise ValueError(
+                        f"Constraint type '{constraint_type}' is not supported for '{name}'.")
+
+                # Dynamically create the constraint instance
+                if constraint_type == "BOUNDS":
+                    v[name] = CONSTRAINT_CLASSES[constraint_type](range=val[1:])
+                else:
+                    if len(val) < 2:
+                        raise ValueError(f"constraint {val} is not correctly "
+                                         "specified")
+                    v[name] = CONSTRAINT_CLASSES[constraint_type](value=val[1])
+
+            else:
+                raise ValueError(f"constraint input type {type(val)} not supported")
+
+        return v
+
+    @field_validator("objectives", mode="before")
+    def validate_objectives(cls, v):
+        assert isinstance(v, dict)
+        for name, val in v.items():
+            if isinstance(val, BaseObjective):
+                v[name] = val
+            elif isinstance(val, dict):
+                objective_type = val.pop("type")
+                try:
+                    class_ = globals()[objective_type]
+                except KeyError:
+                    raise ValueError(f"objective type {objective_type} is not "
+                                     f"available")
+                v[name] = class_(**val)
+            elif isinstance(val, str):
+                # Dynamically create the objective instance
+                if val in ["MINIMIZE", "MAXIMIZE", "CHARACTERIZE"]:
+                    v[name] = OBJECTIVE_CLASSES[val]()
+                elif val == "VIRTUAL":
+                    # TODO: handle virtual objectives
+                    pass
+                else:
+                    raise ValueError(
+                            f"Objective type '{val}' is not supported for '{name}'.")
+            else:
+                raise ValueError(f"objective input type {type(val)} not supported")
 
         return v
 

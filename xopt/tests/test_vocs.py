@@ -7,13 +7,13 @@ import pytest
 from pydantic import ValidationError
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.vocs import ObjectiveEnum, VOCS, ContinuousVariable, DiscreteVariable
+from xopt.vocs import VOCS, ContinuousVariable, DiscreteVariable, \
+    VirtualObjective, CharacterizeObjective, LessThanConstraint, \
+    BoundsConstraint, MinimizeObjective, MaximizeObjective
 
 
 class TestVOCS(object):
     def test_init(self):
-        from xopt.vocs import VOCS
-
         # test various configurations
         vocs = VOCS(
             variables={
@@ -27,50 +27,6 @@ class TestVOCS(object):
         assert vocs.n_constraints == 0
         assert isinstance(vocs.variables["x"], ContinuousVariable)
         assert isinstance(vocs.variables["y"], DiscreteVariable)
-
-        # test variables specified by dict
-        vocs = VOCS(
-            variables={
-                "x": {
-                    "type": "continuous",
-                    "domain": [0, 1]
-                },
-                "y": {
-                    "type": "discrete",
-                    "values": [0, 1, 2, 3]
-                }
-            },
-            objectives={"f": "MINIMIZE"},
-        )
-        assert vocs.n_inputs == 2
-        assert vocs.n_outputs == 1
-        assert vocs.n_constraints == 0
-
-        # test objectives specified by dict
-        vocs = VOCS(
-            variables={"x": [0, 1]},
-            objectives={
-                "y": "MINIMIZE",
-                "z": "MAXIMIZE"
-            }
-        )
-        assert vocs.n_outputs == 2
-
-        vocs = VOCS(
-            variables={"x": [0, 1]},
-            objectives={
-                "y": "EXPLORE"
-            }
-        )
-        assert vocs.n_outputs == 1
-
-        vocs = VOCS(
-            variables={"x": [0, 1]},
-            objectives={
-                "y": {"observables": ["z0", "z1"]}
-            }
-        )
-        assert vocs.n_outputs == 2
 
     def test_variable_validation(self):
         with pytest.raises(ValidationError):
@@ -115,34 +71,51 @@ class TestVOCS(object):
 
     def test_from_yaml(self):
         Y = """
-        variables:
-          a: [0, 1e3] # Note that 1e3 usually parses as a str with YAML.
-          b: [-1, 1]
-        objectives:
-          c: maximize
-          d: minimize
+        constants: {}
         constraints:
-          e: ['Less_than', 2]
-          f: ['greater_than', 0]
-        constants:
-          g: 1234
+            c:
+              type: LessThanConstraint
+              value: 0.0
+            cc:
+              type: BoundsConstraint
+              range:
+                - 0.0
+                - 5.0
+        objectives:
+            z:
+              type: MinimizeObjective
+            zzz:
+              type: CharacterizeObjective
+            zz:
+              type: VirtualObjective
+              observables:
+                - y1
+                - a2
+        variables:
+            x:
+              type: ContinuousVariable
+              domain:
+              - 0.0
+              - 6.283185307179586
+            y:
+              type: DiscreteVariable
+              values:
+                - 0.0
+                - 1.0
+                - 2.0
 
         """
-
         vocs = VOCS.from_yaml(Y)
-        assert vocs.constraint_names == ["e", "f"]
-        assert vocs.variables == {"a": [0, 1e3], "b": [-1, 1]}
-        assert vocs.objectives == {"c": "MAXIMIZE", "d": "MINIMIZE"}
-        assert vocs.constants == {"g": 1234}
+        assert vocs.constraint_names == ["c", "cc"]
+        assert isinstance(vocs.variables["x"], ContinuousVariable)
+        assert isinstance(vocs.variables["y"], DiscreteVariable)
+        assert isinstance(vocs.objectives["z"], MinimizeObjective)
+        assert isinstance(vocs.objectives["zz"], VirtualObjective)
+        assert isinstance(vocs.objectives["zzz"], CharacterizeObjective)
+        assert isinstance(vocs.constraints["c"], LessThanConstraint)
+        assert isinstance(vocs.constraints["cc"], BoundsConstraint)
 
-        assert vocs.objectives["c"] == ObjectiveEnum.MAXIMIZE
-        assert vocs.objectives["d"] == ObjectiveEnum.MINIMIZE
-
-        assert vocs.constraints["e"] == ["LESS_THAN", 2]
-        assert vocs.constraints["f"] == ["GREATER_THAN", 0]
-
-        assert vocs.n_inputs == 3
-        assert vocs.n_outputs == 4
+        assert vocs.n_inputs == 2
 
     def test_random_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
