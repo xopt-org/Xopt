@@ -1,13 +1,13 @@
 import warnings
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import ConfigDict, conlist, Field, field_validator
+from pydantic import ConfigDict, conlist, Field, field_validator, model_validator
 
 from xopt.pydantic import XoptBaseModel
 
@@ -16,6 +16,7 @@ from xopt.pydantic import XoptBaseModel
 class ObjectiveEnum(str, Enum):
     MINIMIZE = "MINIMIZE"
     MAXIMIZE = "MAXIMIZE"
+    EXPLORE = "EXPLORE"
 
     # Allow any case
     @classmethod
@@ -38,23 +39,77 @@ class ConstraintEnum(str, Enum):
                     return member
 
 
+class VariableTypeEnum(str, Enum):
+    CONTINUOUS = "CONTINUOUS"
+    DISCRETE = "DISCRETE"
+    FIDELITY = "FIDELITY"
+
+    @classmethod
+    def _missing_(cls, name):
+        if isinstance(name, str):
+            for member in cls:
+                if member.name.lower() == name.lower():
+                    return member
+
+
+class Variable(XoptBaseModel):
+    default_value: Optional[float] = None
+
+
+class DiscreteVariable(Variable):
+    values: Tuple[float, ...]
+
+    @model_validator(mode="after")
+    def validate_values(self):
+        # check to make sure all values are unqiue
+        if not len(self.values) == len(set(self.values)):
+            raise ValueError("value tuple must have all unique elements")
+        return self
+
+
+class ContinuousVariable(Variable):
+    domain: conlist(float, min_length=2, max_length=2)
+
+    @model_validator(mode="after")
+    def validate_bounds(self):
+        # check to make sure bounds are correct
+        if not self.domain[1] > self.domain[0]:
+            raise ValueError(
+                f"Bounds specified for {self.name} do not satisfy the "
+                f"condition value[1] > value[0]."
+            )
+        return self
+
+
+class FidelityVariable(ContinuousVariable):
+    domain: conlist(float, min_length=2, max_length=2) = [0, 1]
+
+
+class VirtualObjective(XoptBaseModel):
+    observables: List[str, ...]
+
+
+_variable_classes = {
+    "continuous": ContinuousVariable,
+    "discrete": DiscreteVariable,
+    "fidelity": FidelityVariable
+}
+
+
 class VOCS(XoptBaseModel):
     """
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
     to describe optimization problems.
     """
 
-    variables: Dict[str, conlist(float, min_length=2, max_length=2)] = Field(
-        default={},
-        description="input variable names with a list of minimum and maximum values",
-    )
+    variables: Dict[str, Union[ContinuousVariable, DiscreteVariable, FidelityVariable]]
     constraints: Dict[
         str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
     ] = Field(
         default={},
         description="constraint names with a list of constraint type and value",
     )
-    objectives: Dict[str, ObjectiveEnum] = Field(
+    objectives: Dict[str, Union[ObjectiveEnum, VirtualObjective]] = Field(
         default={}, description="objective names with type of objective"
     )
     constants: Dict[str, Any] = Field(
@@ -69,9 +124,29 @@ class VOCS(XoptBaseModel):
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
 
-    @field_validator("variables")
-    def correct_bounds_specification(cls, v):
-        validate_variable_bounds(v)
+    @field_validator("variables", mode="before")
+    def validate_variables(cls, v):
+        assert isinstance(v, dict)
+        for name, val in v.items():
+            if isinstance(val, Variable):
+                v[name] = val
+            elif isinstance(val, list):
+                # if the length of the list is 2 we assume a continuous variable,
+                # otherwise it's a discrete variable
+                if len(val) == 2:
+                    v[name] = ContinuousVariable(domain=val)
+                else:
+                    v[name] = DiscreteVariable(values=val)
+            elif isinstance(val, dict):
+                variable_type = val.pop("type")
+                if variable_type in _variable_classes:
+                    v[name] = _variable_classes[variable_type](**val)
+                else:
+                    raise ValueError(f"variable type {variable_type} not supported, "
+                                     f"possible values are {_variable_classes.keys()}")
+            else:
+                raise TypeError(f"variable input type {type(val)} not supported")
+
         return v
 
     @field_validator("constraints")
@@ -199,11 +274,11 @@ class VOCS(XoptBaseModel):
         return len(self.output_names)
 
     def random_inputs(
-        self,
-        n: int = None,
-        custom_bounds: dict = None,
-        include_constants: bool = True,
-        seed: int = None,
+            self,
+            n: int = None,
+            custom_bounds: dict = None,
+            include_constants: bool = True,
+            seed: int = None,
     ) -> list[dict]:
         """
         Uniform sampling of the variables.
@@ -283,7 +358,7 @@ class VOCS(XoptBaseModel):
             return pd.DataFrame(inputs).to_dict("records")
 
     def convert_dataframe_to_inputs(
-        self, data: pd.DataFrame, include_constants=True
+            self, data: pd.DataFrame, include_constants=True
     ) -> pd.DataFrame:
         """
         Extracts only inputs from a dataframe.
@@ -308,7 +383,7 @@ class VOCS(XoptBaseModel):
         return inner_copy
 
     def convert_numpy_to_inputs(
-        self, inputs: np.ndarray, include_constants=True
+            self, inputs: np.ndarray, include_constants=True
     ) -> pd.DataFrame:
         """
         convert 2D numpy array to list of dicts (inputs) for evaluation
@@ -321,9 +396,9 @@ class VOCS(XoptBaseModel):
 
     # Extract optimization data (in correct column order)
     def variable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "variable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing variables according to `vocs.variables` in sorted
@@ -344,10 +419,10 @@ class VOCS(XoptBaseModel):
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "objective_",
-        return_raw=False,
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "objective_",
+            return_raw=False,
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
@@ -368,9 +443,9 @@ class VOCS(XoptBaseModel):
         return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "constraint_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing constraint data transformed according to
@@ -391,9 +466,9 @@ class VOCS(XoptBaseModel):
         return form_constraint_data(self.constraints, data, prefix)
 
     def observable_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "observable_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "observable_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing observable data
@@ -413,9 +488,9 @@ class VOCS(XoptBaseModel):
         return form_observable_data(self.observable_names, data, prefix)
 
     def feasibility_data(
-        self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
-        prefix: str = "feasible_",
+            self,
+            data: Union[pd.DataFrame, List[Dict], List[Dict]],
+            prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing booleans denoting if a constraint is satisfied or
@@ -465,8 +540,8 @@ class VOCS(XoptBaseModel):
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
                 normed_data[name] = (
-                    input_points[name] - self.variables[name][0]
-                ) / width
+                                            input_points[name] - self.variables[name][0]
+                                    ) / width
 
         if len(normed_data):
             return pd.DataFrame(normed_data)
@@ -502,7 +577,7 @@ class VOCS(XoptBaseModel):
             if name in input_points.columns:
                 width = self.variables[name][1] - self.variables[name][0]
                 denormed_data[name] = (
-                    input_points[name] * width + self.variables[name][0]
+                        input_points[name] * width + self.variables[name][0]
                 )
 
         if len(denormed_data):
@@ -675,7 +750,7 @@ def form_variable_data(variables: Union[Dict, DataFrame], data, prefix="variable
 
 
 def form_objective_data(
-    objectives: Dict, data, prefix="objective_", return_raw: bool = False
+        objectives: Dict, data, prefix="objective_", return_raw: bool = False
 ):
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)

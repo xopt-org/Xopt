@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.vocs import ObjectiveEnum, VOCS
+from xopt.vocs import ObjectiveEnum, VOCS, ContinuousVariable, DiscreteVariable
 
 
 class TestVOCS(object):
@@ -16,12 +16,61 @@ class TestVOCS(object):
 
         # test various configurations
         vocs = VOCS(
-            variables={"x": [0, 1]},
+            variables={
+                "x": [0, 1],
+                "y": [0, 1, 2]
+            },
             objectives={"f": "MINIMIZE"},
         )
-        assert vocs.n_inputs == 1
+        assert vocs.n_inputs == 2
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
+        assert isinstance(vocs.variables["x"], ContinuousVariable)
+        assert isinstance(vocs.variables["y"], DiscreteVariable)
+
+        # test variables specified by dict
+        vocs = VOCS(
+            variables={
+                "x": {
+                    "type": "continuous",
+                    "domain": [0, 1]
+                },
+                "y": {
+                    "type": "discrete",
+                    "values": [0, 1, 2, 3]
+                }
+            },
+            objectives={"f": "MINIMIZE"},
+        )
+        assert vocs.n_inputs == 2
+        assert vocs.n_outputs == 1
+        assert vocs.n_constraints == 0
+
+        # test objectives specified by dict
+        vocs = VOCS(
+            variables={"x": [0, 1]},
+            objectives={
+                "y": "MINIMIZE",
+                "z": "MAXIMIZE"
+            }
+        )
+        assert vocs.n_outputs == 2
+
+        vocs = VOCS(
+            variables={"x": [0, 1]},
+            objectives={
+                "y": "EXPLORE"
+            }
+        )
+        assert vocs.n_outputs == 1
+
+        vocs = VOCS(
+            variables={"x": [0, 1]},
+            objectives={
+                "y": {"observables": ["z0", "z1"]}
+            }
+        )
+        assert vocs.n_outputs == 2
 
     def test_variable_validation(self):
         with pytest.raises(ValidationError):
