@@ -536,8 +536,8 @@ class TestModelConstructor:
 
         state = deepcopy(constructor._hyperparameter_store)
         assert torch.equal(
-            old_model.models[0].covar_module.base_kernel.raw_lengthscale,
-            state["models.0.covar_module.base_kernel.raw_lengthscale"],
+            old_model.models[0].covar_module.raw_lengthscale,
+            state["models.0.covar_module.raw_lengthscale"],
         )
 
         # add data and use the cached model hyperparameters
