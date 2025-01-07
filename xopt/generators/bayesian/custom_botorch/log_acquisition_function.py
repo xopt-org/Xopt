@@ -1,5 +1,4 @@
 from botorch.acquisition import AcquisitionFunction
-from botorch.utils import t_batch_mode_transform
 from botorch.utils.safe_math import log_softplus
 from torch import Tensor
 from torch.nn import Module

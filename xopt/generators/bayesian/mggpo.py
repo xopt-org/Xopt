@@ -2,8 +2,9 @@ from typing import Optional
 
 import pandas as pd
 import torch
-from botorch.acquisition.multi_objective.logei import \
-    qLogNoisyExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective.logei import (
+    qLogNoisyExpectedHypervolumeImprovement,
+)
 from pydantic import Field
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
