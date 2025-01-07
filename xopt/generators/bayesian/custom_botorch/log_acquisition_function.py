@@ -13,7 +13,6 @@ class LogAcquisitionFunction(AcquisitionFunction):
         Module.__init__(self)
         self.acq_func = acq_function
 
-    @t_batch_mode_transform(expected_q=1, assert_output_shape=False)
     def forward(self, X: Tensor) -> Tensor:
         # apply a softplus transform to avoid numerical gradient issues
         return log_softplus(self.acq_func(X), 1e-6)
