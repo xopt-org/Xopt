@@ -1,6 +1,8 @@
 import torch
 from botorch.acquisition import (
-    ScalarizedPosteriorTransform, LogExpectedImprovement, qLogExpectedImprovement,
+    ScalarizedPosteriorTransform,
+    LogExpectedImprovement,
+    qLogExpectedImprovement,
 )
 
 from xopt.generators.bayesian.bayesian_generator import (
