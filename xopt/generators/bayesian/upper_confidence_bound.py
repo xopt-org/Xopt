@@ -34,18 +34,11 @@ beta : float, default 2.0
     def validate_vocs_without_constraints(cls, v):
         if v.constraints:
             warnings.warn(
-                f"Using {cls.__name__} with constraints may lead to numerical issues if the base acquisition "
-                f"function has negative values."
+                f"Using {cls.__name__} with constraints will lead to invalid values "
+                f"if the base acquisition function has negative values. Use with "
+                f"caution."
             )
         return v
-
-    @field_validator("log_transform_acquisition_function")
-    def validate_log_transform_acquisition_function(cls, v):
-        if v:
-            raise ValueError(
-                "Log transform cannot be applied to potentially negative UCB "
-                "acquisition function."
-            )
 
     def _get_acquisition(self, model):
         objective = self._get_objective()
