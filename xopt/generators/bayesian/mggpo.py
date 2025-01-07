@@ -2,7 +2,7 @@ from typing import Optional
 
 import pandas as pd
 import torch
-from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective import qLogNoisyExpectedHypervolumeImprovement
 from pydantic import Field
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
@@ -68,7 +68,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         inputs = self.get_input_data(self.data)
         sampler = self._get_sampler(model)
 
-        acq = qNoisyExpectedHypervolumeImprovement(
+        acq = qLogNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
             prune_baseline=True,

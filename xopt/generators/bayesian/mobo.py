@@ -2,7 +2,6 @@ from typing import Union
 
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from botorch.acquisition.multi_objective import qNoisyExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -24,7 +23,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         description="flag to specify if pareto front points are to be used during "
         "optimization of the acquisition function",
     )
-    __doc__ = """Implements Multi-Objective Bayesian Optimization using the Expected
+    __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
 
     def _get_objective(self):
@@ -60,12 +59,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         inputs = self.get_input_data(self.data)
         sampler = self._get_sampler(model)
 
-        if self.log_transform_acquisition_function:
-            acqclass = qLogNoisyExpectedHypervolumeImprovement
-        else:
-            acqclass = qNoisyExpectedHypervolumeImprovement
-
-        acq = acqclass(
+        acq = qLogNoisyExpectedHypervolumeImprovement(
             model,
             X_baseline=inputs,
             constraints=self._get_constraint_callables(),
