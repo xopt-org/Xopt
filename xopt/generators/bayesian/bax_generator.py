@@ -3,6 +3,7 @@ import pickle
 from copy import deepcopy
 from typing import Dict
 
+from botorch.models import ModelListGP, SingleTaskGP
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
@@ -53,6 +54,10 @@ class BaxGenerator(BayesianGenerator):
             for name in self.algorithm.observable_names_ordered
         ]
         bax_model = model.subset_output(bax_model_ids)
+
+        if isinstance(bax_model, SingleTaskGP):
+            bax_model = ModelListGP(bax_model)
+
         eig = ModelListExpectedInformationGain(
             bax_model, self.algorithm, self._get_optimization_bounds()
         )
