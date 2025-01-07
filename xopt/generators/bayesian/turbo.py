@@ -113,10 +113,8 @@ class TurboController(XoptBaseModel, ABC):
             weights = 1.0
 
             if model is not None:
-                if model.models[0].covar_module.base_kernel.lengthscale is not None:
-                    lengthscales = model.models[
-                        0
-                    ].covar_module.base_kernel.lengthscale.detach()
+                if model.models[0].covar_module.lengthscale is not None:
+                    lengthscales = model.models[0].covar_module.lengthscale.detach()
 
                     # calculate the ratios of lengthscales for each axis
                     weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
