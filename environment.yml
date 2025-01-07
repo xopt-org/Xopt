@@ -3,12 +3,12 @@ name: xopt-dev
 channels:
   - conda-forge
 dependencies:
-  - python>=3.9
+  - python>=3.10
   - deap
   - numpy
   - pydantic>=2.3
   - pyyaml
-  - botorch>=0.9.2,<=0.10.0
+  - botorch
   - scipy>=1.10.1
   - pandas
   - ipywidgets
