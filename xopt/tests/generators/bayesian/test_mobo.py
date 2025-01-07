@@ -236,7 +236,6 @@ class TestMOBOGenerator:
         gen = MOBOGenerator(
             vocs=tnk_vocs,
             reference_point=reference_point,
-            log_transform_acquisition_function=True,
         )
         gen = deepcopy(gen)
         gen.n_monte_carlo_samples = 20
