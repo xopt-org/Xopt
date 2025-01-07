@@ -23,6 +23,29 @@ from torch import Tensor
 
 
 class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
+    r"""
+    Xopt copy of HeteroskedasticSingleTaskGP from botorch which allows for a user
+    to specify mean and covariance modules.
+
+    A single-task exact GP model using a heteroskedastic noise model.
+
+    This model differs from `SingleTaskGP` with observed observation noise
+    variances (`train_Yvar`) in that it can predict noise levels out of sample.
+    This is achieved by internally wrapping another GP (a `SingleTaskGP`) to model
+    the (log of) the observation noise. Noise levels must be provided to
+    `HeteroskedasticSingleTaskGP` as `train_Yvar`.
+
+    Examples of cases in which noise levels are known include online
+    experimentation and simulation optimization.
+
+    Example:
+        >>> train_X = torch.rand(20, 2)
+        >>> train_Y = torch.sin(train_X).sum(dim=1, keepdim=True)
+        >>> se = torch.linalg.norm(train_X, dim=1, keepdim=True)
+        >>> train_Yvar = 0.1 + se * torch.rand_like(train_Y)
+        >>> model = HeteroskedasticSingleTaskGP(train_X, train_Y, train_Yvar)
+    """
+
     def __init__(
         self,
         train_X: Tensor,
@@ -34,12 +57,7 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
         covar_module: Optional[Module] = None,
     ) -> None:
         r"""
-        Xopt copy of HeteroskedasticSingleTaskGP from botorch which allows for a user
-        to specify mean and covariance modules.
-
-
-        Parameters
-        ----------
+        Args:
             train_X: A `batch_shape x n x d` tensor of training features.
             train_Y: A `batch_shape x n x m` tensor of training observations.
             train_Yvar: A `batch_shape x n x m` tensor of observed measurement
@@ -53,6 +71,7 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
             input_transform: An input transfrom that is applied in the model's
                 forward pass.
         """
+
         if outcome_transform is not None:
             train_Y, train_Yvar = outcome_transform(train_Y, train_Yvar)
         self._validate_tensor_args(X=train_X, Y=train_Y, Yvar=train_Yvar)
@@ -65,12 +84,19 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
                 MIN_INFERRED_NOISE_LEVEL, transform=None, initial_value=1.0
             ),
         )
+        # Likelihood will always get evaluated with transformed X, so we need to
+        # transform the training data before constructing the noise model.
+        with torch.no_grad():
+            transformed_X = self.transform_inputs(
+                X=train_X, input_transform=input_transform
+            )
         noise_model = SingleTaskGP(
-            train_X=train_X,
+            train_X=transformed_X,
             train_Y=train_Yvar,
             likelihood=noise_likelihood,
             outcome_transform=Log(),
-            input_transform=input_transform,
+            mean_module=mean_module,
+            covar_module=covar_module,
         )
         likelihood = _GaussianLikelihoodBase(HeteroskedasticNoise(noise_model))
         # This is hacky -- this class used to inherit from SingleTaskGP, but it
@@ -82,9 +108,8 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
             train_X=train_X,
             train_Y=train_Y,
             likelihood=likelihood,
+            outcome_transform=None,
             input_transform=input_transform,
-            mean_module=mean_module,
-            covar_module=covar_module,
         )
         self.register_added_loss_term("noise_added_loss")
         self.update_added_loss_term(

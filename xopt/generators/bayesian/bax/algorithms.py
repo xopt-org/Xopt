@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar, Dict, List, Tuple
 
 import torch
-from botorch.models.model import Model
+from botorch.models.model import Model, ModelList
 from pydantic import Field, PositiveInt
 from torch import Tensor
 
@@ -76,7 +76,11 @@ class GridOptimize(GridScanAlgorithm):
         """get execution paths that minimize the objective function"""
 
         # build evaluation mesh
-        test_points = self.create_mesh(bounds).to(model.models[0].train_targets)
+        test_points = self.create_mesh(bounds)
+        if isinstance(model, ModelList):
+            test_points = test_points.to(model.models[0].train_targets)
+        else:
+            test_points = test_points.to(model.train_targets)
 
         # get samples of the model posterior at mesh points
         posterior_samples = self.evaluate_virtual_objective(
