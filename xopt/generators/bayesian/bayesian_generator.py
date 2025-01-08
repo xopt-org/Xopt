@@ -97,10 +97,6 @@ class BayesianGenerator(Generator, ABC):
     computation_time : Optional[pd.DataFrame]
         A data frame tracking computation time in seconds.
 
-    log_transform_acquisition_function: Optional[bool]
-        Flag to determine if final acquisition function value should be
-        log-transformed before optimization.
-
     n_interpolate_samples: Optional[PositiveInt]
         Number of interpolation points to generate between last observation and next
         observation, requires n_candidates to be 1.
@@ -159,16 +155,11 @@ class BayesianGenerator(Generator, ABC):
         None,
         description="data frame tracking computation time in seconds",
     )
-    log_transform_acquisition_function: Optional[bool] = Field(
-        False,
-        description="flag to log transform the acquisition function before optimization",
-    )
     custom_objective: Optional[CustomXoptObjective] = Field(
         None,
         description="custom objective for optimization, replaces objective specified by VOCS",
     )
     n_interpolate_points: Optional[PositiveInt] = None
-    memory_length: Optional[PositiveInt] = None
 
     n_candidates: int = 1
 
@@ -507,6 +498,9 @@ class BayesianGenerator(Generator, ABC):
                 model, acq, self._get_constraint_callables(), sampler=sampler
             )
 
+            # log transform the result to handle the constraints
+            acq = LogAcquisitionFunction(acq)
+
         # apply fixed features if specified in the generator
         if self.fixed_features is not None:
             # get input dim
@@ -520,9 +514,6 @@ class BayesianGenerator(Generator, ABC):
             acq = FixedFeatureAcquisitionFunction(
                 acq_function=acq, d=dim, columns=columns, values=values
             )
-
-        if self.log_transform_acquisition_function:
-            acq = LogAcquisitionFunction(acq)
 
         return acq
 

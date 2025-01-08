@@ -88,21 +88,6 @@ class TestUpperConfidenceBoundGenerator:
         for _ in range(1):
             X.step()
 
-    def test_positivity(self):
-        # for UCB to work properly with constraints, it must always be positive.
-        # to acheive this we set infeasible cost
-        ucb_gen = UpperConfidenceBoundGenerator(
-            vocs=TEST_VOCS_BASE,
-        )
-        ucb_gen.add_data(
-            pd.DataFrame({"x1": -1.0, "x2": -1.0, "y1": 100.0, "c1": -100}, index=[0])
-        )
-        ucb_gen.train_model()
-        # evaluate acqf
-        acqf = ucb_gen.get_acquisition(ucb_gen.model)
-        with torch.no_grad():
-            assert acqf(torch.tensor((-1.0, -1.0)).reshape(1, 1, 2)) >= 0.0
-
     def test_fixed_feature(self):
         # test with fixed feature not in vocs
         gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)

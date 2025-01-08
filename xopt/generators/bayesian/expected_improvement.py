@@ -1,8 +1,8 @@
 import torch
 from botorch.acquisition import (
-    ExpectedImprovement,
-    qExpectedImprovement,
     ScalarizedPosteriorTransform,
+    LogExpectedImprovement,
+    qLogExpectedImprovement,
 )
 
 from xopt.generators.bayesian.bayesian_generator import (
@@ -30,7 +30,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
             # MC sampling for generating multiple candidate points
             sampler = self._get_sampler(model)
-            acq = qExpectedImprovement(
+            acq = qLogExpectedImprovement(
                 model,
                 best_f=best_f,
                 sampler=sampler,
@@ -42,7 +42,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             # note that the analytic version cannot handle custom objectives
             weights = set_botorch_weights(self.vocs).to(**self.tkwargs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
-            acq = ExpectedImprovement(
+            acq = LogExpectedImprovement(
                 model, best_f=best_f, posterior_transform=posterior_transform
             )
 
