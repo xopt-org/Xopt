@@ -62,6 +62,7 @@ def visualize_model(
     show_acquisition: bool = True,
     n_grid: int = 50,
     axes: Optional[Axes] = None,
+    exponentiate: bool = True
 ) -> tuple:
     """Displays GP model predictions for the selected output(s).
 
@@ -103,6 +104,8 @@ def visualize_model(
         Number of grid points per dimension used to display the model predictions.
     axes : Axes, optional
         Axes object used for plotting.
+    exponentiate : bool, optional
+        Flag to exponentiate acquisition function before plotting.
 
     Returns
     -------
@@ -413,6 +416,7 @@ def plot_acquisition_function(
     show_legend: bool = True,
     n_grid: int = 100,
     axis=None,
+    exponentiate: bool = True,
     **_,
 ):
     """Displays the given acquisition function.
@@ -441,6 +445,8 @@ def plot_acquisition_function(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
+    exponentiate : bool, optional
+        Flag to exponentiate acquisition function before plotting.
     _
 
     Returns
@@ -453,6 +459,12 @@ def plot_acquisition_function(
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
     kwargs = locals()
     input_mesh = _generate_input_mesh(**kwargs)
+
+    if exponentiate:
+        y_label = r"$\exp[ \alpha]$"
+    else:
+        y_label = r"$\alpha$"
+
     if len(variable_names) == 1:
         x_axis = (
             input_mesh[:, vocs.variable_names.index(variable_names[0])]
@@ -468,6 +480,10 @@ def plot_acquisition_function(
                 .numpy()
             )
         acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+
+        if exponentiate:
+            acq = np.exp(acq)
+
         if base_acq is None:
             axis.plot(x_axis, acq, "C0-")
         else:
@@ -479,7 +495,8 @@ def plot_acquisition_function(
             if show_legend:
                 axis.legend()
         axis.set_xlabel(variable_names[0])
-        axis.set_ylabel(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
+
+        axis.set_ylabel(y_label)
     else:
         if only_base_acq:
             if not hasattr(acquisition_function, "base_acquisition"):
@@ -496,6 +513,10 @@ def plot_acquisition_function(
             acq = (
                 acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
             )
+
+        if exponentiate:
+            acq = np.exp(acq)
+
         if only_base_acq:
             title = "Base Acq. Function"
         elif hasattr(acquisition_function, "base_acquisition"):
@@ -506,7 +527,7 @@ def plot_acquisition_function(
             prediction=acq,
             input_mesh=input_mesh,
             title=title,
-            cbar_label=r"$\alpha\,$[{}]".format(vocs.output_names[0]),
+            cbar_label=y_label,
             output_name=vocs.output_names[0],
             **kwargs,
         )
