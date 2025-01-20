@@ -62,7 +62,7 @@ def visualize_model(
     show_acquisition: bool = True,
     n_grid: int = 50,
     axes: Optional[Axes] = None,
-    exponentiate: bool = True
+    exponentiate: bool = True,
 ) -> tuple:
     """Displays GP model predictions for the selected output(s).
 
