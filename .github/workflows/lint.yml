@@ -19,7 +19,7 @@ jobs:
 
       - name: Install pre-commit
         shell: bash -l {0}
-        run: conda install pre-commit nbconvert
+        run: mamba install pre-commit nbconvert
 
       - name: List Python package versions
         shell: bash -l {0}
