@@ -535,7 +535,48 @@ class BayesianGenerator(Generator, ABC):
         return self._process_candidates(result)
 
     def visualize_model(self, **kwargs):
-        """displays the GP models"""
+        """Display GP model predictions for the selected output(s).
+
+        The GP models are displayed with respect to the named variables. If None are given, the list of variables in
+        vocs is used. Feasible samples are indicated with a filled orange "o", infeasible samples with a hollow
+        red "o". Feasibility is calculated with respect to all constraints unless the selected output is a
+        constraint itself, in which case only that one is considered.
+
+        Parameters
+        ----------
+        **kwargs: dict, optional
+            Supported keyword arguments:
+            - output_names : List[str]
+                Outputs for which the GP models are displayed. Defaults to all outputs in vocs.
+            - variable_names : List[str]
+                The variables with respect to which the GP models are displayed (maximum of 2).
+                Defaults to vocs.variable_names.
+            - idx : int
+                Index of the last sample to use. This also selects the point of reference in
+                higher dimensions unless an explicit reference_point is given.
+            - reference_point : dict
+                Reference point determining the value of variables in vocs.variable_names, but not in variable_names
+                (slice plots in higher dimensions). Defaults to last used sample.
+            - show_samples : bool, optional
+                Whether samples are shown.
+            - show_prior_mean : bool, optional
+                Whether the prior mean is shown.
+            - show_feasibility : bool, optional
+                Whether the feasibility region is shown.
+            - show_acquisition : bool, optional
+                Whether the acquisition function is computed and shown (only if acquisition function is not None).
+            - n_grid : int, optional
+                Number of grid points per dimension used to display the model predictions.
+            - axes : Axes, optional
+                Axes object used for plotting.
+            - exponentiate : bool, optional
+                Flag to exponentiate acquisition function before plotting.
+
+        Returns
+        -------
+        result : tuple
+            The matplotlib figure and axes objects.
+        """
         return visualize_generator_model(self, **kwargs)
 
     def _get_initial_conditions(self, n_candidates=1) -> Union[Tensor, None]:
