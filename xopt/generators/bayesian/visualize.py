@@ -15,25 +15,53 @@ from .objectives import feasibility
 
 
 def visualize_generator_model(generator, **kwargs) -> tuple:
-    """Displays GP model predictions for the selected output(s).
+    """Visualizes GP model predictions for the specified output(s).
 
-    The GP models are displayed with respect to the named variables. If None are given, the list of variables in
-    generator.vocs is used. Feasible samples are indicated with a filled orange "o", infeasible samples with a
-    hollow red "o". Feasibility is calculated with respect to all constraints unless the selected output is a
-    constraint itself, in which case only that one is considered.
+    This function generates a visualization of the Gaussian Process (GP) models associated with the provided generator.
+    It plots model predictions for selected outputs, showing feasible samples with filled orange circles ("o") and
+    infeasible samples with hollow red circles ("o"). Feasibility is calculated with respect to all constraints,
+    except when the selected output is a constraint itself, in which case only that constraint is considered.
 
     Parameters
     ----------
     generator : BayesianGenerator
-            Bayesian generator for which the GP model shall be visualized.
-    **kwargs : visualization parameters
-        See parameters of :func:`visualize_model`.
+        The Bayesian generator whose GP model is to be visualized. The generator must have a trained model.
+    **kwargs : dict, optional
+        Additional visualization parameters to customize the plots. Refer to the parameters of :func:`visualize_model`
+        for more details.
+
+    Raises
+    ------
+    ValueError
+        If the generator's model has not been trained (i.e., `generator.model` is None).
 
     Returns
     -------
     tuple
-        The matplotlib figure and axes objects.
+        A tuple containing the matplotlib figure and axes objects used for the visualization.
+
+    Examples
+    --------
+    >>> from xopt.generators.bayesian import ExpectedImprovementGenerator
+    >>> from xopt.generators.bayesian.visualize import visualize_generator_model
+    >>> generator = BayesianGenerator(...)
+    >>> generator.train_model()
+    >>> fig, ax = visualize_generator_model(generator, output_names=['output1'], show_acquisition=False)
+    >>> fig.show()
+
+    Notes
+    -----
+    - The visualization is limited to at most two variables at a time.
+    - The generator should be trained (via `generator.train_model()`) before calling this function.
+    - The function internally calls `visualize_model` to handle the actual plotting.
+
+    The following documentation is inherited from `visualize_model`:
+
     """
+
+    # append docstring dynamically
+    visualize_generator_model.__doc__ += visualize_model.__doc__
+
     if generator.model is None:
         raise ValueError(
             "The generator.model doesn't exist, try calling generator.train_model()."
