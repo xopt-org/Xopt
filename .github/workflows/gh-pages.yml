@@ -38,7 +38,7 @@ jobs:
           zip -r xopt-examples.zip docs/examples/
           mv xopt-examples.zip ./site/assets/
       - name: Upload docs artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
   deploy:
