@@ -15,25 +15,53 @@ from .objectives import feasibility
 
 
 def visualize_generator_model(generator, **kwargs) -> tuple:
-    """Displays GP model predictions for the selected output(s).
+    """Visualizes GP model predictions for the specified output(s).
 
-    The GP models are displayed with respect to the named variables. If None are given, the list of variables in
-    generator.vocs is used. Feasible samples are indicated with a filled orange "o", infeasible samples with a
-    hollow red "o". Feasibility is calculated with respect to all constraints unless the selected output is a
-    constraint itself, in which case only that one is considered.
+    This function generates a visualization of the Gaussian Process (GP) models associated with the provided generator.
+    It plots model predictions for selected outputs, showing feasible samples with filled orange circles ("o") and
+    infeasible samples with hollow red circles ("o"). Feasibility is calculated with respect to all constraints,
+    except when the selected output is a constraint itself, in which case only that constraint is considered.
 
     Parameters
     ----------
     generator : BayesianGenerator
-            Bayesian generator for which the GP model shall be visualized.
-    **kwargs : visualization parameters
-        See parameters of :func:`visualize_model`.
+        The Bayesian generator whose GP model is to be visualized. The generator must have a trained model.
+    **kwargs : dict, optional
+        Additional visualization parameters to customize the plots. Refer to the parameters of :func:`visualize_model`
+        for more details.
+
+    Raises
+    ------
+    ValueError
+        If the generator's model has not been trained (i.e., `generator.model` is None).
 
     Returns
     -------
     tuple
-        The matplotlib figure and axes objects.
+        A tuple containing the matplotlib figure and axes objects used for the visualization.
+
+    Examples
+    --------
+    >>> from xopt.generators.bayesian import ExpectedImprovementGenerator
+    >>> from xopt.generators.bayesian.visualize import visualize_generator_model
+    >>> generator = BayesianGenerator(...)
+    >>> generator.train_model()
+    >>> fig, ax = visualize_generator_model(generator, output_names=['output1'], show_acquisition=False)
+    >>> fig.show()
+
+    Notes
+    -----
+    - The visualization is limited to at most two variables at a time.
+    - The generator should be trained (via `generator.train_model()`) before calling this function.
+    - The function internally calls `visualize_model` to handle the actual plotting.
+
+    The following documentation is inherited from `visualize_model`:
+
     """
+
+    # append docstring dynamically
+    visualize_generator_model.__doc__ += visualize_model.__doc__
+
     if generator.model is None:
         raise ValueError(
             "The generator.model doesn't exist, try calling generator.train_model()."
@@ -62,6 +90,7 @@ def visualize_model(
     show_acquisition: bool = True,
     n_grid: int = 50,
     axes: Optional[Axes] = None,
+    exponentiate: bool = True,
 ) -> tuple:
     """Displays GP model predictions for the selected output(s).
 
@@ -103,6 +132,8 @@ def visualize_model(
         Number of grid points per dimension used to display the model predictions.
     axes : Axes, optional
         Axes object used for plotting.
+    exponentiate : bool, optional
+        Flag to exponentiate acquisition function before plotting.
 
     Returns
     -------
@@ -413,6 +444,7 @@ def plot_acquisition_function(
     show_legend: bool = True,
     n_grid: int = 100,
     axis=None,
+    exponentiate: bool = True,
     **_,
 ):
     """Displays the given acquisition function.
@@ -441,6 +473,8 @@ def plot_acquisition_function(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
+    exponentiate : bool, optional
+        Flag to exponentiate acquisition function before plotting.
     _
 
     Returns
@@ -453,6 +487,12 @@ def plot_acquisition_function(
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
     kwargs = locals()
     input_mesh = _generate_input_mesh(**kwargs)
+
+    if exponentiate:
+        y_label = r"$\exp[ \alpha]$"
+    else:
+        y_label = r"$\alpha$"
+
     if len(variable_names) == 1:
         x_axis = (
             input_mesh[:, vocs.variable_names.index(variable_names[0])]
@@ -468,6 +508,10 @@ def plot_acquisition_function(
                 .numpy()
             )
         acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+
+        if exponentiate:
+            acq = np.exp(acq)
+
         if base_acq is None:
             axis.plot(x_axis, acq, "C0-")
         else:
@@ -479,7 +523,8 @@ def plot_acquisition_function(
             if show_legend:
                 axis.legend()
         axis.set_xlabel(variable_names[0])
-        axis.set_ylabel(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
+
+        axis.set_ylabel(y_label)
     else:
         if only_base_acq:
             if not hasattr(acquisition_function, "base_acquisition"):
@@ -496,6 +541,10 @@ def plot_acquisition_function(
             acq = (
                 acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
             )
+
+        if exponentiate:
+            acq = np.exp(acq)
+
         if only_base_acq:
             title = "Base Acq. Function"
         elif hasattr(acquisition_function, "base_acquisition"):
@@ -506,7 +555,7 @@ def plot_acquisition_function(
             prediction=acq,
             input_mesh=input_mesh,
             title=title,
-            cbar_label=r"$\alpha\,$[{}]".format(vocs.output_names[0]),
+            cbar_label=y_label,
             output_name=vocs.output_names[0],
             **kwargs,
         )
