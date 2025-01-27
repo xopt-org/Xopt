@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Generic, Optional, TypeVar
 
 import numpy as np
 import torch
@@ -8,6 +8,7 @@ from pandas import DataFrame
 
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.ticker import FormatStrFormatter
 
 from xopt.vocs import VOCS
 
@@ -73,6 +74,15 @@ def visualize_generator_model(generator, **kwargs) -> tuple:
         acquisition_function=generator.get_acquisition(generator.model),
         **kwargs,
     )
+
+
+# Little helper class, which is only used as a type.
+DType = TypeVar("DType")
+
+
+class Array(np.ndarray, Generic[DType]):
+    def __getitem__(self, key) -> DType:  # type: ignore
+        return super().__getitem__(key)  # type: ignore
 
 
 def visualize_model(
@@ -150,7 +160,7 @@ def visualize_model(
     dim_x, dim_y = len(variable_names), len(output_names)
     # plot configuration
     figure_config = _get_figure_config(min_ncols=dim_x, min_nrows=dim_y, **kwargs)
-    plots: tuple[Figure, Axes | np.ndarray] = None
+    plots: tuple[Figure, Array[Axes]]
     if axes is None:
         from matplotlib import pyplot as plt  # lazy import
 
@@ -179,6 +189,7 @@ def visualize_model(
                 **kwargs,
             )
             ax[i, 0].set_xlabel(None)
+
         if show_acquisition:
             plot_acquisition_function(
                 axis=ax[len(output_names), 0], **(kwargs | {"show_samples": False})
@@ -772,6 +783,10 @@ def _plot2d_prediction(
     axis.set_title(title)
     axis.set_xlabel(variable_names[0])
     axis.set_ylabel(variable_names[1])
+
+    cbar.ax.ticklabel_format(axis="both", style="sci", useOffset=False)
+    cbar.ax.yaxis.set_major_formatter(FormatStrFormatter("%.3f"))
+
     cbar.set_label(cbar_label)
     if show_samples:
         axis = plot_samples(**kwargs)
