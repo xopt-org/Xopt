@@ -2,7 +2,8 @@ import torch
 from botorch.acquisition import (
     ScalarizedPosteriorTransform,
     LogExpectedImprovement,
-    qLogExpectedImprovement, FixedFeatureAcquisitionFunction,
+    qLogExpectedImprovement,
+    FixedFeatureAcquisitionFunction,
 )
 
 from xopt.generators.bayesian.bayesian_generator import (
@@ -62,7 +63,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
                 best_f=best_f,
                 sampler=sampler,
                 objective=objective,
-                constraints=self._get_constraint_callables()
+                constraints=self._get_constraint_callables(),
             )
         else:
             # analytic acquisition function for single candidate generation with
