@@ -3,6 +3,7 @@ from botorch.acquisition import (
     ScalarizedPosteriorTransform,
     LogExpectedImprovement,
     qLogExpectedImprovement,
+    FixedFeatureAcquisitionFunction,
 )
 
 from xopt.generators.bayesian.bayesian_generator import (
@@ -23,6 +24,33 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         + formatted_base_docstring()
     )
 
+    def get_acquisition(self, model):
+        """
+        Returns a function that can be used to evaluate the acquisition function.
+        Overwrites base `get_acqusition` method.
+        """
+        if model is None:
+            raise ValueError("model cannot be None")
+
+        # get base acquisition function
+        acq = self._get_acquisition(model)
+
+        # apply fixed features if specified in the generator
+        if self.fixed_features is not None:
+            # get input dim
+            dim = len(self.model_input_names)
+            columns = []
+            values = []
+            for name, value in self.fixed_features.items():
+                columns += [self.model_input_names.index(name)]
+                values += [value]
+
+            acq = FixedFeatureAcquisitionFunction(
+                acq_function=acq, d=dim, columns=columns, values=values
+            )
+
+        return acq
+
     def _get_acquisition(self, model):
         objective = self._get_objective()
         best_f = self._get_best_f(self.data, objective)
@@ -35,6 +63,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
                 best_f=best_f,
                 sampler=sampler,
                 objective=objective,
+                constraints=self._get_constraint_callables(),
             )
         else:
             # analytic acquisition function for single candidate generation with
