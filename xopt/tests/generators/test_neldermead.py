@@ -91,9 +91,9 @@ class TestNelderMeadGenerator:
 
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
-        assert (
-            xbest["x0"] == result[0] and xbest["x1"] == result[1]
-        ), "Xopt Simplex does not match the vanilla one"
+        assert xbest["x0"] == result[0] and xbest["x1"] == result[1], (
+            "Xopt Simplex does not match the vanilla one"
+        )
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v",
@@ -140,9 +140,9 @@ class TestNelderMeadGenerator:
 
         idx, best, _ = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert np.array_equal(
-            xbest, result.x
-        ), "Xopt Simplex does not match the vanilla one"
+        assert np.array_equal(xbest, result.x), (
+            "Xopt Simplex does not match the vanilla one"
+        )
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v,cstep",
@@ -218,6 +218,6 @@ class TestNelderMeadGenerator:
 
         idx, best, _ = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert np.array_equal(
-            xbest, result.x
-        ), "Xopt Simplex does not match the vanilla one"
+        assert np.array_equal(xbest, result.x), (
+            "Xopt Simplex does not match the vanilla one"
+        )

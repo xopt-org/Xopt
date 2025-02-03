@@ -18,7 +18,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
     supports_batch_generation: bool = True
 
     ga_generator: Optional[CNSGAGenerator] = Field(
-        None, description="CNSGA generator used to " "generate candidates"
+        None, description="CNSGA generator used to generate candidates"
     )
 
     def __init__(self, **kwargs):

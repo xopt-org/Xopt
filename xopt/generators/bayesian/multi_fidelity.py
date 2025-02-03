@@ -24,7 +24,7 @@ logger = logging.getLogger()
 class MultiFidelityGenerator(MOBOGenerator):
     name = "multi_fidelity"
     fidelity_parameter: Literal["s"] = Field(
-        "s", description="fidelity parameter " "name", exclude=True
+        "s", description="fidelity parameter name", exclude=True
     )
     cost_function: Callable = Field(
         lambda x: x + 1.0,
@@ -132,8 +132,7 @@ class MultiFidelityGenerator(MOBOGenerator):
     def add_data(self, new_data: pd.DataFrame):
         if self.fidelity_parameter not in new_data:
             raise ValueError(
-                f"fidelity parameter {self.fidelity_parameter} must be "
-                f"in added data"
+                f"fidelity parameter {self.fidelity_parameter} must be in added data"
             )
 
         # overwrite add data to check for valid fidelity values

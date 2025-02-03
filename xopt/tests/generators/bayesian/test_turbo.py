@@ -27,7 +27,7 @@ def sin_function(input_dict):
     x = input_dict["x"]
     return {
         "f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x),
-        "c": -1.0
+        "c": -1.0,
     }
 
 
@@ -432,7 +432,7 @@ class TestTurbo(TestCase):
 
         controllers = [
             OptimizeTurboController(test_vocs),
-            SafetyTurboController(test_vocs)
+            SafetyTurboController(test_vocs),
         ]
         for controller in controllers:
             controller.length = 5.0

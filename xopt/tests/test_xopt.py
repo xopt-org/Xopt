@@ -324,9 +324,9 @@ class TestXopt:
         assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
-        assert (
-            len(X.generator.data) == 2
-        ), f"len(X.generator.data) = {len(X.generator.data)}"
+        assert len(X.generator.data) == 2, (
+            f"len(X.generator.data) = {len(X.generator.data)}"
+        )
 
     def test_remove_data(self):
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))

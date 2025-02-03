@@ -30,8 +30,8 @@ if __name__ == "__main__":
         # Pytest will automatically determine the number of times to run
         args = [
             "-vrxs",
-            f"--benchmark-json={script_folder/'bench_output.json'}",
-            f"{script_folder.parent/'benchmarks'}",
+            f"--benchmark-json={script_folder / 'bench_output.json'}",
+            f"{script_folder.parent / 'benchmarks'}",
         ]
 
         # Add extra arguments
@@ -70,4 +70,4 @@ if __name__ == "__main__":
         print(dfsummary.to_string(max_colwidth=20, float_format="{:.3f}".format))
 
         if args.dump is not None:
-            dfsummary.to_csv(f"{script_folder/args.dump}")
+            dfsummary.to_csv(f"{script_folder / args.dump}")

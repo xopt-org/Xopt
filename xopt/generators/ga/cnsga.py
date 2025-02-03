@@ -34,7 +34,7 @@ class CNSGAGenerator(Generator):
         None, description="Population file to load (CSV format)"
     )
     output_path: Optional[str] = Field(
-        None, description="Output path for population " "files"
+        None, description="Output path for population files"
     )
     _children: List[Dict] = PrivateAttr([])
     _offspring: Optional[pd.DataFrame] = PrivateAttr(None)
