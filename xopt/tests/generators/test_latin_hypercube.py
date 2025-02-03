@@ -33,7 +33,7 @@ class TestLatinHypercubeGenerator:
             for config in configs:
                 # Get the samples from xopt
                 test_vocs = deepcopy(TEST_VOCS_BASE)
-                test_vocs.variables = {f"x{i+1}": [0, 1] for i in range(dim)}
+                test_vocs.variables = {f"x{i + 1}": [0, 1] for i in range(dim)}
                 gen = LatinHypercubeGenerator(
                     vocs=test_vocs, seed=1, batch_size=n_samples, **config
                 )

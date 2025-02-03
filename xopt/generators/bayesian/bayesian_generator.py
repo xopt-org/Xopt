@@ -142,7 +142,7 @@ class BayesianGenerator(Generator, ABC):
     )
     numerical_optimizer: SerializeAsAny[NumericalOptimizer] = Field(
         LBFGSOptimizer(),
-        description="optimizer used to optimize the acquisition " "function",
+        description="optimizer used to optimize the acquisition function",
     )
     max_travel_distances: Optional[List[float]] = Field(
         None,
@@ -788,8 +788,7 @@ class BayesianGenerator(Generator, ABC):
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
     reference_point: dict[str, float] = Field(
-        description="dict specifying reference point for multi-objective "
-        "optimization",
+        description="dict specifying reference point for multi-objective optimization",
     )
 
     supports_multi_objective: bool = True

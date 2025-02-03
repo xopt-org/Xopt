@@ -44,7 +44,7 @@ class Generator(XoptBaseModel, ABC):
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_objectives > 1 and not info.data["supports_multi_objective"]:
             raise ValueError(
-                "this generator only supports a single objective " "specified in vocs"
+                "this generator only supports a single objective specified in vocs"
             )
         return v
 
