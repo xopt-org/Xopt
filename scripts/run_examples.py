@@ -140,7 +140,7 @@ if __name__ == "__main__":
         "--path",
         metavar="path",
         default="docs/examples",
-        help="repo " "directory.",
+        help="repo directory.",
     )
     parser.add_argument(
         "-s", "--smoke", action="store_true", help="Run in smoke test mode."

@@ -255,8 +255,7 @@ class VOCS(XoptBaseModel):
             for name, value in bounds.items():
                 if value[0] == value[1]:
                     raise ValueError(
-                        f"specified `custom_bounds` for {name} is "
-                        f"outside vocs domain"
+                        f"specified `custom_bounds` for {name} is outside vocs domain"
                     )
 
             # if clipping was used then raise a warning

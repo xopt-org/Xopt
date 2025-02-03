@@ -193,8 +193,7 @@ def validate_turbo_controller_base(value, available_controller_types, info):
 
         if not valid_type:
             raise ValueError(
-                f"turbo controller of type {type(value)} "
-                f"not allowed for this generator"
+                f"turbo controller of type {type(value)} not allowed for this generator"
             )
 
     elif isinstance(value, str):

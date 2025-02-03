@@ -452,9 +452,9 @@ class RCDSGenerator(Generator):
         self._generator = self._rcds.powellmain()
 
     def add_data(self, new_data: pd.DataFrame):
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
+        assert len(new_data) == 1, (
+            f"length of new_data must be 1, found: {len(new_data)}"
+        )
         res = self.vocs.objective_data(new_data).to_numpy()
         assert res.shape == (1, 1)
         obj = res[0, 0]

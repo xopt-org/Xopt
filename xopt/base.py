@@ -251,8 +251,7 @@ class Xopt(XoptBaseModel):
             if self.max_evaluations is not None:
                 if self.n_data >= self.max_evaluations:
                     logger.info(
-                        "Xopt is done. "
-                        f"Max evaluations {self.max_evaluations} reached."
+                        f"Xopt is done. Max evaluations {self.max_evaluations} reached."
                     )
                     break
 

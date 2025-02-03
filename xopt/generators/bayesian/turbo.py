@@ -162,7 +162,7 @@ class TurboController(XoptBaseModel, ABC):
         pass
 
     def reset(self):
-        """ reset the controller to the initial state"""
+        """reset the controller to the initial state"""
         for name, val in self._initial_state.items():
             if not name == "name":
                 self.__setattr__(name, val)
@@ -175,7 +175,9 @@ class OptimizeTurboController(TurboController):
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, info):
         if not info.objectives:
-            raise ValueError("optimize turbo controller must have an objective specified")
+            raise ValueError(
+                "optimize turbo controller must have an objective specified"
+            )
 
         return info
 
@@ -267,7 +269,9 @@ class SafetyTurboController(TurboController):
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, info):
         if not info.constraints:
-            raise ValueError("safety turbo controller can only be used with constraints")
+            raise ValueError(
+                "safety turbo controller can only be used with constraints"
+            )
 
         if not info.objectives:
             raise ValueError("safety turbo controller must have an objective specified")
@@ -300,8 +304,6 @@ class EntropyTurboController(TurboController):
     _best_entropy: float = None
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
-
-
         if generator.algorithm_results is not None:
             # check to make sure required keys are in algorithm results
             for ele in ["solution_center", "solution_entropy"]:
