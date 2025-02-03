@@ -16,7 +16,7 @@ class AsynchronousXopt(Xopt):
     _n_unfinished_futures: int = 0
     _input_data: DataFrame = DataFrame([])
     is_done: bool = Field(
-        default=False, description="flag indicating that Xopt " "fininshed running"
+        default=False, description="flag indicating that Xopt fininshed running"
     )
 
     def submit_data(
