@@ -255,6 +255,6 @@ class TestExtremumSeekingGenerator:
         for i in range(ES_steps):
             X.step()
 
-        assert np.all(cES == X.data["f"].to_numpy()), (
-            "Xopt ES does not match the vanilla one"
-        )
+        assert np.all(
+            cES == X.data["f"].to_numpy()
+        ), "Xopt ES does not match the vanilla one"
