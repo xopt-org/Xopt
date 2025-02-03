@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 import pandas as pd
 import torch
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -78,6 +78,9 @@ class TurboController(XoptBaseModel, ABC):
                     )
                 )
             )
+
+        # get the initial state for the turbo controller for resetting
+        self._initial_state = self.model_dump()
 
     def get_trust_region(self, generator) -> Tensor:
         """
@@ -158,10 +161,23 @@ class TurboController(XoptBaseModel, ABC):
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         pass
 
+    def reset(self):
+        """ reset the controller to the initial state"""
+        for name, val in self._initial_state.items():
+            if not name == "name":
+                self.__setattr__(name, val)
+
 
 class OptimizeTurboController(TurboController):
     name: str = Field("optimize", frozen=True)
     best_value: Optional[float] = None
+
+    @field_validator("vocs", mode="after")
+    def vocs_validation(cls, info):
+        if not info.objectives:
+            raise ValueError("optimize turbo controller must have an objective specified")
+
+        return info
 
     @property
     def minimize(self) -> bool:
@@ -248,6 +264,16 @@ class SafetyTurboController(TurboController):
     scale_factor: float = 1.25
     min_feasible_fraction: float = 0.75
 
+    @field_validator("vocs", mode="after")
+    def vocs_validation(cls, info):
+        if not info.constraints:
+            raise ValueError("safety turbo controller can only be used with constraints")
+
+        if not info.objectives:
+            raise ValueError("safety turbo controller must have an objective specified")
+
+        return info
+
     def update_state(self, generator, previous_batch_size: int = 1):
         data = generator.data
 
@@ -274,6 +300,8 @@ class EntropyTurboController(TurboController):
     _best_entropy: float = None
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
+
+
         if generator.algorithm_results is not None:
             # check to make sure required keys are in algorithm results
             for ele in ["solution_center", "solution_entropy"]:
