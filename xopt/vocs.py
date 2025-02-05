@@ -606,15 +606,16 @@ class VOCS(XoptBaseModel):
         ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
         obj = self.objectives[self.objective_names[0]]
         obj_name = self.objective_names[0]
+
         res = data[feasible_data["feasible"]].sort_values(
             obj_name, ascending=ascending_flag[obj]
         )[obj_name][:n]
 
-        params = data.iloc[res.index.to_numpy()][self.variable_names].to_dict(
+        params = data.iloc[res.index.to_numpy(int)][self.variable_names].to_dict(
             orient="records"
         )[0]
 
-        return res.index.to_numpy(), res.to_numpy(), params
+        return res.index.to_numpy(int), res.to_numpy(float), params
 
     def cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -705,7 +706,7 @@ def form_objective_data(
 
             weights[i] = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
 
-        oarr = data.loc[:, objectives_names].to_numpy() * weights
+        oarr = data.loc[:, objectives_names].to_numpy(dtype=float) * weights
         oarr[np.isnan(oarr)] = np.inf
         odata = pd.DataFrame(
             oarr, columns=[prefix + k for k in objectives_names], index=data.index
@@ -724,7 +725,7 @@ def form_objective_data(
                 raise ValueError(f"Unknown objective operator: {operator}")
 
             weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
-            arr = data.loc[:, [k]].to_numpy() * weight
+            arr = data.loc[:, [k]].to_numpy(float) * weight
             arr[np.isnan(arr)] = np.inf
             array_list.append(arr)
 
@@ -769,7 +770,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
             cdata[prefix + k] = np.inf
             continue
 
-        x = data[k]
+        x = data[k].astype(float)
         op, d = constraints[k]
         op = op.upper()  # Allow any case
 
@@ -781,7 +782,7 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
             raise ValueError(f"Unknown constraint operator: {op}")
 
         cdata[prefix + k] = cvalues.fillna(np.inf)  # Protect against nans
-    return cdata
+    return cdata.astype(float)
 
 
 def form_observable_data(observables: List, data: pd.DataFrame, prefix="observable_"):
@@ -836,8 +837,9 @@ def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
     c_prefix = "constraint_"
     cdata = form_constraint_data(constraints, data, prefix=c_prefix)
     fdata = pd.DataFrame()
+
     for k in sorted(list(constraints)):
-        fdata[prefix + k] = cdata[c_prefix + k] <= 0
+        fdata[prefix + k] = cdata[c_prefix + k].astype(float) <= 0
     # if all row values are true, then the row is feasible
     fdata["feasible"] = fdata.all(axis=1)
     return fdata

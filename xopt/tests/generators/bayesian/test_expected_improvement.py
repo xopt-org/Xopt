@@ -59,7 +59,7 @@ class TestExpectedImprovement:
         xopt.random_evaluate(3)
 
         # now use bayes opt
-        for _ in range(1):
+        for _ in range(3):
             xopt.step()
 
     def test_custom_objectives(self):
