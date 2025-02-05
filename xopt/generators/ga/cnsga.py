@@ -12,7 +12,7 @@ import xopt.utils
 from xopt.generator import Generator
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
-
+from xopt.generators.ga.visualization import CNSGA_GUI
 # xopt.utils.isotime() # works
 # from xopt.utils import isotime # circular import
 
@@ -165,6 +165,10 @@ class CNSGAGenerator(Generator):
         Convenience name for `options.population_size`
         """
         return self.population_size
+
+    def visualize(self):
+        gui = CNSGA_GUI(self.vocs, self.output_path)
+        return gui
 
 
 def uniform(low, up, size=None):
