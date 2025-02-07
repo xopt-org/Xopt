@@ -109,9 +109,9 @@ class ExtremumSeekingGenerator(Generator):
         AssertionError
             If the length of new_data is not 1.
         """
-        assert len(new_data) <= 1, (
-            f"length of new_data must be 1, found: {len(new_data)}"
-        )
+        assert (
+            len(new_data) <= 1
+        ), f"length of new_data must be 1, found: {len(new_data)}"
 
         self.data = new_data.iloc[-1:]
         self._last_input = self.data[self.vocs.variable_names].to_numpy()[0]

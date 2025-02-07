@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Callable, Dict, Literal, Optional, List
+from typing import Callable, Dict, Literal, Optional
 
 import pandas as pd
 import torch
