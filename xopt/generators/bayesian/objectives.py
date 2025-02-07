@@ -159,7 +159,7 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
 
 def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
     """
-    Create the objective object.
+    Create a monte carlo objective object.
 
     Parameters:
     -----------
