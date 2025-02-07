@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
-from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound
+from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound, AcquisitionFunction
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
 from botorch.utils.multi_objective import is_non_dominated
@@ -115,13 +115,13 @@ class BayesianGenerator(Generator, ABC):
     train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         Train a Bayesian model for Bayesian Optimization.
 
-    propose_candidates(self, model, n_candidates=1) -> Tensor:
+    propose_candidates(self, model: Module, n_candidates: int = 1) -> Tensor:
         Propose candidates for Bayesian Optimization.
 
     get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
         Get input data in torch.Tensor format.
 
-    get_acquisition(self, model) -> AcquisitionFunction:
+    get_acquisition(self, model: Module) -> AcquisitionFunction:
         Get the acquisition function for Bayesian Optimization.
 
     """
@@ -232,6 +232,18 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     def add_data(self, new_data: pd.DataFrame):
+        """
+        Add new data to the generator for Bayesian Optimization.
+
+        Parameters:
+        -----------
+        new_data : pd.DataFrame
+            The new data to be added to the generator.
+
+        Notes:
+        ------
+        This method appends the new data to the existing data in the generator.
+        """
         self.data = pd.concat([self.data, new_data], axis=0)
 
     def generate(self, n_candidates: int) -> list[dict]:
@@ -332,9 +344,32 @@ class BayesianGenerator(Generator, ABC):
 
     def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
         """
-        Returns a ModelListGP containing independent models for the objectives and
-        constraints
+        Train a Bayesian model for Bayesian Optimization.
 
+        Parameters:
+        -----------
+        data : pd.DataFrame, optional
+            The data to be used for training the model. If not provided, the internal
+            data of the generator is used.
+        update_internal : bool, optional
+            Flag to indicate whether to update the internal model of the generator
+            with the trained model (default is True).
+
+        Returns:
+        --------
+        Module
+            The trained Bayesian model.
+
+        Raises:
+        -------
+        ValueError
+            If no data is available to build the model.
+
+        Notes:
+        ------
+        This method trains a Bayesian model using the provided data or the internal
+        data of the generator. It updates the internal model with the trained model
+        if the 'update_internal' flag is set to True.
         """
         if data is None:
             data = self.get_training_data(self.data)
@@ -383,11 +418,27 @@ class BayesianGenerator(Generator, ABC):
             self.model = _model
         return _model
 
-    def propose_candidates(self, model, n_candidates=1):
+    def propose_candidates(self, model: Module, n_candidates: int = 1) -> Tensor:
         """
-        given a GP model, propose candidates by numerically optimizing the
-        acquisition function
+        Propose candidates using Bayesian Optimization.
 
+        Parameters:
+        -----------
+        model : Module
+            The trained Bayesian model.
+        n_candidates : int, optional
+            The number of candidates to propose (default is 1).
+
+        Returns:
+        --------
+        Tensor
+            A tensor containing the proposed candidates.
+
+        Notes:
+        ------
+        This method proposes candidates for Bayesian Optimization by numerically
+        optimizing the acquisition function using the trained model. It updates the
+        state of the Turbo controller if used and calculates the optimization bounds.
         """
         # update TurBO state if used with the last `n_candidates` points
         if self.turbo_controller is not None:
@@ -415,7 +466,7 @@ class BayesianGenerator(Generator, ABC):
 
     def get_training_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Get training data used to train the GP model
+        Get training data used to train the GP model.
 
         If a turbo controller is specified with the flag `restrict_model_data` this
         will return a subset of data that is inside the trust region.
@@ -460,18 +511,18 @@ class BayesianGenerator(Generator, ABC):
         """
         return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
 
-    def get_acquisition(self, model):
+    def get_acquisition(self, model: Module) -> AcquisitionFunction:
         """
         Define the acquisition function based on the given GP model.
 
         Parameters:
         -----------
-        model : Model
+        model : Module
             The BoTorch model to be used for generating the acquisition function.
 
         Returns:
         --------
-        acqusition_function : AcqusitionFunction
+        acqusition_function : AcquisitionFunction
 
         Raises:
         -------
