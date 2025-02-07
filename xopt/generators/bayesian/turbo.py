@@ -70,6 +70,7 @@ class TurboController(XoptBaseModel, ABC):
     reset(self)
         Reset the controller to the initial state.
     """
+
     vocs: VOCS = Field(exclude=True)
     dim: PositiveInt
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")
@@ -266,6 +267,7 @@ class OptimizeTurboController(TurboController):
     update_state(self, generator, previous_batch_size: int = 1) -> None
         Update the state of the controller.
     """
+
     name: str = Field("optimize", frozen=True)
     best_value: Optional[float] = None
 
@@ -384,6 +386,7 @@ class SafetyTurboController(TurboController):
     update_state(self, generator, previous_batch_size: int = 1)
         Update the state of the controller.
     """
+
     name: str = Field("safety", frozen=True)
     scale_factor: PositiveFloat = 1.25
     min_feasible_fraction: PositiveFloat = 0.75
@@ -447,6 +450,7 @@ class EntropyTurboController(TurboController):
     update_state(self, generator, previous_batch_size: int = 1) -> None
         Update the state of the controller.
     """
+
     name: str = Field("entropy", frozen=True)
     _best_entropy: float = None
 
