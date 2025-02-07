@@ -435,6 +435,33 @@ class Xopt(XoptBaseModel):
         )
         result = self.evaluate_data(random_inputs)
         return result
+    
+    def grid_evaluate(
+        self,
+        n_samples: Union[int, Dict[str, int]],
+        custom_bounds: dict = None,
+    ):
+        """
+        Evaluate a meshgrid of points using the VOCS and add the results to the internal
+        DataFrame.
+
+        Parameters
+        ----------
+        n_samples : int or dict
+            The number of samples along each axis to evaluate on a meshgrid.
+            If an int is provided, the same number of samples is used for all axes.
+        custom_bounds : dict, optional
+            Dictionary of vocs-like ranges for mesh sampling.
+
+        Returns
+        -------
+        pd.DataFrame
+            The results of the evaluations added to the internal DataFrame.
+        """
+        grid_inputs = self.vocs.grid_inputs(n_samples, custom_bounds=custom_bounds)
+        result = self.evaluate_data(grid_inputs)
+        return result
+
 
     def yaml(self, **kwargs):
         """
