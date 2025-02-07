@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -64,6 +64,42 @@ class NelderMeadGenerator(Generator):
     """
     Nelder-Mead algorithm from SciPy in Xopt's Generator form.
     Converted to use a state machine to resume in exactly the last state.
+
+    Attributes:
+    -----------
+    name : str
+        The name of the generator.
+    initial_point : Optional[Dict[str, float]]
+        Initial point for the optimization.
+    initial_simplex : Optional[Dict[str, Union[List[float], np.ndarray]]]
+        Initial simplex for the optimization.
+    adaptive : bool
+        Change hyperparameters based on dimensionality.
+    xatol : float
+        Tolerance in x value.
+    fatol : float
+        Tolerance in function value.
+    current_state : SimplexState
+        Current state of the simplex.
+    future_state : Optional[SimplexState]
+        Future state of the simplex.
+    x : Optional[np.ndarray]
+        Current x value.
+    y : Optional[float]
+        Current y value.
+    is_done_bool : bool
+        Indicates if the optimization is done.
+
+    Methods:
+    --------
+    add_data(self, new_data: pd.DataFrame)
+        Add new data to the generator.
+    generate(self, n_candidates: int) -> Optional[List[Dict[str, float]]]
+        Generate a specified number of candidate samples.
+    _call_algorithm(self)
+        Call the Nelder-Mead algorithm.
+    simplex(self) -> Dict[str, np.ndarray]
+        Returns the simplex in the current state.
     """
 
     name = "neldermead"
@@ -108,15 +144,23 @@ class NelderMeadGenerator(Generator):
             self._initial_simplex = None
 
     @property
-    def x0(self):
+    def x0(self) -> np.ndarray:
         """Raw internal initial point for convenience"""
         return np.array([self.initial_point[k] for k in self.vocs.variable_names])
 
     @property
-    def is_done(self):
+    def is_done(self) -> bool:
         return self.is_done_bool
 
     def add_data(self, new_data: pd.DataFrame):
+        """
+        Add new data to the generator.
+
+        Parameters:
+        -----------
+        new_data : pd.DataFrame
+            The new data to be added.
+        """
         if len(new_data) == 0:
             # empty data, i.e. no steps yet
             assert self.future_state is None
@@ -129,7 +173,6 @@ class NelderMeadGenerator(Generator):
         ngen = self.current_state.ngen
         if ndata == ngen:
             # just resuming
-            # print(f'Resuming with {ngen=}')
             return
         else:
             # Must have made at least 1 step, require future_state
@@ -151,9 +194,21 @@ class NelderMeadGenerator(Generator):
                 return
 
             self.y = yt
-            # print(f'Added data {self.y=}')
 
-    def generate(self, n_candidates: int) -> Optional[list[dict]]:
+    def generate(self, n_candidates: int) -> Optional[List[Dict[str, float]]]:
+        """
+        Generate a specified number of candidate samples.
+
+        Parameters:
+        -----------
+        n_candidates : int
+            The number of candidate samples to generate.
+
+        Returns:
+        --------
+        Optional[List[Dict[str, float]]]
+            A list of dictionaries containing the generated samples.
+        """
         if self.is_done:
             return None
 
@@ -181,7 +236,6 @@ class NelderMeadGenerator(Generator):
         x, state_extra = results
         assert len(state_extra) == len(STATE_KEYS)
         stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
-        # print("State:", stateobj)
         self.future_state = stateobj
 
         inputs = dict(zip(self.vocs.variable_names, x))
@@ -206,24 +260,29 @@ class NelderMeadGenerator(Generator):
         return results
 
     @property
-    def simplex(self):
+    def simplex(self) -> Dict[str, np.ndarray]:
         """
         Returns the simplex in the current state.
+
+        Returns:
+        --------
+        Dict[str, np.ndarray]
+            The simplex in the current state.
         """
         sim = self.current_state.sim
         return dict(zip(self.vocs.variable_names, sim.T))
 
 
 def _neldermead_generator(
-    x0,
-    state,
-    lastval=None,
-    initial_simplex=None,
-    xatol=1e-4,
-    fatol=1e-4,
-    adaptive=True,
-    bounds=None,
-):
+    x0: np.ndarray,
+    state: SimplexState,
+    lastval: Optional[float] = None,
+    initial_simplex: Optional[np.ndarray] = None,
+    xatol: float = 1e-4,
+    fatol: float = 1e-4,
+    adaptive: bool = True,
+    bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+) -> Optional[Tuple[np.ndarray, Tuple]]:
     """
     Modification of scipy.optimize._optimize._minimize_neldermead
     https://github.com/scipy/scipy/blob/4cf21e753cf937d1c6c2d2a0e372fbc1dbbeea81/scipy/optimize/_optimize.py#L635
@@ -234,41 +293,32 @@ def _neldermead_generator(
 
     Minimization of scalar function of one or more variables using the
     Nelder-Mead algorithm.
-    Options
-    -------
-    maxiter, maxfev : int
-        Maximum allowed number of iterations and function evaluations.
-        Will default to ``N*200``, where ``N`` is the number of
-        variables, if neither `maxiter` or `maxfev` is set. If both
-        `maxiter` and `maxfev` are set, minimization will stop at the
-        first reached.
-    initial_simplex : array_like of shape (N + 1, N)
-        Initial simplex. If given, overrides `x0`.
-        ``initial_simplex[j,:]`` should contain the coordinates of
-        the jth vertex of the ``N+1`` vertices in the simplex, where
-        ``N`` is the dimension.
+
+    Parameters
+    ----------
+    x0 : np.ndarray
+        Initial point for the optimization.
+    state : SimplexState
+        Current state of the simplex.
+    lastval : float, optional
+        Last function value.
+    initial_simplex : np.ndarray, optional
+        Initial simplex for the optimization.
     xatol : float, optional
-        Absolute error in xopt between iterations that is acceptable for
-        convergence.
-    fatol : number, optional
-        Absolute error in func(xopt) between iterations that is acceptable for
-        convergence.
+        Absolute error in xopt between iterations that is acceptable for convergence.
+    fatol : float, optional
+        Absolute error in func(xopt) between iterations that is acceptable for convergence.
     adaptive : bool, optional
-        Adapt algorithm parameters to dimensionality of problem. Useful for
-        high-dimensional minimization [1]_.
-    bounds : sequence or `Bounds`, optional
+        Adapt algorithm parameters to dimensionality of problem. Useful for high-dimensional minimization.
+    bounds : Tuple[np.ndarray, np.ndarray], optional
         Bounds on variables. There are two ways to specify the bounds:
             1. Instance of `Bounds` class.
-            2. Sequence of ``(min, max)`` pairs for each element in `x`. None
-               is used to specify no bound.
-        Note that this just clips all vertices in simplex based on
-        the bounds.
-    References
-    ----------
-    .. [1] Gao, F. and Han, L.
-       Implementing the Nelder-Mead simplex algorithm with adaptive
-       parameters. 2012. Computational Optimization and Applications.
-       51:1, pp. 259-277
+            2. Sequence of ``(min, max)`` pairs for each element in `x`. None is used to specify no bound.
+
+    Returns
+    -------
+    Optional[Tuple[np.ndarray, Tuple]]
+        The next point to evaluate and the state of the simplex.
     """
 
     # Stages
