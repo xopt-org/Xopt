@@ -621,9 +621,10 @@ class RCDSGenerator(Generator):
         AssertionError
             If the length of new_data is not 1.
         """
-        assert len(new_data) == 1, (
-            f"length of new_data must be 1, found: {len(new_data)}"
-        )
+        assert (
+            len(new_data) == 1
+        ), f"length of new_data must be 1, found: {len(new_data)}"
+        
 
         res = self.vocs.objective_data(new_data).to_numpy()
         assert res.shape == (1, 1)

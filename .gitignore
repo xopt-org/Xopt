@@ -130,4 +130,4 @@ private_tests/*
 *.csv
 
 # don't include vscode settings
-.vscode\
+/.vscode
