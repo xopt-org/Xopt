@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Callable
 
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
@@ -10,12 +10,38 @@ from pydantic import Field
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
-
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.numerical_optimizer import LBFGSOptimizer
 
 
 class MOBOGenerator(MultiObjectiveBayesianGenerator):
+    """
+    Implements Multi-Objective Bayesian Optimization using the Log Expected
+    Hypervolume Improvement acquisition function.
+
+    Attributes:
+    -----------
+    name : str
+        The name of the generator.
+    supports_batch_generation : bool
+        Indicates if the generator supports batch candidate generation.
+    use_pf_as_initial_points : bool
+        Flag to specify if Pareto front points are to be used during optimization
+        of the acquisition function.
+
+    Methods:
+    --------
+    _get_objective(self) -> Callable
+        Create the multi-objective Bayesian optimization objective.
+    get_acquisition(self, model: torch.nn.Module) -> FixedFeatureAcquisitionFunction
+        Get the acquisition function for Bayesian Optimization.
+    _get_acquisition(self, model: torch.nn.Module) -> qLogNoisyExpectedHypervolumeImprovement
+        Create the Log Expected Hypervolume Improvement acquisition function.
+    _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]
+        Generate initial candidates for optimizing the acquisition function based on
+        the Pareto front.
+    """
+
     name = "mobo"
     supports_batch_generation: bool = True
     use_pf_as_initial_points: bool = Field(
@@ -26,12 +52,32 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
 
-    def _get_objective(self):
+    def _get_objective(self) -> Callable:
+        """
+        Create the multi-objective Bayesian optimization objective.
+
+        Returns:
+        --------
+        Callable
+            The multi-objective Bayesian optimization objective.
+        """
         return create_mobo_objective(self.vocs)
 
-    def get_acquisition(self, model):
+    def get_acquisition(
+        self, model: torch.nn.Module
+    ) -> FixedFeatureAcquisitionFunction:
         """
-        Returns a function that can be used to evaluate the acquisition function
+        Get the acquisition function for Bayesian Optimization.
+
+        Parameters:
+        -----------
+        model : torch.nn.Module
+            The model used for Bayesian Optimization.
+
+        Returns:
+        --------
+        FixedFeatureAcquisitionFunction
+            The acquisition function.
         """
         if model is None:
             raise ValueError("model cannot be None")
@@ -55,7 +101,22 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
         return acq
 
-    def _get_acquisition(self, model):
+    def _get_acquisition(
+        self, model: torch.nn.Module
+    ) -> qLogNoisyExpectedHypervolumeImprovement:
+        """
+        Create the Log Expected Hypervolume Improvement acquisition function.
+
+        Parameters:
+        -----------
+        model : torch.nn.Module
+            The model used for Bayesian Optimization.
+
+        Returns:
+        --------
+        qLogNoisyExpectedHypervolumeImprovement
+            The Log Expected Hypervolume Improvement acquisition function.
+        """
         inputs = self.get_input_data(self.data)
         sampler = self._get_sampler(model)
 
@@ -72,19 +133,26 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
         return acq
 
-    def _get_initial_conditions(self, n_candidates=1) -> Union[Tensor, None]:
+    def _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]:
         """
-        generate initial candidates for optimizing the acquisition function based on
-        the pareto front
+        Generate initial candidates for optimizing the acquisition function based on
+        the Pareto front.
 
         If `use_pf_as_initial_points` flag is set to true then the current
         Pareto-optimal set is used as initial points for optimizing the acquisition
         function instead of randomly selected points (random points fill in the set
         if `num_restarts` is greater than the number of points in the Pareto set).
 
-        Returns:
-            A `num_restarts x q x d` tensor of initial conditions.
+        Parameters:
+        -----------
+        n_candidates : int, optional
+            The number of candidates to generate, by default 1.
 
+        Returns:
+        --------
+        Optional[Tensor]
+            A `num_restarts x q x d` tensor of initial conditions, or None if the
+            Pareto front is not used.
         """
         if self.use_pf_as_initial_points:
             if isinstance(self.numerical_optimizer, LBFGSOptimizer):
