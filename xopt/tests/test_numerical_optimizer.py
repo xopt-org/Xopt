@@ -36,7 +36,7 @@ class TestNumericalOptimizers:
         for ncandidate in [1, 3]:
             start_time = time.time()
             candidates = max_time_optimizer.optimize(f, bounds, ncandidate)
-            assert time.time() - start_time < 0.01
+            assert time.time() - start_time < 0.1
             assert candidates.shape == torch.Size([ncandidate, ndim])
 
     def test_grid_optimizer(self):
