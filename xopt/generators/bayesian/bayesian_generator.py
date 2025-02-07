@@ -8,7 +8,11 @@ from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
-from botorch.acquisition import FixedFeatureAcquisitionFunction, qUpperConfidenceBound, AcquisitionFunction
+from botorch.acquisition import (
+    FixedFeatureAcquisitionFunction,
+    qUpperConfidenceBound,
+    AcquisitionFunction,
+)
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
 from botorch.utils.multi_objective import is_non_dominated

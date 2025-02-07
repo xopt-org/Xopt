@@ -20,6 +20,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     """
     Bayesian optimization generator using Log Expected Improvement.
     """
+
     name = "expected_improvement"
     supports_batch_generation: bool = True
 

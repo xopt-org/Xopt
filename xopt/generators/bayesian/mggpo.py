@@ -14,8 +14,8 @@ from .bayesian_generator import MultiObjectiveBayesianGenerator
 
 class MGGPOGenerator(MultiObjectiveBayesianGenerator):
     """
-    Multi-Generation Gaussian Process Optimization (MGGPO) generator. 
-    Combines multi-objective bayesian optimization with genetic algorithms 
+    Multi-Generation Gaussian Process Optimization (MGGPO) generator.
+    Combines multi-objective bayesian optimization with genetic algorithms
     to do highly-parallelized multi-objective optimization.
 
     Attributes:

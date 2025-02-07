@@ -19,6 +19,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
     """
     Bayesian exploration generator for autonomous characterization.
     """
+
     name = "bayesian_exploration"
     supports_batch_generation: bool = True
 
@@ -96,6 +97,7 @@ class qPosteriorVariance(MCAcquisitionFunction):
     forward(self, X: Tensor) -> Tensor
         Evaluate qPosteriorVariance on the candidate set `X`.
     """
+
     def __init__(
         self,
         model: Model,

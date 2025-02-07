@@ -14,7 +14,9 @@ from xopt.vocs import VOCS
 from .objectives import feasibility
 
 
-def visualize_generator_model(generator, **kwargs) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+def visualize_generator_model(
+    generator, **kwargs
+) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Visualizes GP model predictions for the specified output(s).
 
     This function generates a visualization of the Gaussian Process (GP) models associated with the provided generator.

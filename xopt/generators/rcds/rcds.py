@@ -46,6 +46,7 @@ class RCDS:
     OBJ : None
         Placeholder for the objective function, initialized to None.
     """
+
     def __init__(
         self,
         x0: np.ndarray,
@@ -220,7 +221,6 @@ class RCDS:
         idx: Optional[int] = None,
         replaced: bool = False,
     ) -> tuple[np.ndarray, float, int]:
-
         """
         Find the minimum along a direction using a parabolic fit.
 
@@ -278,11 +278,7 @@ class RCDS:
         return x1, f1, ndf1 + ndf2
 
     def bracketmin(
-        self, 
-        x0: np.ndarray, 
-        f0: float, 
-        dv: np.ndarray, 
-        step: float
+        self, x0: np.ndarray, f0: float, dv: np.ndarray, step: float
     ) -> tuple[np.ndarray, float, float, float, np.ndarray, int]:
         """
         Bracket the minimum along a direction.
@@ -420,7 +416,7 @@ class RCDS:
         alo: float,
         ahi: float,
         Np: int,
-        xflist: np.ndarray
+        xflist: np.ndarray,
     ) -> tuple[np.ndarray, float, int]:
         """
         Line optimizer for RCDS.
@@ -625,9 +621,9 @@ class RCDSGenerator(Generator):
         AssertionError
             If the length of new_data is not 1.
         """
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
+        assert len(new_data) == 1, (
+            f"length of new_data must be 1, found: {len(new_data)}"
+        )
 
         res = self.vocs.objective_data(new_data).to_numpy()
         assert res.shape == (1, 1)
