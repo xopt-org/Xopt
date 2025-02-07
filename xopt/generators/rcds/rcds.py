@@ -625,7 +625,6 @@ class RCDSGenerator(Generator):
             len(new_data) == 1
         ), f"length of new_data must be 1, found: {len(new_data)}"
         
-
         res = self.vocs.objective_data(new_data).to_numpy()
         assert res.shape == (1, 1)
         obj = res[0, 0]
