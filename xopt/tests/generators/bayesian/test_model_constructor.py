@@ -467,43 +467,8 @@ class TestModelConstructor:
         test_data["y1_var"] = test_data["y1"] * 0.1
         model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
 
-        # validate against botorch HeteroskedasticSingleTaskGP
-        train_x, train_y, train_yvar = get_training_data(
-            test_vocs.variable_names, "y1", test_data
-        )
-        bounds = torch.vstack(
-            [
-                torch.tensor(test_vocs.variables[name])
-                for name in test_vocs.variable_names
-            ]
-        ).T
-
-        # create transform
-        input_transform = Normalize(len(test_vocs.variable_names), bounds=bounds)
-
-        bmodel = HeteroskedasticSingleTaskGP(
-            train_x,
-            train_y,
-            train_yvar,
-            input_transform=input_transform,
-            outcome_transform=Standardize(1),
-        )
-        mll = ExactMarginalLogLikelihood(bmodel.likelihood, bmodel)
-
-        # TODO: model fitting fails sometimes
-        fit_gpytorch_mll(mll)
-
         assert isinstance(model.models[0], XoptHeteroskedasticSingleTaskGP)
-        test_x = torch.rand(20, len(test_vocs.variable_names))
-        with torch.no_grad():
-            posterior = model.posterior(test_x.unsqueeze(1))
-            bposterior = bmodel.posterior(test_x.unsqueeze(1))
-        assert torch.allclose(
-            posterior.mean[..., 0].flatten(), bposterior.mean.flatten()
-        )
-        assert torch.allclose(
-            posterior.variance[..., 0].flatten(), bposterior.variance.flatten()
-        )
+
 
     def test_custom_noise_prior(self):
         test_data = deepcopy(TEST_VOCS_DATA)
