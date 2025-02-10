@@ -22,6 +22,7 @@ from torch import Tensor
 
 MIN_INFERRED_NOISE_LEVEL = torch.tensor(1e-4)
 
+
 class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
     r"""
     Xopt copy of HeteroskedasticSingleTaskGP from botorch which allows for a user

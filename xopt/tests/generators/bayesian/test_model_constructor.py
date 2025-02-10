@@ -469,7 +469,6 @@ class TestModelConstructor:
 
         assert isinstance(model.models[0], XoptHeteroskedasticSingleTaskGP)
 
-
     def test_custom_noise_prior(self):
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)

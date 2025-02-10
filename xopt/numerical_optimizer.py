@@ -39,7 +39,7 @@ class LBFGSOptimizer(NumericalOptimizer):
         assert isinstance(bounds, Tensor)
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
-        
+
         # emperical testing showed that the max time is overrun slightly on the botorch side
         # fix by slightly reducing the max time passed to this function
         if self.max_time is not None:
