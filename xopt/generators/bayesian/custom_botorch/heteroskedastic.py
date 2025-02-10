@@ -2,7 +2,6 @@ from typing import NoReturn, Optional
 
 import torch
 from botorch.models import SingleTaskGP
-from botorch.models.gp_regression import MIN_INFERRED_NOISE_LEVEL
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms.input import InputTransform
 from botorch.models.transforms.outcome import Log, OutcomeTransform
@@ -21,6 +20,7 @@ from gpytorch.module import Module
 from gpytorch.priors.smoothed_box_prior import SmoothedBoxPrior
 from torch import Tensor
 
+MIN_INFERRED_NOISE_LEVEL = torch.tensor(1e-4)
 
 class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
     r"""
