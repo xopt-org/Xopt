@@ -8,7 +8,7 @@ import pytest
 import torch
 import yaml
 from botorch import fit_gpytorch_mll
-from botorch.models import HeteroskedasticSingleTaskGP, SingleTaskGP
+from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
@@ -22,7 +22,6 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
-from xopt.generators.bayesian.utils import get_training_data
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
