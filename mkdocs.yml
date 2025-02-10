@@ -46,8 +46,6 @@ nav:
         - Other:
             - Extremum seeking: examples/es/extremum_seeking.ipynb
             - RCDS: examples/rcds/rcds.ipynb
-
-
     - API:
       - Xopt: api/xopt.md
       - Vocs: api/vocs.md
@@ -110,6 +108,7 @@ plugins:
 
   - mkdocs-jupyter:
       include_source: True
+      execute: True
 
   - mkdocstrings:
       default_handler: python
