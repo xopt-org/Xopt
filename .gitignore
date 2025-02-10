@@ -128,3 +128,4 @@ private_tests/*
 # Don't include JupyterLab language server (LSP) files:
 /.virtual_documents
 *.csv
+/.vscode
