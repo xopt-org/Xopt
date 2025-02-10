@@ -11,22 +11,68 @@ from xopt.pydantic import XoptBaseModel
 
 
 class NumericalOptimizer(XoptBaseModel, ABC):
-    name: str = Field("base_numerical_optimizer", frozen=True)
-    model_config = ConfigDict(extra="forbid")
+    """
+    Base class for numerical optimizers.
+
+    Attributes
+    ----------
+    name : str
+        The name of the optimizer. Default is "base_numerical_optimizer".
+    model_config : ConfigDict
+        Configuration dictionary with extra fields forbidden.
+
+    Methods
+    -------
+    optimize(function, bounds, n_candidates=1, **kwargs)
+        Abstract method to optimize a function to produce a number of candidate points that minimize the function.
+    """
 
     @abstractmethod
     def optimize(
         self, function: AcquisitionFunction, bounds: Tensor, n_candidates=1, **kwargs
     ):
-        """optimize a function to produce a number of candidate points that
-        minimize the function"""
+        """Optimize a function to produce a number of candidate points that minimize the function."""
         pass
 
 
 class LBFGSOptimizer(NumericalOptimizer):
+    """
+    LBFGSOptimizer is a numerical optimizer that uses the Limited-memory Broyden–Fletcher–Goldfarb–Shanno (LBFGS) algorithm.
+
+    Attributes
+    ----------
+    n_restarts : PositiveInt
+        Number of restarts during acquisition function optimization, default is 20.
+    max_iter : PositiveInt
+        Maximum number of iterations for the optimizer, default is 2000.
+    max_time : Optional[PositiveFloat]
+        Maximum time allowed for optimization, default is None (no time limit).
+
+    Methods
+    -------
+    optimize(function, bounds, n_candidates=1, **kwargs)
+        Optimize the given acquisition function within the specified bounds.
+
+    Parameters
+    ----------
+    function : callable
+        The acquisition function to be optimized.
+    bounds : Tensor
+        The bounds within which to optimize the acquisition function. Must have shape [2, ndim].
+    n_candidates : int, optional
+        Number of candidates to return, default is 1.
+    **kwargs : dict
+        Additional keyword arguments to pass to the optimizer.
+
+    Returns
+    -------
+    candidates : Tensor
+        The optimized candidates.
+    """
+
     name: str = Field("LBFGS", frozen=True)
     n_restarts: PositiveInt = Field(
-        20, description="number of restarts during acquistion function optimization"
+        20, description="number of restarts during acquisition function optimization"
     )
     max_iter: PositiveInt = Field(2000)
     max_time: Optional[PositiveFloat] = Field(
@@ -36,6 +82,26 @@ class LBFGSOptimizer(NumericalOptimizer):
     model_config = ConfigDict(validate_assignment=True)
 
     def optimize(self, function, bounds, n_candidates=1, **kwargs):
+        """
+        Optimize the given acquisition function within the specified bounds.
+
+        Parameters
+        ----------
+        function : Callable
+            The acquisition function to be optimized.
+        bounds : Tensor
+            A tensor specifying the bounds for the optimization. It must have the shape [2, ndim].
+        n_candidates : int, optional
+            The number of candidates to generate (default is 1).
+        **kwargs : dict
+            Additional keyword arguments to be passed to the acquisition function optimizer.
+
+        Returns
+        -------
+        candidates : Tensor
+            The optimized candidates.
+        """
+
         assert isinstance(bounds, Tensor)
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
@@ -62,14 +128,33 @@ class LBFGSOptimizer(NumericalOptimizer):
 
 class GridOptimizer(NumericalOptimizer):
     """
-    Numerical optimizer that uses a brute-force grid search to find the optimium.
+    Numerical optimizer that uses a brute-force grid search to find the optimum.
+
+    Attributes
+    ----------
+    name : str
+        The name of the optimizer. Default is "grid".
+    n_grid_points : PositiveInt
+        Number of mesh points per axis to sample. Algorithm time scales as `n_grid_points`^`input_dimension`.
+
+    Methods
+    -------
+    optimize(function, bounds, n_candidates=1)
+        Optimize the given acquisition function within the specified bounds.
 
     Parameters
     ----------
-    n_grid_points: PositiveInt, optional
-        Number of mesh points per axis to sample. Algorithm time scales as
-        `n_grd_points`^`input_dimension`
+    function : callable
+        The acquisition function to be optimized.
+    bounds : Tensor
+        The bounds within which to optimize the acquisition function. Must have shape [2, ndim].
+    n_candidates : int, optional
+        Number of candidates to return, default is 1.
 
+    Returns
+    -------
+    candidates : Tensor
+        The optimized candidates.
     """
 
     name: str = Field("grid", frozen=True)
@@ -78,6 +163,23 @@ class GridOptimizer(NumericalOptimizer):
     )
 
     def optimize(self, function, bounds, n_candidates=1):
+        """
+        Optimize the given acquisition function within the specified bounds.
+
+        Parameters
+        ----------
+        function : Callable
+            The acquisition function to be optimized.
+        bounds : Tensor
+            A tensor specifying the bounds for the optimization. It must have the shape [2, ndim].
+        n_candidates : int, optional
+            The number of candidates to generate (default is 1).
+
+        Returns
+        -------
+        candidates : Tensor
+            The optimized candidates.
+        """
         assert isinstance(bounds, Tensor)
         # create mesh
         if len(bounds) != 2:
