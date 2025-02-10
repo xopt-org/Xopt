@@ -132,6 +132,64 @@ class TestVOCS(object):
         assert vocs.n_outputs == 2
         assert vocs.variable_names == ["x1"]
 
+    def test_grid_inputs(self):
+        # Define a sample VOCS object
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": [0.0, 1.0]},
+            constraints={},
+            objectives={},
+            constants={"c1": 5.0},
+            observables=[],
+        )
+
+        # Test with default parameters
+        n = 5
+        grid = vocs.grid_inputs(n=n)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (n**2, 3)  # 2 variables + 1 constant
+        assert "x1" in grid.columns
+        assert "x2" in grid.columns
+        assert "c1" in grid.columns
+        assert np.all(grid["c1"] == 5.0)
+
+        # Test with custom bounds
+        custom_bounds = {"x1": [0.2, 0.8], "x2": [0.1, 0.9]}
+        grid = vocs.grid_inputs(n=n, custom_bounds=custom_bounds)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (n**2, 3)  # 2 variables + 1 constant
+        assert "x1" in grid.columns
+        assert "x2" in grid.columns
+        assert "c1" in grid.columns
+        assert np.all(grid["c1"] == 5.0)
+        assert np.all(grid["x1"] >= 0.2) and np.all(grid["x1"] <= 0.8)
+        assert np.all(grid["x2"] >= 0.1) and np.all(grid["x2"] <= 0.9)
+
+        # Test with invalid custom bounds
+        invalid_custom_bounds = {
+            "x1": [1.2, 0.8],  # Invalid bounds
+            "x2": [0.1, 0.9],
+        }
+        with pytest.raises(ValueError):
+            vocs.grid_inputs(n=n, custom_bounds=invalid_custom_bounds)
+
+        # Test with include_constants=False
+        grid = vocs.grid_inputs(n=n, include_constants=False)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (n**2, 2)  # 2 variables
+        assert "x1" in grid.columns
+        assert "x2" in grid.columns
+        assert "c1" not in grid.columns
+
+        # Test with different number of points for each variable
+        n_dict = {"x1": 3, "x2": 4}
+        grid = vocs.grid_inputs(n=n_dict)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (3 * 4, 3)  # 2 variables + 1 constant
+        assert "x1" in grid.columns
+        assert "x2" in grid.columns
+        assert "c1" in grid.columns
+        assert np.all(grid["c1"] == 5.0)
+
     def test_random_sampling_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)
 

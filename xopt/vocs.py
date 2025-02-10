@@ -377,6 +377,109 @@ class VOCS(XoptBaseModel):
         else:
             return pd.DataFrame(inputs).to_dict("records")
 
+    def grid_inputs(
+        self,
+        n: Union[int, Dict[str, int]],
+        custom_bounds: dict = None,
+        include_constants: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Generate a meshgrid of inputs.
+
+        Parameters
+        ----------
+        n : Union[int, Dict[str, int]]
+            Number of points to generate along each axis. If an integer is provided, the same number of points
+            is used for all variables. If a dictionary is provided, it should have variable names as keys and
+            the number of points as values.
+        custom_bounds : dict, optional
+            Custom bounds for the variables. If None, the default bounds from `self.variables` are used.
+            The dictionary should have variable names as keys and a list of two values [min, max] as values.
+        include_constants : bool, optional
+            If True, include constant values from `self.constants` in the output DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the generated meshgrid of inputs. Each column corresponds to a variable,
+            and each row represents a point in the grid.
+
+        Raises
+        ------
+        TypeError
+            If `custom_bounds` is not a dictionary.
+        ValueError
+            If `custom_bounds` are not valid or if any specified `custom_bounds` are outside the domain of `self.variables`.
+
+        Warns
+        -----
+        RuntimeWarning
+            If `custom_bounds` are clipped by the bounds of `self.variables`.
+
+        Notes
+        -----
+        The function generates a meshgrid of inputs based on the specified bounds. If `custom_bounds` are provided,
+        they are validated and clipped to ensure they lie within the domain of `self.variables`. The resulting meshgrid
+        is flattened and returned as a DataFrame. If `include_constants` is True, constant values from `self.constants`
+        are added to the DataFrame.
+        """
+
+        if custom_bounds is None:
+            bounds = self.variables
+        else:
+            variable_bounds = pd.DataFrame(self.variables)
+
+            if not isinstance(custom_bounds, dict):
+                raise TypeError("`custom_bounds` must be a dict")
+
+            try:
+                validate_variable_bounds(custom_bounds)
+            except ValueError:
+                raise ValueError("specified `custom_bounds` not valid")
+
+            old_custom_bounds = deepcopy(custom_bounds)
+
+            custom_bounds = pd.DataFrame(custom_bounds)
+            custom_bounds = custom_bounds.clip(
+                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
+            )
+            bounds = custom_bounds.to_dict()
+
+            for name, value in bounds.items():
+                if value[0] == value[1]:
+                    raise ValueError(
+                        f"specified `custom_bounds` for {name} is outside vocs domain"
+                    )
+
+            if bounds != old_custom_bounds:
+                warnings.warn(
+                    "custom bounds were clipped by vocs bounds", RuntimeWarning
+                )
+
+            for k in bounds.keys():
+                bounds[k] = [bounds[k][i] for i in range(2)]
+
+        grid_axes = []
+        for key, val in bounds.items():
+            if isinstance(n, int):
+                num_points = n
+            elif isinstance(n, dict) and key in n:
+                num_points = n[key]
+            else:
+                raise ValueError(
+                    f"Number of points for variable '{key}' not specified."
+                )
+            grid_axes.append(np.linspace(val[0], val[1], num_points))
+
+        mesh = np.meshgrid(*grid_axes)
+        inputs = {key: mesh[i].flatten() for i, key in enumerate(bounds.keys())}
+
+        if include_constants and self.constants is not None:
+            for key, value in self.constants.items():
+                inputs[key] = np.full_like(next(iter(inputs.values())), value)
+
+        return pd.DataFrame(inputs)
+
     def convert_dataframe_to_inputs(
         self, data: pd.DataFrame, include_constants: bool = True
     ) -> pd.DataFrame:

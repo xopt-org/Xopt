@@ -129,5 +129,4 @@ private_tests/*
 /.virtual_documents
 *.csv
 
-# don't include vscode settings
 /.vscode

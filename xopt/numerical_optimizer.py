@@ -106,13 +106,20 @@ class LBFGSOptimizer(NumericalOptimizer):
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
 
-        candidates, out = optimize_acqf(
+        # emperical testing showed that the max time is overrun slightly on the botorch side
+        # fix by slightly reducing the max time passed to this function
+        if self.max_time is not None:
+            max_time = self.max_time * 0.8 - 0.01
+        else:
+            max_time = None
+
+        candidates, _ = optimize_acqf(
             acq_function=function,
             bounds=bounds,
             q=n_candidates,
             raw_samples=self.n_restarts,
             num_restarts=self.n_restarts,
-            timeout_sec=self.max_time,
+            timeout_sec=max_time,
             options={"maxiter": self.max_iter},
             **kwargs,
         )
