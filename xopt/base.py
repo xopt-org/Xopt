@@ -124,6 +124,9 @@ class Xopt(XoptBaseModel):
     @model_validator(mode="before")
     @classmethod
     def validate_model(cls, data: Any):
+        """
+        Validate the Xopt model by checking the generator and evaluator.
+        """
         if isinstance(data, dict):
             # validate vocs
             if isinstance(data["vocs"], dict):

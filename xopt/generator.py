@@ -13,6 +13,27 @@ logger = logging.getLogger(__name__)
 
 
 class Generator(XoptBaseModel, ABC):
+    """
+    Base class for Generators.
+
+    Generators are responsible for generating new points to evaluate.
+
+    Attributes
+    ----------
+    name : str
+        Name of the generator.
+    supports_batch_generation : bool
+        Flag that describes if this generator can generate batches of points.
+    supports_multi_objective : bool
+        Flag that describes if this generator can solve multi-objective problems.
+    vocs : VOCS
+        Generator VOCS.
+    data : pd.DataFrame, optional
+        Generator data.
+    model_config : ConfigDict
+        Model configuration.
+    """
+
     name: ClassVar[str] = Field(description="generator name")
 
     supports_batch_generation: bool = Field(

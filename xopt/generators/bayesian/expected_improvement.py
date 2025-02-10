@@ -1,3 +1,4 @@
+from pandas import DataFrame
 import torch
 from botorch.acquisition import (
     ScalarizedPosteriorTransform,
@@ -16,6 +17,10 @@ from xopt.generators.bayesian.utils import set_botorch_weights
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
+    """
+    Bayesian optimization generator using Log Expected Improvement.
+    """
+
     name = "expected_improvement"
     supports_batch_generation: bool = True
 
@@ -27,7 +32,17 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     def get_acquisition(self, model):
         """
         Returns a function that can be used to evaluate the acquisition function.
-        Overwrites base `get_acqusition` method.
+        Overwrites base `get_acquisition` method.
+
+        Parameters:
+        -----------
+        model : Model
+            The model used for Bayesian Optimization.
+
+        Returns:
+        --------
+        acq : AcquisitionFunction
+            The acquisition function.
         """
         if model is None:
             raise ValueError("model cannot be None")
@@ -51,7 +66,20 @@ class ExpectedImprovementGenerator(BayesianGenerator):
 
         return acq
 
-    def _get_acquisition(self, model):
+    def _get_acquisition(self, model: torch.nn.Module):
+        """
+        Get the acquisition function for Bayesian Optimization.
+
+        Parameters:
+        -----------
+        model : Model
+            The model used for Bayesian Optimization.
+
+        Returns:
+        --------
+        acq : AcquisitionFunction
+            The acquisition function.
+        """
         objective = self._get_objective()
         best_f = self._get_best_f(self.data, objective)
 
@@ -77,8 +105,22 @@ class ExpectedImprovementGenerator(BayesianGenerator):
 
         return acq
 
-    def _get_best_f(self, data, objective):
-        """get best function value for EI based on the objective"""
+    def _get_best_f(self, data: DataFrame, objective: CustomXoptObjective):
+        """
+        Get the best function value for Expected Improvement based on the objective.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            The data used for optimization.
+        objective : Objective
+            The objective function.
+
+        Returns:
+        --------
+        best_f : Tensor
+            The best function value.
+        """
         if isinstance(objective, CustomXoptObjective):
             best_f = objective(
                 torch.tensor(self.vocs.observable_data(data).to_numpy(), **self.tkwargs)
@@ -96,5 +138,7 @@ class TDExpectedImprovementGenerator(
     TimeDependentBayesianGenerator, ExpectedImprovementGenerator
 ):
     name = "time_dependent_expected_improvement"
-    __doc__ = """Implements Time-Dependent Bayesian Optimization using the Expected
-    Improvement acquisition function"""
+    __doc__ = (
+        "Implements Time-Dependent Bayesian Optimization using the Expected "
+        "Improvement acquisition function\n" + formatted_base_docstring()
+    )

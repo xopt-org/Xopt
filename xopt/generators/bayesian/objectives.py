@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import partial
-from typing import Optional
+from typing import Optional, Callable, List
 
 import torch
 from botorch.acquisition import GenericMCObjective, MCAcquisitionObjective
@@ -18,8 +18,17 @@ from xopt.generators.bayesian.utils import set_botorch_weights
 
 class CustomXoptObjective(MCAcquisitionObjective, ABC):
     """
-    Custom objective function wrapper for use in Bayesian generators
+    Custom objective function wrapper for use in Bayesian generators.
 
+    Attributes:
+    -----------
+    vocs : VOCS
+        The VOCS (Variables, Objectives, Constraints, Statics) object.
+
+    Methods:
+    --------
+    forward(samples: Tensor, X: Optional[Tensor] = None) -> Tensor
+        Evaluate the objective on the samples.
     """
 
     def __init__(self, vocs: VOCS, *args, **kwargs):
@@ -50,7 +59,31 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
         pass
 
 
-def feasibility(X, model, vocs, posterior_transform=None):
+def feasibility(
+    X: Tensor,
+    model: torch.nn.Module,
+    vocs: VOCS,
+    posterior_transform: Optional[Callable] = None,
+) -> Tensor:
+    """
+    Calculate the feasibility of the given points.
+
+    Parameters:
+    -----------
+    X : Tensor
+        The input tensor.
+    model : torch.nn.Module
+        The model used for Bayesian Optimization.
+    vocs : VOCS
+        The VOCS (Variables, Objectives, Constraints, Statics) object.
+    posterior_transform : Optional[Callable], optional
+        The posterior transform, by default None.
+
+    Returns:
+    --------
+    Tensor
+        The feasibility values.
+    """
     constraints = create_constraint_callables(vocs)
     posterior = model.posterior(X=X, posterior_transform=posterior_transform)
 
@@ -63,11 +96,26 @@ def feasibility(X, model, vocs, posterior_transform=None):
     return torch.mean(objective(samples, X), dim=0)
 
 
-def constraint_function(Z, vocs, name):
+def constraint_function(Z: Tensor, vocs: VOCS, name: str) -> Tensor:
     """
-    create constraint function
-    - constraint functions should return negative values for feasible values and
-    positive values for infeasible values
+    Create constraint function.
+
+    Constraint functions should return negative values for feasible values and
+    positive values for infeasible values.
+
+    Parameters:
+    -----------
+    Z : Tensor
+        The input tensor.
+    vocs : VOCS
+        The VOCS (Variables, Objectives, Constraints, Statics) object.
+    name : str
+        The name of the constraint.
+
+    Returns:
+    --------
+    Tensor
+        The constraint values.
     """
     output_names = vocs.output_names
     constraint = vocs.constraints[name]
@@ -78,7 +126,20 @@ def constraint_function(Z, vocs, name):
         return -(Z[..., output_names.index(name)] - constraint[1])
 
 
-def create_constraint_callables(vocs):
+def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
+    """
+    Create a list of constraint callables.
+
+    Parameters:
+    -----------
+    vocs : VOCS
+        The VOCS (Variables, Objectives, Constraints, Statics) object.
+
+    Returns:
+    --------
+    Optional[List[Callable]]
+        A list of constraint callables, or None if there are no constraints.
+    """
     if vocs.constraints is not None:
         constraint_names = vocs.constraint_names
         constraint_callables = []
@@ -96,28 +157,51 @@ def create_constraint_callables(vocs):
         return None
 
 
-def create_mc_objective(vocs, tkwargs):
+def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
     """
-    create the objective object
+    Create a monte carlo objective object.
 
+    Parameters:
+    -----------
+    vocs : VOCS
+        The VOCS (Variables, Objectives, Constraints, Statics) object.
+    tkwargs : dict
+        Tensor keyword arguments.
+
+    Returns:
+    --------
+    GenericMCObjective
+        The objective object.
     """
     weights = set_botorch_weights(vocs)
 
-    def obj_callable(Z, X=None):
+    def obj_callable(Z: Tensor, X: Optional[Tensor] = None) -> Tensor:
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
     return GenericMCObjective(obj_callable)
 
 
-def create_mobo_objective(vocs):
+def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
     """
-    botorch assumes maximization so we need to negate any objectives that have
-    minimize keyword and zero out anything that is a constraint
+    Create the multi-objective Bayesian optimization objective.
+
+    BoTorch assumes maximization, so we need to negate any objectives that have
+    the minimize keyword and zero out anything that is a constraint.
+
+    Parameters:
+    -----------
+    vocs : VOCS
+        The VOCS (Variables, Objectives, Constraints, Statics) object.
+
+    Returns:
+    --------
+    WeightedMCMultiOutputObjective
+        The multi-objective Bayesian optimization objective.
     """
     output_names = vocs.output_names
-    objective_indicies = [output_names.index(name) for name in vocs.objectives]
-    weights = set_botorch_weights(vocs)[objective_indicies]
+    objective_indices = [output_names.index(name) for name in vocs.objectives]
+    weights = set_botorch_weights(vocs)[objective_indices]
 
     return WeightedMCMultiOutputObjective(
-        weights, outcomes=objective_indicies, num_outcomes=vocs.n_objectives
+        weights, outcomes=objective_indices, num_outcomes=vocs.n_objectives
     )
