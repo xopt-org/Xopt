@@ -280,8 +280,8 @@ class VOCS(XoptBaseModel):
             return [inputs]
         else:
             return pd.DataFrame(inputs).to_dict("records")
-        
-    def grid_inputs(         
+
+    def grid_inputs(
         self,
         n: Union[int, Dict[str, int]],
         custom_bounds: dict = None,
@@ -301,25 +301,25 @@ class VOCS(XoptBaseModel):
             The dictionary should have variable names as keys and a list of two values [min, max] as values.
         include_constants : bool, optional
             If True, include constant values from `self.constants` in the output DataFrame.
-       
+
         Returns
         -------
         pd.DataFrame
             A DataFrame containing the generated meshgrid of inputs. Each column corresponds to a variable,
             and each row represents a point in the grid.
-        
+
         Raises
         ------
         TypeError
             If `custom_bounds` is not a dictionary.
         ValueError
             If `custom_bounds` are not valid or if any specified `custom_bounds` are outside the domain of `self.variables`.
-        
+
         Warns
         -----
         RuntimeWarning
             If `custom_bounds` are clipped by the bounds of `self.variables`.
-        
+
         Notes
         -----
         The function generates a meshgrid of inputs based on the specified bounds. If `custom_bounds` are provided,
@@ -370,7 +370,9 @@ class VOCS(XoptBaseModel):
             elif isinstance(n, dict) and key in n:
                 num_points = n[key]
             else:
-                raise ValueError(f"Number of points for variable '{key}' not specified.")
+                raise ValueError(
+                    f"Number of points for variable '{key}' not specified."
+                )
             grid_axes.append(np.linspace(val[0], val[1], num_points))
 
         mesh = np.meshgrid(*grid_axes)
