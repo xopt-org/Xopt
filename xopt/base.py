@@ -435,7 +435,7 @@ class Xopt(XoptBaseModel):
         )
         result = self.evaluate_data(random_inputs)
         return result
-    
+
     def grid_evaluate(
         self,
         n_samples: Union[int, Dict[str, int]],
@@ -461,7 +461,6 @@ class Xopt(XoptBaseModel):
         grid_inputs = self.vocs.grid_inputs(n_samples, custom_bounds=custom_bounds)
         result = self.evaluate_data(grid_inputs)
         return result
-
 
     def yaml(self, **kwargs):
         """
