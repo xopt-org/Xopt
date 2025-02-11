@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from IPython.core.display_functions import display
-from fastnumbers import isfloat
 from matplotlib.backend_bases import MouseButton
 from scipy.optimize import curve_fit
 
@@ -745,7 +744,7 @@ class CNSGA_GUI:
         pop_filenames = list(self.file_select.value)
 
         if self.best_n_checkbox.value:
-            if isfloat(self.best_n_value.value):
+            if isinstance(self.best_n_value.value, float):
                 best_n = int(np.ceil(float(self.best_n_value.value)))
                 for ii, pop in enumerate(self.pop_list):
                     if best_n == len(pop):
@@ -899,7 +898,7 @@ class CNSGA_GUI:
                     if ii == 0:
                         line_alpha = 1.0
                     else:
-                        if isfloat(self.color_fading_alpha.value):
+                        if isinstance(self.color_fading_alpha.value, float):
                             line_alpha = float(self.color_fading_alpha.value)
                             line_alpha = np.min([np.max([0.001, line_alpha]), 1.0])
                         else:
@@ -922,12 +921,12 @@ class CNSGA_GUI:
                 n1 = float(self.cheb_value.value)
                 n2 = float(self.cheb_value2.value)
 
-                if isfloat(n1):
+                if isinstance(n1, float):
                     n1_cheb = int(np.min([5, np.max([0, n1])]))
                 else:
                     n1_cheb = int(0)
 
-                if isfloat(n2):
+                if isinstance(n2, float):
                     n2_cheb = int(np.min([5, np.max([0, n2])]))
                 else:
                     n2_cheb = int(0)
@@ -1061,7 +1060,7 @@ class CNSGA_GUI:
 
     def edit_settings_to_run(self, change):
         if type(self.settings[self.settings_menu.value]) is not str:
-            if isfloat(self.settings_value.value):
+            if isinstance(self.settings_value.value, float):
                 self.run_settings[self.settings_menu.value] = float(
                     self.settings_value.value
                 )
