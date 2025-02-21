@@ -173,7 +173,7 @@ class BayesianGenerator(Generator, ABC):
             if v.startswith("base64:"):
                 v = decode_torch_module(v)
             elif os.path.exists(v):
-                v = torch.load(v)
+                v = torch.load(v, weights_only=False)
         return v
 
     @field_validator("gp_constructor", mode="before")
