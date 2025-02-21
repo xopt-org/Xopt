@@ -181,7 +181,7 @@ def decode_torch_module(modulestr: str):
     decoded = base64.standard_b64decode(base64str)
     decompressed = gzip.decompress(decoded)
     bytestream = io.BytesIO(decompressed)
-    module = torch.load(bytestream)
+    module = torch.load(bytestream, weights_only=False)
     return module
 
 
@@ -194,7 +194,7 @@ class XoptBaseModel(BaseModel):
             if os.path.exists(value):
                 extension = value.split(".")[-1]
                 if extension == "pt":
-                    value = torch.load(value)
+                    value = torch.load(value, weights_only=False)
 
         return value
 

@@ -102,7 +102,7 @@ class StandardModelConstructor(ModelConstructor):
                     if val.startswith("base64:"):
                         v[key] = decode_torch_module(val)
                     elif os.path.exists(val):
-                        v[key] = torch.load(val)
+                        v[key] = torch.load(val, weights_only=False)
 
         return v
 
