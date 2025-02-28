@@ -344,6 +344,7 @@ class OptimizeTurboController(TurboController):
         recent_data = data.iloc[-previous_batch_size:]
         f_data = self.vocs.feasibility_data(recent_data)
         recent_f_data = recent_data[f_data["feasible"]]
+        recent_f_data_minform = self.vocs.objective_data(recent_f_data, "")
 
         # if none of the candidates are valid count this as a failure
         if len(recent_f_data) == 0:
@@ -354,9 +355,10 @@ class OptimizeTurboController(TurboController):
             # if we had previous feasible points we need to compare with previous
             # best values, NOTE: this is the opposite of botorch which assumes
             # maximization, xopt assumes minimization
-            Y_last = recent_f_data[self.vocs.objective_names[0]].min()
+            Y_last = recent_f_data_minform[self.vocs.objective_names[0]].min()
+            best_value = self.best_value if self.minimize else -self.best_value
 
-            if Y_last < self.best_value + 1e-3 * math.fabs(self.best_value):
+            if Y_last < best_value + 1e-3 * math.fabs(best_value):
                 self.success_counter += 1
                 self.failure_counter = 0
             else:

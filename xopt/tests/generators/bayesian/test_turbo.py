@@ -115,6 +115,89 @@ class TestTurbo(TestCase):
         assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
 
     @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_sign_conventions(self):
+        # 2D minimization
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        gen = BayesianGenerator(vocs=test_vocs)
+        # ensure first update will be a failure
+        data = TEST_VOCS_DATA.copy()
+        data.loc[:, "y1"].iloc[-1] = data["y1"].max()
+        gen.add_data(data)
+        gen.train_model()
+
+        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        # make next step to better (lower) value
+        test_data = {
+            "x1": [0.1234],
+            "x2": [0.1234],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].min() - 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 1
+        assert turbo_state.failure_counter == 0
+
+        # make next step to worse (higher) value
+        test_data = {
+            "x1": [0.2345],
+            "x2": [0.2345],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].max() + 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        # 2D maximization
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives["y1"] = "MAXIMIZE"
+        gen = BayesianGenerator(vocs=test_vocs)
+        # ensure first update will be a failure
+        data = TEST_VOCS_DATA.copy()
+        data.loc[:, "y1"].iloc[-1] = data["y1"].min()
+        gen.add_data(data)
+        gen.train_model()
+
+        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        # make next step to better (higher) value
+        test_data = {
+            "x1": [0.1234],
+            "x2": [0.1234],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].max() + 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 1
+        assert turbo_state.failure_counter == 0
+
+        # make next step to worse (lower) value
+        test_data = {
+            "x1": [0.2345],
+            "x2": [0.2345],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].min() - 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_restrict_data(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
