@@ -121,7 +121,7 @@ class TestTurbo(TestCase):
         gen = BayesianGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data['y1'].max()
+        data.loc[:, "y1"].iloc[-1] = data["y1"].max()
         gen.add_data(data)
         gen.train_model()
 
@@ -135,7 +135,7 @@ class TestTurbo(TestCase):
             "x1": [0.1234],
             "x2": [0.1234],
             "c1": [1.0],
-            "y1": [TEST_VOCS_DATA['y1'].min() - 1.0]
+            "y1": [TEST_VOCS_DATA["y1"].min() - 1.0],
         }
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
@@ -148,7 +148,7 @@ class TestTurbo(TestCase):
             "x1": [0.2345],
             "x2": [0.2345],
             "c1": [1.0],
-            "y1": [TEST_VOCS_DATA['y1'].max() + 1.0]
+            "y1": [TEST_VOCS_DATA["y1"].max() + 1.0],
         }
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
@@ -162,7 +162,7 @@ class TestTurbo(TestCase):
         gen = BayesianGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data['y1'].min()
+        data.loc[:, "y1"].iloc[-1] = data["y1"].min()
         gen.add_data(data)
         gen.train_model()
 
@@ -176,7 +176,7 @@ class TestTurbo(TestCase):
             "x1": [0.1234],
             "x2": [0.1234],
             "c1": [1.0],
-            "y1": [TEST_VOCS_DATA['y1'].max() + 1.0]
+            "y1": [TEST_VOCS_DATA["y1"].max() + 1.0],
         }
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
@@ -189,7 +189,7 @@ class TestTurbo(TestCase):
             "x1": [0.2345],
             "x2": [0.2345],
             "c1": [1.0],
-            "y1": [TEST_VOCS_DATA['y1'].min() - 1.0]
+            "y1": [TEST_VOCS_DATA["y1"].min() - 1.0],
         }
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
