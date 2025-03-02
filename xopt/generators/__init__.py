@@ -26,7 +26,7 @@ all_generator_names = {
         "expected_improvement",
         "multi_fidelity",
     },
-    "ga": {"cnsga"},
+    "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
     "rcds": {"rcds"},
 }
@@ -103,10 +103,16 @@ def get_generator_dynamic(name: str):
 
     elif name in all_generator_names["ga"]:
         try:
-            from xopt.generators.ga import CNSGAGenerator
+            from xopt.generators.ga import CNSGAGenerator, NSGA2Generator
+            
+            registered_generators = [
+                CNSGAGenerator,
+                NSGA2Generator,
+            ]
 
-            generators[name] = CNSGAGenerator
-            return CNSGAGenerator
+            for gen in registered_generators:
+                generators[gen.name] = gen
+            return generators[name]
         except ModuleNotFoundError:
             warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
     elif name in all_generator_names["es"]:
