@@ -387,7 +387,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     # Output options
     output_dir: Optional[str] = None
     checkpoint_freq: int = Field(-1, description="How often (in generations) to save checkpoints (set to -1 to disable)")
-    _overwrite: bool = False  # Used in file overwrite protection logic. PLEASE DO NOT CHANGE
+    _output_dir_setup: bool = False  # Used in initializing the directory. PLEASE DO NOT CHANGE
     
     # Metadata
     fevals: int = Field(0, description="Number of function evaluations the optimizer has seen up to this point")
@@ -402,6 +402,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     child: List[Dict] = Field(default_factory=list)
 
     def _generate(self, n_candidates: int) -> List[Dict]:
+        self.ensure_output_dir_setup()
         start_t = time.perf_counter()
         
         # If we have a population create children, otherwise generate randomly sampled points
@@ -445,6 +446,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
         return candidates
 
     def add_data(self, new_data: pd.DataFrame):
+        self.ensure_output_dir_setup()
+        
         # Pass to parent class for inclusion in self.data
         super().add_data(new_data)
 
@@ -488,23 +491,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
             if self.output_dir is not None:
                 save_start_t = time.perf_counter()
 
-                # Check if directory exists and do collision avoidance
-                if not self._overwrite:
-                    counter = 2
-                    output_dir_dedup = self.output_dir
-                    while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
-                        output_dir_dedup = f"{self.output_dir}_{counter}"
-                        counter += 1
-                    logger.debug(f"detected existing output_dir \"{self.output_dir}\" and corrected "
-                                 f"to \"{output_dir_dedup}\" to avoid overwriting")
-                    self.output_dir = output_dir_dedup
-                
-                # Only avoid overwriting once per run
-                self._overwrite = True
-                
-                # Setup the directory
-                os.makedirs(self.output_dir, exist_ok=True)
-                
                 # Save all of the data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
@@ -551,3 +537,23 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     def __str__(self) -> str:
         return self.__repr__()
     
+    def ensure_output_dir_setup(self):
+        if (self.output_dir is None) or self._output_dir_setup:
+            return
+
+        # Check if directory exists and do collision avoidance
+        counter = 2
+        output_dir_dedup = self.output_dir
+        while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
+            output_dir_dedup = f"{self.output_dir}_{counter}"
+            counter += 1
+        logger.debug(f"detected existing output_dir \"{self.output_dir}\" and corrected "
+                        f"to \"{output_dir_dedup}\" to avoid overwriting")
+        self.output_dir = output_dir_dedup
+        
+        # We are now setup
+        self._output_dir_setup = True
+        
+        # Setup the directory
+        os.makedirs(self.output_dir, exist_ok=True)
+        
