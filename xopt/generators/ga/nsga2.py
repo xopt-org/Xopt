@@ -530,7 +530,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                     # Now we have a unique filename
                     with open(checkpoint_path, "w") as f:
                         f.write(self.to_json())
-                    self._logger.debug(f"saved checkpoint file \"{checkpoint_path}\"")
+                    self._logger.info(f"saved checkpoint file \"{checkpoint_path}\"")
 
     def __repr__(self) -> str:
         return (f"NSGA2Generator(pop_size={self.population_size}, "
@@ -552,7 +552,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
         while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
             output_dir_dedup = f"{self.output_dir}_{counter}"
             counter += 1
-        self._logger.debug(f"detected existing output_dir \"{self.output_dir}\" and corrected "
+        self._logger.info(f"detected existing output_dir \"{self.output_dir}\" and corrected "
                            f"to \"{output_dir_dedup}\" to avoid overwriting")
         self.output_dir = output_dir_dedup
         
