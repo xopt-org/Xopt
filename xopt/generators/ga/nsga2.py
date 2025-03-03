@@ -404,14 +404,19 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
 
             # Generate candidates one by one
             candidates = []
+            pop_x = self.vocs.variable_data(self.pop).to_numpy()
+            pop_f = self.vocs.objective_data(self.pop).to_numpy()
+            pop_g = self.vocs.constraint_data(self.pop).to_numpy()
+            fitness = get_fitness(pop_f, pop_g)
             for _ in range(n_candidates):
                 candidates.append({k: v for k, v in zip(var_names, generate_child_binary_tournament(
-                    self.vocs.variable_data(self.pop).to_numpy(), 
-                    self.vocs.objective_data(self.pop).to_numpy(), 
-                    self.vocs.constraint_data(self.pop).to_numpy(), 
+                    pop_x,
+                    pop_f,
+                    pop_g,
                     self.vocs.bounds,
                     mutate=self.mutation_operator,
                     crossover=self.crossover_operator,
+                    fitness=fitness
                 ))})
             logger.debug(f"generated {n_candidates} candidates from generation {self.n_generations} "
                          f"in {1000*(time.perf_counter()-start_t):.2f}ms")
