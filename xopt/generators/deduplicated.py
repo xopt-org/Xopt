@@ -44,7 +44,7 @@ class DeduplicatedGeneratorBase(Generator):
             return np.array(value)
         return value
 
-    def generate(self, n_candidates) -> list[dict]:
+    def generate(self, n_candidates: int) -> list[dict]:
         """
         Generate the unique candidates.
         
@@ -118,7 +118,7 @@ class DeduplicatedGeneratorBase(Generator):
         logger.info(msg)
         return candidates
 
-    def _generate(self, n_candidates) -> list[dict]:
+    def _generate(self, n_candidates: int) -> list[dict]:
         """
         Generate candidate solutions without deduplication.
         
