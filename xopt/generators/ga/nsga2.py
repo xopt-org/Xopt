@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 ########################################################################################################################
 # Helper functions
 ########################################################################################################################
-def get_domination(pop_f, pop_g=None):
+def get_domination(pop_f: np.ndarray, pop_g: Optional[np.ndarray]=None) -> np.ndarray:
     """
     Compute domination matrix for a population based on objective values and constraints. Determines domination 
     relationships between all pairs of individuals in a population.
@@ -68,7 +68,7 @@ def get_domination(pop_f, pop_g=None):
     return dom
 
 
-def fast_dominated_argsort_internal(dom):
+def fast_dominated_argsort_internal(dom: np.ndarray) -> List[np.ndarray]:
     """
     Used inside of `fast_dominated_argsort`. Call that function instead.
 
@@ -104,7 +104,7 @@ def fast_dominated_argsort_internal(dom):
     return F
 
 
-def fast_dominated_argsort(pop_f, pop_g=None):
+def fast_dominated_argsort(pop_f: np.ndarray, pop_g: Optional[np.ndarray]=None) -> List[np.ndarray]:
     """
     Performs a dominated sort on matrix of objective function values O.  This is a numpy implementation of the algorithm
     described in [1].
@@ -132,7 +132,7 @@ def fast_dominated_argsort(pop_f, pop_g=None):
     return fast_dominated_argsort_internal(dom)
 
 
-def get_crowding_distance(pop_f):
+def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
     """
     Calculates NSGA-II style crowding distance as described in [1].
 
@@ -170,7 +170,7 @@ def get_crowding_distance(pop_f):
     return np.array(dist)
 
 
-def crowded_comparison_argsort(pop_f, pop_g=None):
+def crowded_comparison_argsort(pop_f: np.ndarray, pop_g: Optional[np.ndarray]=None):
     """
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
     Indices to individuals are returned in order of increasing value by crowded comparison operator.
@@ -203,7 +203,7 @@ def crowded_comparison_argsort(pop_f, pop_g=None):
     return np.array(inds)[::-1]
 
 
-def get_fitness(pop_f, pop_g):
+def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray):
     """
     Get the "fitness" of each individual according to domination and crowding distance.
 
@@ -224,8 +224,15 @@ def get_fitness(pop_f, pop_g):
     return fitness
 
 
-def generate_child_binary_tournament(pop_x, pop_f, pop_g, bounds, mutate: MutationOperator, crossover: CrossoverOperator,
-                                     fitness=None):
+def generate_child_binary_tournament(
+    pop_x: np.ndarray, 
+    pop_f: np.ndarray, 
+    pop_g: np.ndarray, 
+    bounds: np.ndarray, 
+    mutate: MutationOperator, 
+    crossover: CrossoverOperator,
+    fitness: Optional[np.ndarray]=None
+) -> np.ndarray:
     """
     Creates a single child from the population using binary tournament selection, crossover, and mutation.
     
@@ -281,7 +288,7 @@ def generate_child_binary_tournament(pop_x, pop_f, pop_g, bounds, mutate: Mutati
     return child
 
 
-def cull_population(pop_x, pop_f, pop_g, population_size):
+def cull_population(pop_x: np.ndarray, pop_f: np.ndarray, pop_g: np.ndarray, population_size: int) -> np.ndarray:
     """
     Reduce population size by selecting the best individuals based on crowded comparison.
     
