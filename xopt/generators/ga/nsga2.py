@@ -1,6 +1,6 @@
 import numpy as np
 from xopt.generator import Generator
-from pydantic import Field, BaseModel, Discriminator
+from pydantic import Field, BaseModel, Discriminator, field_validator
 from typing import Dict, List, Optional, Literal, Annotated, Tuple, Union
 import pandas as pd
 import os
@@ -575,6 +575,13 @@ class DeduplicatedGeneratorBase(Generator):
     # The decision vars seen so far
     decision_vars_seen: Optional[np.ndarray] = None
 
+    @field_validator("decision_vars_seen", mode="before")
+    @classmethod
+    def cast_arr(cls, value):
+        if isinstance(value, list):
+            return np.array(value)
+        return value
+
     def generate(self, n_candidates) -> list[dict]:
         """
         Generate the unique candidates.
@@ -836,7 +843,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 if not self._overwrite:
                     counter = 2
                     output_dir_dedup = self.output_dir
-                    while os.path.exists(output_dir_dedup):
+                    while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
                         output_dir_dedup = f"{self.output_dir}_{counter}"
                         counter += 1
                     logger.debug(f"detected existing output_dir \"{self.output_dir}\" and corrected "
@@ -850,7 +857,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 os.makedirs(self.output_dir, exist_ok=True)
                 
                 # Save all of the data
-                self.data.to_csv(os.path.join(self.output_dir, "data.csv"))
+                self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 
                 # Save this generation to the population file
                 pop_df = pd.DataFrame(self.pop)
