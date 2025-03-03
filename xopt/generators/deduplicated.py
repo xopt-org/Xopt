@@ -6,9 +6,6 @@ import logging
 import time
 
 
-logger = logging.getLogger(__name__)
-
-
 class DeduplicatedGeneratorBase(Generator):
     """
     Base class for generators that avoid producing duplicate candidates.
@@ -36,6 +33,14 @@ class DeduplicatedGeneratorBase(Generator):
     
     # The decision vars seen so far
     decision_vars_seen: Optional[np.ndarray] = None
+
+    # For per-object log output in child objects (see eg NSGA2Generator)
+    _logger: Optional[logging.Logger] = None
+
+
+    def model_post_init(self, context):
+        # Get a unique logger per object
+        self._logger = logging.getLogger(f"{__name__}.DeduplicatedGeneratorBase.{id(self)}")
 
     @field_validator("decision_vars_seen", mode="before")
     @classmethod
@@ -105,8 +110,9 @@ class DeduplicatedGeneratorBase(Generator):
                 idx = idx[idx >= 0]
                 for i in idx:
                     candidates.append(from_generator[i])
-                logger.debug(f"deduplicated generation round {round_idx} completed (n_removed={n_removed}, len(idx)={len(idx)}, "
-                             f"n_existing_vars={n_existing_vars}, len(self.decision_vars_seen)={len(self.decision_vars_seen)})")
+                self._logger.debug(f"deduplicated generation round {round_idx} completed (n_removed={n_removed}, "
+                                   f"len(idx)={len(idx)}, n_existing_vars={n_existing_vars}, "
+                                   f"len(self.decision_vars_seen)={len(self.decision_vars_seen)})")
                 round_idx += 1
 
             # Hand candidates back to user
@@ -115,7 +121,7 @@ class DeduplicatedGeneratorBase(Generator):
         msg = f"generated {len(candidates)} candidates in {1000*(time.perf_counter() - start_t):.2f}ms"
         if self.deduplicate_output:
             msg += f" (removed {n_removed} duplicate individuals)"
-        logger.info(msg)
+        self._logger.info(msg)
         return candidates
 
     def _generate(self, n_candidates: int) -> list[dict]:
