@@ -104,7 +104,7 @@ def get_generator_dynamic(name: str):
     elif name in all_generator_names["ga"]:
         try:
             from xopt.generators.ga import CNSGAGenerator, NSGA2Generator
-            
+
             registered_generators = [
                 CNSGAGenerator,
                 NSGA2Generator,
