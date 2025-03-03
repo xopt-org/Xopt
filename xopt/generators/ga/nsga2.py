@@ -355,7 +355,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     n_candidates : int
         Total number of candidate solutions generated.
     history_idx : list of list of int
-        XOpt indices of individuals in each generation.
+        Xopt indices of individuals in each generation.
     pop : list of dict
         Current population of individuals.
     child : list of dict
@@ -386,14 +386,14 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     
     # Output options
     output_dir: Optional[str] = None
-    checkpoint_freq: int = 1
+    checkpoint_freq: int = Field(-1, description="How often (in generations) to save checkpoints (set to -1 to disable)")
     _overwrite: bool = False  # Used in file overwrite protection logic. PLEASE DO NOT CHANGE
     
     # Metadata
     fevals: int = Field(0, description="Number of function evaluations the optimizer has seen up to this point")
     n_generations: int = Field(0, description="The number of generations completed so far")
     n_candidates: int = Field(0, description="The number of candidate solutions generated so far")
-    history_idx: List[List[int]] = Field(default_factory=list, description="XOpt indices of the individuals in each population")
+    history_idx: List[List[int]] = Field(default_factory=list, description="Xopt indices of the individuals in each population")
     generation_start_t: float = Field(default_factory=time.perf_counter,
                                       description="When did the generation start, for logging", exclude=True)
 
@@ -507,6 +507,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 
                 # Save all of the data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
+                with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
+                    f.write(self.vocs.to_json())
                 
                 # Save this generation to the population file
                 pop_df = pd.DataFrame(self.pop)
@@ -518,7 +520,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 logger.info(f"saved optimization data to \"{self.output_dir}\" "
                             f"in {1000*(time.perf_counter()-save_start_t):.2f}ms")
                 
-                if self.n_generations % self.checkpoint_freq == 0:
+                if self.checkpoint_freq > 0 and (self.n_generations % self.checkpoint_freq == 0):
                     # Create a base filename
                     os.makedirs(os.path.join(self.output_dir, "checkpoints"), exist_ok=True)
                     base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
