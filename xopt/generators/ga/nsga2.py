@@ -387,8 +387,10 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     # Output options
     output_dir: Optional[str] = None
     checkpoint_freq: int = Field(-1, description="How often (in generations) to save checkpoints (set to -1 to disable)")
+    log_level: int = Field(logging.INFO, description="Log message level output to log.txt")
     _output_dir_setup: bool = False  # Used in initializing the directory. PLEASE DO NOT CHANGE
-    
+    _logger: Optional[logging.Logger] = None
+
     # Metadata
     fevals: int = Field(0, description="Number of function evaluations the optimizer has seen up to this point")
     n_generations: int = Field(0, description="The number of generations completed so far")
@@ -400,6 +402,11 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     # The population and returned children
     pop: List[Dict] = Field(default_factory=list)
     child: List[Dict] = Field(default_factory=list)
+
+    def model_post_init(self, context):
+        # Get a unique logger per object
+        self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
+        self._logger.setLevel(self.log_level)
 
     def _generate(self, n_candidates: int) -> List[Dict]:
         self.ensure_output_dir_setup()
@@ -426,13 +433,13 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                     crossover=self.crossover_operator,
                     fitness=fitness
                 ))})
-            logger.debug(f"generated {n_candidates} candidates from generation {self.n_generations} "
-                         f"in {1000*(time.perf_counter()-start_t):.2f}ms")
+            self._logger.debug(f"generated {n_candidates} candidates from generation {self.n_generations} "
+                               f"in {1000*(time.perf_counter()-start_t):.2f}ms")
         else:
             vars = np.vstack([np.random.uniform(x[0], x[1], n_candidates) for x in self.vocs.bounds.T]).T
             candidates = [{k: v for k, v in zip(self.vocs.variable_names, individual)} for individual in vars]
-            logger.debug(f"generated {n_candidates} random candidates in {1000*(time.perf_counter()-start_t):.2f}ms "
-                         f"(no population exists yet)")
+            self._logger.debug(f"generated {n_candidates} random candidates in {1000*(time.perf_counter()-start_t):.2f}ms "
+                               f"(no population exists yet)")
                 
         # Add in useful tags for individuals
         for cand in candidates:
@@ -454,7 +461,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
         # Record the function evaluations
         self.fevals += len(new_data)
         self.child.extend(new_data.to_dict(orient='records'))
-        logger.info(f"adding {len(new_data)} new evaluated individuals to generator")
+        self._logger.info(f"adding {len(new_data)} new evaluated individuals to generator")
 
         round_idx = 0
         while len(self.child) >= self.population_size:
@@ -477,9 +484,10 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
             # Generate logging message
             n_feasible = np.sum((self.vocs.constraint_data(self.pop).to_numpy() <= 0.0).all(axis=1))
             n_err = np.sum([x["xopt_error"] for x in self.pop])
-            logger.info(f"completed generation {self.n_generations+1} in {time.perf_counter()-self.generation_start_t:.3f}s"
-                         f" (n_feasible={n_feasible}, n_err={n_err}, children_performance={perf_message}, "
-                         f"add_data_round={round_idx}, fevals={self.fevals}, n_candidates={self.n_candidates})")
+            self._logger.info(f"completed generation {self.n_generations+1} in "
+                              f"{time.perf_counter()-self.generation_start_t:.3f}s"
+                              f" (n_feasible={n_feasible}, n_err={n_err}, children_performance={perf_message}, "
+                              f"add_data_round={round_idx}, fevals={self.fevals}, n_candidates={self.n_candidates})")
             round_idx += 1
             self.generation_start_t = time.perf_counter()
             
@@ -503,8 +511,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 pop_df.to_csv(csv_path, index=False, mode="a", header=not os.path.isfile(csv_path))
                 
                 # Log some things
-                logger.info(f"saved optimization data to \"{self.output_dir}\" "
-                            f"in {1000*(time.perf_counter()-save_start_t):.2f}ms")
+                self._logger.info(f"saved optimization data to \"{self.output_dir}\" "
+                                  f"in {1000*(time.perf_counter()-save_start_t):.2f}ms")
                 
                 if self.checkpoint_freq > 0 and (self.n_generations % self.checkpoint_freq == 0):
                     # Create a base filename
@@ -525,7 +533,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                     # Now we have a unique filename
                     with open(checkpoint_path, "w") as f:
                         f.write(self.to_json())
-                    logger.debug(f"saved checkpoint file \"{checkpoint_path}\"")
+                    self._logger.debug(f"saved checkpoint file \"{checkpoint_path}\"")
 
     def __repr__(self) -> str:
         return (f"NSGA2Generator(pop_size={self.population_size}, "
@@ -547,8 +555,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
         while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
             output_dir_dedup = f"{self.output_dir}_{counter}"
             counter += 1
-        logger.debug(f"detected existing output_dir \"{self.output_dir}\" and corrected "
-                        f"to \"{output_dir_dedup}\" to avoid overwriting")
+        self._logger.debug(f"detected existing output_dir \"{self.output_dir}\" and corrected "
+                           f"to \"{output_dir_dedup}\" to avoid overwriting")
         self.output_dir = output_dir_dedup
         
         # We are now setup
@@ -557,3 +565,26 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
         # Setup the directory
         os.makedirs(self.output_dir, exist_ok=True)
         
+        # Set up file logging
+        log_file_path = os.path.join(self.output_dir, "log.txt")
+        file_handler = logging.FileHandler(log_file_path, mode='w')
+        file_handler.setLevel(self.log_level)
+        
+        # Use the same format as the default logger
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        
+        # Add the file handler to the logger
+        self._logger.addHandler(file_handler)
+        self._logger.info(f"routing log output to file: {log_file_path}")
+
+    def close_log_file(self):
+        """
+        Closes out the log file (if used)
+        """
+        if self.output_dir is not None and self._output_dir_setup:
+            # Remove all handlers from the logger
+            for handler in list(self._logger.handlers):
+                if isinstance(handler, logging.FileHandler):
+                    handler.close()
+                self._logger.removeHandler(handler)
