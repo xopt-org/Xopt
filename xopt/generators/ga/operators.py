@@ -17,29 +17,39 @@ class DummyMutation(BaseModel):
 class PolynomialMutation(MutationOperator):
     """
     Polynomial mutation operator for evolutionary algorithms.
-    
-    This operator performs mutation by adding a polynomial perturbation to the 
-    parent solution, with the perturbation magnitude controlled by the distribution 
+
+    This operator performs mutation by adding a polynomial perturbation to the
+    parent solution, with the perturbation magnitude controlled by the distribution
     parameter eta_m.
-    
+
     Parameters
     ----------
     pm : float, optional
         Mutation probability for each decision variable, between 0 and 1.
         If None, defaults to 1/n where n is the number of variables.
     eta_m : int, default=20
-        Mutation distribution parameter controlling the shape of the 
+        Mutation distribution parameter controlling the shape of the
         perturbation. Larger values produce perturbations closer to the parent.
     """
+
     name: Literal["polynomial_mutation"] = "polynomial_mutation"
-    pm: Annotated[Optional[float], Field(strict=True, ge=0, le=1, 
-            description="Mutation probability or 1/n if None (n = # of vars)")] = None
-    eta_m: Annotated[float, Field(strict=True, ge=0.0, description="Mutation distribution parameter")] = 20
+    pm: Annotated[
+        Optional[float],
+        Field(
+            strict=True,
+            ge=0,
+            le=1,
+            description="Mutation probability or 1/n if None (n = # of vars)",
+        ),
+    ] = None
+    eta_m: Annotated[
+        float, Field(strict=True, ge=0.0, description="Mutation distribution parameter")
+    ] = 20
 
     def __call__(self, parent: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         """
         Apply polynomial mutation to a parent solution.
-        
+
         Parameters
         ----------
         parent : numpy.ndarray
@@ -48,12 +58,12 @@ class PolynomialMutation(MutationOperator):
             Bounds for decision variables, shape (2, n) where n is the number
             of variables. bounds[0] contains lower bounds, bounds[1] contains
             upper bounds.
-            
+
         Returns
         -------
         numpy.ndarray
             Mutated solution (child) with the same shape as the parent.
-            
+
         Notes
         -----
         The mutation is applied with probability pm to each decision variable.
@@ -63,7 +73,7 @@ class PolynomialMutation(MutationOperator):
         """
         # Get the variables we are mutating
         if self.pm is None:
-            pm = 1/parent.size
+            pm = 1 / parent.size
         else:
             pm = self.pm
 
@@ -88,13 +98,15 @@ class PolynomialMutation(MutationOperator):
         # Towards upper bound
         delta2 = (xu - xm) / (xu - xl)
         xy = 1.0 - delta2
-        val = 2.0 * (1.0 - rand) + 2.0 * (rand - 0.5) * (np.power(xy, (self.eta_m + 1.0)))
+        val = 2.0 * (1.0 - rand) + 2.0 * (rand - 0.5) * (
+            np.power(xy, (self.eta_m + 1.0))
+        )
         dd = 1.0 - (np.power(val, mut_pow))
         deltaq[rand > 0.5] = dd[rand > 0.5]
 
         # Apply the mutation
         xm += deltaq * (xu - xl)
-        
+
         # back in bounds if necessary (correct for floating point issues)
         xm[xm < xl] = xl[xm < xl]
         xm[xm > xu] = xu[xm > xu]
@@ -109,7 +121,9 @@ class PolynomialMutation(MutationOperator):
 class CrossoverOperator(BaseModel):
     name: Literal["abstract"] = "abstract"
 
-    def __call__(self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def __call__(
+        self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
 
@@ -120,12 +134,12 @@ class DummyCrossover(BaseModel):
 class SimulatedBinaryCrossover(BaseModel):
     """
     Simulated Binary Crossover (SBX) operator for evolutionary algorithms.
-    
+
     This crossover operator simulates the behavior of single-point crossover in
     binary-encoded genetic algorithms but is designed for real-valued variables.
     The method creates offspring that have a similar distance between them as their
     parents, with the spread controlled by the distribution parameter eta_c.
-    
+
     Parameters
     ----------
     delta_1 : float, default=0.5
@@ -136,20 +150,29 @@ class SimulatedBinaryCrossover(BaseModel):
         Crossover distribution parameter that controls the spread of children
         solutions around parents. Larger values produce children closer to parents.
         Must be >= 0.
-    
+
     References
     ----------
     [1] Deb, K., & Agrawal, R. B. (1995). Simulated binary crossover for continuous search space. Complex systems, 9(2), 115-148
     """
-    name: Literal["simulated_binary_crossover"] = "simulated_binary_crossover"
-    delta_1: Annotated[float, Field(strict=True, ge=0, le=1, description="Crossover probability")] = 0.5
-    delta_2: Annotated[float, Field(strict=True, ge=0, le=1, description="Crossover probability")] = 0.5
-    eta_c: Annotated[int, Field(strict=True, ge=0, description="Crossover distribution parameter")] = 20
 
-    def __call__(self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    name: Literal["simulated_binary_crossover"] = "simulated_binary_crossover"
+    delta_1: Annotated[
+        float, Field(strict=True, ge=0, le=1, description="Crossover probability")
+    ] = 0.5
+    delta_2: Annotated[
+        float, Field(strict=True, ge=0, le=1, description="Crossover probability")
+    ] = 0.5
+    eta_c: Annotated[
+        int, Field(strict=True, ge=0, description="Crossover distribution parameter")
+    ] = 20
+
+    def __call__(
+        self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply simulated binary crossover to generate two offspring from two parents.
-        
+
         Parameters
         ----------
         parent_a : numpy.ndarray
@@ -161,13 +184,13 @@ class SimulatedBinaryCrossover(BaseModel):
             Bounds for decision variables, shape (2, n) where n is the number
             of variables. bounds[0] contains lower bounds, bounds[1] contains
             upper bounds.
-            
+
         Returns
         -------
         tuple of numpy.ndarray
             A tuple containing two offspring solutions (child_a, child_b),
             each with the same shape as the parents.
-            
+
         Notes
         -----
         The implementation follows these steps:
@@ -196,10 +219,18 @@ class SimulatedBinaryCrossover(BaseModel):
         # Calculate the bounds scaling factor
         bl = np.ones(parent_a.shape[0])
         bu = np.ones(parent_a.shape[0])
-        bl[less_than] = 1 + 2 * (parent_a[less_than] - bounds[0, less_than]) / (parent_b[less_than] - parent_a[less_than])
-        bu[less_than] = 1 + 2 * (bounds[1, less_than] - parent_b[less_than]) / (parent_b[less_than] - parent_a[less_than])
-        bl[greater_than] = 1 + 2 * (parent_b[greater_than] - bounds[0, greater_than]) / (parent_a[greater_than] - parent_b[greater_than])
-        bu[greater_than] = 1 + 2 * (bounds[1, greater_than] - parent_a[greater_than]) / (parent_a[greater_than] - parent_b[greater_than])
+        bl[less_than] = 1 + 2 * (parent_a[less_than] - bounds[0, less_than]) / (
+            parent_b[less_than] - parent_a[less_than]
+        )
+        bu[less_than] = 1 + 2 * (bounds[1, less_than] - parent_b[less_than]) / (
+            parent_b[less_than] - parent_a[less_than]
+        )
+        bl[greater_than] = 1 + 2 * (
+            parent_b[greater_than] - bounds[0, greater_than]
+        ) / (parent_a[greater_than] - parent_b[greater_than])
+        bu[greater_than] = 1 + 2 * (
+            bounds[1, greater_than] - parent_a[greater_than]
+        ) / (parent_a[greater_than] - parent_b[greater_than])
 
         # Make the distribution symmetric (what Deb does)
         f = bl < bu
@@ -232,7 +263,9 @@ class SimulatedBinaryCrossover(BaseModel):
         c2[f] = (parent_a[f] + parent_b[f] + b1[f] * (parent_b[f] - parent_a[f])) / 2.0
 
         # Swap variables with probability delta_2
-        f = np.bitwise_and(np.random.random(parent_a.shape[0]) < self.delta_2, crossed_over)
+        f = np.bitwise_and(
+            np.random.random(parent_a.shape[0]) < self.delta_2, crossed_over
+        )
         t = c1[f]
         c1[f] = c2[f]
         c2[f] = t
