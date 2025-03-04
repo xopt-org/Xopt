@@ -2,9 +2,8 @@ import json
 import warnings
 from typing import List
 
-from xopt.errors import XoptError
-
-from xopt.generators.random import RandomGenerator
+from ..errors import XoptError
+from .random import RandomGenerator
 
 # by default only load random generator
 registered_generators = [
@@ -160,6 +159,7 @@ def get_generator_defaults(
             if v.default is None:
                 defaults[k] = None
             else:
+                print(v.default)
                 try:
                     # handles pydantic models as defaults
                     defaults[k] = json.loads(v.default.json())
