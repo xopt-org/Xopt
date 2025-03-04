@@ -89,7 +89,8 @@ class TestNelderMeadGenerator:
         X.step()
         assert X.generator.current_state.astg > 0
         # this will reset state and warn
-        X.random_evaluate(1)
+        with pytest.warns(UserWarning):
+            X.random_evaluate(1)
         assert X.generator._initial_simplex is not None
         assert X.generator.current_state.astg == -1
         X.step()
