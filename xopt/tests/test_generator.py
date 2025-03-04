@@ -6,8 +6,17 @@ import pytest
 from pydantic import ValidationError
 
 from xopt.generator import Generator
-from xopt.generators import generators, get_generator, get_generator_defaults
+from xopt.generators import (
+    generators,
+    get_generator,
+    get_generator_defaults,
+    try_load_all_generators,
+)
 from xopt.resources.testing import TEST_VOCS_BASE
+
+
+# Generators must be loaded to have access to names in generator tests
+try_load_all_generators()
 
 
 class TestGenerator:
