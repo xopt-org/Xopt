@@ -7,16 +7,11 @@ from pydantic import ValidationError
 
 from xopt.generator import Generator
 from xopt.generators import (
-    generators,
     get_generator,
     get_generator_defaults,
-    try_load_all_generators,
+    list_available_generators,
 )
 from xopt.resources.testing import TEST_VOCS_BASE
-
-
-# Generators must be loaded to have access to names in generator tests
-try_load_all_generators()
 
 
 class TestGenerator:
@@ -30,7 +25,7 @@ class TestGenerator:
         with pytest.raises(ValidationError):
             Generator(vocs=test_vocs)
 
-    @pytest.mark.parametrize("name", list(generators.keys()))
+    @pytest.mark.parametrize("name", list_available_generators())
     def test_serialization_loading(self, name):
         gen_config = get_generator_defaults(name)
         gen_class = get_generator(name)
