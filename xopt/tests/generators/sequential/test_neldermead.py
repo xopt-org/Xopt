@@ -38,6 +38,62 @@ class TestNelderMeadGenerator:
         with pytest.raises(NotImplementedError):
             gen.generate(2)
 
+    def test_simplex_forced_random_init(self):
+        # Xopt Simplex
+        YAML = """
+        generator:
+            name: neldermead
+            initial_point: {x0: -1, x1: -1}
+            adaptive: true
+            xatol: 0.0001
+            fatol: 0.0001
+        evaluator:
+            function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
+        vocs:
+            variables:
+                x0: [-5, 5]
+                x1: [-5, 5]
+            objectives: {y: MINIMIZE}
+        """
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(1)
+        X.step()
+        assert X.generator._initial_simplex is None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        X.step()
+        assert X.generator._initial_simplex is not None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(4)
+        X.step()
+        assert X.generator._initial_simplex is not None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        X.step()
+        assert X.generator._initial_simplex is not None
+        X.step()
+        assert X.generator.current_state.astg != -1
+        # this will reset state
+        X.random_evaluate(1)
+        assert X.generator._initial_simplex is not None
+        assert X.generator.current_state.astg == -1
+        X.step()
+
     def test_simplex_options(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
 

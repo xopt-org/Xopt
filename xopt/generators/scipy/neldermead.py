@@ -123,7 +123,9 @@ class NelderMeadGenerator(Generator):
     is_done_bool: bool = False
 
     _initial_simplex = None
+    _initial_point = None
     _saved_options: Dict = None
+    manual_data_cnt: int = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -146,7 +148,10 @@ class NelderMeadGenerator(Generator):
     @property
     def x0(self) -> np.ndarray:
         """Raw internal initial point for convenience"""
-        return np.array([self.initial_point[k] for k in self.vocs.variable_names])
+        if self._initial_point is not None:
+            return self._initial_point
+        else:
+            return np.array([self.initial_point[k] for k in self.vocs.variable_names])
 
     @property
     def is_done(self) -> bool:
@@ -171,15 +176,45 @@ class NelderMeadGenerator(Generator):
         # Complicated part - need to determine if data corresponds to result of last gen
         ndata = len(self.data)
         ngen = self.current_state.ngen
-        if ndata == ngen:
+        if ndata - self.manual_data_cnt == ngen:
             # just resuming
             return
         else:
-            # Must have made at least 1 step, require future_state
-            assert self.future_state is not None
+            if self.future_state is None:
+                if self.current_state.astg != -1:
+                    warnings.warn('Forced point added while simplex is running - this is strongly discouraged')
+                # This is a hack where simplex has not started and random data is being added
+                # remake initial simplex and initial point
+                logger.debug(f'Adding new random data to existing {self.data.shape[0]} points')
+                variable_data = self.vocs.variable_data(self.data).to_numpy()
+                objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
+
+                _initial_simplex = variable_data.copy()
+                N = self.vocs.n_variables
+                if _initial_simplex.shape[0] > N + 1:
+                    _initial_simplex = _initial_simplex[-(N + 1):, :]
+                    objective_data = objective_data[-(N + 1):]
+
+                if _initial_simplex.shape[0] == N + 1:
+                    logger.debug(f'Forcing new simplex with {N+1} points')
+                    # if we have enough, form new simplex and force state to just after it is all probed
+                    fake_initialized_state = _fake_partial_state_gen(_initial_simplex,
+                                                                     objective_data)
+                    self.current_state = fake_initialized_state
+                    self._initial_simplex = _initial_simplex
+                    #self.y = objective_data[-1]
+                    self.manual_data_cnt = len(new_data) - (N + 1)
+                else:
+                    self.manual_data_cnt = len(new_data)
+
+                self._initial_point = _initial_simplex[-1, :]
+                self.y = float(objective_data[-1])
+                return
 
             # new data -> advance state machine 1 step
-            assert ndata == self.future_state.ngen == ngen + 1
+            assert ndata - self.manual_data_cnt == self.future_state.ngen, (f"Bad data length {ndata}"
+                                                                             f" {self.future_state.ngen}")
+            assert ndata - self.manual_data_cnt == ngen + 1
             self.current_state = self.future_state
             self.future_state = None
 
@@ -246,7 +281,7 @@ class NelderMeadGenerator(Generator):
 
     def _call_algorithm(self):
         results = _neldermead_generator(
-            self.x0,
+            x0=self.x0,
             state=self.current_state,
             lastval=self.y,
             adaptive=self.adaptive,
@@ -271,6 +306,38 @@ class NelderMeadGenerator(Generator):
         """
         sim = self.current_state.sim
         return dict(zip(self.vocs.variable_names, sim.T))
+
+
+def _fake_partial_state_gen(sim: np.ndarray, fsim: np.ndarray):
+    # active stage
+    astg = 0
+    # internal simplex variables that will be saved/restored
+    ind = fxr = xr = xbar = x = xe = xc = xcc = None
+    kend = jend = ngen = 0
+    doshrink = 0
+
+    assert sim.shape[0] == fsim.shape[0]
+    kend = sim.shape[0] - 1
+    ngen = sim.shape[0]
+    # lastval will set final fsim entry
+
+    state = SimplexState(astg=astg,
+                            N=sim.shape[1],
+                            kend=kend,
+                            jend=jend,
+                            ind=ind,
+                            sim=sim,
+                            fsim=fsim,
+                            fxr=fxr,
+                            x=x,
+                            xr=xr,
+                            xe=xe,
+                            xc=xc,
+                            xcc=xcc,
+                            xbar=xbar,
+                            doshrink=doshrink,
+                            ngen=ngen)
+    return state
 
 
 def _neldermead_generator(
