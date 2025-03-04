@@ -187,7 +187,7 @@ class NelderMeadGenerator(Generator):
                     warnings.warn(
                         "Forced point added while simplex is running - this is strongly discouraged"
                     )
-                # This is a hack where simplex has not started and random data is being added
+                # This section is a hack for when random data is being added
                 # remake initial simplex and initial point
                 variable_data = self.vocs.variable_data(self.data).to_numpy()
                 objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
@@ -207,6 +207,7 @@ class NelderMeadGenerator(Generator):
                     self._initial_simplex = _initial_simplex
                     self.manual_data_cnt = len(self.data) - (N + 1)
                 else:
+                    # otherwise, just set the last point as the initial point - effectively loses output data
                     self.current_state = SimplexState()
                     self._initial_simplex = None
                     self.manual_data_cnt = len(self.data)
