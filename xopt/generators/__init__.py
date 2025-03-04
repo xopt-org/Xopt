@@ -115,7 +115,7 @@ def get_generator_dynamic(name: str):
         generators[name] = ExtremumSeekingGenerator
         return ExtremumSeekingGenerator
     elif name in all_generator_names["rcds"]:
-        from xopt.generators.rcds.rcds import RCDSGenerator
+        from xopt.generators.sequential.rcds import RCDSGenerator
 
         generators[name] = RCDSGenerator
         return RCDSGenerator
