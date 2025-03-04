@@ -87,12 +87,15 @@ class TestNelderMeadGenerator:
         X.step()
         assert X.generator._initial_simplex is not None
         X.step()
-        assert X.generator.current_state.astg != -1
-        # this will reset state
+        assert X.generator.current_state.astg > 0
+        # this will reset state and warn
         X.random_evaluate(1)
         assert X.generator._initial_simplex is not None
         assert X.generator.current_state.astg == -1
         X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
 
     def test_simplex_options(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
