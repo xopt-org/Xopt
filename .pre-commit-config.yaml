@@ -30,7 +30,7 @@ repos:
       - id: jupyter-notebook-clear-output
         name: jupyter-notebook-jupyter-clear
         files: \.ipynb$
-        stages: [commit]
+        stages: [pre-commit]
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
         exclude: "^.*(TODO|TODO2).ipynb$"
