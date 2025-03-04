@@ -182,38 +182,43 @@ class NelderMeadGenerator(Generator):
         else:
             if self.future_state is None:
                 if self.current_state.astg != -1:
-                    warnings.warn('Forced point added while simplex is running - this is strongly discouraged')
+                    warnings.warn(
+                        "Forced point added while simplex is running - this is strongly discouraged"
+                    )
                 # This is a hack where simplex has not started and random data is being added
                 # remake initial simplex and initial point
-                logger.debug(f'Adding new random data to existing {self.data.shape[0]} points')
+                logger.debug(
+                    f"Adding new random data to existing {self.data.shape[0]} points"
+                )
                 variable_data = self.vocs.variable_data(self.data).to_numpy()
                 objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
 
                 _initial_simplex = variable_data.copy()
                 N = self.vocs.n_variables
                 if _initial_simplex.shape[0] > N + 1:
-                    _initial_simplex = _initial_simplex[-(N + 1):, :]
-                    objective_data = objective_data[-(N + 1):]
+                    _initial_simplex = _initial_simplex[-(N + 1) :, :]
+                    objective_data = objective_data[-(N + 1) :]
 
                 if _initial_simplex.shape[0] == N + 1:
-                    logger.debug(f'Forcing new simplex with {N+1} points')
+                    logger.debug(f"Forcing new simplex with {N + 1} points")
                     # if we have enough, form new simplex and force state to just after it is all probed
-                    fake_initialized_state = _fake_partial_state_gen(_initial_simplex,
-                                                                     objective_data)
+                    fake_initialized_state = _fake_partial_state_gen(
+                        _initial_simplex, objective_data
+                    )
                     self.current_state = fake_initialized_state
                     self._initial_simplex = _initial_simplex
-                    #self.y = objective_data[-1]
-                    self.manual_data_cnt = len(new_data) - (N + 1)
+                    self.manual_data_cnt = len(self.data) - (N + 1)
                 else:
-                    self.manual_data_cnt = len(new_data)
+                    self.manual_data_cnt = len(self.data)
 
                 self._initial_point = _initial_simplex[-1, :]
                 self.y = float(objective_data[-1])
                 return
 
             # new data -> advance state machine 1 step
-            assert ndata - self.manual_data_cnt == self.future_state.ngen, (f"Bad data length {ndata}"
-                                                                             f" {self.future_state.ngen}")
+            assert ndata - self.manual_data_cnt == self.future_state.ngen, (
+                f"Bad data length {ndata} {self.manual_data_cnt} {self.future_state.ngen}"
+            )
             assert ndata - self.manual_data_cnt == ngen + 1
             self.current_state = self.future_state
             self.future_state = None
@@ -319,24 +324,27 @@ def _fake_partial_state_gen(sim: np.ndarray, fsim: np.ndarray):
     assert sim.shape[0] == fsim.shape[0]
     kend = sim.shape[0] - 1
     ngen = sim.shape[0]
+    astg = -1
     # lastval will set final fsim entry
 
-    state = SimplexState(astg=astg,
-                            N=sim.shape[1],
-                            kend=kend,
-                            jend=jend,
-                            ind=ind,
-                            sim=sim,
-                            fsim=fsim,
-                            fxr=fxr,
-                            x=x,
-                            xr=xr,
-                            xe=xe,
-                            xc=xc,
-                            xcc=xcc,
-                            xbar=xbar,
-                            doshrink=doshrink,
-                            ngen=ngen)
+    state = SimplexState(
+        astg=astg,
+        N=sim.shape[1],
+        kend=kend,
+        jend=jend,
+        ind=ind,
+        sim=sim,
+        fsim=fsim,
+        fxr=fxr,
+        x=x,
+        xr=xr,
+        xe=xe,
+        xc=xc,
+        xcc=xcc,
+        xbar=xbar,
+        doshrink=doshrink,
+        ngen=ngen,
+    )
     return state
 
 
