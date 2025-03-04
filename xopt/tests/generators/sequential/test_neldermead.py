@@ -83,17 +83,31 @@ class TestNelderMeadGenerator:
         X2.step()
 
         X = Xopt.from_yaml(YAML)
+        X.step()
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == 0
+        # this will reset state and warn
+        with pytest.warns(UserWarning):
+            X.random_evaluate(1)
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == -1
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
         assert X.generator._initial_simplex is not None
         X.step()
         assert X.generator.current_state.astg > 0
-        # this will reset state and warn
         with pytest.warns(UserWarning):
             X.random_evaluate(1)
         assert X.generator._initial_simplex is not None
         assert X.generator.current_state.astg == -1
         X.step()
+        assert X.generator.current_state.astg == 0
         state = X.json()
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
