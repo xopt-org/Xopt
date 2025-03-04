@@ -187,9 +187,9 @@ class NelderMeadGenerator(Generator):
                     )
                 # This is a hack where simplex has not started and random data is being added
                 # remake initial simplex and initial point
-                logger.debug(
-                    f"Adding new random data to existing {self.data.shape[0]} points"
-                )
+                # logger.debug(
+                #     f"Adding manual data to existing {self.data.shape[0]} points"
+                # )
                 variable_data = self.vocs.variable_data(self.data).to_numpy()
                 objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
 
@@ -200,7 +200,7 @@ class NelderMeadGenerator(Generator):
                     objective_data = objective_data[-(N + 1) :]
 
                 if _initial_simplex.shape[0] == N + 1:
-                    logger.debug(f"Forcing new simplex with {N + 1} points")
+                    # logger.debug(f"Forcing new simplex with {N + 1} points")
                     # if we have enough, form new simplex and force state to just after it is all probed
                     fake_initialized_state = _fake_partial_state_gen(
                         _initial_simplex, objective_data
@@ -216,9 +216,7 @@ class NelderMeadGenerator(Generator):
                 return
 
             # new data -> advance state machine 1 step
-            assert ndata - self.manual_data_cnt == self.future_state.ngen, (
-                f"Bad data length {ndata} {self.manual_data_cnt} {self.future_state.ngen}"
-            )
+            assert ndata - self.manual_data_cnt == self.future_state.ngen
             assert ndata - self.manual_data_cnt == ngen + 1
             self.current_state = self.future_state
             self.future_state = None
@@ -226,7 +224,7 @@ class NelderMeadGenerator(Generator):
             # Can have multiple points if resuming from file, grab last one
             new_data_df = self.vocs.objective_data(new_data)
             res = new_data_df.iloc[-1:, :].to_numpy()
-            assert np.shape(res) == (1, 1), f"Bad last point {res}"
+            assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
 
             yt = res[0, 0].item()
             if np.isinf(yt) or np.isnan(yt):
