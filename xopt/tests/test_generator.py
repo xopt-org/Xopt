@@ -26,7 +26,7 @@ class TestGenerator:
         # Get generator defaults and class for this generator
         gen_config = get_generator_defaults(generator_name)
         gen_class = get_generator(generator_name)
-        
+
         # Handle special cases for different generator types
         if generator_name in ["mobo", "cnsga", "mggpo"]:
             gen_config["reference_point"] = {"y1": 10.0}
@@ -40,11 +40,11 @@ class TestGenerator:
             test_vocs.observables = ["f"]
         else:
             test_vocs = TEST_VOCS_BASE
-        
+
         # Test JSON serialization
         serialized = json.dumps(gen_config)
         assert serialized is not None
-        
+
         # Test instantiation with the configuration
         generator = gen_class(vocs=test_vocs, **gen_config)
         assert generator is not None
