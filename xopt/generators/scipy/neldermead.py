@@ -207,6 +207,8 @@ class NelderMeadGenerator(Generator):
                     self._initial_simplex = _initial_simplex
                     self.manual_data_cnt = len(self.data) - (N + 1)
                 else:
+                    self.current_state = SimplexState()
+                    self._initial_simplex = None
                     self.manual_data_cnt = len(self.data)
 
                 self._initial_point = _initial_simplex[-1, :]
@@ -312,10 +314,9 @@ class NelderMeadGenerator(Generator):
 
 def _fake_partial_state_gen(sim: np.ndarray, fsim: np.ndarray):
     # active stage
-    astg = 0
     # internal simplex variables that will be saved/restored
     ind = fxr = xr = xbar = x = xe = xc = xcc = None
-    kend = jend = ngen = 0
+    jend = 0
     doshrink = 0
 
     assert sim.shape[0] == fsim.shape[0]
