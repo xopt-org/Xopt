@@ -416,7 +416,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
         0, description="The number of candidate solutions generated so far"
     )
     history_idx: List[List[int]] = Field(
-        default_factory=list,
+        default=[],
         description="Xopt indices of the individuals in each population",
     )
     generation_start_t: float = Field(
@@ -426,8 +426,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
     )
 
     # The population and returned children
-    pop: List[Dict] = Field(default_factory=list)
-    child: List[Dict] = Field(default_factory=list)
+    pop: List[Dict] = Field(default=[])
+    child: List[Dict] = Field(default=[])
 
     def model_post_init(self, context):
         # Get a unique logger per object

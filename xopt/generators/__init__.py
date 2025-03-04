@@ -1,7 +1,6 @@
-from pydantic_core import PydanticUndefined
-from typing import List
 import json
 import warnings
+from typing import List
 
 from ..errors import XoptError
 from .random import RandomGenerator
@@ -159,16 +158,13 @@ def get_generator_defaults(
         else:
             if v.default is None:
                 defaults[k] = None
-            elif v.default != PydanticUndefined:
+            else:
                 try:
                     # handles pydantic models as defaults
                     defaults[k] = json.loads(v.default.json())
                 except AttributeError:
                     # handles everything else
                     defaults[k] = v.default
-            # Handle fields with default factories
-            elif v.default_factory != PydanticUndefined:
-                defaults[k] = v.default_factory()
 
     return defaults
 
