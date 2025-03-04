@@ -121,11 +121,13 @@ class NelderMeadGenerator(Generator):
     x: Optional[np.ndarray] = None
     y: Optional[float] = None
     is_done_bool: bool = False
+    manual_data_cnt: int = Field(
+        0, description="How many points are considered manual/not part of simplex run"
+    )
 
     _initial_simplex = None
     _initial_point = None
     _saved_options: Dict = None
-    manual_data_cnt: int = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -187,9 +189,6 @@ class NelderMeadGenerator(Generator):
                     )
                 # This is a hack where simplex has not started and random data is being added
                 # remake initial simplex and initial point
-                # logger.debug(
-                #     f"Adding manual data to existing {self.data.shape[0]} points"
-                # )
                 variable_data = self.vocs.variable_data(self.data).to_numpy()
                 objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
 
@@ -200,7 +199,6 @@ class NelderMeadGenerator(Generator):
                     objective_data = objective_data[-(N + 1) :]
 
                 if _initial_simplex.shape[0] == N + 1:
-                    # logger.debug(f"Forcing new simplex with {N + 1} points")
                     # if we have enough, form new simplex and force state to just after it is all probed
                     fake_initialized_state = _fake_partial_state_gen(
                         _initial_simplex, objective_data
@@ -283,6 +281,7 @@ class NelderMeadGenerator(Generator):
         return [inputs]
 
     def _call_algorithm(self):
+        mins, maxs = self.vocs.bounds
         results = _neldermead_generator(
             x0=self.x0,
             state=self.current_state,
@@ -291,7 +290,7 @@ class NelderMeadGenerator(Generator):
             xatol=self.xatol,
             fatol=self.fatol,
             initial_simplex=self._initial_simplex,
-            bounds=self.vocs.bounds,
+            bounds=(mins, maxs),
         )
 
         self.y = None
