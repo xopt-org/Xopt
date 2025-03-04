@@ -8,6 +8,7 @@ from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
 from xopt.generator import Generator
+from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class RCDS:
         tol : float, optional
             Tolerance for convergence. Defaults to 1e-5.
         """
-        self.x0 = np.matrix(x0).T  # convert to a col vector
+        self.x0 = x0.reshape(-1,1)  # convert to a col vector
         self.Imat = init_mat
         self.noise = noise
         self.step = step
@@ -527,7 +528,7 @@ class RCDS:
         return obj, obj_raw
 
 
-class RCDSGenerator(Generator):
+class RCDSGenerator(SequentialGenerator):
     """
     RCDS algorithm.
 
@@ -565,38 +566,20 @@ class RCDSGenerator(Generator):
     """
 
     name = "rcds"
-    x0: Optional[list] = Field(None)
     init_mat: Optional[np.ndarray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
     step: PositiveFloat = Field(1e-2)
     tol: PositiveFloat = Field(1e-5)
 
-    _ub: np.ndarray = 0
-    _lb: np.ndarray = 0
     _rcds: RCDS = None
     _generator = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    def __init__(self, **kwargs):
-        """
-        Initialize the RCDSGenerator.
+    def _reset(self):
+        """reset the rcds object"""
 
-        Parameters
-        ----------
-        **kwargs : dict
-            Keyword arguments for the generator.
-        """
-        super().__init__(**kwargs)
-
-        bound_low, bound_up = self.vocs.bounds
-        self._ub = bound_up
-        self._lb = bound_low
-        x_ave = (bound_up + bound_low) / 2
-        if self.x0 is None:
-            x0 = x_ave
-        else:
-            x0 = self.x0
+        x0 = self._get_initial_point()
 
         self._rcds = RCDS(
             x0=x0,
@@ -607,65 +590,24 @@ class RCDSGenerator(Generator):
         )
         self._generator = self._rcds.powellmain()
 
-    def add_data(self, new_data: pd.DataFrame) -> None:
-        """
-        Add new data to the generator.
+    def _generate(self):
+        """ generate a new candidate """
+        # first update the rcds object from the last measurement
+        res = float(self.data.iloc[-1][self.vocs.objective_names].to_numpy())
+        self._rcds.update_obj(res)
 
-        Parameters
-        ----------
-        new_data : pd.DataFrame
-            New data to be added.
+        x_next = next(self._generator)
 
-        Raises
-        ------
-        AssertionError
-            If the length of new_data is not 1.
-        """
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
-
-        res = self.vocs.objective_data(new_data).to_numpy()
-        assert res.shape == (1, 1)
-        obj = res[0, 0]
-        self._rcds.update_obj(obj)
-
-    def generate(self, n_candidates: int) -> list[dict]:
-        """
-        Generate new candidates.
-
-        Parameters
-        ----------
-        n_candidates : int
-            Number of candidates to generate.
-
-        Returns
-        -------
-        list[dict]
-            List of generated candidates.
-
-        Raises
-        ------
-        NotImplementedError
-            If n_candidates is not 1.
-        """
-        if n_candidates != 1:
-            raise NotImplementedError("rcds can only produce one candidate at a time")
-
-        x_next = np.array(next(self._generator))  # note that x_next is a np.matrix!
+        bound_low, bound_up = self.vocs.bounds
+        _ub = bound_up
+        _lb = bound_low
 
         # Verify the candidate here
-        while np.any(x_next > self._ub) or np.any(x_next < self._lb):
+        while np.any(x_next > _ub) or np.any(x_next < _lb):
             self._rcds.update_obj(
                 np.nan
             )  # notify RCDS that the search reached the bound
-            x_next = np.array(next(self._generator))  # request next candidate
+            x_next = next(self._generator) # request next candidate
 
-        # Return the next value
-        try:
-            pd.DataFrame(dict(zip(self.vocs.variable_names, x_next)))
-        except Exception as e:
-            print(self.vocs.variable_names, x_next, type(x_next), x_next.shape)
-            raise e
-
+        x_next = [float(ele) for ele in x_next]
         return [dict(zip(self.vocs.variable_names, x_next))]
