@@ -3,7 +3,7 @@ import pytest
 from pydantic import ValidationError
 
 from xopt import Xopt
-from xopt.generators.rcds.rcds import RCDSGenerator
+from xopt.generators.sequential.rcds import RCDSGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
@@ -23,7 +23,7 @@ class TestRCDSGenerator:
         gen = RCDSGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError):
             gen.generate(2)
 
     def test_rcds_options(self):
@@ -40,7 +40,6 @@ class TestRCDSGenerator:
         max_evaluations: 100
         generator:
             name: rcds
-            x0: null
             init_mat: null
             noise: 0.00001
             step: 0.01
@@ -49,11 +48,20 @@ class TestRCDSGenerator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
         vocs:
             variables:
-                p0: [0, 1]
-                p1: [0, 1]
+                x1: [0, 1]
+                x2: [0, 1]
             objectives:
-                f: MINIMIZE
+                y1: MINIMIZE
         """
         X = Xopt.from_yaml(YAML)
-        gen = X.generator
-        gen.generate(1)
+        X.random_evaluate(1)
+
+        # test running multiple steps
+        for i in range(10):
+            X.step()
+
+        assert X.generator.is_active
+        assert X.generator._last_candidate is not None
+
+        X.generator.reset()
+        assert not X.generator.is_active
