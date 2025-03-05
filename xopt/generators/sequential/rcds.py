@@ -3,11 +3,9 @@ import math
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
-from xopt.generator import Generator
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 logger = logging.getLogger(__name__)
@@ -72,7 +70,7 @@ class RCDS:
         tol : float, optional
             Tolerance for convergence. Defaults to 1e-5.
         """
-        self.x0 = x0.reshape(-1,1)  # convert to a col vector
+        self.x0 = x0.reshape(-1, 1)  # convert to a col vector
         self.Imat = init_mat
         self.noise = noise
         self.step = step
@@ -579,7 +577,7 @@ class RCDSGenerator(SequentialGenerator):
     def _reset(self):
         """reset the rcds object"""
 
-        x0 = self._get_initial_point()
+        x0, f0 = self._get_initial_point()
 
         self._rcds = RCDS(
             x0=x0,
@@ -588,14 +586,18 @@ class RCDSGenerator(SequentialGenerator):
             step=self.step,
             tol=self.tol,
         )
+        self._rcds.update_obj(float(f0))
         self._generator = self._rcds.powellmain()
 
-    def _generate(self):
-        """ generate a new candidate """
+    def _add_data(self, new_data):
         # first update the rcds object from the last measurement
-        res = float(self.data.iloc[-1][self.vocs.objective_names].to_numpy())
-        self._rcds.update_obj(res)
+        res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
 
+        if self._rcds is not None:
+            self._rcds.update_obj(res)
+
+    def _generate(self):
+        """generate a new candidate"""
         x_next = next(self._generator)
 
         bound_low, bound_up = self.vocs.bounds
@@ -607,7 +609,7 @@ class RCDSGenerator(SequentialGenerator):
             self._rcds.update_obj(
                 np.nan
             )  # notify RCDS that the search reached the bound
-            x_next = next(self._generator) # request next candidate
+            x_next = next(self._generator)  # request next candidate
 
         x_next = [float(ele) for ele in x_next]
         return [dict(zip(self.vocs.variable_names, x_next))]
