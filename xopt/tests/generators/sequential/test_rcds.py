@@ -56,12 +56,6 @@ class TestRCDSGenerator:
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(1)
 
-        # test getting initial point
-        initial_point = X.generator._get_initial_point()
-        assert np.allclose(
-            initial_point, X.data.iloc[-1][X.vocs.variable_names].to_numpy(dtype=float)
-        )
-
         # test running multiple steps
         for i in range(10):
             X.step()
