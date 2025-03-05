@@ -1,3 +1,3 @@
-from xopt.generators.rcds.rcds import RCDSGenerator
+from xopt.generators.sequential.rcds import RCDSGenerator
 
 __all__ = ["RCDSGenerator"]

@@ -1,16 +1,13 @@
-import logging
 from typing import List, Dict
 
 import numpy as np
 import pandas as pd
 from pydantic import Field, PositiveFloat
 
-from xopt.generator import Generator
-
-logger = logging.getLogger(__name__)
+from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 
-class ExtremumSeekingGenerator(Generator):
+class ExtremumSeekingGenerator(SequentialGenerator):
     """
     Extremum seeking algorithm.
 
@@ -95,29 +92,16 @@ class ExtremumSeekingGenerator(Generator):
         self._p_ave = (bound_up + bound_low) / 2
         self._p_diff = bound_up - bound_low
 
-    def add_data(self, new_data: pd.DataFrame):
-        """
-        Add new data to the generator.
+    def _reset(self):
+        self._i = 0
+        self._last_input = self.vocs.variable_data(self.data).to_numpy()[-1]
+        self._last_outcome = self.vocs.objective_data(self.data).to_numpy()[-1, 0]
 
-        Parameters:
-        -----------
-        new_data : pd.DataFrame
-            The new data to be added.
-
-        Raises:
-        -------
-        AssertionError
-            If the length of new_data is not 1.
-        """
-        assert (
-            len(new_data) <= 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
-
+    def _add_data(self, new_data: pd.DataFrame):
         self.data = new_data.iloc[-1:]
         self._last_input = self.data[self.vocs.variable_names].to_numpy()[0]
 
         res = self.vocs.objective_data(new_data).to_numpy()
-        assert res.shape == (1, 1)
         self._last_outcome = res[0, 0]
 
         self._i += 1
@@ -156,7 +140,7 @@ class ExtremumSeekingGenerator(Generator):
         p_un_norm = p * self._p_diff / 2.0 + self._p_ave
         return p_un_norm
 
-    def generate(self, n_candidates: int) -> List[Dict[str, float]]:
+    def _generate(self) -> List[Dict[str, float]]:
         """
         Generate a specified number of candidate samples.
 
@@ -175,14 +159,6 @@ class ExtremumSeekingGenerator(Generator):
         NotImplementedError
             If n_candidates is not 1.
         """
-        if n_candidates != 1:
-            raise NotImplementedError(
-                "extremum seeking can only produce one candidate at a time"
-            )
-
-        # Initial data point
-        if self.data is None:
-            return [dict(zip(self.vocs.variable_names, self._p_ave.reshape(-1, 1)))]
 
         p_n = self.p_normalize(self._last_input)
 
@@ -214,4 +190,5 @@ class ExtremumSeekingGenerator(Generator):
         self._amplitude *= self.decay_rate  # decay the osc amplitude
 
         # Return the next value
-        return [dict(zip(self.vocs.variable_names, p_next.reshape(-1, 1)))]
+        p_next = [float(ele) for ele in p_next]
+        return [dict(zip(self.vocs.variable_names, p_next))]
