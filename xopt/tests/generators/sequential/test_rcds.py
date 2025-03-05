@@ -58,7 +58,9 @@ class TestRCDSGenerator:
 
         # test getting initial point
         initial_point = X.generator._get_initial_point()
-        assert np.allclose(initial_point, X.data.iloc[-1][X.vocs.variable_names].to_numpy(dtype=float))
+        assert np.allclose(
+            initial_point, X.data.iloc[-1][X.vocs.variable_names].to_numpy(dtype=float)
+        )
 
         # test running multiple steps
         for i in range(10):
@@ -69,5 +71,3 @@ class TestRCDSGenerator:
 
         X.generator.reset()
         assert not X.generator.is_active
-
-        
