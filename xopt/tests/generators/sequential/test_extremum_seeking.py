@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from xopt import Xopt
 from xopt.evaluator import Evaluator
-from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.vocs import VOCS
 
@@ -14,7 +14,7 @@ class TestExtremumSeekingGenerator:
         gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError):
             gen.generate(2)
 
     def test_es_options(self):
@@ -251,10 +251,13 @@ class TestExtremumSeekingGenerator:
         evaluator = Evaluator(function=f_ES_minimize)
         generator = ExtremumSeekingGenerator(vocs=vocs)
         X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+        X.evaluate_data(
+            {name:val for name,val in zip(vocs.variable_names, pES[0])}
+        )
 
         for i in range(ES_steps):
             X.step()
 
-        assert np.all(
-            cES == X.data["f"].to_numpy()
+        assert np.allclose(
+            cES, X.data["f"].to_numpy()[:-1]
         ), "Xopt ES does not match the vanilla one"

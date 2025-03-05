@@ -110,7 +110,7 @@ def get_generator_dynamic(name: str):
         except ModuleNotFoundError:
             warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
     elif name in all_generator_names["es"]:
-        from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+        from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 
         generators[name] = ExtremumSeekingGenerator
         return ExtremumSeekingGenerator
