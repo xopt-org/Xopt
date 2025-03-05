@@ -251,13 +251,11 @@ class TestExtremumSeekingGenerator:
         evaluator = Evaluator(function=f_ES_minimize)
         generator = ExtremumSeekingGenerator(vocs=vocs)
         X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
-        X.evaluate_data(
-            {name:val for name,val in zip(vocs.variable_names, pES[0])}
-        )
+        X.evaluate_data({name: val for name, val in zip(vocs.variable_names, pES[0])})
 
         for i in range(ES_steps):
             X.step()
 
-        assert np.allclose(
-            cES, X.data["f"].to_numpy()[:-1]
-        ), "Xopt ES does not match the vanilla one"
+        assert np.allclose(cES, X.data["f"].to_numpy()[:-1]), (
+            "Xopt ES does not match the vanilla one"
+        )

@@ -4,6 +4,7 @@ import numpy as np
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.vocs import VOCS
 
+
 class TestSequentialGenerator(SequentialGenerator):
     def _add_data(self, new_data: pd.DataFrame):
         pass
@@ -14,6 +15,7 @@ class TestSequentialGenerator(SequentialGenerator):
     def _reset(self):
         pass
 
+
 @pytest.fixture
 def sample_vocs():
     return VOCS(
@@ -21,16 +23,16 @@ def sample_vocs():
         constraints={},
         objectives={"y1": "MINIMIZE"},
         constants={},
-        observables=[]
+        observables=[],
     )
+
 
 @pytest.fixture
 def sample_data():
-    return pd.DataFrame({
-        "x1": [0.1, 0.2, 0.3],
-        "x2": [0.4, 0.5, 0.6],
-        "y1": [1.0, 0.8, 0.6]
-    })
+    return pd.DataFrame(
+        {"x1": [0.1, 0.2, 0.3], "x2": [0.4, 0.5, 0.6], "y1": [1.0, 0.8, 0.6]}
+    )
+
 
 def test_add_data(sample_vocs, sample_data):
     gen = TestSequentialGenerator(vocs=sample_vocs)
@@ -42,6 +44,7 @@ def test_add_data(sample_vocs, sample_data):
     with pytest.raises(ValueError):
         gen.add_data(sample_data)
 
+
 def test_generate(sample_vocs):
     gen = TestSequentialGenerator(vocs=sample_vocs)
     candidate = gen.generate()
@@ -51,6 +54,7 @@ def test_generate(sample_vocs):
     with pytest.raises(ValueError):
         gen.generate(n_candidates=2)
 
+
 def test_reset(sample_vocs):
     gen = TestSequentialGenerator(vocs=sample_vocs)
     gen.is_active = True
@@ -58,6 +62,7 @@ def test_reset(sample_vocs):
     gen.reset()
     assert not gen.is_active
     assert gen._last_candidate is None
+
 
 def test_get_initial_point(sample_vocs, sample_data):
     gen = TestSequentialGenerator(vocs=sample_vocs)
