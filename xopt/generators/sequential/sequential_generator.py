@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 import numpy as np
 from xopt.generator import Generator
 import pandas as pd
@@ -14,7 +14,7 @@ class SequentialGenerator(Generator):
     """
 
     is_active: bool = False
-    _last_candidate: dict = None
+    _last_candidate: Optional[dict] = None
 
     def add_data(self, new_data: pd.DataFrame):
         """
@@ -50,7 +50,7 @@ class SequentialGenerator(Generator):
         # update internal state of the generator
         self._add_data(new_data)
 
-        super().add_data(new_data)
+        #super().add_data(new_data)
 
     def _add_data(self, new_data: pd.DataFrame):
         """
