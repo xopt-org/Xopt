@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
 
-from xopt.generator import Generator
+from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ STATE_KEYS = [
 ]
 
 
-class NelderMeadGenerator(Generator):
+class NelderMeadGenerator(SequentialGenerator):
     """
     Nelder-Mead algorithm from SciPy in Xopt's Generator form.
     Converted to use a state machine to resume in exactly the last state.
@@ -159,7 +159,7 @@ class NelderMeadGenerator(Generator):
     def is_done(self) -> bool:
         return self.is_done_bool
 
-    def add_data(self, new_data: pd.DataFrame):
+    def _add_data(self, new_data: pd.DataFrame):
         """
         Add new data to the generator.
 
@@ -174,48 +174,40 @@ class NelderMeadGenerator(Generator):
             return
 
         self.data = pd.concat([self.data, new_data], axis=0)
-
-        # Complicated part - need to determine if data corresponds to result of last gen
         ndata = len(self.data)
         ngen = self.current_state.ngen
-        if ndata - self.manual_data_cnt == ngen:
-            # just resuming
+
+        # Complicated part - need to determine if data corresponds to result of last gen
+        if not self.is_active:
+            assert self.future_state is None, "Not active, but future state exists"
+
+            variable_data = self.vocs.variable_data(self.data).to_numpy()
+            objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
+
+            _initial_simplex = variable_data.copy()
+            N = self.vocs.n_variables
+            if _initial_simplex.shape[0] > N + 1:
+                _initial_simplex = _initial_simplex[-(N + 1) :, :]
+                objective_data = objective_data[-(N + 1) :]
+
+            if _initial_simplex.shape[0] == N + 1:
+                # if we have enough, form new simplex and force state to just after it is all probed
+                fake_initialized_state = _fake_partial_state_gen(
+                    _initial_simplex, objective_data
+                )
+                self.current_state = fake_initialized_state
+                self._initial_simplex = _initial_simplex
+                self.manual_data_cnt = len(self.data) - (N + 1)
+            else:
+                # otherwise, just set the last point as the initial point - effectively loses output data
+                self.current_state = SimplexState()
+                self._initial_simplex = None
+                self.manual_data_cnt = len(self.data)
+
+            self._initial_point = _initial_simplex[-1, :]
+            self.y = float(objective_data[-1])
             return
         else:
-            if self.future_state is None:
-                if self.current_state.astg != -1:
-                    warnings.warn(
-                        "Forced point added while simplex is running - this is strongly discouraged"
-                    )
-                # This section is a hack for when random data is being added
-                # remake initial simplex and initial point
-                variable_data = self.vocs.variable_data(self.data).to_numpy()
-                objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
-
-                _initial_simplex = variable_data.copy()
-                N = self.vocs.n_variables
-                if _initial_simplex.shape[0] > N + 1:
-                    _initial_simplex = _initial_simplex[-(N + 1) :, :]
-                    objective_data = objective_data[-(N + 1) :]
-
-                if _initial_simplex.shape[0] == N + 1:
-                    # if we have enough, form new simplex and force state to just after it is all probed
-                    fake_initialized_state = _fake_partial_state_gen(
-                        _initial_simplex, objective_data
-                    )
-                    self.current_state = fake_initialized_state
-                    self._initial_simplex = _initial_simplex
-                    self.manual_data_cnt = len(self.data) - (N + 1)
-                else:
-                    # otherwise, just set the last point as the initial point - effectively loses output data
-                    self.current_state = SimplexState()
-                    self._initial_simplex = None
-                    self.manual_data_cnt = len(self.data)
-
-                self._initial_point = _initial_simplex[-1, :]
-                self.y = float(objective_data[-1])
-                return
-
             # new data -> advance state machine 1 step
             assert ndata - self.manual_data_cnt == self.future_state.ngen
             assert ndata - self.manual_data_cnt == ngen + 1
@@ -234,7 +226,17 @@ class NelderMeadGenerator(Generator):
 
             self.y = yt
 
-    def generate(self, n_candidates: int) -> Optional[List[Dict[str, float]]]:
+    def _reset(self):
+        self.current_state = SimplexState()
+        self.future_state = None
+        if self.initial_simplex:
+            self._initial_simplex = np.array(
+                [self.initial_simplex[k] for k in self.vocs.variable_names]
+            ).T
+        else:
+            self._initial_simplex = None
+
+    def _generate(self) -> Optional[List[Dict[str, float]]]:
         """
         Generate a specified number of candidate samples.
 
@@ -250,11 +252,6 @@ class NelderMeadGenerator(Generator):
         """
         if self.is_done:
             return None
-
-        if n_candidates != 1:
-            raise NotImplementedError(
-                "simplex can only produce one candidate at a time"
-            )
 
         if self.current_state.N is None:
             # fresh start
