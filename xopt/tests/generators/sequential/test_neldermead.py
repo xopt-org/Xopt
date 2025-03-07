@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from scipy.optimize import minimize
 
 from xopt import Xopt
-from xopt.generators.scipy.neldermead import NelderMeadGenerator
+from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
@@ -35,11 +35,10 @@ class TestNelderMeadGenerator:
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError):
             gen.generate(2)
 
-    def test_simplex_forced_random_init(self):
-        # Xopt Simplex
+    def test_simplex_forced_init(self):
         YAML = """
         generator:
             name: neldermead
@@ -57,7 +56,11 @@ class TestNelderMeadGenerator:
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(1)
+        assert not X.generator.is_active
+        assert X.generator._last_candidate is None
         X.step()
+        assert X.generator.is_active
+        assert X.generator._last_candidate is not None
         assert X.generator._initial_simplex is None
         X.step()
         state = X.json()
