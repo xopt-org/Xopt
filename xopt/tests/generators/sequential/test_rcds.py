@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from xopt import VOCS, Xopt
+from xopt import Evaluator, VOCS, Xopt
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.rcds import RCDSGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
@@ -18,6 +18,13 @@ def f_RCDS_minimize(input_dict):
 
     return outcome_dict
 
+
+def eval_f_linear_pos(x):
+    return {"y1": np.sum([x**2 for x in x.values()])}
+
+
+def eval_f_linear_neg(x):
+    return {"y1": -np.sum([x**2 for x in x.values()])}
 
 class TestRCDSGenerator:
     def test_rcds_generate_multiple_points(self):
@@ -67,28 +74,28 @@ class TestRCDSGenerator:
         X.generator.reset()
         assert not X.generator.is_active
 
-    def test_rcds_convergence(self):
-        def eval_f(x):
-            return {"y1": np.sum([x**2 for x in x.values()])}
-
+    @pytest.mark.parametrize(
+        "fun, obj", [(eval_f_linear_pos, "MINIMIZE"), (eval_f_linear_neg, "MAXIMIZE")]
+    )
+    def test_rcds_convergence(self, fun, obj):
         variables = {f"x{i}": [-5, 5] for i in range(10)}
-        objectives = {"y1": "MINIMIZE"}
+        objectives = {"y1": obj}
         vocs = VOCS(variables=variables, objectives=objectives)
+        generator = RCDSGenerator(tol=0.00001, step=0.01, noise=0.00001, vocs=vocs)
+        evaluator = Evaluator(function=fun)
+        X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
 
-        config = {
-            "generator": {
-                "name": "rcds",
-            },
-            "evaluator": {"function": eval_f},
-            "vocs": vocs,
-        }
-        X = Xopt.from_dict(config)
         X.random_evaluate(1)
-        for i in range(1000):
+        for i in range(3000):
             X.step()
-        print(X.data["y1"])
 
         idx, best, _ = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert best[0] >= 0.0
-        assert best[0] <= 0.001
+        if obj == "MINIMIZE":
+            assert best[0] >= 0.0
+            assert best[0] <= 0.001
+        else:
+            assert best[0] <= 0.0
+            assert best[0] >= -0.001
+        assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-3)
+
