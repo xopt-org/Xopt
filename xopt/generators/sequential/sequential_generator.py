@@ -50,6 +50,12 @@ class SequentialGenerator(Generator):
                     "Call reset() to reset the generator."
                 )
 
+        # do not call super, this will likely need to be customized for some generators
+        if self.data is not None:
+            self.data = pd.concat([self.data, new_data], axis=0)
+        else:
+            self.data = new_data
+
         # update internal state of the generator
         self._add_data(new_data)
 
@@ -119,9 +125,8 @@ class SequentialGenerator(Generator):
 
         # if the generator is not active, we need to start it
         if not self.is_active:
-            # self.reset()
-            self.is_active = True
             candidate = self._generate(True)
+            self.is_active = True
         else:
             candidate = self._generate()
 
@@ -167,7 +172,7 @@ class SequentialGenerator(Generator):
         """
         raise NotImplementedError("Sequential generators must implement _reset method.")
 
-    def _get_initial_point(self) -> Tuple[np.ndarray]:
+    def _get_initial_point(self) -> Tuple[np.ndarray, np.ndarray]:
         """
         Get the initial x0, f0 value from data.
 
@@ -188,6 +193,6 @@ class SequentialGenerator(Generator):
             raise ValueError(
                 f"At least one point is required to start {self.__class__.__name__}, add data manually or via Xopt.random_evaluate() or Xopt.evaluate_data()"
             )
-        return self.data.iloc[-1][self.vocs.variable_names].to_numpy(
-            dtype=float
-        ), self.data.iloc[-1][self.vocs.objective_names].to_numpy(dtype=float)
+        x0 = self.data.iloc[-1][self.vocs.variable_names].to_numpy(dtype=float)
+        f0 = self.data.iloc[-1][self.vocs.objective_names].to_numpy(dtype=float)
+        return x0, f0

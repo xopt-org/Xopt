@@ -196,7 +196,7 @@ class RCDS:
                         % (k, max(dotp))
                     )
 
-            logger.debug("g count is ", self.cnt)
+            logger.debug("g count is %d", self.cnt)
 
             if 2.0 * abs(f0 - fm) < tol * (abs(f0) + abs(fm)) and tol > 0:
                 logger.debug(
@@ -560,8 +560,6 @@ class RCDSGenerator(SequentialGenerator):
         Instance of the RCDS algorithm.
     _generator : generator
         Generator for the RCDS algorithm.
-    model_config : ConfigDict
-        Configuration dictionary for the model.
     """
 
     name = "rcds"
@@ -599,6 +597,9 @@ class RCDSGenerator(SequentialGenerator):
 
     def _generate(self, first_gen: bool = False):
         """generate a new candidate"""
+        if first_gen:
+            self.reset()
+
         x_next = next(self._generator)
 
         bound_low, bound_up = self.vocs.bounds
