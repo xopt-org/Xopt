@@ -31,6 +31,14 @@ def compare(X, X2):
     pd.testing.assert_frame_equal(data, data2, check_index_type=False)
 
 
+def eval_f_linear_pos(x):
+    return {"y1": np.sum([x**2 for x in x.values()])}
+
+
+def eval_f_linear_neg(x):
+    return {"y1": -np.sum([x**2 for x in x.values()])}
+
+
 class TestNelderMeadGenerator:
     def test_simplex_generate_multiple_points(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
@@ -179,12 +187,12 @@ class TestNelderMeadGenerator:
             "Xopt Simplex does not match the vanilla one"
         )
 
-    def test_simplex_convergence(self):
-        def eval_f(x):
-            return {"y1": np.sum([x**2 for x in x.values()])}
-
+    @pytest.mark.parametrize(
+        "fun, obj", [(eval_f_linear_pos, "MINIMIZE"), (eval_f_linear_neg, "MAXIMIZE")]
+    )
+    def test_simplex_convergence(self, fun, obj):
         variables = {f"x{i}": [-5, 5] for i in range(10)}
-        objectives = {"y1": "MINIMIZE"}
+        objectives = {"y1": obj}
         vocs = VOCS(variables=variables, objectives=objectives)
 
         config = {
@@ -192,7 +200,7 @@ class TestNelderMeadGenerator:
                 "name": "neldermead",
                 "initial_point": {f"x{i}": 3.5 for i in range(len(variables))},
             },
-            "evaluator": {"function": eval_f},
+            "evaluator": {"function": fun},
             "vocs": vocs,
         }
         X = Xopt.from_dict(config)
@@ -201,8 +209,13 @@ class TestNelderMeadGenerator:
 
         idx, best, _ = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert best[0] >= 0.0
-        assert best[0] <= 0.001
+        assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-4)
+        if obj == "MINIMIZE":
+            assert best[0] >= 0.0
+            assert best[0] <= 0.001
+        else:
+            assert best[0] <= 0.0
+            assert best[0] >= -0.001
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v",
