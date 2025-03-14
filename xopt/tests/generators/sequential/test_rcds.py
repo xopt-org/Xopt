@@ -75,9 +75,7 @@ class TestRCDSGenerator:
         X.generator.reset()
         assert not X.generator.is_active
 
-    @pytest.mark.parametrize(
-        "fun, obj", [(eval_f_linear_pos, "MINIMIZE")]
-    )
+    @pytest.mark.parametrize("fun, obj", [(eval_f_linear_pos, "MINIMIZE")])
     def test_rcds_convergence(self, fun, obj):
         variables = {f"x{i}": [-5, 5] for i in range(10)}
         objectives = {"y1": obj}

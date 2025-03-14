@@ -364,16 +364,13 @@ class Xopt(XoptBaseModel):
         # Set internal dataframe.
         if self.data is not None:
             new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
-            new_data.index = np.arange(
-                len(self.data), len(self.data) + len(new_data)
-            )
+            new_data.index = np.arange(len(self.data), len(self.data) + len(new_data))
             self.data = pd.concat([self.data, new_data], axis=0)
         else:
             if new_data.index.dtype != np.int64:
                 new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
         self.generator.add_data(new_data)
-
 
     def reset_data(self):
         """
