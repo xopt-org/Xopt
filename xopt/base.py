@@ -18,6 +18,7 @@ from pydantic import (
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator
 from xopt.generators import get_generator
+from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
@@ -169,7 +170,12 @@ class Xopt(XoptBaseModel):
                 raise ValueError("dataframe index must be integer")
         # also add data to generator
         # TODO: find a more robust way of doing this
-        info.data["generator"].add_data(v)
+        generator = info.data["generator"]
+        if not isinstance(generator, SequentialGenerator):
+            # sequential generators must maintain their own state
+            generator.add_data(v)
+        else:
+            generator.set_data(v)
 
         return v
 
@@ -355,17 +361,23 @@ class Xopt(XoptBaseModel):
         """
         logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
 
-        # Set internal dataframe.
-        if self.data is not None:
-            new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
-            new_data.index = np.arange(len(self.data), len(self.data) + len(new_data))
-
-            self.data = pd.concat([self.data, new_data], axis=0)
-        else:
-            if new_data.index.dtype != np.int64:
-                new_data.index = new_data.index.astype(np.int64)
-            self.data = new_data
-        self.generator.add_data(new_data)
+        old_data = self.data  # reference, not copy, since will copy below
+        try:
+            # Set internal dataframe.
+            if self.data is not None:
+                new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
+                new_data.index = np.arange(
+                    len(self.data), len(self.data) + len(new_data)
+                )
+                self.data = pd.concat([self.data, new_data], axis=0)
+            else:
+                if new_data.index.dtype != np.int64:
+                    new_data.index = new_data.index.astype(np.int64)
+                self.data = new_data
+            self.generator.add_data(new_data)
+        except:
+            self.data = old_data
+            raise
 
     def reset_data(self):
         """

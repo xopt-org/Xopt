@@ -6,8 +6,9 @@ import pytest
 from pydantic import ValidationError
 from scipy.optimize import minimize
 
-from xopt import Xopt
-from xopt.generators.scipy.neldermead import NelderMeadGenerator
+from xopt import VOCS, Xopt
+from xopt.errors import SeqGeneratorError
+from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
@@ -30,13 +31,104 @@ def compare(X, X2):
     pd.testing.assert_frame_equal(data, data2, check_index_type=False)
 
 
+def eval_f_linear_pos(x):
+    return {"y1": np.sum([x**2 for x in x.values()])}
+
+
+def eval_f_linear_neg(x):
+    return {"y1": -np.sum([x**2 for x in x.values()])}
+
+
 class TestNelderMeadGenerator:
     def test_simplex_generate_multiple_points(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(SeqGeneratorError):
             gen.generate(2)
+
+    def test_simplex_forced_init(self):
+        YAML = """
+        generator:
+            name: neldermead
+            initial_point: {x0: -1, x1: -1}
+            adaptive: true
+            xatol: 0.0001
+            fatol: 0.0001
+        evaluator:
+            function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
+        vocs:
+            variables:
+                x0: [-5, 5]
+                x1: [-5, 5]
+            objectives: {y: MINIMIZE}
+        """
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(1)
+        assert not X.generator.is_active
+        assert X.generator._last_candidate is None
+        X.step()
+        assert X.generator.is_active
+        assert X.generator._last_candidate is not None
+        assert X.generator._initial_simplex is None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        assert X.generator._initial_simplex is not None
+        X.step()
+        assert X.generator._initial_simplex is not None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(4)
+        X.step()
+        assert X.generator._initial_simplex is not None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.step()
+        # print(X.generator.data, X.generator.current_state.ngen)
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == 0
+
+        with pytest.raises(SeqGeneratorError):
+            X.random_evaluate(1)
+        # assert X.generator._initial_simplex is None
+        # assert X.generator.current_state.astg == -1
+        X.step()
+        # print(X.generator.data, X.generator.current_state.ngen)
+        X.step()
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == 0
+        state = X.json()
+        # print(X.generator.data, X.generator.current_state.ngen)
+        X2 = Xopt.model_validate(json.loads(state))
+        # print(X2.generator.data, X.generator.current_state.ngen)
+        X2.step()
+
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        X.step()
+        assert X.generator._initial_simplex is not None
+        assert X.generator.current_state.astg == 0
+        X.step()
+        assert X.generator.current_state.astg > 0
+        with pytest.raises(SeqGeneratorError):
+            X.random_evaluate(1)
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
 
     def test_simplex_options(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
@@ -94,6 +186,36 @@ class TestNelderMeadGenerator:
         assert xbest["x0"] == result[0] and xbest["x1"] == result[1], (
             "Xopt Simplex does not match the vanilla one"
         )
+
+    @pytest.mark.parametrize(
+        "fun, obj", [(eval_f_linear_pos, "MINIMIZE"), (eval_f_linear_neg, "MAXIMIZE")]
+    )
+    def test_simplex_convergence(self, fun, obj):
+        variables = {f"x{i}": [-5, 5] for i in range(10)}
+        objectives = {"y1": obj}
+        vocs = VOCS(variables=variables, objectives=objectives)
+
+        config = {
+            "generator": {
+                "name": "neldermead",
+                "initial_point": {f"x{i}": 3.5 for i in range(len(variables))},
+            },
+            "evaluator": {"function": fun},
+            "vocs": vocs,
+        }
+        X = Xopt.from_dict(config)
+        for i in range(1000):
+            X.step()
+
+        idx, best, _ = X.vocs.select_best(X.data)
+        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-4)
+        if obj == "MINIMIZE":
+            assert best[0] >= 0.0
+            assert best[0] <= 0.001
+        else:
+            assert best[0] <= 0.0
+            assert best[0] >= -0.001
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v",
@@ -192,6 +314,8 @@ class TestNelderMeadGenerator:
 
                 state = X.json()
                 X3 = Xopt.model_validate(json.loads(state))
+                # TODO: maybe store in dump?
+                X3.generator._last_candidate = X2.generator._last_candidate
                 compare(X, X3)
 
                 X.evaluate_data(samples)
