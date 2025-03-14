@@ -3,6 +3,7 @@ import math
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
@@ -589,14 +590,14 @@ class RCDSGenerator(SequentialGenerator):
         self._rcds.update_obj(float(f0))
         self._generator = self._rcds.powellmain()
 
-    def _add_data(self, new_data):
+    def _add_data(self, new_data: pd.DataFrame):
         # first update the rcds object from the last measurement
         res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
 
         if self._rcds is not None:
             self._rcds.update_obj(res)
 
-    def _generate(self):
+    def _generate(self, first_gen: bool = False):
         """generate a new candidate"""
         x_next = next(self._generator)
 
