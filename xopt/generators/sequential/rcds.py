@@ -3,6 +3,7 @@ import math
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
@@ -195,7 +196,7 @@ class RCDS:
                         % (k, max(dotp))
                     )
 
-            logger.debug("g count is ", self.cnt)
+            logger.debug("g count is %d", self.cnt)
 
             if 2.0 * abs(f0 - fm) < tol * (abs(f0) + abs(fm)) and tol > 0:
                 logger.debug(
@@ -559,8 +560,6 @@ class RCDSGenerator(SequentialGenerator):
         Instance of the RCDS algorithm.
     _generator : generator
         Generator for the RCDS algorithm.
-    model_config : ConfigDict
-        Configuration dictionary for the model.
     """
 
     name = "rcds"
@@ -589,15 +588,18 @@ class RCDSGenerator(SequentialGenerator):
         self._rcds.update_obj(float(f0))
         self._generator = self._rcds.powellmain()
 
-    def _add_data(self, new_data):
+    def _add_data(self, new_data: pd.DataFrame):
         # first update the rcds object from the last measurement
         res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
 
         if self._rcds is not None:
             self._rcds.update_obj(res)
 
-    def _generate(self):
+    def _generate(self, first_gen: bool = False):
         """generate a new candidate"""
+        if first_gen:
+            self.reset()
+
         x_next = next(self._generator)
 
         bound_low, bound_up = self.vocs.bounds
