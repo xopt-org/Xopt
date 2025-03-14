@@ -480,6 +480,70 @@ class VOCS(XoptBaseModel):
 
         return pd.DataFrame(inputs)
 
+    def simplex_inputs(
+        self,
+        x0: np.ndarray,
+        custom_bounds: dict = None,
+        nonzdelt: float = 0.05,
+        zdelt: float = 0.00025,
+    ) -> np.ndarray:
+        assert x0.ndim == 1, "Expected 1D array"
+        assert len(x0) == self.n_variables, (
+            f"Expected {self.n_variables} dimensions, got {len(x0)}"
+        )
+        if custom_bounds is None:
+            bounds = self.variables
+        else:
+            variable_bounds = pd.DataFrame(self.variables)
+
+            if not isinstance(custom_bounds, dict):
+                raise TypeError("`custom_bounds` must be a dict")
+
+            try:
+                validate_variable_bounds(custom_bounds)
+            except ValueError:
+                raise ValueError("specified `custom_bounds` not valid")
+
+            old_custom_bounds = deepcopy(custom_bounds)
+
+            custom_bounds = pd.DataFrame(custom_bounds)
+            custom_bounds = custom_bounds.clip(
+                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
+            )
+            bounds = custom_bounds.to_dict()
+
+            for name, value in bounds.items():
+                if value[0] == value[1]:
+                    raise ValueError(
+                        f"specified `custom_bounds` for {name} is outside vocs domain"
+                    )
+
+            if bounds != old_custom_bounds:
+                warnings.warn(
+                    "custom bounds were clipped by vocs bounds", RuntimeWarning
+                )
+
+            for k in bounds.keys():
+                bounds[k] = [bounds[k][i] for i in range(2)]
+
+        lower_bound, upper_bound = bounds
+
+        N = len(x0)
+        sim = np.empty((N + 1, N), dtype=x0.dtype)
+        sim[0] = x0
+        for k in range(N):
+            y = np.array(x0, copy=True)
+            if y[k] != 0:
+                y[k] = (1 + nonzdelt) * y[k]
+            else:
+                y[k] = zdelt
+            sim[k + 1] = y
+
+        if bounds is not None:
+            sim = np.clip(sim, lower_bound, upper_bound)
+
+        return sim
+
     def convert_dataframe_to_inputs(
         self, data: pd.DataFrame, include_constants: bool = True
     ) -> pd.DataFrame:

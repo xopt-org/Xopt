@@ -106,6 +106,10 @@ class ExtremumSeekingGenerator(SequentialGenerator):
 
         self._i += 1
 
+    def _set_data(self, data: pd.DataFrame):
+        self.data = data.iloc[-1:]
+        # TODO: add proper reload tests
+
     def p_normalize(self, p: np.ndarray) -> np.ndarray:
         """
         Normalize parameters.
@@ -140,25 +144,17 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         p_un_norm = p * self._p_diff / 2.0 + self._p_ave
         return p_un_norm
 
-    def _generate(self) -> List[Dict[str, float]]:
+    def _generate(self, first_gen: bool = False) -> List[Dict[str, float]]:
         """
-        Generate a specified number of candidate samples.
-
-        Parameters:
-        -----------
-        n_candidates : int
-            The number of candidate samples to generate.
+        Generate next candidate.
 
         Returns:
         --------
         List[Dict[str, float]]
             A list of dictionaries containing the generated samples.
-
-        Raises:
-        -------
-        NotImplementedError
-            If n_candidates is not 1.
         """
+        if first_gen:
+            self.reset()
 
         p_n = self.p_normalize(self._last_input)
 

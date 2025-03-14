@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from scipy.optimize import minimize
 
 from xopt import Xopt
+from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
@@ -35,7 +36,7 @@ class TestNelderMeadGenerator:
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
-        with pytest.raises(ValueError):
+        with pytest.raises(SeqGeneratorError):
             gen.generate(2)
 
     def test_simplex_forced_init(self):
@@ -69,6 +70,7 @@ class TestNelderMeadGenerator:
 
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
+        assert X.generator._initial_simplex is not None
         X.step()
         assert X.generator._initial_simplex is not None
         X.step()
@@ -87,30 +89,35 @@ class TestNelderMeadGenerator:
 
         X = Xopt.from_yaml(YAML)
         X.step()
+        # print(X.generator.data, X.generator.current_state.ngen)
         assert X.generator._initial_simplex is None
         assert X.generator.current_state.astg == 0
-        # this will reset state and warn
-        with pytest.warns(UserWarning):
+
+        with pytest.raises(SeqGeneratorError):
             X.random_evaluate(1)
-        assert X.generator._initial_simplex is None
-        assert X.generator.current_state.astg == -1
+        # assert X.generator._initial_simplex is None
+        # assert X.generator.current_state.astg == -1
         X.step()
+        # print(X.generator.data, X.generator.current_state.ngen)
+        X.step()
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == 0
         state = X.json()
+        # print(X.generator.data, X.generator.current_state.ngen)
         X2 = Xopt.model_validate(json.loads(state))
+        # print(X2.generator.data, X.generator.current_state.ngen)
         X2.step()
 
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
         assert X.generator._initial_simplex is not None
+        assert X.generator.current_state.astg == 0
         X.step()
         assert X.generator.current_state.astg > 0
-        with pytest.warns(UserWarning):
+        with pytest.raises(SeqGeneratorError):
             X.random_evaluate(1)
-        assert X.generator._initial_simplex is not None
-        assert X.generator.current_state.astg == -1
         X.step()
-        assert X.generator.current_state.astg == 0
         state = X.json()
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
@@ -269,6 +276,8 @@ class TestNelderMeadGenerator:
 
                 state = X.json()
                 X3 = Xopt.model_validate(json.loads(state))
+                # TODO: maybe store in dump?
+                X3.generator._last_candidate = X2.generator._last_candidate
                 compare(X, X3)
 
                 X.evaluate_data(samples)

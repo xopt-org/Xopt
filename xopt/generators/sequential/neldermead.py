@@ -173,25 +173,29 @@ class NelderMeadGenerator(SequentialGenerator):
             assert self.future_state is None
             return
 
-        self.data = pd.concat([self.data, new_data], axis=0)
+        if self.data is not None:
+            self.data = pd.concat([self.data, new_data], axis=0)
+        else:
+            self.data = new_data
+
         ndata = len(self.data)
         ngen = self.current_state.ngen
 
         # Complicated part - need to determine if data corresponds to result of last gen
         if not self.is_active:
-            assert self.future_state is None, "Not active, but future state exists"
+            assert self.future_state is None, "Not active, but future state exists?"
 
             variable_data = self.vocs.variable_data(self.data).to_numpy()
             objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
 
             _initial_simplex = variable_data.copy()
             N = self.vocs.n_variables
-            if _initial_simplex.shape[0] > N + 1:
+            if _initial_simplex.shape[0] >= N + 1:
+                # TODO: is this really needed?
+                # if we have enough, form new simplex and force state to just after it is all probed
                 _initial_simplex = _initial_simplex[-(N + 1) :, :]
                 objective_data = objective_data[-(N + 1) :]
 
-            if _initial_simplex.shape[0] == N + 1:
-                # if we have enough, form new simplex and force state to just after it is all probed
                 fake_initialized_state = _fake_partial_state_gen(
                     _initial_simplex, objective_data
                 )
@@ -206,11 +210,16 @@ class NelderMeadGenerator(SequentialGenerator):
 
             self._initial_point = _initial_simplex[-1, :]
             self.y = float(objective_data[-1])
-            return
         else:
+            assert new_data.shape[0] == 1, (
+                "Only one point at a time is expected in active mode"
+            )
             # new data -> advance state machine 1 step
-            assert ndata - self.manual_data_cnt == self.future_state.ngen
-            assert ndata - self.manual_data_cnt == ngen + 1
+            n_auto_points = ndata - self.manual_data_cnt
+            assert n_auto_points == self.future_state.ngen, (
+                f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
+            )
+            assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
             self.current_state = self.future_state
             self.future_state = None
 
@@ -226,6 +235,14 @@ class NelderMeadGenerator(SequentialGenerator):
 
             self.y = yt
 
+    def _set_data(self, data: pd.DataFrame):
+        # just store data
+        self.data = data
+
+        new_data_df = self.vocs.objective_data(data)
+        res = new_data_df.iloc[-1:, :].to_numpy()
+        assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
+
     def _reset(self):
         self.current_state = SimplexState()
         self.future_state = None
@@ -236,14 +253,9 @@ class NelderMeadGenerator(SequentialGenerator):
         else:
             self._initial_simplex = None
 
-    def _generate(self) -> Optional[List[Dict[str, float]]]:
+    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
         """
-        Generate a specified number of candidate samples.
-
-        Parameters:
-        -----------
-        n_candidates : int
-            The number of candidate samples to generate.
+        Generate candidate.
 
         Returns:
         --------
@@ -411,8 +423,8 @@ def _neldermead_generator(
     doshrink = 0
 
     def save_state():
-        nonlocal ngen
-        ngen += 1
+        # nonlocal ngen
+        # ngen += 1
         return (
             astg,
             N,
@@ -429,7 +441,7 @@ def _neldermead_generator(
             xcc,
             xbar,
             doshrink,
-            ngen,
+            ngen + 1,
         )
 
     (
