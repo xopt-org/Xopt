@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 from scipy.optimize import minimize
 
-from xopt import Xopt
+from xopt import VOCS, Xopt
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
@@ -178,6 +178,31 @@ class TestNelderMeadGenerator:
         assert xbest["x0"] == result[0] and xbest["x1"] == result[1], (
             "Xopt Simplex does not match the vanilla one"
         )
+
+    def test_simplex_convergence(self):
+        def eval_f(x):
+            return {"y1": np.sum([x**2 for x in x.values()])}
+
+        variables = {f"x{i}": [-5, 5] for i in range(10)}
+        objectives = {"y1": "MINIMIZE"}
+        vocs = VOCS(variables=variables, objectives=objectives)
+
+        config = {
+            "generator": {
+                "name": "neldermead",
+                "initial_point": {f"x{i}": 3.5 for i in range(len(variables))},
+            },
+            "evaluator": {"function": eval_f},
+            "vocs": vocs,
+        }
+        X = Xopt.from_dict(config)
+        for i in range(1000):
+            X.step()
+
+        idx, best, _ = X.vocs.select_best(X.data)
+        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        assert best[0] >= 0.0
+        assert best[0] <= 0.001
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v",
