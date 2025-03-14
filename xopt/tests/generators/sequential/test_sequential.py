@@ -1,6 +1,8 @@
 import pytest
 import pandas as pd
 import numpy as np
+
+from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.vocs import VOCS
 
@@ -9,7 +11,7 @@ class TestSequentialGenerator(SequentialGenerator):
     def _add_data(self, new_data: pd.DataFrame):
         pass
 
-    def _generate(self) -> dict:
+    def _generate(self, first_gen: bool = False) -> dict:
         return {"x1": 0.5, "x2": 0.5}
 
     def _reset(self):
@@ -51,7 +53,7 @@ def test_generate(sample_vocs):
     assert candidate == {"x1": 0.5, "x2": 0.5}
     assert gen._last_candidate == candidate
 
-    with pytest.raises(ValueError):
+    with pytest.raises(SeqGeneratorError):
         gen.generate(n_candidates=2)
 
 

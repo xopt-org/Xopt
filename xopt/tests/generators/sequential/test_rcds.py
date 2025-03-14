@@ -26,6 +26,7 @@ def eval_f_linear_pos(x):
 def eval_f_linear_neg(x):
     return {"y1": -np.sum([x**2 for x in x.values()])}
 
+
 class TestRCDSGenerator:
     def test_rcds_generate_multiple_points(self):
         gen = RCDSGenerator(vocs=TEST_VOCS_BASE)
@@ -98,4 +99,3 @@ class TestRCDSGenerator:
             assert best[0] <= 0.0
             assert best[0] >= -0.001
         assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-3)
-
