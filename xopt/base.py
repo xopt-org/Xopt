@@ -361,23 +361,19 @@ class Xopt(XoptBaseModel):
         """
         logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
 
-        old_data = self.data  # reference, not copy, since will copy below
-        try:
-            # Set internal dataframe.
-            if self.data is not None:
-                new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
-                new_data.index = np.arange(
-                    len(self.data), len(self.data) + len(new_data)
-                )
-                self.data = pd.concat([self.data, new_data], axis=0)
-            else:
-                if new_data.index.dtype != np.int64:
-                    new_data.index = new_data.index.astype(np.int64)
-                self.data = new_data
-            self.generator.add_data(new_data)
-        except:
-            self.data = old_data
-            raise
+        # Set internal dataframe.
+        if self.data is not None:
+            new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
+            new_data.index = np.arange(
+                len(self.data), len(self.data) + len(new_data)
+            )
+            self.data = pd.concat([self.data, new_data], axis=0)
+        else:
+            if new_data.index.dtype != np.int64:
+                new_data.index = new_data.index.astype(np.int64)
+            self.data = new_data
+        self.generator.add_data(new_data)
+
 
     def reset_data(self):
         """

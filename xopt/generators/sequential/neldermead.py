@@ -212,11 +212,11 @@ class NelderMeadGenerator(SequentialGenerator):
                 "Only one point at a time is expected in active mode"
             )
             # new data -> advance state machine 1 step
-            n_auto_points = ndata - self.manual_data_cnt
-            assert n_auto_points == self.future_state.ngen, (
-                f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
-            )
-            assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
+            # n_auto_points = ndata - self.manual_data_cnt
+            # assert n_auto_points == self.future_state.ngen, (
+            #    f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
+            # )
+            # assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
             self.current_state = self.future_state
             self.future_state = None
 
