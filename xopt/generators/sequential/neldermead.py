@@ -175,9 +175,6 @@ class NelderMeadGenerator(SequentialGenerator):
             assert self.future_state is None
             return
 
-        ndata = len(self.data)
-        ngen = self.current_state.ngen
-
         # Complicated part - need to determine if data corresponds to result of last gen
         if not self.is_active:
             assert self.future_state is None, "Not active, but future state exists?"
