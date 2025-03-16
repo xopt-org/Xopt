@@ -286,7 +286,7 @@ class VOCS(XoptBaseModel):
     def random_inputs(
         self,
         n: int = None,
-        custom_bounds: dict = None,
+        custom_bounds: dict[str, list[float]] = None,
         include_constants: bool = True,
         seed: int = None,
     ) -> list[dict]:
@@ -320,48 +320,7 @@ class VOCS(XoptBaseModel):
             rng = np.random.default_rng(seed=seed)
             rng_sample_function = rng.random
 
-        # get bounds
-        # if custom_bounds is specified then they will be clipped inside
-        # vocs variable bounds -- raise a warning in this case
-        if custom_bounds is None:
-            bounds = self.variables
-        else:
-            variable_bounds = pd.DataFrame(self.variables)
-
-            # check type
-            if not isinstance(custom_bounds, dict):
-                raise TypeError("`custom_bounds` must be a dict")
-
-            # check custom bounds validity
-            try:
-                validate_variable_bounds(custom_bounds)
-            except ValueError:
-                raise ValueError("specified `custom_bounds` not valid")
-
-            old_custom_bounds = deepcopy(custom_bounds)
-
-            custom_bounds = pd.DataFrame(custom_bounds)
-            custom_bounds = custom_bounds.clip(
-                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
-            )
-            bounds = custom_bounds.to_dict()
-
-            # check to make sure clipped values are not equal -- if not custom_bounds
-            # are not inside vocs bounds
-            for name, value in bounds.items():
-                if value[0] == value[1]:
-                    raise ValueError(
-                        f"specified `custom_bounds` for {name} is outside vocs domain"
-                    )
-
-            # if clipping was used then raise a warning
-            if bounds != old_custom_bounds:
-                warnings.warn(
-                    "custom bounds were clipped by vocs bounds", RuntimeWarning
-                )
-
-            for k in bounds.keys():
-                bounds[k] = [bounds[k][i] for i in range(2)]
+        bounds = clip_variable_bounds(self, custom_bounds)
 
         for key, val in bounds.items():  # No need to sort here
             a, b = val
@@ -423,41 +382,7 @@ class VOCS(XoptBaseModel):
         is flattened and returned as a DataFrame. If `include_constants` is True, constant values from `self.constants`
         are added to the DataFrame.
         """
-
-        if custom_bounds is None:
-            bounds = self.variables
-        else:
-            variable_bounds = pd.DataFrame(self.variables)
-
-            if not isinstance(custom_bounds, dict):
-                raise TypeError("`custom_bounds` must be a dict")
-
-            try:
-                validate_variable_bounds(custom_bounds)
-            except ValueError:
-                raise ValueError("specified `custom_bounds` not valid")
-
-            old_custom_bounds = deepcopy(custom_bounds)
-
-            custom_bounds = pd.DataFrame(custom_bounds)
-            custom_bounds = custom_bounds.clip(
-                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
-            )
-            bounds = custom_bounds.to_dict()
-
-            for name, value in bounds.items():
-                if value[0] == value[1]:
-                    raise ValueError(
-                        f"specified `custom_bounds` for {name} is outside vocs domain"
-                    )
-
-            if bounds != old_custom_bounds:
-                warnings.warn(
-                    "custom bounds were clipped by vocs bounds", RuntimeWarning
-                )
-
-            for k in bounds.keys():
-                bounds[k] = [bounds[k][i] for i in range(2)]
+        bounds = clip_variable_bounds(self, custom_bounds)
 
         grid_axes = []
         for key, val in bounds.items():
@@ -1082,15 +1007,76 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         )
 
 
-def validate_variable_bounds(variable_dict: Dict[str, List[float]]):
+def validate_variable_bounds(variable_dict: dict[str, list[float]]):
     """
     Check to make sure that bounds for variables are specified correctly. Raises
     ValueError if anything is incorrect
     """
 
     for name, value in variable_dict.items():
+        if not isinstance(value, list):
+            raise ValueError(f"Bounds specified for `{name}` must be a list.")
+        if not len(value) == 2:
+            raise ValueError(
+                f"Bounds specified for `{name}` must be a list of length 2."
+            )
         if not value[1] > value[0]:
             raise ValueError(
                 f"Bounds specified for `{name}` do not satisfy the "
                 f"condition value[1] > value[0]."
             )
+
+
+def clip_variable_bounds(vocs: VOCS, custom_bounds: dict[str, list[float]]):
+    if custom_bounds is None:
+        final_bounds = vocs.variables
+    else:
+        variable_bounds = vocs.variables
+
+        if not isinstance(custom_bounds, dict):
+            raise TypeError("`custom_bounds` must be a dict")
+
+        try:
+            validate_variable_bounds(custom_bounds)
+        except ValueError:
+            raise ValueError("specified `custom_bounds` not valid")
+
+        vars_clipped_lb_list = []
+        vars_clipped_ub_list = []
+
+        final_bounds = {}
+        for var, (lb, ub) in variable_bounds.items():
+            if var in custom_bounds:
+                clb = custom_bounds[var][0]
+                cub = custom_bounds[var][1]
+                if clb >= ub:
+                    # we already checked that clb < cub, so this is always an error
+                    raise ValueError(
+                        f"specified `custom_bounds` for {var} is outside vocs domain"
+                    )
+                if clb >= lb:
+                    flb = clb
+                else:
+                    vars_clipped_lb_list.append(var)
+                    flb = lb
+                if cub <= ub:
+                    fub = cub
+                else:
+                    vars_clipped_ub_list.append(var)
+                    fub = ub
+                final_bounds[var] = [flb, fub]
+            else:
+                final_bounds[var] = [lb, ub]
+
+        if vars_clipped_lb_list:
+            warnings.warn(
+                f"custom bounds lower value exceeded vocs: {vars_clipped_lb_list}",
+                RuntimeWarning,
+            )
+        if vars_clipped_ub_list:
+            warnings.warn(
+                f"custom bounds upper value exceeded vocs: {vars_clipped_ub_list}",
+                RuntimeWarning,
+            )
+
+    return final_bounds
