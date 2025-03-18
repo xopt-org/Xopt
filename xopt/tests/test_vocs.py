@@ -207,7 +207,7 @@ class TestVOCS(object):
         # test custom bounds within the vocs domain -- no warnings should be raised
         in_domain_custom_bounds = {"x1": [0.5, 0.75], "x2": [0.5, 0.75]}
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+            warnings.simplefilter("error")
             vocs.random_inputs(100, custom_bounds=in_domain_custom_bounds)
 
         # test wrong type
@@ -222,6 +222,19 @@ class TestVOCS(object):
         for ele in bad_custom_bounds:
             with pytest.raises(ValueError):
                 vocs.random_inputs(100, custom_bounds=ele)
+
+        custom_bounds = {
+            k: [v[0] + 0.01, v[1] - 0.01] for k, v in TEST_VOCS_BASE.variables.items()
+        }
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            vocs.random_inputs(3, custom_bounds=custom_bounds)
+
+        custom_bounds = {
+            k: [v[0] - 0.01, v[1] - 0.01] for k, v in TEST_VOCS_BASE.variables.items()
+        }
+        with pytest.warns(RuntimeWarning):
+            vocs.random_inputs(3, custom_bounds=custom_bounds)
 
     def test_duplicate_outputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
