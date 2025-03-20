@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from xopt.errors import SeqGeneratorError
@@ -15,8 +15,8 @@ class SequentialGenerator(Generator):
     These algorithms will start from the last point in the history.
     """
 
-    is_active: bool = False
-    _last_candidate: Optional[dict] = None
+    _is_active: bool = False
+    _last_candidate: Optional[List[Dict[str, float]]] = None
     _data_set: bool = False
 
     def add_data(self, new_data: pd.DataFrame):
@@ -34,7 +34,7 @@ class SequentialGenerator(Generator):
             If the generator is active but no candidate was generated, or if the new data does not contain the last candidate.
         """
         # if the generator is active then the new data must contain the last candidate
-        if self.is_active:
+        if self._is_active:
             if self._last_candidate is None:
                 raise SeqGeneratorError(
                     "Generator is active, but no candidate was generated. Cannot add data."
@@ -124,9 +124,9 @@ class SequentialGenerator(Generator):
             )
 
         # if the generator is not active, we need to start it
-        if not self.is_active:
+        if not self._is_active:
             candidate = self._generate(True)
-            self.is_active = True
+            self._is_active = True
         else:
             candidate = self._generate()
 
@@ -135,7 +135,7 @@ class SequentialGenerator(Generator):
 
         return candidate
 
-    def _generate(self, first_gen: bool = False) -> dict:
+    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
         """
         Generate a new candidate point.
 
@@ -157,7 +157,7 @@ class SequentialGenerator(Generator):
         """
         Reset the generator.
         """
-        self.is_active = False
+        self._is_active = False
         self._last_candidate = None
         self._reset()
 
