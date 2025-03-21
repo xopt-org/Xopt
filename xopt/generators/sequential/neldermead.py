@@ -1,13 +1,15 @@
 import logging
 import warnings
+from copy import deepcopy
 from typing import Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
 
-from xopt.generator import Generator
+from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
+from xopt.vocs import VOCS, validate_variable_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +62,7 @@ STATE_KEYS = [
 ]
 
 
-class NelderMeadGenerator(Generator):
+class NelderMeadGenerator(SequentialGenerator):
     """
     Nelder-Mead algorithm from SciPy in Xopt's Generator form.
     Converted to use a state machine to resume in exactly the last state.
@@ -121,8 +123,12 @@ class NelderMeadGenerator(Generator):
     x: Optional[np.ndarray] = None
     y: Optional[float] = None
     is_done_bool: bool = False
+    manual_data_cnt: int = Field(
+        0, description="How many points are considered manual/not part of simplex run"
+    )
 
     _initial_simplex = None
+    _initial_point = None
     _saved_options: Dict = None
 
     def __init__(self, **kwargs):
@@ -146,13 +152,16 @@ class NelderMeadGenerator(Generator):
     @property
     def x0(self) -> np.ndarray:
         """Raw internal initial point for convenience"""
-        return np.array([self.initial_point[k] for k in self.vocs.variable_names])
+        if self._initial_point is not None:
+            return self._initial_point
+        else:
+            return np.array([self.initial_point[k] for k in self.vocs.variable_names])
 
     @property
     def is_done(self) -> bool:
         return self.is_done_bool
 
-    def add_data(self, new_data: pd.DataFrame):
+    def _add_data(self, new_data: pd.DataFrame):
         """
         Add new data to the generator.
 
@@ -166,27 +175,52 @@ class NelderMeadGenerator(Generator):
             assert self.future_state is None
             return
 
-        self.data = pd.concat([self.data, new_data], axis=0)
-
         # Complicated part - need to determine if data corresponds to result of last gen
-        ndata = len(self.data)
-        ngen = self.current_state.ngen
-        if ndata == ngen:
-            # just resuming
-            return
-        else:
-            # Must have made at least 1 step, require future_state
-            assert self.future_state is not None
+        if not self.is_active:
+            assert self.future_state is None, "Not active, but future state exists?"
 
+            variable_data = self.vocs.variable_data(self.data).to_numpy()
+            objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
+
+            _initial_simplex = variable_data.copy()
+            N = self.vocs.n_variables
+            if _initial_simplex.shape[0] >= N + 1:
+                # TODO: is this really needed?
+                # if we have enough, form new simplex and force state to just after it is all probed
+                _initial_simplex = _initial_simplex[-(N + 1) :, :]
+                objective_data = objective_data[-(N + 1) :]
+
+                fake_initialized_state = _fake_partial_state_gen(
+                    _initial_simplex, objective_data
+                )
+                self.current_state = fake_initialized_state
+                self._initial_simplex = _initial_simplex
+                self.manual_data_cnt = len(self.data) - (N + 1)
+            else:
+                # otherwise, just set the last point as the initial point - effectively loses output data
+                self.current_state = SimplexState()
+                self._initial_simplex = None
+                self.manual_data_cnt = len(self.data)
+
+            self._initial_point = _initial_simplex[-1, :]
+            self.y = float(objective_data[-1])
+        else:
+            assert new_data.shape[0] == 1, (
+                "Only one point at a time is expected in active mode"
+            )
             # new data -> advance state machine 1 step
-            assert ndata == self.future_state.ngen == ngen + 1
+            # n_auto_points = ndata - self.manual_data_cnt
+            # assert n_auto_points == self.future_state.ngen, (
+            #    f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
+            # )
+            # assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
             self.current_state = self.future_state
             self.future_state = None
 
             # Can have multiple points if resuming from file, grab last one
             new_data_df = self.vocs.objective_data(new_data)
             res = new_data_df.iloc[-1:, :].to_numpy()
-            assert np.shape(res) == (1, 1), f"Bad last point {res}"
+            assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
 
             yt = res[0, 0].item()
             if np.isinf(yt) or np.isnan(yt):
@@ -195,14 +229,27 @@ class NelderMeadGenerator(Generator):
 
             self.y = yt
 
-    def generate(self, n_candidates: int) -> Optional[List[Dict[str, float]]]:
-        """
-        Generate a specified number of candidate samples.
+    def _set_data(self, data: pd.DataFrame):
+        # just store data
+        self.data = data
 
-        Parameters:
-        -----------
-        n_candidates : int
-            The number of candidate samples to generate.
+        new_data_df = self.vocs.objective_data(data)
+        res = new_data_df.iloc[-1:, :].to_numpy()
+        assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
+
+    def _reset(self):
+        self.current_state = SimplexState()
+        self.future_state = None
+        if self.initial_simplex:
+            self._initial_simplex = np.array(
+                [self.initial_simplex[k] for k in self.vocs.variable_names]
+            ).T
+        else:
+            self._initial_simplex = None
+
+    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
+        """
+        Generate candidate.
 
         Returns:
         --------
@@ -211,11 +258,6 @@ class NelderMeadGenerator(Generator):
         """
         if self.is_done:
             return None
-
-        if n_candidates != 1:
-            raise NotImplementedError(
-                "simplex can only produce one candidate at a time"
-            )
 
         if self.current_state.N is None:
             # fresh start
@@ -245,15 +287,16 @@ class NelderMeadGenerator(Generator):
         return [inputs]
 
     def _call_algorithm(self):
+        mins, maxs = self.vocs.bounds
         results = _neldermead_generator(
-            self.x0,
+            x0=self.x0,
             state=self.current_state,
             lastval=self.y,
             adaptive=self.adaptive,
             xatol=self.xatol,
             fatol=self.fatol,
             initial_simplex=self._initial_simplex,
-            bounds=self.vocs.bounds,
+            bounds=(mins, maxs),
         )
 
         self.y = None
@@ -271,6 +314,40 @@ class NelderMeadGenerator(Generator):
         """
         sim = self.current_state.sim
         return dict(zip(self.vocs.variable_names, sim.T))
+
+
+def _fake_partial_state_gen(sim: np.ndarray, fsim: np.ndarray):
+    # active stage
+    # internal simplex variables that will be saved/restored
+    ind = fxr = xr = xbar = x = xe = xc = xcc = None
+    jend = 0
+    doshrink = 0
+
+    assert sim.shape[0] == fsim.shape[0]
+    kend = sim.shape[0] - 1
+    ngen = sim.shape[0]
+    astg = -1
+    # lastval will set final fsim entry
+
+    state = SimplexState(
+        astg=astg,
+        N=sim.shape[1],
+        kend=kend,
+        jend=jend,
+        ind=ind,
+        sim=sim,
+        fsim=fsim,
+        fxr=fxr,
+        x=x,
+        xr=xr,
+        xe=xe,
+        xc=xc,
+        xcc=xcc,
+        xbar=xbar,
+        doshrink=doshrink,
+        ngen=ngen,
+    )
+    return state
 
 
 def _neldermead_generator(
@@ -340,8 +417,8 @@ def _neldermead_generator(
     doshrink = 0
 
     def save_state():
-        nonlocal ngen
-        ngen += 1
+        # nonlocal ngen
+        # ngen += 1
         return (
             astg,
             N,
@@ -358,7 +435,7 @@ def _neldermead_generator(
             xcc,
             xbar,
             doshrink,
-            ngen,
+            ngen + 1,
         )
 
     (
@@ -474,11 +551,6 @@ def _neldermead_generator(
     while True:
         if stage == -1:
             astg = 1
-            if (
-                np.max(np.ravel(np.abs(sim[1:] - sim[0]))) <= xatol
-                and np.max(np.abs(fsim[0] - fsim[1:])) <= fatol
-            ):
-                break
 
             xbar = np.add.reduce(sim[:-1], 0) / N
             xr = (1 + rho) * xbar - rho * sim[-1]
@@ -610,3 +682,67 @@ def _neldermead_generator(
         ind = np.argsort(fsim)
         sim = np.take(sim, ind, 0)
         fsim = np.take(fsim, ind, 0)
+
+    def simplex_inputs(
+        vocs: VOCS,
+        x0: np.ndarray,
+        custom_bounds: dict = None,
+        nonzdelt: float = 0.05,
+        zdelt: float = 0.00025,
+    ) -> np.ndarray:
+        assert x0.ndim == 1, "Expected 1D array"
+        assert len(x0) == vocs.n_variables, (
+            f"Expected {vocs.n_variables} dimensions, got {len(x0)}"
+        )
+        if custom_bounds is None:
+            bounds = vocs.variables
+        else:
+            variable_bounds = pd.DataFrame(vocs.variables)
+
+            if not isinstance(custom_bounds, dict):
+                raise TypeError("`custom_bounds` must be a dict")
+
+            try:
+                validate_variable_bounds(custom_bounds)
+            except ValueError:
+                raise ValueError("specified `custom_bounds` not valid")
+
+            old_custom_bounds = deepcopy(custom_bounds)
+
+            custom_bounds = pd.DataFrame(custom_bounds)
+            custom_bounds = custom_bounds.clip(
+                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
+            )
+            bounds = custom_bounds.to_dict()
+
+            for name, value in bounds.items():
+                if value[0] == value[1]:
+                    raise ValueError(
+                        f"specified `custom_bounds` for {name} is outside vocs domain"
+                    )
+
+            if bounds != old_custom_bounds:
+                warnings.warn(
+                    "custom bounds were clipped by vocs bounds", RuntimeWarning
+                )
+
+            for k in bounds.keys():
+                bounds[k] = [bounds[k][i] for i in range(2)]
+
+        lower_bound, upper_bound = bounds
+
+        N = len(x0)
+        sim = np.empty((N + 1, N), dtype=x0.dtype)
+        sim[0] = x0
+        for k in range(N):
+            y = np.array(x0, copy=True)
+            if y[k] != 0:
+                y[k] = (1 + nonzdelt) * y[k]
+            else:
+                y[k] = zdelt
+            sim[k + 1] = y
+
+        if bounds is not None:
+            sim = np.clip(sim, lower_bound, upper_bound)
+
+        return sim
