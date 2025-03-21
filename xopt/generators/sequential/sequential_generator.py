@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional, Tuple
 import numpy as np
-from pydantic import Field
 
 from xopt.errors import SeqGeneratorError
 from xopt.generator import Generator
