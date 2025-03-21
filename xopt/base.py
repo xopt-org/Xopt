@@ -16,9 +16,8 @@ from pydantic import (
 )
 
 from xopt.evaluator import Evaluator, validate_outputs
-from xopt.generator import Generator
+from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
-from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
@@ -171,8 +170,9 @@ class Xopt(XoptBaseModel):
         # also add data to generator
         # TODO: find a more robust way of doing this
         generator = info.data["generator"]
-        if not isinstance(generator, SequentialGenerator):
-            # sequential generators must maintain their own state
+
+        # Some generators need to maintain their own state (such as sequential generators)
+        if not isinstance(generator, StateOwner):
             generator.add_data(v)
         else:
             generator.set_data(v)
