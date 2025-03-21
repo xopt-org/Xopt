@@ -184,9 +184,9 @@ class TestNelderMeadGenerator:
 
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
-        assert np.isclose(xbest["x0"], result[0]) and np.isclose(xbest["x1"], result[1]), (
-            "Xopt Simplex does not match the vanilla one"
-        )
+        assert np.isclose(xbest["x0"], result[0]) and np.isclose(
+            xbest["x1"], result[1]
+        ), "Xopt Simplex does not match the vanilla one"
 
     @pytest.mark.parametrize(
         "fun, obj", [(eval_f_linear_pos, "MINIMIZE"), (eval_f_linear_neg, "MAXIMIZE")]
