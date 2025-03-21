@@ -42,20 +42,20 @@ def test_mutation_operator(mutation_operator):
             child = mutation_operator(parent, bounds)
 
             # Check shape
-            assert (
-                child.shape == parent.shape
-            ), f"Output shape {child.shape} doesn't match input shape {parent.shape}"
+            assert child.shape == parent.shape, (
+                f"Output shape {child.shape} doesn't match input shape {parent.shape}"
+            )
 
             # Check for NaN values
             assert not np.isnan(child).any(), "Output contains NaN values"
 
             # Check bounds
-            assert np.all(
-                child >= bounds[0]
-            ), "Output contains values below lower bounds"
-            assert np.all(
-                child <= bounds[1]
-            ), "Output contains values above upper bounds"
+            assert np.all(child >= bounds[0]), (
+                "Output contains values below lower bounds"
+            )
+            assert np.all(child <= bounds[1]), (
+                "Output contains values above upper bounds"
+            )
 
 
 @pytest.mark.parametrize(
@@ -95,27 +95,27 @@ def test_crossover_operator(crossover_operator):
             child_a, child_b = crossover_operator(parent_a, parent_b, bounds)
 
             # Check shape
-            assert (
-                child_a.shape == parent_a.shape
-            ), f"Child A shape {child_a.shape} doesn't match parent shape {parent_a.shape}"
-            assert (
-                child_b.shape == parent_b.shape
-            ), f"Child B shape {child_b.shape} doesn't match parent shape {parent_b.shape}"
+            assert child_a.shape == parent_a.shape, (
+                f"Child A shape {child_a.shape} doesn't match parent shape {parent_a.shape}"
+            )
+            assert child_b.shape == parent_b.shape, (
+                f"Child B shape {child_b.shape} doesn't match parent shape {parent_b.shape}"
+            )
 
             # Check for NaN values
             assert not np.isnan(child_a).any(), "Child A contains NaN values"
             assert not np.isnan(child_b).any(), "Child B contains NaN values"
 
             # Check bounds
-            assert np.all(
-                child_a >= bounds[0]
-            ), "Child A contains values below lower bounds"
-            assert np.all(
-                child_a <= bounds[1]
-            ), "Child A contains values above upper bounds"
-            assert np.all(
-                child_b >= bounds[0]
-            ), "Child B contains values below lower bounds"
-            assert np.all(
-                child_b <= bounds[1]
-            ), "Child B contains values above upper bounds"
+            assert np.all(child_a >= bounds[0]), (
+                "Child A contains values below lower bounds"
+            )
+            assert np.all(child_a <= bounds[1]), (
+                "Child A contains values above upper bounds"
+            )
+            assert np.all(child_b >= bounds[0]), (
+                "Child B contains values below lower bounds"
+            )
+            assert np.all(child_b <= bounds[1]), (
+                "Child B contains values above upper bounds"
+            )

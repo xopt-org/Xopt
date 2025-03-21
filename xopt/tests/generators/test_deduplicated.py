@@ -103,17 +103,17 @@ def test_without_deduplication(zdt_vocs):
         # Skip even indices (except 0) as they are duplicates
         if i > 0 and i % 2 == 0:
             # Check that this candidate is a duplicate of the previous one
-            assert (
-                candidates[i] == candidates[i - 1]
-            ), f"Expected candidate at index {i} to be a duplicate of candidate at index {i - 1}"
+            assert candidates[i] == candidates[i - 1], (
+                f"Expected candidate at index {i} to be a duplicate of candidate at index {i - 1}"
+            )
         else:
             # Check that the values match the formula
             for j in range(zdt_vocs.n_variables):
                 var_name = f"x{j + 1}"
                 expected_value = (expected_counter * 0.001 + j * 0.0001) % 1.0
-                assert (
-                    abs(candidates[i][var_name] - expected_value) < 1e-10
-                ), f"Value mismatch at index {i}, variable {var_name}: expected {expected_value}, got {candidates[i][var_name]}"
+                assert abs(candidates[i][var_name] - expected_value) < 1e-10, (
+                    f"Value mismatch at index {i}, variable {var_name}: expected {expected_value}, got {candidates[i][var_name]}"
+                )
             expected_counter += 1
 
 

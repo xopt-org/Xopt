@@ -146,9 +146,9 @@ def test_fast_dominated_argsort_internal(dom, expected_ranks):
     result = fast_dominated_argsort_internal(dom)
 
     # Check that we have the expected number of ranks
-    assert len(result) == len(
-        expected_ranks
-    ), f"Expected {len(expected_ranks)} ranks, got {len(result)}"
+    assert len(result) == len(expected_ranks), (
+        f"Expected {len(expected_ranks)} ranks, got {len(result)}"
+    )
 
     # Check each rank contains the expected individuals
     for i, (result_rank, expected_rank) in enumerate(zip(result, expected_ranks)):
@@ -158,9 +158,9 @@ def test_fast_dominated_argsort_internal(dom, expected_ranks):
         )
 
         # Sort both lists to handle different ordering within the same rank
-        assert sorted(result_rank_list) == sorted(
-            expected_rank
-        ), f"Rank {i} mismatch: expected {expected_rank}, got {result_rank_list}"
+        assert sorted(result_rank_list) == sorted(expected_rank), (
+            f"Rank {i} mismatch: expected {expected_rank}, got {result_rank_list}"
+        )
 
 
 def test_nsga2():
@@ -292,9 +292,9 @@ def test_generate_child_binary_tournament():
     )
 
     # Verify the child has the correct shape
-    assert child.shape == (
-        n_variables,
-    ), f"Expected shape {(n_variables,)}, got {child.shape}"
+    assert child.shape == (n_variables,), (
+        f"Expected shape {(n_variables,)}, got {child.shape}"
+    )
 
     # Verify the child is within bounds
     assert np.all(child >= lower_bounds), "Child contains values below lower bounds"
@@ -316,22 +316,22 @@ def test_generate_child_binary_tournament():
     )
 
     # Verify the child with fitness has the correct shape
-    assert child_with_fitness.shape == (
-        n_variables,
-    ), f"Expected shape {(n_variables,)}, got {child_with_fitness.shape}"
+    assert child_with_fitness.shape == (n_variables,), (
+        f"Expected shape {(n_variables,)}, got {child_with_fitness.shape}"
+    )
 
     # Verify the child with fitness is within bounds
-    assert np.all(
-        child_with_fitness >= lower_bounds
-    ), "Child with fitness contains values below lower bounds"
-    assert np.all(
-        child_with_fitness <= upper_bounds
-    ), "Child with fitness contains values above upper bounds"
+    assert np.all(child_with_fitness >= lower_bounds), (
+        "Child with fitness contains values below lower bounds"
+    )
+    assert np.all(child_with_fitness <= upper_bounds), (
+        "Child with fitness contains values above upper bounds"
+    )
 
     # Verify the child with fitness doesn't contain NaN values
-    assert not np.any(
-        np.isnan(child_with_fitness)
-    ), "Child with fitness contains NaN values"
+    assert not np.any(np.isnan(child_with_fitness)), (
+        "Child with fitness contains NaN values"
+    )
 
 
 def test_nsga2_checkpoint_reload():
