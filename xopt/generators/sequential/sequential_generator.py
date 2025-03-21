@@ -3,11 +3,11 @@ import numpy as np
 from pydantic import Field
 
 from xopt.errors import SeqGeneratorError
-from xopt.generator import Generator
+from xopt.generator import Generator, StateOwner
 import pandas as pd
 
 
-class SequentialGenerator(Generator):
+class SequentialGenerator(Generator, StateOwner):
     """
     A generator that runs a sequential optimization algorithm, such as Nelder-Mead, extremum seeking, RCDS, etc.
 

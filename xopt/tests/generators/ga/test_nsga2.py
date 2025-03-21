@@ -448,3 +448,96 @@ def test_nsga2_all_individuals_in_data():
 
         # Close log file before exiting context
         generator.close_log_file()
+
+
+def test_resume_consistency(pop_size=5, n_steps=128, check_step=10):
+    """
+    Test that NSGA2Generator produces consistent results when serialized and deserialized.
+    
+    This test verifies that:
+    1. The generator produces the same results when reloaded from a serialized state
+    2. The random seed ensures deterministic behavior
+    
+    Because NSGA2 is stochastic, we set a fixed random seed before each operation
+    to ensure reproducibility.
+    """
+    # Use TNK problem for testing
+    problem_vocs = tnk_vocs
+    problem_func = evaluate_TNK
+    
+    # Function to compare two Xopt objects
+    def compare(val_a, val_b):
+        """Compare two Xopt objects"""
+        # Must ignore runtime
+        for x in val_a.generator.child:
+            x["xopt_runtime"] = 0.0
+        for x in val_b.generator.child:
+            x["xopt_runtime"] = 0.0
+        for x in val_a.generator.pop:
+            x["xopt_runtime"] = 0.0
+        for x in val_b.generator.pop:
+            x["xopt_runtime"] = 0.0
+
+        # Compare everything except data
+        y = json.loads(val_a.json())
+        y2 = json.loads(val_b.json())
+        y.pop("data")
+        y2.pop("data")
+        assert y == y2
+
+        # Compare the data (taken from neldermead tests)
+        # For unclear reasons, column order changes on reload....
+        data = X.data.drop(["xopt_runtime", "xopt_error"], axis=1)
+        data2 = X2.data.drop(["xopt_runtime", "xopt_error"], axis=1)
+        # On reload, index is not a range index anymore!
+        pd.testing.assert_frame_equal(data, data2, check_index_type=False)
+        
+    # Create the Xopt object
+    X = Xopt(
+        generator=NSGA2Generator(
+            vocs=problem_vocs,
+            population_size=pop_size,
+        ),
+        evaluator=Evaluator(function=problem_func),
+        vocs=problem_vocs,
+    )
+    
+    # Run the first step to initialize
+    np.random.seed(42)
+    X.step()
+    
+    # Run through steps, checking consistency at intervals
+    for i in range(1, n_steps):
+        # For performance, only check some steps
+        if i % check_step == 0 or i == n_steps - 1:
+            # Serialize the current state
+            state = X.json()
+            X2 = Xopt.model_validate(json.loads(state))
+            compare(X, X2)
+            
+            # Generate samples from both and compare
+            np.random.seed(42)
+            samples = X.generator.generate(1)
+            np.random.seed(42)
+            samples2 = X2.generator.generate(1)
+            
+            assert samples == samples2, f"Generated samples differ at step {i}"
+            
+            # Evaluate the samples
+            np.random.seed(42)
+            X.evaluate_data(samples)
+            X2.evaluate_data(samples2)
+            compare(X, X2)
+            
+            # Create a third instance to test another serialization cycle and compare to X2
+            X3 = Xopt.model_validate(json.loads(state))
+            np.random.seed(42)
+            samples3 = X3.generator.generate(1)
+            assert samples == samples3, f"Generated samples differ in third instance at step {i}"
+            X3.evaluate_data(samples3)
+            compare(X2, X3)
+        else:
+            # Just run a normal step
+            np.random.seed(42)
+            samples = X.generator.generate(1)
+            X.evaluate_data(samples)

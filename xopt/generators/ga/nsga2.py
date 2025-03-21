@@ -7,6 +7,7 @@ from datetime import datetime
 import logging
 import time
 
+from ...generator import StateOwner
 from ..deduplicated import DeduplicatedGeneratorBase
 from .operators import (
     PolynomialMutation,
@@ -321,7 +322,7 @@ def cull_population(
 ########################################################################################################################
 
 
-class NSGA2Generator(DeduplicatedGeneratorBase):
+class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     """
     Non-dominated Sorting Genetic Algorithm II (NSGA-II) generator.  Implements the NSGA-II algorithm
     for multi-objective optimization as described in [1]. This generator accomdates user selected mutation
@@ -599,6 +600,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                         f.write(self.to_json())
                     self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
 
+    def set_data(self, data):
+        self.data = data
+    
     def __repr__(self) -> str:
         return (
             f"NSGA2Generator(pop_size={self.population_size}, "
