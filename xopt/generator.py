@@ -59,8 +59,6 @@ class Generator(XoptBaseModel, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    _is_done = False
-
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_objectives > 1 and not info.data["supports_multi_objective"]:
@@ -85,10 +83,6 @@ class Generator(XoptBaseModel, ABC):
         """
         super().__init__(**kwargs)
         logger.info(f"Initialized generator {self.name}")
-
-    @property
-    def is_done(self):
-        return self._is_done
 
     @abstractmethod
     def generate(self, n_candidates) -> list[dict]:
