@@ -39,8 +39,13 @@ class SequentialGenerator(Generator):
                 raise SeqGeneratorError(
                     "Generator is active, but no candidate was generated. Cannot add data."
                 )
-            # check if the last candidate is in the new data
-            self.validate_point(self._last_candidate[0])
+            if len(new_data) > 1:
+                raise SeqGeneratorError(
+                    "Cannot add more than one data point when generator is active."
+                )
+            else:
+                # check if the last candidate is in the new data
+                self.validate_point(self._last_candidate[0])
 
         # do not call super, this will likely need to be customized for some generators
         if self.data is not None:
