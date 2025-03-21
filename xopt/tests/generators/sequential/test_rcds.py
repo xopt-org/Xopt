@@ -27,6 +27,10 @@ def eval_f_linear_neg(x):
     return {"y1": -np.sum([x**2 for x in x.values()])}
 
 
+def eval_f_linear_offset(x):  # offset the optimal solution
+    return {"y1": np.sum([(x - 2) ** 2 for x in x.values()])}
+
+
 class TestRCDSGenerator:
     def test_rcds_generate_multiple_points(self):
         gen = RCDSGenerator(vocs=TEST_VOCS_BASE)
@@ -75,17 +79,27 @@ class TestRCDSGenerator:
         X.generator.reset()
         assert not X.generator.is_active
 
-    @pytest.mark.parametrize("fun, obj", [(eval_f_linear_pos, "MINIMIZE")])
-    def test_rcds_convergence(self, fun, obj):
-        variables = {f"x{i}": [-5, 5] for i in range(10)}
+    @pytest.mark.parametrize(
+        "fun, obj, x_opt, max_iter",
+        [
+            (eval_f_linear_pos, "MINIMIZE", np.zeros(10), 3000),
+            (eval_f_linear_neg, "MAXIMIZE", np.zeros(10), 3000),
+            (eval_f_linear_offset, "MINIMIZE", 2 * np.ones(10), 3000),
+        ],
+    )
+    def test_rcds_convergence(self, fun, obj, x_opt, max_iter):
+        variables = {f"x{i}": [-5, 5] for i in range(len(x_opt))}
         objectives = {"y1": obj}
         vocs = VOCS(variables=variables, objectives=objectives)
         generator = RCDSGenerator(tol=0.00001, step=0.01, noise=0.00001, vocs=vocs)
         evaluator = Evaluator(function=fun)
         X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
 
-        X.random_evaluate(1)
-        for i in range(3000):
+        if x_opt.sum():  # if the optimal solution is not 0
+            X.evaluate_data({f"x{i}": 1.2 for i in range(len(x_opt))})
+        else:
+            X.random_evaluate(1)
+        for i in range(max_iter):
             X.step()
 
         idx, best, _ = X.vocs.select_best(X.data)
@@ -96,4 +110,4 @@ class TestRCDSGenerator:
         else:
             assert best[0] <= 0.0
             assert best[0] >= -0.001
-        assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-3)
+        assert np.allclose(xbest, x_opt, rtol=0, atol=1e-3)
