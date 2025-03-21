@@ -469,7 +469,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 )
             self._logger.debug(
                 f"generated {n_candidates} candidates from generation {self.n_generations} "
-                f"in {1000*(time.perf_counter()-start_t):.2f}ms"
+                f"in {1000 * (time.perf_counter() - start_t):.2f}ms"
             )
         else:
             vars = np.vstack(
@@ -483,7 +483,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 for individual in vars
             ]
             self._logger.debug(
-                f"generated {n_candidates} random candidates in {1000*(time.perf_counter()-start_t):.2f}ms "
+                f"generated {n_candidates} random candidates in {1000 * (time.perf_counter() - start_t):.2f}ms "
                 f"(no population exists yet)"
             )
 
@@ -535,8 +535,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
             )
             n_err = np.sum([x["xopt_error"] for x in self.pop])
             self._logger.info(
-                f"completed generation {self.n_generations+1} in "
-                f"{time.perf_counter()-self.generation_start_t:.3f}s"
+                f"completed generation {self.n_generations + 1} in "
+                f"{time.perf_counter() - self.generation_start_t:.3f}s"
                 f" (n_feasible={n_feasible}, n_err={n_err}, children_performance={perf_message}, "
                 f"add_data_round={round_idx}, fevals={self.fevals}, n_candidates={self.n_candidates})"
             )
@@ -567,7 +567,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase):
                 # Log some things
                 self._logger.info(
                     f'saved optimization data to "{self.output_dir}" '
-                    f"in {1000*(time.perf_counter()-save_start_t):.2f}ms"
+                    f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
                 )
 
                 if self.checkpoint_freq > 0 and (

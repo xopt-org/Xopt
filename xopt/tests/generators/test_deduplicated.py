@@ -105,7 +105,7 @@ def test_without_deduplication(zdt_vocs):
             # Check that this candidate is a duplicate of the previous one
             assert (
                 candidates[i] == candidates[i - 1]
-            ), f"Expected candidate at index {i} to be a duplicate of candidate at index {i-1}"
+            ), f"Expected candidate at index {i} to be a duplicate of candidate at index {i - 1}"
         else:
             # Check that the values match the formula
             for j in range(zdt_vocs.n_variables):
