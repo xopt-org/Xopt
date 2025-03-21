@@ -126,7 +126,7 @@ class DeduplicatedGeneratorBase(Generator):
             # Hand candidates back to user
             candidates = candidates[:n_candidates]
 
-        msg = f"generated {len(candidates)} candidates in {1000*(time.perf_counter() - start_t):.2f}ms"
+        msg = f"generated {len(candidates)} candidates in {1000 * (time.perf_counter() - start_t):.2f}ms"
         if self.deduplicate_output:
             msg += f" (removed {n_removed} duplicate individuals)"
         self._logger.info(msg)
