@@ -252,3 +252,25 @@ class TestMOBOGenerator:
                 X.generator.get_acquisition(X.generator.model),
                 qLogNoisyExpectedHypervolumeImprovement,
             )
+
+    def test_objective_constraint_nans(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.objectives.update({"y2": "MINIMIZE"})
+        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
+        test_data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.4, 0.4, 0.15],
+                "x2": [0.1, 0.2, 0.3, 0.2, 0.15],
+                "y1": [1.0, 2.0, 1.0, 0.0, 1.5],
+                "y2": [0.5, 0.1, np.nan, 1.5, 0.25],
+                "c1": [1.0, 1.0, 1.0, np.nan, 0.0],
+            }
+        )
+
+        reference_point = {"y1": 10.0, "y2": 1.5}
+        gen = MOBOGenerator(
+            vocs=vocs,
+            reference_point=reference_point,
+        )
+        gen.add_data(test_data)
+        gen.generate(1)
