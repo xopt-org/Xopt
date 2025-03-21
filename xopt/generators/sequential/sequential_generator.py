@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 import numpy as np
+from pydantic import Field
 
 from xopt.errors import SeqGeneratorError
 from xopt.generator import Generator
@@ -15,7 +16,7 @@ class SequentialGenerator(Generator):
     These algorithms will start from the last point in the history.
     """
 
-    _is_active: bool = False
+    is_active: bool = Field(False, exclude=True)
     _last_candidate: Optional[List[Dict[str, float]]] = None
     _data_set: bool = False
 
@@ -34,7 +35,7 @@ class SequentialGenerator(Generator):
             If the generator is active but no candidate was generated, or if the new data does not contain the last candidate.
         """
         # if the generator is active then the new data must contain the last candidate
-        if self._is_active:
+        if self.is_active:
             if self._last_candidate is None:
                 raise SeqGeneratorError(
                     "Generator is active, but no candidate was generated. Cannot add data."
@@ -124,9 +125,9 @@ class SequentialGenerator(Generator):
             )
 
         # if the generator is not active, we need to start it
-        if not self._is_active:
+        if not self.is_active:
             candidate = self._generate(True)
-            self._is_active = True
+            self.is_active = True
         else:
             candidate = self._generate()
 
@@ -157,7 +158,7 @@ class SequentialGenerator(Generator):
         """
         Reset the generator.
         """
-        self._is_active = False
+        self.is_active = False
         self._last_candidate = None
         self._reset()
 

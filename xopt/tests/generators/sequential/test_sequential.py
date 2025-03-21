@@ -41,7 +41,7 @@ def test_add_data(sample_vocs, sample_data):
     gen.add_data(sample_data)
     assert gen.data.equals(sample_data)
 
-    gen._is_active = True
+    gen.is_active = True
     gen._last_candidate = [{"x1": 0.3, "x2": 0.6}]
     with pytest.raises(ValueError):
         gen.add_data(sample_data)
@@ -59,10 +59,10 @@ def test_generate(sample_vocs):
 
 def test_reset(sample_vocs):
     gen = TestSequentialGenerator(vocs=sample_vocs)
-    gen._is_active = True
+    gen.is_active = True
     gen._last_candidate = {"x1": 0.5, "x2": 0.5}
     gen.reset()
-    assert not gen._is_active
+    assert not gen.is_active
     assert gen._last_candidate is None
 
 

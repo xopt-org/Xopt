@@ -65,10 +65,10 @@ class TestNelderMeadGenerator:
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(1)
-        assert not X.generator._is_active
+        assert not X.generator.is_active
         assert X.generator._last_candidate is None
         X.step()
-        assert X.generator._is_active
+        assert X.generator.is_active
         assert X.generator._last_candidate is not None
         assert X.generator._initial_simplex is None
         X.step()
