@@ -175,7 +175,7 @@ class NelderMeadGenerator(SequentialGenerator):
         """
         Raw internal initial point for convenience.
         If initial_point is set, it will be used. Otherwise, if data is set, the last point will be used.
-        
+
         Returns:
         --------
         np.ndarray
@@ -188,8 +188,9 @@ class NelderMeadGenerator(SequentialGenerator):
         elif self.data is not None:
             return self._get_initial_point()[0]
         else:
-            raise ValueError("No initial point specified in generator or taken from data")
-
+            raise ValueError(
+                "No initial point specified in generator or taken from data"
+            )
 
     def _add_data(self, new_data: pd.DataFrame):
         """
@@ -204,7 +205,7 @@ class NelderMeadGenerator(SequentialGenerator):
             # empty data, i.e. no steps yet
             assert self.future_state is None
             return
-        
+
         ndata = len(self.data)
         ngen = self.current_state.ngen
 
@@ -214,7 +215,6 @@ class NelderMeadGenerator(SequentialGenerator):
 
             variable_data = self.vocs.variable_data(self.data).to_numpy()
             objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
-
 
             _initial_simplex = variable_data.copy()
             N = self.vocs.n_variables
@@ -245,7 +245,7 @@ class NelderMeadGenerator(SequentialGenerator):
             # new data -> advance state machine 1 step
             n_auto_points = ndata - self.manual_data_cnt
             assert n_auto_points == self.future_state.ngen, (
-               f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
+                f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
             )
             assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
             self.current_state = self.future_state
