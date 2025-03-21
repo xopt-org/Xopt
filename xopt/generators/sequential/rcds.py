@@ -579,7 +579,9 @@ class RCDSGenerator(SequentialGenerator):
     def _reset(self):
         """reset the rcds object"""
 
-        objective_name = self.vocs.objective_names[0]  # rcds only supports one objective
+        objective_name = self.vocs.objective_names[
+            0
+        ]  # rcds only supports one objective
         direction = self.vocs.objectives[objective_name]
         if direction == "MINIMIZE":
             self._sign = 1
