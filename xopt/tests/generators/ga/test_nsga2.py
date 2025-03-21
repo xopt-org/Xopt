@@ -13,7 +13,9 @@ from xopt.generators.ga.nsga2 import (
     get_domination,
     NSGA2Generator,
     fast_dominated_argsort_internal,
+    generate_child_binary_tournament,
 )
+from xopt.generators.ga.operators import PolynomialMutation, SimulatedBinaryCrossover
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.vocs import VOCS
 
@@ -244,6 +246,92 @@ def test_nsga2_output_data():
 
         # Close log file before exiting context
         generator.close_log_file()
+
+
+def test_generate_child_binary_tournament():
+    """
+    Test that generate_child_binary_tournament function works correctly with random input.
+
+    This test verifies that:
+    1. The function runs without errors with random input
+    2. The output is within the specified bounds
+    3. The output doesn't contain NaN values
+    """
+    # Create random population data
+    n_individuals = 10
+    n_variables = 3
+    n_objectives = 2
+    n_constraints = 2
+
+    # Create random population with decision variables
+    pop_x = np.random.rand(n_individuals, n_variables)
+
+    # Create random objective values (lower is better)
+    pop_f = np.random.rand(n_individuals, n_objectives)
+
+    # Create random constraint values (<=0 means satisfied)
+    pop_g = np.random.uniform(-1, 1, (n_individuals, n_constraints))
+
+    # Define bounds for variables
+    lower_bounds = np.zeros(n_variables)
+    upper_bounds = np.ones(n_variables)
+    bounds = np.vstack((lower_bounds, upper_bounds))
+
+    # Create mutation and crossover operators
+    mutation = PolynomialMutation()
+    crossover = SimulatedBinaryCrossover()
+
+    # Generate a child using binary tournament
+    child = generate_child_binary_tournament(
+        pop_x=pop_x,
+        pop_f=pop_f,
+        pop_g=pop_g,
+        bounds=bounds,
+        mutate=mutation,
+        crossover=crossover,
+    )
+
+    # Verify the child has the correct shape
+    assert child.shape == (
+        n_variables,
+    ), f"Expected shape {(n_variables,)}, got {child.shape}"
+
+    # Verify the child is within bounds
+    assert np.all(child >= lower_bounds), "Child contains values below lower bounds"
+    assert np.all(child <= upper_bounds), "Child contains values above upper bounds"
+
+    # Verify the child doesn't contain NaN values
+    assert not np.any(np.isnan(child)), "Child contains NaN values"
+
+    # Test with pre-computed fitness
+    fitness = np.random.randint(0, n_individuals, n_individuals)
+    child_with_fitness = generate_child_binary_tournament(
+        pop_x=pop_x,
+        pop_f=pop_f,
+        pop_g=pop_g,
+        bounds=bounds,
+        mutate=mutation,
+        crossover=crossover,
+        fitness=fitness,
+    )
+
+    # Verify the child with fitness has the correct shape
+    assert child_with_fitness.shape == (
+        n_variables,
+    ), f"Expected shape {(n_variables,)}, got {child_with_fitness.shape}"
+
+    # Verify the child with fitness is within bounds
+    assert np.all(
+        child_with_fitness >= lower_bounds
+    ), "Child with fitness contains values below lower bounds"
+    assert np.all(
+        child_with_fitness <= upper_bounds
+    ), "Child with fitness contains values above upper bounds"
+
+    # Verify the child with fitness doesn't contain NaN values
+    assert not np.any(
+        np.isnan(child_with_fitness)
+    ), "Child with fitness contains NaN values"
 
 
 def test_nsga2_checkpoint_reload():
