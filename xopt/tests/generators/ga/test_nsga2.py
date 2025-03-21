@@ -1,7 +1,12 @@
+from random import random
+
 import numpy as np
 import pytest
 
-from xopt.generators.ga.nsga2 import get_domination
+from xopt.base import Xopt
+from xopt.evaluator import Evaluator
+from xopt.generators.ga.nsga2 import get_domination, NSGA2Generator
+from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 
 
 @pytest.mark.parametrize(
@@ -64,3 +69,16 @@ def test_get_domination(pop_f, pop_g, expected_dom):
     """
     result = get_domination(pop_f, pop_g)
     np.testing.assert_array_equal(result, expected_dom)
+
+
+def test_nsga2():
+    """
+    Basic test for NSGA2Generator.
+    """
+    X = Xopt(
+        generator=NSGA2Generator(vocs=tnk_vocs),
+        evaluator=Evaluator(function=evaluate_TNK),
+        vocs=tnk_vocs,
+        max_evaluations=5,
+    )
+    X.run()
