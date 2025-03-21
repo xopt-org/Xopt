@@ -69,11 +69,11 @@ class TestRCDSGenerator:
         for i in range(10):
             X.step()
 
-        assert X.generator._is_active
+        assert X.generator.is_active
         assert X.generator._last_candidate is not None
 
         X.generator.reset()
-        assert not X.generator._is_active
+        assert not X.generator.is_active
 
     @pytest.mark.parametrize("fun, obj", [(eval_f_linear_pos, "MINIMIZE")])
     def test_rcds_convergence(self, fun, obj):
