@@ -122,7 +122,7 @@ class StateOwner:
     Mix-in class that represents a generator that owns its own state and needs special handling
     of data loading on deserialization.
     """
-    
+
     def set_data(self, data: pd.DataFrame):
         """
         Set the full dataset for the generator. Typically only used when loading from a save file.

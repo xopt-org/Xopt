@@ -602,7 +602,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     def set_data(self, data):
         self.data = data
-    
+
     def __repr__(self) -> str:
         return (
             f"NSGA2Generator(pop_size={self.population_size}, "
