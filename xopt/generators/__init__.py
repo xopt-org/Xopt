@@ -60,7 +60,7 @@ def get_generator_dynamic(name: str):
     elif name in all_generator_names["scipy"]:
         try:
             from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
-            from xopt.generators.scipy.neldermead import NelderMeadGenerator
+            from xopt.generators.sequential.neldermead import NelderMeadGenerator
 
             registered_generators = [
                 NelderMeadGenerator,
@@ -115,12 +115,12 @@ def get_generator_dynamic(name: str):
         except ModuleNotFoundError:
             warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
     elif name in all_generator_names["es"]:
-        from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+        from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 
         generators[name] = ExtremumSeekingGenerator
         return ExtremumSeekingGenerator
     elif name in all_generator_names["rcds"]:
-        from xopt.generators.rcds.rcds import RCDSGenerator
+        from xopt.generators.sequential.rcds import RCDSGenerator
 
         generators[name] = RCDSGenerator
         return RCDSGenerator
