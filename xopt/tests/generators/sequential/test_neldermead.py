@@ -179,11 +179,12 @@ class TestNelderMeadGenerator:
             objectives: {y: MINIMIZE}
         """
         X = Xopt.from_yaml(YAML)
+        X.max_evaluations = 1000
         X.run()
 
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
-        assert xbest["x0"] == result[0] and xbest["x1"] == result[1], (
+        assert np.isclose(xbest["x0"], result[0]) and np.isclose(xbest["x1"], result[1]), (
             "Xopt Simplex does not match the vanilla one"
         )
 

@@ -551,11 +551,6 @@ def _neldermead_generator(
     while True:
         if stage == -1:
             astg = 1
-            if (
-                np.max(np.ravel(np.abs(sim[1:] - sim[0]))) <= xatol
-                and np.max(np.abs(fsim[0] - fsim[1:])) <= fatol
-            ):
-                break
 
             xbar = np.add.reduce(sim[:-1], 0) / N
             xr = (1 + rho) * xbar - rho * sim[-1]
