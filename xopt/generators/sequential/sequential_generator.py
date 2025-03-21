@@ -16,7 +16,7 @@ class SequentialGenerator(Generator):
     These algorithms will start from the last point in the history.
     """
 
-    is_active: bool = Field(False, exclude=True)
+    is_active: bool = False
     _last_candidate: Optional[List[Dict[str, float]]] = None
     _data_set: bool = False
 
