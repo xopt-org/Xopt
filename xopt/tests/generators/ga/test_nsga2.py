@@ -9,7 +9,11 @@ import pytest
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
-from xopt.generators.ga.nsga2 import get_domination, NSGA2Generator
+from xopt.generators.ga.nsga2 import (
+    get_domination,
+    NSGA2Generator,
+    fast_dominated_argsort_internal,
+)
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.vocs import VOCS
 
@@ -65,6 +69,96 @@ def test_get_domination(pop_f, pop_g, expected_dom):
     """
     result = get_domination(pop_f, pop_g)
     np.testing.assert_array_equal(result, expected_dom)
+
+
+@pytest.mark.parametrize(
+    "dom, expected_ranks",
+    [
+        # Test case 1: Simple domination chain
+        (
+            np.array(
+                [
+                    [False, True, False, False],
+                    [False, False, True, False],
+                    [False, False, False, True],
+                    [False, False, False, False],
+                ]
+            ),
+            [
+                [0],
+                [1],
+                [2],
+                [3],
+            ],
+        ),
+        # Test case 2: Multiple individuals in the same front
+        (
+            np.array(
+                [
+                    [False, False, True, True],
+                    [False, False, True, True],
+                    [False, False, False, False],
+                    [False, False, False, False],
+                ]
+            ),
+            [
+                [0, 1],
+                [2, 3],
+            ],
+        ),
+        # Test case 3: Multiple fronts
+        (
+            np.array(
+                [
+                    [False, False, True, True, True, False],
+                    [False, False, False, True, True, False],
+                    [False, False, False, False, True, True],
+                    [False, False, False, False, False, True],
+                    [False, False, False, False, False, False],
+                    [False, False, False, False, False, False],
+                ]
+            ),
+            [
+                [0, 1],
+                [2, 3],
+                [4, 5],
+            ],
+        ),
+    ],
+)
+def test_fast_dominated_argsort_internal(dom, expected_ranks):
+    """
+    Test the fast_dominated_argsort_internal function with various domination matrices.
+
+    This function tests the core nondominated sorting algorithm used in NSGA-II
+    with specific domination matrices and verifies the correct sorting of individuals
+    into domination ranks.
+
+    Parameters
+    ----------
+    dom : numpy.ndarray
+        Boolean domination matrix where dom[i,j] = True means individual i dominates j
+    expected_ranks : list of lists
+        Expected sorting of individuals into domination ranks
+    """
+    result = fast_dominated_argsort_internal(dom)
+
+    # Check that we have the expected number of ranks
+    assert len(result) == len(
+        expected_ranks
+    ), f"Expected {len(expected_ranks)} ranks, got {len(result)}"
+
+    # Check each rank contains the expected individuals
+    for i, (result_rank, expected_rank) in enumerate(zip(result, expected_ranks)):
+        # Convert result to list for easier comparison
+        result_rank_list = (
+            result_rank.tolist() if isinstance(result_rank, np.ndarray) else result_rank
+        )
+
+        # Sort both lists to handle different ordering within the same rank
+        assert sorted(result_rank_list) == sorted(
+            expected_rank
+        ), f"Rank {i} mismatch: expected {expected_rank}, got {result_rank_list}"
 
 
 def test_nsga2():
