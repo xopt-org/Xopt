@@ -1,5 +1,6 @@
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import numpy as np
+from pydantic import Field
 
 from xopt.errors import SeqGeneratorError
 from xopt.generator import Generator
@@ -16,7 +17,7 @@ class SequentialGenerator(Generator):
     """
 
     is_active: bool = False
-    _last_candidate: Optional[dict] = None
+    _last_candidate: Optional[List[Dict[str, float]]] = None
     _data_set: bool = False
 
     def add_data(self, new_data: pd.DataFrame):
@@ -135,7 +136,7 @@ class SequentialGenerator(Generator):
 
         return candidate
 
-    def _generate(self, first_gen: bool = False) -> dict:
+    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
         """
         Generate a new candidate point.
 
