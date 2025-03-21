@@ -48,7 +48,7 @@ class TestNelderMeadGenerator:
             gen.generate(2)
 
     def test_simplex_generate(self):
-        """ test simplex without providing an initial point -- started from point in data"""
+        """test simplex without providing an initial point -- started from point in data"""
         YAML = """
         generator:
             name: neldermead
@@ -72,10 +72,9 @@ class TestNelderMeadGenerator:
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
 
-
     def test_simplex_forced_init(self):
-        """ test to make sure that a re-loaded simplex generator works the same as the normal one at each step"""
-        
+        """test to make sure that a re-loaded simplex generator works the same as the normal one at each step"""
+
         YAML = """
         generator:
             name: neldermead
@@ -130,7 +129,7 @@ class TestNelderMeadGenerator:
         state = X.json()
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
-        
+
         # test where we start simplex after random evals and then try to add a random evaluation in the middle
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
@@ -187,9 +186,9 @@ class TestNelderMeadGenerator:
 
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
-        assert np.isclose(xbest["x0"], result[0]) and np.isclose(xbest["x1"], result[1]), (
-            "Xopt Simplex does not match the vanilla one"
-        )
+        assert np.isclose(xbest["x0"], result[0]) and np.isclose(
+            xbest["x1"], result[1]
+        ), "Xopt Simplex does not match the vanilla one"
 
     @pytest.mark.parametrize(
         "fun, obj", [(eval_f_linear_pos, "MINIMIZE"), (eval_f_linear_neg, "MAXIMIZE")]
