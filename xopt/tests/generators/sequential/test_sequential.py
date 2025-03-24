@@ -43,7 +43,7 @@ def test_add_data(sample_vocs, sample_data):
 
     gen.is_active = True
     gen._last_candidate = [{"x1": 0.3, "x2": 0.6}]
-    with pytest.raises(ValueError):
+    with pytest.raises(SeqGeneratorError):
         gen.add_data(sample_data)
 
 

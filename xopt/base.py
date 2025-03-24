@@ -259,7 +259,12 @@ class Xopt(XoptBaseModel):
         Run until the maximum number of evaluations is reached or the generator is done.
 
         """
-        while not self.generator.is_done:
+        # TODO: implement stopping criteria class
+        logger.info("Running Xopt")
+        if self.max_evaluations is None:
+            raise ValueError("max_evaluations must be set to call Xopt.run()")
+
+        while True:
             # Stopping criteria
             if self.max_evaluations is not None:
                 if self.n_data >= self.max_evaluations:
@@ -335,6 +340,11 @@ class Xopt(XoptBaseModel):
         # add constants to input data
         for name, value in self.vocs.constants.items():
             input_data[name] = value
+
+        # if we are using a sequential generator that is active, make sure that the evaluated data matches the last candidate
+        if isinstance(self.generator, SequentialGenerator):
+            if self.generator.is_active:
+                self.generator.validate_point(input_data)
 
         output_data = self.evaluator.evaluate_data(input_data)
 

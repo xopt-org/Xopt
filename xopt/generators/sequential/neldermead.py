@@ -77,10 +77,6 @@ class NelderMeadGenerator(SequentialGenerator):
         Initial simplex for the optimization.
     adaptive : bool
         Change hyperparameters based on dimensionality.
-    xatol : float
-        Tolerance in x value.
-    fatol : float
-        Tolerance in function value.
     current_state : SimplexState
         Current state of the simplex.
     future_state : Optional[SimplexState]
@@ -89,8 +85,6 @@ class NelderMeadGenerator(SequentialGenerator):
         Current x value.
     y : Optional[float]
         Current y value.
-    is_done_bool : bool
-        Indicates if the optimization is done.
 
     Methods:
     --------
@@ -114,15 +108,12 @@ class NelderMeadGenerator(SequentialGenerator):
     adaptive: bool = Field(
         True, description="Change hyperparameters based on dimensionality"
     )
-    xatol: float = Field(1e-4, description="Tolerance in x value")
-    fatol: float = Field(1e-4, description="Tolerance in function value")
     current_state: SimplexState = SimplexState()
     future_state: Optional[SimplexState] = None
 
     # Internal data structures
     x: Optional[np.ndarray] = None
     y: Optional[float] = None
-    is_done_bool: bool = False
     manual_data_cnt: int = Field(
         0, description="How many points are considered manual/not part of simplex run"
     )
@@ -133,10 +124,6 @@ class NelderMeadGenerator(SequentialGenerator):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # Initialize the first candidate if not given
-        if self.initial_point is None:
-            self.initial_point = self.vocs.random_inputs()[0]
 
         self._saved_options = self.model_dump(
             exclude={"current_state", "future_state"}
@@ -149,17 +136,61 @@ class NelderMeadGenerator(SequentialGenerator):
         else:
             self._initial_simplex = None
 
-    @property
-    def x0(self) -> np.ndarray:
-        """Raw internal initial point for convenience"""
-        if self._initial_point is not None:
-            return self._initial_point
+    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
+        """
+        Generate candidate.
+
+        Returns:
+        --------
+        Optional[List[Dict[str, float]]]
+            A list of dictionaries containing the generated samples.
+        """
+
+        if self.current_state.N is None:
+            # fresh start
+            pass
         else:
-            return np.array([self.initial_point[k] for k in self.vocs.variable_names])
+            n_inputs = len(self.data)
+            if self.current_state.ngen == n_inputs:
+                # We are in a state where result of last point is known
+                pass
+            else:
+                pass
+
+        results = self._call_algorithm()
+
+        x, state_extra = results
+        assert len(state_extra) == len(STATE_KEYS)
+        stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
+        self.future_state = stateobj
+
+        inputs = dict(zip(self.vocs.variable_names, x))
+        if self.vocs.constants is not None:
+            inputs.update(self.vocs.constants)
+
+        return [inputs]
 
     @property
-    def is_done(self) -> bool:
-        return self.is_done_bool
+    def x0(self) -> np.ndarray:
+        """
+        Raw internal initial point for convenience.
+        If initial_point is set, it will be used. Otherwise, if data is set, the last point will be used.
+
+        Returns:
+        --------
+        np.ndarray
+            The initial point as a NumPy array.
+        """
+        if self._initial_point is not None:
+            return self._initial_point
+        elif self.initial_point is not None:
+            return np.array([self.initial_point[k] for k in self.vocs.variable_names])
+        elif self.data is not None:
+            return self._get_initial_point()[0]
+        else:
+            raise ValueError(
+                "No initial point specified in generator or taken from data"
+            )
 
     def _add_data(self, new_data: pd.DataFrame):
         """
@@ -174,6 +205,9 @@ class NelderMeadGenerator(SequentialGenerator):
             # empty data, i.e. no steps yet
             assert self.future_state is None
             return
+
+        ndata = len(self.data)
+        ngen = self.current_state.ngen
 
         # Complicated part - need to determine if data corresponds to result of last gen
         if not self.is_active:
@@ -209,11 +243,11 @@ class NelderMeadGenerator(SequentialGenerator):
                 "Only one point at a time is expected in active mode"
             )
             # new data -> advance state machine 1 step
-            # n_auto_points = ndata - self.manual_data_cnt
-            # assert n_auto_points == self.future_state.ngen, (
-            #    f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
-            # )
-            # assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
+            n_auto_points = ndata - self.manual_data_cnt
+            assert n_auto_points == self.future_state.ngen, (
+                f"Internal error {n_auto_points=} {self.future_state=} {ndata=}"
+            )
+            assert n_auto_points == ngen + 1, f"Internal error {n_auto_points=} {ngen=}"
             self.current_state = self.future_state
             self.future_state = None
 
@@ -223,9 +257,6 @@ class NelderMeadGenerator(SequentialGenerator):
             assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
 
             yt = res[0, 0].item()
-            if np.isinf(yt) or np.isnan(yt):
-                self.is_done_bool = True
-                return
 
             self.y = yt
 
@@ -247,45 +278,6 @@ class NelderMeadGenerator(SequentialGenerator):
         else:
             self._initial_simplex = None
 
-    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
-        """
-        Generate candidate.
-
-        Returns:
-        --------
-        Optional[List[Dict[str, float]]]
-            A list of dictionaries containing the generated samples.
-        """
-        if self.is_done:
-            return None
-
-        if self.current_state.N is None:
-            # fresh start
-            pass
-        else:
-            n_inputs = len(self.data)
-            if self.current_state.ngen == n_inputs:
-                # We are in a state where result of last point is known
-                pass
-            else:
-                pass
-
-        results = self._call_algorithm()
-        if results is None:
-            self.is_done_bool = True
-            return None
-
-        x, state_extra = results
-        assert len(state_extra) == len(STATE_KEYS)
-        stateobj = SimplexState(**{k: v for k, v in zip(STATE_KEYS, state_extra)})
-        self.future_state = stateobj
-
-        inputs = dict(zip(self.vocs.variable_names, x))
-        if self.vocs.constants is not None:
-            inputs.update(self.vocs.constants)
-
-        return [inputs]
-
     def _call_algorithm(self):
         mins, maxs = self.vocs.bounds
         results = _neldermead_generator(
@@ -293,8 +285,6 @@ class NelderMeadGenerator(SequentialGenerator):
             state=self.current_state,
             lastval=self.y,
             adaptive=self.adaptive,
-            xatol=self.xatol,
-            fatol=self.fatol,
             initial_simplex=self._initial_simplex,
             bounds=(mins, maxs),
         )
@@ -355,8 +345,6 @@ def _neldermead_generator(
     state: SimplexState,
     lastval: Optional[float] = None,
     initial_simplex: Optional[np.ndarray] = None,
-    xatol: float = 1e-4,
-    fatol: float = 1e-4,
     adaptive: bool = True,
     bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None,
 ) -> Optional[Tuple[np.ndarray, Tuple]]:
@@ -381,10 +369,6 @@ def _neldermead_generator(
         Last function value.
     initial_simplex : np.ndarray, optional
         Initial simplex for the optimization.
-    xatol : float, optional
-        Absolute error in xopt between iterations that is acceptable for convergence.
-    fatol : float, optional
-        Absolute error in func(xopt) between iterations that is acceptable for convergence.
     adaptive : bool, optional
         Adapt algorithm parameters to dimensionality of problem. Useful for high-dimensional minimization.
     bounds : Tuple[np.ndarray, np.ndarray], optional
