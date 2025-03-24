@@ -26,7 +26,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
 
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 
-    _compatable_turbo_controllers = [SafetyTurboController]
+    _compatible_turbo_controllers = [SafetyTurboController]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):

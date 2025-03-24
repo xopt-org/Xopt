@@ -53,7 +53,7 @@ class BaxGenerator(BayesianGenerator):
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0
-    _compatable_turbo_controllers = [EntropyTurboController, SafetyTurboController]
+    _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
