@@ -169,7 +169,7 @@ def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
     return np.array(dist)
 
 
-def crowded_comparison_argsort(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None):
+def crowded_comparison_argsort(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.ndarray:
     """
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
     Indices to individuals are returned in order of increasing value by crowded comparison operator.
@@ -202,7 +202,7 @@ def crowded_comparison_argsort(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = 
     return np.array(inds)[::-1]
 
 
-def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray):
+def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray) -> np.ndarray:
     """
     Get the "fitness" of each individual according to domination and crowding distance.
 
