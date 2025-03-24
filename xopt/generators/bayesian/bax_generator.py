@@ -11,7 +11,6 @@ from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformatio
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
-from xopt.generators.bayesian.utils import validate_turbo_controller_base
 
 logger = logging.getLogger()
 

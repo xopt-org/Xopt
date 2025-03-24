@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import torch
 
-from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -231,7 +230,7 @@ def validate_turbo_controller_base(value, valid_controller_types, info):
 
     if not valid_type:
         raise ValueError(
-            f"turbo controller of type {type(value)} not allowed for this generator"
+            f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
         )
 
     return value
