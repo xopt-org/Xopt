@@ -11,7 +11,6 @@ from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformatio
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
-from xopt.generators.bayesian.utils import validate_turbo_controller_base
 
 logger = logging.getLogger()
 
@@ -54,31 +53,7 @@ class BaxGenerator(BayesianGenerator):
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0
-
-    @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(cls, value, info: ValidationInfo):
-        """
-        Validate the turbo controller.
-
-        Parameters:
-        -----------
-        value : Any
-            The value to validate.
-        info : ValidationInfo
-            The validation information.
-
-        Returns:
-        --------
-        Any
-            The validated value.
-        """
-        controller_dict = {
-            "entropy": EntropyTurboController,
-            "safety": SafetyTurboController,
-        }
-        value = validate_turbo_controller_base(value, controller_dict, info)
-
-        return value
+    _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):

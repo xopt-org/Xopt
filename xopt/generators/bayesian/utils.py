@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import torch
 
-from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -184,26 +183,27 @@ def interpolate_points(df, num_points=10):
     return interpolated_points
 
 
-def validate_turbo_controller_base(value, available_controller_types, info):
-    if isinstance(value, TurboController):
-        valid_type = False
-        for _, controller_type in available_controller_types.items():
-            if isinstance(value, controller_type):
-                valid_type = True
+def validate_turbo_controller_base(value, valid_controller_types, info):
+    """Validate turbo controller input"""
 
-        if not valid_type:
-            raise ValueError(
-                f"turbo controller of type {type(value)} not allowed for this generator"
-            )
+    # get string names of available controller types
+    controller_types = {
+        controller.__name__: controller for controller in valid_controller_types
+    }
 
-    elif isinstance(value, str):
+    if isinstance(value, str):
+        # handle old string input
+        if value == "optimize":
+            value = "OptimizeTurboController"
+        elif value == "safety":
+            value = "SafetyTurboController"
+
         # create turbo controller from string input
-        if value in available_controller_types:
-            value = available_controller_types[value](info.data["vocs"])
+        if value in controller_types:
+            value = controller_types[value](info.data["vocs"])
         else:
             raise ValueError(
-                f"{value} not found, available values are "
-                f"{available_controller_types.keys()}"
+                f"{value} not found, available values are {controller_types.keys()}"
             )
     elif isinstance(value, dict):
         value_copy = deepcopy(value)
@@ -211,17 +211,26 @@ def validate_turbo_controller_base(value, available_controller_types, info):
         if "name" not in value:
             raise ValueError("turbo input dict needs to have a `name` attribute")
         name = value_copy.pop("name")
-        if name in available_controller_types:
+        if name in controller_types:
             # pop unnecessary elements
             for ele in ["dim"]:
                 value_copy.pop(ele, None)
 
-            value = available_controller_types[name](
-                vocs=info.data["vocs"], **value_copy
-            )
+            value = controller_types[name](vocs=info.data["vocs"], **value_copy)
         else:
             raise ValueError(
-                f"{value} not found, available values are "
-                f"{available_controller_types.keys()}"
+                f"{value} not found, available values are {controller_types.keys()}"
             )
+
+    # check if turbo controller is compatabile with the generator
+    valid_type = False
+    for controller_type in valid_controller_types:
+        if isinstance(value, controller_type):
+            valid_type = True
+
+    if not valid_type:
+        raise ValueError(
+            f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
+        )
+
     return value
