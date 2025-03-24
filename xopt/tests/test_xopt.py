@@ -499,7 +499,7 @@ class TestXopt:
             generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
         )
 
-        assert X.generator is not X2.generator        
+        assert X.generator is not X2.generator
 
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
