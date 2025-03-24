@@ -160,7 +160,7 @@ def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
         # Calculate distances for this objective
         dist[0] = np.inf
         dist[-1] = np.inf
-        dist[1:-1] += (Ps[2:] - Ps[:-2]) / (Ps[-1] - Ps[0] + 1e-300)
+        dist[1:-1] += (Ps[2:] - Ps[:-2]) / (Ps[-1] - Ps[0] + np.finfo(np.float64).smallest_normal)
 
         # Unsort it
         unsort_ind = np.argsort(sort_ind)
