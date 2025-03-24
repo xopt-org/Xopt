@@ -268,7 +268,7 @@ class OptimizeTurboController(TurboController):
         Update the state of the controller.
     """
 
-    name: str = Field("optimize", frozen=True)
+    name: str = Field("OptimizeTurboController", frozen=True)
     best_value: Optional[float] = None
 
     @field_validator("vocs", mode="after")
@@ -389,7 +389,7 @@ class SafetyTurboController(TurboController):
         Update the state of the controller.
     """
 
-    name: str = Field("safety", frozen=True)
+    name: str = Field("SafetyTurboController", frozen=True)
     scale_factor: PositiveFloat = 1.25
     min_feasible_fraction: PositiveFloat = 0.75
 
@@ -399,9 +399,6 @@ class SafetyTurboController(TurboController):
             raise ValueError(
                 "safety turbo controller can only be used with constraints"
             )
-
-        if not info.objectives:
-            raise ValueError("safety turbo controller must have an objective specified")
 
         return info
 
@@ -453,7 +450,7 @@ class EntropyTurboController(TurboController):
         Update the state of the controller.
     """
 
-    name: str = Field("entropy", frozen=True)
+    name: str = Field("EntropyTurboController", frozen=True)
     _best_entropy: float = None
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
