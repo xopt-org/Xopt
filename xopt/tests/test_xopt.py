@@ -201,14 +201,13 @@ class TestXopt:
 
         # test with vocs that uses "x1" as a constant
         test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables = {"x2": [0, 1]}
+        test_vocs.constants["x1"] = 2.0
 
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=test_vocs)
 
         xopt = Xopt(generator=generator, evaluator=evaluator, vocs=test_vocs)
-
-        test_vocs.variables = {"x2": [0, 1]}
-        test_vocs.constants["x1"] = 2.0
 
         out = xopt.evaluate({"x2": 0.2})
         assert isinstance(out, dict)
