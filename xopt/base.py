@@ -147,6 +147,10 @@ class Xopt(XoptBaseModel):
                     {"vocs": data["vocs"]}
                 )
 
+            # make a copy of the generator / vocs objects to avoid modifying the original
+            data["vocs"] = deepcopy(data["vocs"])
+            data["generator"] = deepcopy(data["generator"])
+
         return data
 
     @field_validator("evaluator", mode="before")
