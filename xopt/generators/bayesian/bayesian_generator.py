@@ -165,7 +165,7 @@ class BayesianGenerator(Generator, ABC):
 
     n_candidates: int = 1
 
-    _compatable_turbo_controllers: Optional[List[TurboController]] = None
+    _compatible_turbo_controllers: Optional[List[TurboController]] = None
 
     @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
@@ -223,11 +223,11 @@ class BayesianGenerator(Generator, ABC):
         if value is None:
             return value
 
-        if cls._compatable_turbo_controllers.default is None:
+        if cls._compatible_turbo_controllers.default is None:
             raise ValueError("cannot use any turbo controller with this generator")
         else:
             return validate_turbo_controller_base(
-                value, cls._compatable_turbo_controllers.default, info
+                value, cls._compatible_turbo_controllers.default, info
             )
 
     @field_validator("computation_time", mode="before")
