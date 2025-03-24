@@ -33,7 +33,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         + formatted_base_docstring()
     )
 
-    _compatable_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
+    _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     def get_acquisition(self, model):
         """

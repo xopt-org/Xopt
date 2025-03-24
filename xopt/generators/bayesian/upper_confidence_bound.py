@@ -24,7 +24,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation: bool = True
-    _compatable_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
+    _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound
 
