@@ -13,6 +13,10 @@ from xopt.generators.bayesian.bayesian_generator import (
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
@@ -20,6 +24,8 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation: bool = True
+    _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
+
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound
 
 Attributes

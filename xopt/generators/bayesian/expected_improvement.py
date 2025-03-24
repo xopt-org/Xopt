@@ -13,6 +13,10 @@ from xopt.generators.bayesian.bayesian_generator import (
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
@@ -28,6 +32,8 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         "Bayesian optimization generator using Expected improvement\n"
         + formatted_base_docstring()
     )
+
+    _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     def get_acquisition(self, model):
         """
