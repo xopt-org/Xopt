@@ -38,8 +38,6 @@ from xopt.generators.bayesian.objectives import (
     CustomXoptObjective,
 )
 from xopt.generators.bayesian.turbo import (
-    OptimizeTurboController,
-    SafetyTurboController,
     TurboController,
 )
 from xopt.generators.bayesian.utils import (
@@ -167,6 +165,8 @@ class BayesianGenerator(Generator, ABC):
 
     n_candidates: int = 1
 
+    _compatible_turbo_controllers: Optional[List[TurboController]] = None
+
     @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
         if isinstance(v, str):
@@ -220,13 +220,15 @@ class BayesianGenerator(Generator, ABC):
     @field_validator("turbo_controller", mode="before")
     def validate_turbo_controller(cls, value, info: ValidationInfo):
         """note default behavior is no use of turbo"""
-        controller_dict = {
-            "optimize": OptimizeTurboController,
-            "safety": SafetyTurboController,
-        }
-        value = validate_turbo_controller_base(value, controller_dict, info)
+        if value is None:
+            return value
 
-        return value
+        if cls._compatible_turbo_controllers.default is None:
+            raise ValueError("cannot use any turbo controller with this generator")
+        else:
+            return validate_turbo_controller_base(
+                value, cls._compatible_turbo_controllers.default, info
+            )
 
     @field_validator("computation_time", mode="before")
     def validate_computation_time(cls, value):

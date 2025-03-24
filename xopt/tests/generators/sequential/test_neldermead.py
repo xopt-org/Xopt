@@ -47,14 +47,12 @@ class TestNelderMeadGenerator:
         with pytest.raises(SeqGeneratorError):
             gen.generate(2)
 
-    def test_simplex_forced_init(self):
+    def test_simplex_generate(self):
+        """test simplex without providing an initial point -- started from point in data"""
         YAML = """
         generator:
             name: neldermead
-            initial_point: {x0: -1, x1: -1}
             adaptive: true
-            xatol: 0.0001
-            fatol: 0.0001
         evaluator:
             function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
         vocs:
@@ -63,6 +61,35 @@ class TestNelderMeadGenerator:
                 x1: [-5, 5]
             objectives: {y: MINIMIZE}
         """
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(1)
+
+        for _ in range(2):
+            X.step()
+
+        # test reloading
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+    def test_simplex_forced_init(self):
+        """test to make sure that a re-loaded simplex generator works the same as the normal one at each step"""
+
+        YAML = """
+        generator:
+            name: neldermead
+            initial_point: {x0: -1, x1: -1}
+            adaptive: true
+        evaluator:
+            function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
+        vocs:
+            variables:
+                x0: [-5, 5]
+                x1: [-5, 5]
+            objectives: {y: MINIMIZE}
+        """
+
+        # test where we first random evaluate a point before starting simplex -- simplex will still start with the initial point
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(1)
         assert not X.generator.is_active
@@ -76,6 +103,7 @@ class TestNelderMeadGenerator:
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
 
+        # test where we first random evaluate multiple points before starting simplex
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         assert X.generator._initial_simplex is not None
@@ -86,36 +114,23 @@ class TestNelderMeadGenerator:
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
 
-        X = Xopt.from_yaml(YAML)
-        X.random_evaluate(4)
-        X.step()
-        assert X.generator._initial_simplex is not None
-        X.step()
-        state = X.json()
-        X2 = Xopt.model_validate(json.loads(state))
-        X2.step()
-
+        # test where we start simplex immediately but then try to add a random evaluation in the middle
         X = Xopt.from_yaml(YAML)
         X.step()
         # print(X.generator.data, X.generator.current_state.ngen)
         assert X.generator._initial_simplex is None
         assert X.generator.current_state.astg == 0
-
         with pytest.raises(SeqGeneratorError):
             X.random_evaluate(1)
-        # assert X.generator._initial_simplex is None
-        # assert X.generator.current_state.astg == -1
         X.step()
-        # print(X.generator.data, X.generator.current_state.ngen)
         X.step()
         assert X.generator._initial_simplex is None
         assert X.generator.current_state.astg == 0
         state = X.json()
-        # print(X.generator.data, X.generator.current_state.ngen)
         X2 = Xopt.model_validate(json.loads(state))
-        # print(X2.generator.data, X.generator.current_state.ngen)
         X2.step()
 
+        # test where we start simplex after random evals and then try to add a random evaluation in the middle
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
         X.step()
@@ -142,17 +157,6 @@ class TestNelderMeadGenerator:
                 "x2": 0,
             }
 
-        with pytest.raises(ValidationError):
-            gen.xatol = None
-
-        with pytest.raises(ValidationError):
-            gen.fatol = None
-
-        gen.xatol = 1e-3
-        gen.fatol = 1e-3
-        assert gen.xatol == 1e-3
-        assert gen.fatol == 1e-3
-
     def test_simplex_agreement(self):
         """Compare between Vanilla Simplex and Xopt Simplex in full auto run mode"""
 
@@ -168,8 +172,6 @@ class TestNelderMeadGenerator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
             adaptive: true
-            xatol: 0.0001
-            fatol: 0.0001
         evaluator:
             function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
         vocs:
@@ -245,8 +247,6 @@ class TestNelderMeadGenerator:
                 "name": "neldermead",
                 "initial_point": {f"x{i}": x0[i] for i in range(len(x0))},
                 "adaptive": True,
-                "xatol": 1e-4,
-                "fatol": 1e-4,
             },
             "evaluator": {"function": f"xopt.resources.test_functions.{fstring}"},
             "vocs": v.model_dump(),
@@ -292,8 +292,6 @@ class TestNelderMeadGenerator:
                 "name": "neldermead",
                 "initial_point": {f"x{i}": x0[i] for i in range(len(x0))},
                 "adaptive": True,
-                "xatol": 1e-4,
-                "fatol": 1e-4,
             },
             "evaluator": {"function": f"xopt.resources.test_functions.{fstring}"},
             "vocs": v.model_dump(),
