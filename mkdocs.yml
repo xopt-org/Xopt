@@ -41,9 +41,9 @@ nav:
         - Evolutionary:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
         - Sequential:
-            - Nelder-Mead: examples/scipy/neldermead.ipynb
-            - Extremum seeking: examples/es/extremum_seeking.ipynb
-            - RCDS: examples/rcds/rcds.ipynb
+            - Nelder-Mead: examples/sequential/neldermead.ipynb
+            - Extremum seeking: examples/sequential/extremum_seeking.ipynb
+            - RCDS: examples/sequential/rcds.ipynb
         - Other:
             - Latin Hypercube: examples/scipy/latin_hypercube.ipynb
 
