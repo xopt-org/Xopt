@@ -13,6 +13,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
+from xopt.generators.bayesian.turbo import SafetyTurboController
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
@@ -24,6 +25,8 @@ class BayesianExplorationGenerator(BayesianGenerator):
     supports_batch_generation: bool = True
 
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
+
+    _compatable_turbo_controllers = [SafetyTurboController]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
