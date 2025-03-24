@@ -61,6 +61,26 @@ class TestBayesianExplorationGenerator:
         X.step()
         X.step()
 
+    def test_with_turbo(self):
+        evaluator = Evaluator(function=xtest_callable)
+
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+
+        gen = BayesianExplorationGenerator(
+            vocs=test_vocs, turbo_controller="SafetyTurboController"
+        )
+        gen.numerical_optimizer.n_restarts = 1
+        gen.n_monte_carlo_samples = 1
+        gen.data = TEST_VOCS_DATA
+
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+
+        # now use bayes opt
+        X.step()
+        X.step()
+
     def test_interpolation(self):
         evaluator = Evaluator(function=xtest_callable)
 
