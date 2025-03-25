@@ -2,11 +2,11 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from xopt.errors import SeqGeneratorError
-from xopt.generator import Generator
+from xopt.generator import Generator, StateOwner
 import pandas as pd
 
 
-class SequentialGenerator(Generator):
+class SequentialGenerator(Generator, StateOwner):
     """
     A generator that runs a sequential optimization algorithm, such as Nelder-Mead, extremum seeking, RCDS, etc.
 
