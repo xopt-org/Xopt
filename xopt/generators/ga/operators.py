@@ -8,14 +8,13 @@ from ...pydantic import XoptBaseModel
 class MutationOperator(XoptBaseModel):
     name: Literal["abstract"] = "abstract"
 
-
     @field_validator("name", mode="after")
     def validate_files(cls, value, info):
         """
-        Hack to override the wildcard before validator in `XoptBaseModel` for 
+        Hack to override the wildcard before validator in `XoptBaseModel` for
         the discriminator field. Before validators are dissallowed in this case.
         """
-        return value 
+        return value
 
     def __call__(self, parent: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         raise NotImplementedError
@@ -135,10 +134,10 @@ class CrossoverOperator(XoptBaseModel):
     @field_validator("name", mode="after")
     def validate_files(cls, value, info):
         """
-        Hack to override the wildcard before validator in `XoptBaseModel` for 
+        Hack to override the wildcard before validator in `XoptBaseModel` for
         the discriminator field. Before validators are dissallowed in this case.
         """
-        return value 
+        return value
 
     def __call__(
         self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
