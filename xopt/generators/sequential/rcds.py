@@ -26,8 +26,6 @@ class RCDS:
         Estimated noise level. Defaults to 0.1.
     step : float, optional
         Step size for the optimization. Defaults to 1e-2.
-    tol : float, optional
-        Tolerance for convergence. Defaults to 1e-5.
 
     Attributes
     ----------
@@ -39,8 +37,6 @@ class RCDS:
         Estimated noise level.
     step : float
         Step size for the optimization.
-    tol : float
-        Tolerance for convergence.
     cnt : int
         Internal counter initialized to 0.
     OBJ : None
@@ -53,7 +49,6 @@ class RCDS:
         init_mat: Optional[np.ndarray] = None,
         noise: float = 0.1,
         step: float = 1e-2,
-        tol: float = 1e-5,
     ):
         """
         Initialize the RCDS algorithm.
@@ -68,14 +63,11 @@ class RCDS:
             Estimated noise level. Defaults to 0.1.
         step : float, optional
             Step size for the optimization. Defaults to 1e-2.
-        tol : float, optional
-            Tolerance for convergence. Defaults to 1e-5.
         """
         self.x0 = x0.reshape(-1, 1)  # convert to a col vector
         self.Imat = init_mat
         self.noise = noise
         self.step = step
-        self.tol = tol
 
         # Internal vars
         self.cnt = 0
@@ -97,7 +89,6 @@ class RCDS:
 
         x0 = self.x0
         step = self.step
-        tol = self.tol
         self.Nvar = len(x0)
         yield x0
         f0, _ = self.func_obj(x0)
@@ -197,13 +188,6 @@ class RCDS:
                     )
 
             logger.debug("g count is %d", self.cnt)
-
-            if 2.0 * abs(f0 - fm) < tol * (abs(f0) + abs(fm)) and tol > 0:
-                logger.debug(
-                    "terminated: f0=%4.2e\t, fm=%4.2e, f0-fm=%4.2e\n"
-                    % (f0, fm, f0 - fm)
-                )
-                # break
 
             f0 = fm
             x0 = xm
@@ -550,8 +534,6 @@ class RCDSGenerator(SequentialGenerator):
         Estimated noise level.
     step : PositiveFloat
         Step size for the optimization.
-    tol : PositiveFloat
-        Tolerance for convergence.
     _ub : np.ndarray
         Upper bounds of the variables.
     _lb : np.ndarray
@@ -568,7 +550,6 @@ class RCDSGenerator(SequentialGenerator):
     init_mat: Optional[np.ndarray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
     step: PositiveFloat = Field(1e-2)
-    tol: PositiveFloat = Field(1e-5)
 
     _rcds: RCDS = None
     _generator = None
@@ -599,7 +580,6 @@ class RCDSGenerator(SequentialGenerator):
             init_mat=self.init_mat,
             noise=self.noise,
             step=self.step,
-            tol=self.tol,
         )
         self._rcds.update_obj(self._sign * float(f0))
         self._generator = self._rcds.powellmain()

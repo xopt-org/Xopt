@@ -40,12 +40,13 @@ nav:
                 - Multi-generation gaussian process optimization: examples/multi_objective_bayes_opt/mggpo.ipynb
         - Evolutionary:
             - CNSGA: examples/cnsga/cnsga_tnk.ipynb
-        - SciPy:
-            - Nelder-Mead: examples/scipy/neldermead.ipynb
-            - Latin Hypercube: examples/scipy/latin_hypercube.ipynb
+        - Sequential:
+            - Nelder-Mead: examples/sequential/neldermead.ipynb
+            - Extremum seeking: examples/sequential/extremum_seeking.ipynb
+            - RCDS: examples/sequential/rcds.ipynb
         - Other:
-            - Extremum seeking: examples/es/extremum_seeking.ipynb
-            - RCDS: examples/rcds/rcds.ipynb
+            - Latin Hypercube: examples/scipy/latin_hypercube.ipynb
+
     - API:
       - Xopt: api/xopt.md
       - Vocs: api/vocs.md
