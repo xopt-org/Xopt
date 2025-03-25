@@ -54,7 +54,9 @@ def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
         # Calculate distances for this objective
         dist[0] = np.inf
         dist[-1] = np.inf
-        dist[1:-1] += (Ps[2:] - Ps[:-2]) / (Ps[-1] - Ps[0] + np.finfo(np.float64).smallest_normal)
+        dist[1:-1] += (Ps[2:] - Ps[:-2]) / (
+            Ps[-1] - Ps[0] + np.finfo(np.float64).smallest_normal
+        )
 
         # Unsort it
         unsort_ind = np.argsort(sort_ind)
@@ -63,7 +65,9 @@ def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
     return np.array(dist)
 
 
-def crowded_comparison_argsort(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.ndarray:
+def crowded_comparison_argsort(
+    pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None
+) -> np.ndarray:
     """
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
     Indices to individuals are returned in order of increasing value by crowded comparison operator.
