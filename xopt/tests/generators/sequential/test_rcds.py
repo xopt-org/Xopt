@@ -56,7 +56,6 @@ class TestRCDSGenerator:
             init_mat: null
             noise: 0.00001
             step: 0.01
-            tol: 0.00001
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
         vocs:
@@ -91,7 +90,7 @@ class TestRCDSGenerator:
         variables = {f"x{i}": [-5, 5] for i in range(len(x_opt))}
         objectives = {"y1": obj}
         vocs = VOCS(variables=variables, objectives=objectives)
-        generator = RCDSGenerator(tol=0.00001, step=0.01, noise=0.00001, vocs=vocs)
+        generator = RCDSGenerator(step=0.01, noise=0.00001, vocs=vocs)
         evaluator = Evaluator(function=fun)
         X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
 
