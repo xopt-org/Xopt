@@ -47,4 +47,3 @@ class TestSequentialSerialization:
 
         # test pickling
         pickle.dumps(X2.generator)
-    
