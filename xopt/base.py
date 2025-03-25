@@ -18,6 +18,7 @@ from pydantic import (
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
+from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS

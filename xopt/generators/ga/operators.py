@@ -1,19 +1,28 @@
 import numpy as np
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import Optional, Literal, Annotated, Tuple
 
-from ...base import XoptBaseModel
+from ...pydantic import XoptBaseModel
 
 
 class MutationOperator(XoptBaseModel):
-    name = "abstract"
+    name: Literal["abstract"] = "abstract"
+
+
+    @field_validator("name", mode="after")
+    def validate_files(cls, value, info):
+        """
+        Hack to override the wildcard before validator in `XoptBaseModel` for 
+        the discriminator field. Before validators are dissallowed in this case.
+        """
+        return value 
 
     def __call__(self, parent: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
 class DummyMutation(MutationOperator):
-    name = "_dummy"
+    name: Literal["_dummy"] = "_dummy"
 
 
 class PolynomialMutation(MutationOperator):
@@ -34,7 +43,7 @@ class PolynomialMutation(MutationOperator):
         perturbation. Larger values produce perturbations closer to the parent.
     """
 
-    name = "polynomial_mutation"
+    name: Literal["polynomial_mutation"] = "polynomial_mutation"
     pm: Annotated[
         Optional[float],
         Field(
@@ -121,7 +130,15 @@ class PolynomialMutation(MutationOperator):
 
 
 class CrossoverOperator(XoptBaseModel):
-    name = "abstract"
+    name: Literal["abstract"] = "abstract"
+
+    @field_validator("name", mode="after")
+    def validate_files(cls, value, info):
+        """
+        Hack to override the wildcard before validator in `XoptBaseModel` for 
+        the discriminator field. Before validators are dissallowed in this case.
+        """
+        return value 
 
     def __call__(
         self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
@@ -130,7 +147,7 @@ class CrossoverOperator(XoptBaseModel):
 
 
 class DummyCrossover(CrossoverOperator):
-    name = "_dummy"
+    name: Literal["_dummy"] = "_dummy"
 
 
 class SimulatedBinaryCrossover(CrossoverOperator):
@@ -158,7 +175,7 @@ class SimulatedBinaryCrossover(CrossoverOperator):
     [1] Deb, K., & Agrawal, R. B. (1995). Simulated binary crossover for continuous search space. Complex systems, 9(2), 115-148
     """
 
-    name = "simulated_binary_crossover"
+    name: Literal["simulated_binary_crossover"] = "simulated_binary_crossover"
     delta_1: Annotated[
         float, Field(strict=True, ge=0, le=1, description="Crossover probability")
     ] = 0.5
