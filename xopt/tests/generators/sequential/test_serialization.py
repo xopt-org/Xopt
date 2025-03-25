@@ -1,4 +1,3 @@
-from copy import deepcopy
 import pickle
 
 import numpy as np
@@ -8,7 +7,6 @@ from xopt.generators.sequential import (
     ExtremumSeekingGenerator,
     NelderMeadGenerator,
 )
-from xopt.resources.testing import TEST_VOCS_BASE
 from xopt import Evaluator, Xopt
 from xopt.vocs import VOCS
 
