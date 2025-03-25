@@ -1,16 +1,18 @@
 import numpy as np
-from pydantic import Field, BaseModel
+from pydantic import Field
 from typing import Optional, Literal, Annotated, Tuple
 
+from ...base import XoptBaseModel
 
-class MutationOperator(BaseModel):
+
+class MutationOperator(XoptBaseModel):
     name: Literal["abstract"] = "abstract"
 
     def __call__(self, parent: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
-class DummyMutation(BaseModel):
+class DummyMutation(MutationOperator):
     name: Literal["_dummy"] = "_dummy"
 
 
@@ -118,7 +120,7 @@ class PolynomialMutation(MutationOperator):
         return mutated
 
 
-class CrossoverOperator(BaseModel):
+class CrossoverOperator(XoptBaseModel):
     name: Literal["abstract"] = "abstract"
 
     def __call__(
@@ -127,11 +129,11 @@ class CrossoverOperator(BaseModel):
         raise NotImplementedError
 
 
-class DummyCrossover(BaseModel):
+class DummyCrossover(CrossoverOperator):
     name: Literal["_dummy"] = "_dummy"
 
 
-class SimulatedBinaryCrossover(BaseModel):
+class SimulatedBinaryCrossover(CrossoverOperator):
     """
     Simulated Binary Crossover (SBX) operator for evolutionary algorithms.
 
