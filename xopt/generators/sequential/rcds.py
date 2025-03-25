@@ -542,6 +542,8 @@ class RCDSGenerator(SequentialGenerator):
         Instance of the RCDS algorithm.
     _generator : generator
         Generator for the RCDS algorithm.
+    _sign : int
+        Sign of the objective function (1 for MINIMIZE, -1 for MAXIMIZE).
     """
 
     name = "rcds"
@@ -551,21 +553,35 @@ class RCDSGenerator(SequentialGenerator):
 
     _rcds: RCDS = None
     _generator = None
+    _sign = 1
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
     def _reset(self):
         """reset the rcds object"""
 
+        objective_name = self.vocs.objective_names[
+            0
+        ]  # rcds only supports one objective
+        direction = self.vocs.objectives[objective_name]
+        if direction == "MINIMIZE":
+            self._sign = 1
+        elif direction == "MAXIMIZE":
+            self._sign = -1
+
         x0, f0 = self._get_initial_point()
 
+        # RCDS assume a normalized problem
+        lb, ub = self.vocs.bounds
+        _x0 = (x0 - lb) / (ub - lb)
+
         self._rcds = RCDS(
-            x0=x0,
+            x0=_x0,
             init_mat=self.init_mat,
             noise=self.noise,
             step=self.step,
         )
-        self._rcds.update_obj(float(f0))
+        self._rcds.update_obj(self._sign * float(f0))
         self._generator = self._rcds.powellmain()
 
     def _add_data(self, new_data: pd.DataFrame):
@@ -573,25 +589,25 @@ class RCDSGenerator(SequentialGenerator):
         res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
 
         if self._rcds is not None:
-            self._rcds.update_obj(res)
+            self._rcds.update_obj(self._sign * res)
 
     def _generate(self, first_gen: bool = False):
         """generate a new candidate"""
         if first_gen:
             self.reset()
 
-        x_next = next(self._generator)
-
-        bound_low, bound_up = self.vocs.bounds
-        _ub = bound_up
-        _lb = bound_low
-
+        _x_next = next(self._generator)
         # Verify the candidate here
-        while np.any(x_next > _ub) or np.any(x_next < _lb):
+        while np.any(_x_next > 1) or np.any(_x_next < 0):
             self._rcds.update_obj(
                 np.nan
             )  # notify RCDS that the search reached the bound
-            x_next = next(self._generator)  # request next candidate
+            _x_next = next(self._generator)  # request next candidate
+
+        # RCDS generator yields normalized x so denormalize it here
+        _x_next = np.array(_x_next).flatten()  # convert 2D matrix to 1D array
+        lb, ub = self.vocs.bounds
+        x_next = (ub - lb) * _x_next + lb
 
         x_next = [float(ele) for ele in x_next]
         return [dict(zip(self.vocs.variable_names, x_next))]
