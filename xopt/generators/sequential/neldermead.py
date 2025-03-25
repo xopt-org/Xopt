@@ -136,7 +136,7 @@ class NelderMeadGenerator(SequentialGenerator):
         else:
             self._initial_simplex = None
 
-    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
+    def _generate(self) -> Optional[List[Dict[str, float]]]:
         """
         Generate candidate.
 

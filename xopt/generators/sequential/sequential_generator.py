@@ -136,7 +136,7 @@ class SequentialGenerator(Generator):
 
         # if the generator is not active, we need to start it
         if not self.is_active:
-            candidate = self._generate(True)
+            candidate = self._generate()
             self.is_active = True
         else:
             candidate = self._generate()
@@ -146,7 +146,7 @@ class SequentialGenerator(Generator):
 
         return candidate
 
-    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
+    def _generate(self) -> Optional[List[Dict[str, float]]]:
         """
         Generate a new candidate point.
 

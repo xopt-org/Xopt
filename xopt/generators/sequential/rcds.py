@@ -526,8 +526,6 @@ class RCDSGenerator(SequentialGenerator):
     ----------
     name : str
         Name of the generator.
-    x0 : Optional[list]
-        Initial solution vector.
     init_mat : Optional[np.ndarray]
         Initial direction matrix.
     noise : PositiveFloat
@@ -591,10 +589,13 @@ class RCDSGenerator(SequentialGenerator):
         if self._rcds is not None:
             self._rcds.update_obj(self._sign * res)
 
-    def _generate(self, first_gen: bool = False):
+    def _set_data(self, data):
+        self.data = data
+
+    def _generate(self):
         """generate a new candidate"""
-        if first_gen:
-            self.reset()
+        if self._generator is None:
+            self._reset()
 
         _x_next = next(self._generator)
         # Verify the candidate here
