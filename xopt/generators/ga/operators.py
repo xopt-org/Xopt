@@ -6,14 +6,14 @@ from ...base import XoptBaseModel
 
 
 class MutationOperator(XoptBaseModel):
-    name: Literal["abstract"] = "abstract"
+    name = "abstract"
 
     def __call__(self, parent: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
 class DummyMutation(MutationOperator):
-    name: Literal["_dummy"] = "_dummy"
+    name = "_dummy"
 
 
 class PolynomialMutation(MutationOperator):
@@ -34,7 +34,7 @@ class PolynomialMutation(MutationOperator):
         perturbation. Larger values produce perturbations closer to the parent.
     """
 
-    name: Literal["polynomial_mutation"] = "polynomial_mutation"
+    name = "polynomial_mutation"
     pm: Annotated[
         Optional[float],
         Field(
@@ -121,7 +121,7 @@ class PolynomialMutation(MutationOperator):
 
 
 class CrossoverOperator(XoptBaseModel):
-    name: Literal["abstract"] = "abstract"
+    name = "abstract"
 
     def __call__(
         self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
@@ -130,7 +130,7 @@ class CrossoverOperator(XoptBaseModel):
 
 
 class DummyCrossover(CrossoverOperator):
-    name: Literal["_dummy"] = "_dummy"
+    name = "_dummy"
 
 
 class SimulatedBinaryCrossover(CrossoverOperator):
@@ -158,7 +158,7 @@ class SimulatedBinaryCrossover(CrossoverOperator):
     [1] Deb, K., & Agrawal, R. B. (1995). Simulated binary crossover for continuous search space. Complex systems, 9(2), 115-148
     """
 
-    name: Literal["simulated_binary_crossover"] = "simulated_binary_crossover"
+    name = "simulated_binary_crossover"
     delta_1: Annotated[
         float, Field(strict=True, ge=0, le=1, description="Crossover probability")
     ] = 0.5
