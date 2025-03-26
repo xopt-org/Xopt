@@ -1,12 +1,10 @@
 import warnings
-from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 import numpy as np
 import pandas as pd
 import yaml
-from pandas import DataFrame
 from pydantic import ConfigDict, conlist, Field, field_validator
 
 from xopt.pydantic import XoptBaseModel
@@ -42,25 +40,73 @@ class VOCS(XoptBaseModel):
     """
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
     to describe optimization problems.
+
+    Attributes:
+    -----------
+    variables : Dict[str, conlist(float, min_length=2, max_length=2)]
+        Input variable names with a list of minimum and maximum values.
+    constraints : Dict[str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)]
+        Constraint names with a list of constraint type and value.
+    objectives : Dict[str, ObjectiveEnum]
+        Objective names with type of objective.
+    constants : Dict[str, Any]
+        Constant names and values passed to evaluate function.
+    observables : List[str]
+        Observation names tracked alongside objectives and constraints.
+
+    Methods:
+    --------
+    from_yaml(cls, yaml_text: str) -> 'VOCS'
+        Create a VOCS object from a YAML string.
+    as_yaml(self) -> str
+        Convert the VOCS object to a YAML string.
+    random_inputs(self, n: int = None, custom_bounds: dict = None, include_constants: bool = True, seed: int = None) -> list[dict]
+        Uniform sampling of the variables.
+    convert_dataframe_to_inputs(self, data: pd.DataFrame, include_constants: bool = True) -> pd.DataFrame
+        Extracts only inputs from a dataframe.
+    convert_numpy_to_inputs(self, inputs: np.ndarray, include_constants: bool = True) -> pd.DataFrame
+        Convert 2D numpy array to list of dicts (inputs) for evaluation.
+    variable_data(self, data: Union[pd.DataFrame, List[Dict], List[Dict]], prefix: str = "variable_") -> pd.DataFrame
+        Returns a dataframe containing variables according to `vocs.variables` in sorted order.
+    objective_data(self, data: Union[pd.DataFrame, List[Dict], List[Dict]], prefix: str = "objective_", return_raw: bool = False) -> pd.DataFrame
+        Returns a dataframe containing objective data transformed according to `vocs.objectives`.
+    constraint_data(self, data: Union[pd.DataFrame, List[Dict], List[Dict]], prefix: str = "constraint_") -> pd.DataFrame
+        Returns a dataframe containing constraint data transformed according to `vocs.constraints`.
+    observable_data(self, data: Union[pd.DataFrame, List[Dict], List[Dict]], prefix: str = "observable_") -> pd.DataFrame
+        Returns a dataframe containing observable data.
+    feasibility_data(self, data: Union[pd.DataFrame, List[Dict], List[Dict]], prefix: str = "feasible_") -> pd.DataFrame
+        Returns a dataframe containing booleans denoting if a constraint is satisfied or not.
+    normalize_inputs(self, input_points: pd.DataFrame) -> pd.DataFrame
+        Normalize input data (transform data into the range [0,1]) based on the variable ranges defined in the VOCS.
+    denormalize_inputs(self, input_points: pd.DataFrame) -> pd.DataFrame
+        Denormalize input data (transform data from the range [0,1]) based on the variable ranges defined in the VOCS.
+    validate_input_data(self, input_points: pd.DataFrame) -> None
+        Validates input data. Raises an error if the input data does not satisfy requirements given by vocs.
+    extract_data(self, data: pd.DataFrame, return_raw: bool = False, return_valid: bool = False) -> tuple
+        Split dataframe into separate dataframes for variables, objectives and constraints based on vocs.
+    select_best(self, data: pd.DataFrame, n: int = 1) -> tuple
+        Get the best value and point for a given data set based on vocs.
+    cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame
+        Returns the cumulative optimum for the given DataFrame.
     """
 
-    variables: Dict[str, conlist(float, min_length=2, max_length=2)] = Field(
+    variables: dict[str, conlist(float, min_length=2, max_length=2)] = Field(
         default={},
         description="input variable names with a list of minimum and maximum values",
     )
-    constraints: Dict[
+    constraints: dict[
         str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
     ] = Field(
         default={},
         description="constraint names with a list of constraint type and value",
     )
-    objectives: Dict[str, ObjectiveEnum] = Field(
+    objectives: dict[str, ObjectiveEnum] = Field(
         default={}, description="objective names with type of objective"
     )
-    constants: Dict[str, Any] = Field(
+    constants: dict[str, Any] = Field(
         default={}, description="constant names and values passed to evaluate function"
     )
-    observables: List[str] = Field(
+    observables: list[str] = Field(
         default=[],
         description="observation names tracked alongside objectives and constraints",
     )
@@ -93,49 +139,81 @@ class VOCS(XoptBaseModel):
         return v
 
     @classmethod
-    def from_yaml(cls, yaml_text):
+    def from_yaml(cls, yaml_text: str) -> "VOCS":
+        """
+        Create a VOCS object from a YAML string.
+
+        Parameters
+        ----------
+        yaml_text : str
+            The YAML string to create the VOCS object from.
+
+        Returns
+        -------
+        VOCS
+            The created VOCS object.
+        """
         loaded = yaml.safe_load(yaml_text)
         return cls(**loaded)
 
-    def as_yaml(self):
+    def as_yaml(self) -> str:
+        """
+        Convert the VOCS object to a YAML string.
+
+        Returns
+        -------
+        str
+            The YAML string representation of the VOCS object.
+        """
         return yaml.dump(self.model_dump(), default_flow_style=None, sort_keys=False)
 
     @property
-    def bounds(self):
+    def bounds(self) -> np.ndarray:
         """
-        Returns a bounds array (mins, maxs) of shape (2, n_variables)
+        Returns a bounds array (mins, maxs) of shape (2, n_variables).
         Arrays of lower and upper bounds can be extracted by:
             mins, maxs = vocs.bounds
+
+        Returns
+        -------
+        np.ndarray
+            The bounds array.
         """
         return np.array([v for _, v in sorted(self.variables.items())]).T
 
     @property
-    def variable_names(self):
+    def variable_names(self) -> list[str]:
         """Returns a sorted list of variable names"""
         return list(sorted(self.variables.keys()))
 
     @property
-    def objective_names(self):
+    def objective_names(self) -> list[str]:
         """Returns a sorted list of objective names"""
         return list(sorted(self.objectives.keys()))
 
     @property
-    def constraint_names(self):
+    def constraint_names(self) -> list[str]:
         """Returns a sorted list of constraint names"""
         if self.constraints is None:
             return []
         return list(sorted(self.constraints.keys()))
 
     @property
-    def observable_names(self):
+    def observable_names(self) -> list[str]:
+        """Returns a sorted list of observable names"""
         return sorted(self.observables)
 
     @property
-    def output_names(self):
+    def output_names(self) -> list[str]:
         """
         Returns a list of expected output keys:
             (objectives + constraints + observables)
         Each sub-list is sorted.
+
+        Returns
+        -------
+        List[str]
+            The list of expected output keys.
         """
         full_list = self.objective_names
         for ele in self.constraint_names:
@@ -149,59 +227,64 @@ class VOCS(XoptBaseModel):
         return full_list
 
     @property
-    def constant_names(self):
-        """Returns a sorted list of constraint names"""
+    def constant_names(self) -> list[str]:
+        """Returns a sorted list of constant names"""
         if self.constants is None:
             return []
         return list(sorted(self.constants.keys()))
 
     @property
-    def all_names(self):
+    def all_names(self) -> list[str]:
         """Returns all vocs names (variables, constants, objectives, constraints)"""
         return self.variable_names + self.constant_names + self.output_names
 
     @property
-    def n_variables(self):
+    def n_variables(self) -> int:
         """Returns the number of variables"""
         return len(self.variables)
 
     @property
-    def n_constants(self):
+    def n_constants(self) -> int:
         """Returns the number of constants"""
         return len(self.constants)
 
     @property
-    def n_inputs(self):
+    def n_inputs(self) -> int:
         """Returns the number of inputs (variables and constants)"""
         return self.n_variables + self.n_constants
 
     @property
-    def n_objectives(self):
+    def n_objectives(self) -> int:
         """Returns the number of objectives"""
         return len(self.objectives)
 
     @property
-    def n_constraints(self):
+    def n_constraints(self) -> int:
         """Returns the number of constraints"""
         return len(self.constraints)
 
     @property
-    def n_observables(self):
-        """Returns the number of constraints"""
+    def n_observables(self) -> int:
+        """Returns the number of observables"""
         return len(self.observables)
 
     @property
-    def n_outputs(self):
+    def n_outputs(self) -> int:
         """
         Returns the number of outputs
             len(objectives + constraints + observables)
+
+        Returns
+        -------
+        int
+            The number of outputs.
         """
         return len(self.output_names)
 
     def random_inputs(
         self,
         n: int = None,
-        custom_bounds: dict = None,
+        custom_bounds: dict[str, list[float]] = None,
         include_constants: bool = True,
         seed: int = None,
     ) -> list[dict]:
@@ -212,10 +295,21 @@ class VOCS(XoptBaseModel):
 
         If include_constants, the vocs.constants are added to the dict.
 
-        Optional:
-            n (integer) to make arrays of inputs, of size n.
-            seed (integer) to initialize the random number generator
+        Parameters
+        ----------
+        n : int, optional
+            Number of samples to generate. Defaults to None.
+        custom_bounds : dict, optional
+            Custom bounds for the variables. Defaults to None.
+        include_constants : bool, optional
+            Whether to include constants in the inputs. Defaults to True.
+        seed : int, optional
+            Seed for the random number generator. Defaults to None.
 
+        Returns
+        -------
+        list[dict]
+            A list of dictionaries containing the sampled inputs.
         """
         inputs = {}
         if seed is None:
@@ -224,48 +318,7 @@ class VOCS(XoptBaseModel):
             rng = np.random.default_rng(seed=seed)
             rng_sample_function = rng.random
 
-        # get bounds
-        # if custom_bounds is specified then they will be clipped inside
-        # vocs variable bounds -- raise a warning in this case
-        if custom_bounds is None:
-            bounds = self.variables
-        else:
-            variable_bounds = pd.DataFrame(self.variables)
-
-            # check type
-            if not isinstance(custom_bounds, dict):
-                raise TypeError("`custom_bounds` must be a dict")
-
-            # check custom bounds validity
-            try:
-                validate_variable_bounds(custom_bounds)
-            except ValueError:
-                raise ValueError("specified `custom_bounds` not valid")
-
-            old_custom_bounds = deepcopy(custom_bounds)
-
-            custom_bounds = pd.DataFrame(custom_bounds)
-            custom_bounds = custom_bounds.clip(
-                variable_bounds.iloc[0], variable_bounds.iloc[1], axis=1
-            )
-            bounds = custom_bounds.to_dict()
-
-            # check to make sure clipped values are not equal -- if not custom_bounds
-            # are not inside vocs bounds
-            for name, value in bounds.items():
-                if value[0] == value[1]:
-                    raise ValueError(
-                        f"specified `custom_bounds` for {name} is outside vocs domain"
-                    )
-
-            # if clipping was used then raise a warning
-            if bounds != old_custom_bounds:
-                warnings.warn(
-                    "custom bounds were clipped by vocs bounds", RuntimeWarning
-                )
-
-            for k in bounds.keys():
-                bounds[k] = [bounds[k][i] for i in range(2)]
+        bounds = clip_variable_bounds(self, custom_bounds)
 
         for key, val in bounds.items():  # No need to sort here
             a, b = val
@@ -281,12 +334,93 @@ class VOCS(XoptBaseModel):
         else:
             return pd.DataFrame(inputs).to_dict("records")
 
+    def grid_inputs(
+        self,
+        n: int | dict[str, int],
+        custom_bounds: dict = None,
+        include_constants: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Generate a meshgrid of inputs.
+
+        Parameters
+        ----------
+        n : Union[int, Dict[str, int]]
+            Number of points to generate along each axis. If an integer is provided, the same number of points
+            is used for all variables. If a dictionary is provided, it should have variable names as keys and
+            the number of points as values.
+        custom_bounds : dict, optional
+            Custom bounds for the variables. If None, the default bounds from `self.variables` are used.
+            The dictionary should have variable names as keys and a list of two values [min, max] as values.
+        include_constants : bool, optional
+            If True, include constant values from `self.constants` in the output DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the generated meshgrid of inputs. Each column corresponds to a variable,
+            and each row represents a point in the grid.
+
+        Raises
+        ------
+        TypeError
+            If `custom_bounds` is not a dictionary.
+        ValueError
+            If `custom_bounds` are not valid or are outside the domain of `self.variables`.
+
+        Warns
+        -----
+        RuntimeWarning
+            If `custom_bounds` are clipped by the bounds of `self.variables`.
+
+        Notes
+        -----
+        The function generates a meshgrid of inputs based on the specified bounds. If `custom_bounds` are provided,
+        they are validated and clipped to ensure they lie within the domain of `self.variables`. The resulting meshgrid
+        is flattened and returned as a DataFrame. If `include_constants` is True, constant values from `self.constants`
+        are added to the DataFrame.
+        """
+        bounds = clip_variable_bounds(self, custom_bounds)
+
+        grid_axes = []
+        for key, val in bounds.items():
+            if isinstance(n, int):
+                num_points = n
+            elif isinstance(n, dict) and key in n:
+                num_points = n[key]
+            else:
+                raise ValueError(
+                    f"Number of points for variable '{key}' not specified."
+                )
+            grid_axes.append(np.linspace(val[0], val[1], num_points))
+
+        mesh = np.meshgrid(*grid_axes)
+        inputs = {key: mesh[i].flatten() for i, key in enumerate(bounds.keys())}
+
+        if include_constants and self.constants is not None:
+            for key, value in self.constants.items():
+                inputs[key] = np.full_like(next(iter(inputs.values())), value)
+
+        return pd.DataFrame(inputs)
+
     def convert_dataframe_to_inputs(
-        self, data: pd.DataFrame, include_constants=True
+        self, data: pd.DataFrame, include_constants: bool = True
     ) -> pd.DataFrame:
         """
         Extracts only inputs from a dataframe.
         This will add constants if `include_constants` is true.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The dataframe to extract inputs from.
+        include_constants : bool, optional
+            Whether to include constants in the inputs. Defaults to True.
+
+        Returns
+        -------
+        pd.DataFrame
+            A dataframe containing the extracted inputs.
         """
         # make sure that the df keys only contain vocs variables
         if not set(self.variable_names) == set(data.keys()):
@@ -307,46 +441,55 @@ class VOCS(XoptBaseModel):
         return inner_copy
 
     def convert_numpy_to_inputs(
-        self, inputs: np.ndarray, include_constants=True
+        self, inputs: np.ndarray, include_constants: bool = True
     ) -> pd.DataFrame:
         """
-        convert 2D numpy array to list of dicts (inputs) for evaluation
+        Convert 2D numpy array to list of dicts (inputs) for evaluation.
         Assumes that the columns of the array match correspond to
-        `sorted(self.vocs.variables.keys())
+        `sorted(self.vocs.variables.keys())`
 
+        Parameters
+        ----------
+        inputs : np.ndarray
+            The 2D numpy array to convert.
+        include_constants : bool, optional
+            Whether to include constants in the inputs. Defaults to True.
+
+        Returns
+        -------
+        pd.DataFrame
+            A dataframe containing the converted inputs.
         """
         df = pd.DataFrame(inputs, columns=self.variable_names)
         return self.convert_dataframe_to_inputs(df, include_constants)
 
-    # Extract optimization data (in correct column order)
     def variable_data(
         self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        data: pd.DataFrame | list[dict],
         prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
-        Returns a dataframe containing variables according to `vocs.variables` in sorted
-        order
+        Returns a dataframe containing variables according to `vocs.variables` in sorted order.
 
         Parameters
         ----------
-            data: DataFrame
-                Data to be processed.
-            prefix: str, optional
-                Prefix added to column names.
+        data : Union[pd.DataFrame, List[Dict]]
+            The data to be processed.
+        prefix : str, optional
+            Prefix added to column names. Defaults to "variable_".
 
         Returns
         -------
-            result: DataFrame
-                Processed Dataframe
+        pd.DataFrame
+            The processed dataframe.
         """
         return form_variable_data(self.variables, data, prefix=prefix)
 
     def objective_data(
         self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        data: pd.DataFrame | list[dict],
         prefix: str = "objective_",
-        return_raw=False,
+        return_raw: bool = False,
     ) -> pd.DataFrame:
         """
         Returns a dataframe containing objective data transformed according to
@@ -354,21 +497,23 @@ class VOCS(XoptBaseModel):
 
         Parameters
         ----------
-            data: DataFrame
-                Data to be processed.
-            prefix: str, optional
-                Prefix added to column names.
+        data : Union[pd.DataFrame, List[Dict]]
+            The data to be processed.
+        prefix : str, optional
+            Prefix added to column names. Defaults to "objective_".
+        return_raw : bool, optional
+            Whether to return raw objective data. Defaults to False.
 
         Returns
         -------
-            result: DataFrame
-                Processed Dataframe
+        pd.DataFrame
+            The processed dataframe.
         """
         return form_objective_data(self.objectives, data, prefix, return_raw)
 
     def constraint_data(
         self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        data: pd.DataFrame | list[dict],
         prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
@@ -377,43 +522,43 @@ class VOCS(XoptBaseModel):
 
         Parameters
         ----------
-            data: DataFrame
-                Data to be processed.
-            prefix: str, optional
-                Prefix added to column names.
+        data : Union[pd.DataFrame, List[Dict]]
+            The data to be processed.
+        prefix : str, optional
+            Prefix added to column names. Defaults to "constraint_".
 
         Returns
         -------
-            result: DataFrame
-                Processed Dataframe
+        pd.DataFrame
+            The processed dataframe.
         """
         return form_constraint_data(self.constraints, data, prefix)
 
     def observable_data(
         self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        data: pd.DataFrame | list[dict],
         prefix: str = "observable_",
     ) -> pd.DataFrame:
         """
-        Returns a dataframe containing observable data
+        Returns a dataframe containing observable data.
 
         Parameters
         ----------
-            data: DataFrame
-                Data to be processed.
-            prefix: str, optional
-                Prefix added to column names.
+        data : Union[pd.DataFrame, List[Dict]]
+            The data to be processed.
+        prefix : str, optional
+            Prefix added to column names. Defaults to "observable_".
 
         Returns
         -------
-            result: DataFrame
-                Processed Dataframe
+        pd.DataFrame
+            The processed dataframe.
         """
         return form_observable_data(self.observable_names, data, prefix)
 
     def feasibility_data(
         self,
-        data: Union[pd.DataFrame, List[Dict], List[Dict]],
+        data: pd.DataFrame | list[dict],
         prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
@@ -423,15 +568,15 @@ class VOCS(XoptBaseModel):
 
         Parameters
         ----------
-            data: DataFrame
-                Data to be processed.
-            prefix: str, optional
-                Prefix added to column names.
+        data : Union[pd.DataFrame, List[Dict]]
+            The data to be processed.
+        prefix : str, optional
+            Prefix added to column names. Defaults to "feasible_".
 
         Returns
         -------
-            result: DataFrame
-                Processed Dataframe
+        pd.DataFrame
+            The processed dataframe.
         """
         return form_feasibility_data(self.constraints, data, prefix)
 
@@ -447,7 +592,7 @@ class VOCS(XoptBaseModel):
 
         Returns
         -------
-        result : pd.DataFrame
+        pd.DataFrame
             A DataFrame with input data in the range [0,1] corresponding to the
             specified variable ranges. Contains columns equal to the intersection
             between `input_points` and `vocs.variable_names`.
@@ -484,7 +629,7 @@ class VOCS(XoptBaseModel):
 
         Returns
         -------
-        result : pd.DataFrame
+        pd.DataFrame
             A DataFrame with denormalized input data corresponding to the
             specified variable ranges. Contains columns equal to the intersection
             between `input_points` and `vocs.variable_names`.
@@ -656,14 +801,16 @@ class VOCS(XoptBaseModel):
 OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
 
 
-def form_variable_data(variables: Union[Dict, DataFrame], data, prefix="variable_"):
+def form_variable_data(
+    variables: dict | pd.DataFrame, data, prefix="variable_"
+) -> pd.DataFrame:
     """
     Use variables dict to form a dataframe.
     """
     if not variables:
         return pd.DataFrame([])
 
-    if not isinstance(data, DataFrame):
+    if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
 
     # Pick out columns in right order
@@ -675,8 +822,8 @@ def form_variable_data(variables: Union[Dict, DataFrame], data, prefix="variable
 
 
 def form_objective_data(
-    objectives: Dict, data, prefix="objective_", return_raw: bool = False
-):
+    objectives: dict, data, prefix="objective_", return_raw: bool = False
+) -> pd.DataFrame:
     """
     Use objective dict and data (dataframe) to generate objective data (dataframe)
 
@@ -738,7 +885,9 @@ def form_objective_data(
     return odata
 
 
-def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constraint_"):
+def form_constraint_data(
+    constraints: dict, data: pd.DataFrame, prefix="constraint_"
+) -> pd.DataFrame:
     """
     Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
     constraint is satisfied if the evaluation is < 0.
@@ -785,7 +934,9 @@ def form_constraint_data(constraints: Dict, data: pd.DataFrame, prefix="constrai
     return cdata.astype(float)
 
 
-def form_observable_data(observables: List, data: pd.DataFrame, prefix="observable_"):
+def form_observable_data(
+    observables: list, data: pd.DataFrame, prefix="observable_"
+) -> pd.DataFrame:
     """
     Use constraint dict and data (dataframe) to generate constraint data (dataframe). A
     constraint is satisfied if the evaluation is < 0.
@@ -822,9 +973,9 @@ def form_observable_data(observables: List, data: pd.DataFrame, prefix="observab
     return cdata
 
 
-def form_feasibility_data(constraints: Dict, data, prefix="feasible_"):
+def form_feasibility_data(constraints: dict, data, prefix="feasible_") -> pd.DataFrame:
     """
-    Use constraint dict and data to identify feasible points in the the dataset.
+    Use constraint dict and data to identify feasible points in the dataset.
 
     Returns a dataframe with the feasible data.
     """
@@ -860,15 +1011,81 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         )
 
 
-def validate_variable_bounds(variable_dict: Dict[str, List[float]]):
+def validate_variable_bounds(variable_dict: dict[str, list[float]]):
     """
     Check to make sure that bounds for variables are specified correctly. Raises
     ValueError if anything is incorrect
     """
 
     for name, value in variable_dict.items():
+        if not isinstance(value, list):
+            raise ValueError(f"Bounds specified for `{name}` must be a list.")
+        if not len(value) == 2:
+            raise ValueError(
+                f"Bounds specified for `{name}` must be a list of length 2."
+            )
         if not value[1] > value[0]:
             raise ValueError(
                 f"Bounds specified for `{name}` do not satisfy the "
                 f"condition value[1] > value[0]."
             )
+
+
+def clip_variable_bounds(
+    vocs: VOCS, custom_bounds: dict[str, list[float]]
+) -> dict[str, list[float]]:
+    """
+    Return new bounds as intersection of vocs and custom bounds
+    """
+    if custom_bounds is None:
+        final_bounds = vocs.variables
+    else:
+        variable_bounds = vocs.variables
+
+        if not isinstance(custom_bounds, dict):
+            raise TypeError("`custom_bounds` must be a dict")
+
+        try:
+            validate_variable_bounds(custom_bounds)
+        except ValueError:
+            raise ValueError("specified `custom_bounds` not valid")
+
+        vars_clipped_lb_list = []
+        vars_clipped_ub_list = []
+
+        final_bounds = {}
+        for var, (lb, ub) in variable_bounds.items():
+            if var in custom_bounds:
+                clb = custom_bounds[var][0]
+                cub = custom_bounds[var][1]
+                if clb >= ub:
+                    # we already checked that clb < cub, so this is always an error
+                    raise ValueError(
+                        f"specified `custom_bounds` for {var} is outside vocs domain"
+                    )
+                if clb >= lb:
+                    flb = clb
+                else:
+                    vars_clipped_lb_list.append(var)
+                    flb = lb
+                if cub <= ub:
+                    fub = cub
+                else:
+                    vars_clipped_ub_list.append(var)
+                    fub = ub
+                final_bounds[var] = [flb, fub]
+            else:
+                final_bounds[var] = [lb, ub]
+
+        if vars_clipped_lb_list:
+            warnings.warn(
+                f"custom bounds lower value exceeded vocs: {vars_clipped_lb_list}",
+                RuntimeWarning,
+            )
+        if vars_clipped_ub_list:
+            warnings.warn(
+                f"custom bounds upper value exceeded vocs: {vars_clipped_ub_list}",
+                RuntimeWarning,
+            )
+
+    return final_bounds

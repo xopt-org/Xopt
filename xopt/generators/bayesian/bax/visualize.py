@@ -23,30 +23,30 @@ def visualize_virtual_objective(
 
     Parameters
     ----------
-        generator : Generator
-            Bayesian generator object.
-        variable_names : List[str]
-            The variables with respect to which the GP models are displayed (maximum
-            of 2). Defaults to generator.vocs.variable_names.
-        idx : int
-            Index of the last sample to use. This also selects the point of reference in
-            higher dimensions unless an explicit reference_point is given.
-        reference_point : dict
-            Reference point determining the value of variables in
-            generator.vocs.variable_names, but not in variable_names (slice plots in
-            higher dimensions). Defaults to last used sample.
-        show_samples : bool, optional
-            Whether samples are shown.
-        n_grid : int, optional
-            Number of grid points per dimension used to display the model predictions.
-        n_samples : int, optional
-            Number of virtual objective samples to evaluate for each point in the scan.
-        kwargs : dict, optional
-            Additional keyword arguments for evaluating the virtual objective.
+    generator : Generator
+        Bayesian generator object.
+    variable_names : List[str]
+        The variables with respect to which the GP models are displayed (maximum
+        of 2). Defaults to generator.vocs.variable_names.
+    idx : int
+        Index of the last sample to use. This also selects the point of reference in
+        higher dimensions unless an explicit reference_point is given.
+    reference_point : dict
+        Reference point determining the value of variables in
+        generator.vocs.variable_names, but not in variable_names (slice plots in
+        higher dimensions). Defaults to last used sample.
+    show_samples : bool, optional
+        Whether samples are shown.
+    n_grid : int, optional
+        Number of grid points per dimension used to display the model predictions.
+    n_samples : int, optional
+        Number of virtual objective samples to evaluate for each point in the scan.
+    kwargs : dict, optional
+        Additional keyword arguments for evaluating the virtual objective.
 
-        Returns:
-        --------
-            The matplotlib figure and axes objects.
+    Returns:
+    --------
+        The matplotlib figure and axes objects.
     """
     vocs, data = generator.vocs, generator.data
     reference_point = _get_reference_point(reference_point, vocs, data, idx)

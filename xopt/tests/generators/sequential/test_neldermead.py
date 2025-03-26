@@ -6,8 +6,9 @@ import pytest
 from pydantic import ValidationError
 from scipy.optimize import minimize
 
-from xopt import Xopt
-from xopt.generators.scipy.neldermead import NelderMeadGenerator
+from xopt import VOCS, Xopt
+from xopt.errors import SeqGeneratorError
+from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
@@ -30,13 +31,119 @@ def compare(X, X2):
     pd.testing.assert_frame_equal(data, data2, check_index_type=False)
 
 
+def eval_f_linear_pos(x):
+    return {"y1": np.sum([x**2 for x in x.values()])}
+
+
+def eval_f_linear_neg(x):
+    return {"y1": -np.sum([x**2 for x in x.values()])}
+
+
 class TestNelderMeadGenerator:
     def test_simplex_generate_multiple_points(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
 
         # Try to generate multiple samples
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(SeqGeneratorError):
             gen.generate(2)
+
+    def test_simplex_generate(self):
+        """test simplex without providing an initial point -- started from point in data"""
+        YAML = """
+        generator:
+            name: neldermead
+            adaptive: true
+        evaluator:
+            function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
+        vocs:
+            variables:
+                x0: [-5, 5]
+                x1: [-5, 5]
+            objectives: {y: MINIMIZE}
+        """
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(1)
+
+        for _ in range(2):
+            X.step()
+
+        # test reloading
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+    def test_simplex_forced_init(self):
+        """test to make sure that a re-loaded simplex generator works the same as the normal one at each step"""
+
+        YAML = """
+        generator:
+            name: neldermead
+            initial_point: {x0: -1, x1: -1}
+            adaptive: true
+        evaluator:
+            function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
+        vocs:
+            variables:
+                x0: [-5, 5]
+                x1: [-5, 5]
+            objectives: {y: MINIMIZE}
+        """
+
+        # test where we first random evaluate a point before starting simplex -- simplex will still start with the initial point
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(1)
+        assert not X.generator.is_active
+        assert X.generator._last_candidate is None
+        X.step()
+        assert X.generator.is_active
+        assert X.generator._last_candidate is not None
+        assert X.generator._initial_simplex is None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        # test where we first random evaluate multiple points before starting simplex
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        assert X.generator._initial_simplex is not None
+        X.step()
+        assert X.generator._initial_simplex is not None
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        # test where we start simplex immediately but then try to add a random evaluation in the middle
+        X = Xopt.from_yaml(YAML)
+        X.step()
+        # print(X.generator.data, X.generator.current_state.ngen)
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == 0
+        with pytest.raises(SeqGeneratorError):
+            X.random_evaluate(1)
+        X.step()
+        X.step()
+        assert X.generator._initial_simplex is None
+        assert X.generator.current_state.astg == 0
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
+
+        # test where we start simplex after random evals and then try to add a random evaluation in the middle
+        X = Xopt.from_yaml(YAML)
+        X.random_evaluate(3)
+        X.step()
+        assert X.generator._initial_simplex is not None
+        assert X.generator.current_state.astg == 0
+        X.step()
+        assert X.generator.current_state.astg > 0
+        with pytest.raises(SeqGeneratorError):
+            X.random_evaluate(1)
+        X.step()
+        state = X.json()
+        X2 = Xopt.model_validate(json.loads(state))
+        X2.step()
 
     def test_simplex_options(self):
         gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
@@ -49,17 +156,6 @@ class TestNelderMeadGenerator:
                 "x1": [0, 1],
                 "x2": 0,
             }
-
-        with pytest.raises(ValidationError):
-            gen.xatol = None
-
-        with pytest.raises(ValidationError):
-            gen.fatol = None
-
-        gen.xatol = 1e-3
-        gen.fatol = 1e-3
-        assert gen.xatol == 1e-3
-        assert gen.fatol == 1e-3
 
     def test_simplex_agreement(self):
         """Compare between Vanilla Simplex and Xopt Simplex in full auto run mode"""
@@ -76,8 +172,6 @@ class TestNelderMeadGenerator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
             adaptive: true
-            xatol: 0.0001
-            fatol: 0.0001
         evaluator:
             function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
         vocs:
@@ -87,13 +181,44 @@ class TestNelderMeadGenerator:
             objectives: {y: MINIMIZE}
         """
         X = Xopt.from_yaml(YAML)
+        X.max_evaluations = 1000
         X.run()
 
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
-        assert (
-            xbest["x0"] == result[0] and xbest["x1"] == result[1]
+        assert np.isclose(xbest["x0"], result[0]) and np.isclose(
+            xbest["x1"], result[1]
         ), "Xopt Simplex does not match the vanilla one"
+
+    @pytest.mark.parametrize(
+        "fun, obj", [(eval_f_linear_pos, "MINIMIZE"), (eval_f_linear_neg, "MAXIMIZE")]
+    )
+    def test_simplex_convergence(self, fun, obj):
+        variables = {f"x{i}": [-5, 5] for i in range(10)}
+        objectives = {"y1": obj}
+        vocs = VOCS(variables=variables, objectives=objectives)
+
+        config = {
+            "generator": {
+                "name": "neldermead",
+                "initial_point": {f"x{i}": 3.5 for i in range(len(variables))},
+            },
+            "evaluator": {"function": fun},
+            "vocs": vocs,
+        }
+        X = Xopt.from_dict(config)
+        for i in range(1000):
+            X.step()
+
+        idx, best, _ = X.vocs.select_best(X.data)
+        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-4)
+        if obj == "MINIMIZE":
+            assert best[0] >= 0.0
+            assert best[0] <= 0.001
+        else:
+            assert best[0] <= 0.0
+            assert best[0] >= -0.001
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v",
@@ -122,8 +247,6 @@ class TestNelderMeadGenerator:
                 "name": "neldermead",
                 "initial_point": {f"x{i}": x0[i] for i in range(len(x0))},
                 "adaptive": True,
-                "xatol": 1e-4,
-                "fatol": 1e-4,
             },
             "evaluator": {"function": f"xopt.resources.test_functions.{fstring}"},
             "vocs": v.model_dump(),
@@ -140,9 +263,9 @@ class TestNelderMeadGenerator:
 
         idx, best, _ = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert np.array_equal(
-            xbest, result.x
-        ), "Xopt Simplex does not match the vanilla one"
+        assert np.array_equal(xbest, result.x), (
+            "Xopt Simplex does not match the vanilla one"
+        )
 
     @pytest.mark.parametrize(
         "fun,fstring,x0,v,cstep",
@@ -169,8 +292,6 @@ class TestNelderMeadGenerator:
                 "name": "neldermead",
                 "initial_point": {f"x{i}": x0[i] for i in range(len(x0))},
                 "adaptive": True,
-                "xatol": 1e-4,
-                "fatol": 1e-4,
             },
             "evaluator": {"function": f"xopt.resources.test_functions.{fstring}"},
             "vocs": v.model_dump(),
@@ -192,6 +313,8 @@ class TestNelderMeadGenerator:
 
                 state = X.json()
                 X3 = Xopt.model_validate(json.loads(state))
+                # TODO: maybe store in dump?
+                X3.generator._last_candidate = X2.generator._last_candidate
                 compare(X, X3)
 
                 X.evaluate_data(samples)
@@ -218,6 +341,6 @@ class TestNelderMeadGenerator:
 
         idx, best, _ = X.vocs.select_best(X.data)
         xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert np.array_equal(
-            xbest, result.x
-        ), "Xopt Simplex does not match the vanilla one"
+        assert np.array_equal(xbest, result.x), (
+            "Xopt Simplex does not match the vanilla one"
+        )
