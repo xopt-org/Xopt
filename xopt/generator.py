@@ -13,6 +13,27 @@ logger = logging.getLogger(__name__)
 
 
 class Generator(XoptBaseModel, ABC):
+    """
+    Base class for Generators.
+
+    Generators are responsible for generating new points to evaluate.
+
+    Attributes
+    ----------
+    name : str
+        Name of the generator.
+    supports_batch_generation : bool
+        Flag that describes if this generator can generate batches of points.
+    supports_multi_objective : bool
+        Flag that describes if this generator can solve multi-objective problems.
+    vocs : VOCS
+        Generator VOCS.
+    data : pd.DataFrame, optional
+        Generator data.
+    model_config : ConfigDict
+        Model configuration.
+    """
+
     name: ClassVar[str] = Field(description="generator name")
 
     supports_batch_generation: bool = Field(
@@ -37,8 +58,6 @@ class Generator(XoptBaseModel, ABC):
     )
 
     model_config = ConfigDict(validate_assignment=True)
-
-    _is_done = False
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
@@ -65,10 +84,6 @@ class Generator(XoptBaseModel, ABC):
         super().__init__(**kwargs)
         logger.info(f"Initialized generator {self.name}")
 
-    @property
-    def is_done(self):
-        return self._is_done
-
     @abstractmethod
     def generate(self, n_candidates) -> list[dict]:
         pass
@@ -94,3 +109,21 @@ class Generator(XoptBaseModel, ABC):
         res.pop("supports_multi_objective", None)
 
         return res
+
+
+class StateOwner:
+    """
+    Mix-in class that represents a generator that owns its own state and needs special handling
+    of data loading on deserialization.
+    """
+
+    def set_data(self, data: pd.DataFrame):
+        """
+        Set the full dataset for the generator. Typically only used when loading from a save file.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to set.
+        """
+        raise NotImplementedError

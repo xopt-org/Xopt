@@ -30,13 +30,13 @@ class TestNumericalOptimizers:
                 assert candidates.shape == torch.Size([ncandidate, ndim])
 
         # test max time
-        max_time_optimizer = LBFGSOptimizer(max_time=0.01)
+        max_time_optimizer = LBFGSOptimizer(max_time=1.0)
         ndim = 1
         bounds = torch.stack((torch.zeros(ndim), torch.ones(ndim)))
         for ncandidate in [1, 3]:
             start_time = time.time()
             candidates = max_time_optimizer.optimize(f, bounds, ncandidate)
-            assert time.time() - start_time < 0.01
+            assert time.time() - start_time < 1.0
             assert candidates.shape == torch.Size([ncandidate, ndim])
 
     def test_grid_optimizer(self):

@@ -7,49 +7,88 @@ import pandas as pd
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
-from xopt.generator import Generator
+from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 logger = logging.getLogger(__name__)
 
 
 class RCDS:
+    """
+    Robust Conjugate Direction Search (RCDS) algorithm.
+
+    Parameters
+    ----------
+    x0 : array-like
+        Initial solution vector.
+    init_mat : array-like, optional
+        Initial direction matrix. Defaults to None.
+    noise : float, optional
+        Estimated noise level. Defaults to 0.1.
+    step : float, optional
+        Step size for the optimization. Defaults to 1e-2.
+
+    Attributes
+    ----------
+    x0 : numpy.matrix
+        Initial solution as a column vector.
+    Imat : array-like
+        Initial direction matrix.
+    noise : float
+        Estimated noise level.
+    step : float
+        Step size for the optimization.
+    cnt : int
+        Internal counter initialized to 0.
+    OBJ : None
+        Placeholder for the objective function, initialized to None.
+    """
+
     def __init__(
         self,
-        x0,
-        init_mat=None,
-        noise=0.1,
-        step=1e-2,
-        tol=1e-5,
+        x0: np.ndarray,
+        init_mat: Optional[np.ndarray] = None,
+        noise: float = 0.1,
+        step: float = 1e-2,
     ):
         """
-        Input:
-            x0: initial solution
-            init_mat: initial direction matrix
-            noise: estimated noise level
-            step, tol: floating number, step size and tolerance
+        Initialize the RCDS algorithm.
+
+        Parameters
+        ----------
+        x0 : np.ndarray
+            Initial solution vector.
+        init_mat : np.ndarray, optional
+            Initial direction matrix. Defaults to None.
+        noise : float, optional
+            Estimated noise level. Defaults to 0.1.
+        step : float, optional
+            Step size for the optimization. Defaults to 1e-2.
         """
-        self.x0 = np.matrix(x0).T  # convert to a col vector
+        self.x0 = x0.reshape(-1, 1)  # convert to a col vector
         self.Imat = init_mat
         self.noise = noise
         self.step = step
-        self.tol = tol
 
         # Internal vars
         self.cnt = 0
         self.OBJ = None
 
     def powellmain(self):
-        """RCDS main, implementing Powell's direction set update method
-        Created by X. Huang, 10/5/2016
-        Modified by Z. Zhang, 11/30/2022
-
-        Output:
-            x1, f1,
-            nf: integer, number of evaluations
         """
+        RCDS main, implementing Powell's direction set update method.
+
+        Returns
+        -------
+        x1 : numpy.matrix
+            The updated solution vector.
+        f1 : float
+            The function value at the updated solution.
+        nf : int
+            Number of function evaluations.
+        """
+
         x0 = self.x0
         step = self.step
-        tol = self.tol
         self.Nvar = len(x0)
         yield x0
         f0, _ = self.func_obj(x0)
@@ -148,14 +187,7 @@ class RCDS:
                         % (k, max(dotp))
                     )
 
-            logger.debug("g count is ", self.cnt)
-
-            if 2.0 * abs(f0 - fm) < tol * (abs(f0) + abs(fm)) and tol > 0:
-                logger.debug(
-                    "terminated: f0=%4.2e\t, fm=%4.2e, f0-fm=%4.2e\n"
-                    % (f0, fm, f0 - fm)
-                )
-                # break
+            logger.debug("g count is %d", self.cnt)
 
             f0 = fm
             x0 = xm
@@ -163,8 +195,47 @@ class RCDS:
         return xm, fm, nf
 
     def get_min_along_dir_parab(
-        self, x0, f0, dv, Npmin=6, step=None, it=None, idx=None, replaced=False
-    ):
+        self,
+        x0: np.ndarray,
+        f0: float,
+        dv: np.ndarray,
+        Npmin: int = 6,
+        step: Optional[float] = None,
+        it: Optional[int] = None,
+        idx: Optional[int] = None,
+        replaced: bool = False,
+    ) -> tuple[np.ndarray, float, int]:
+        """
+        Find the minimum along a direction using a parabolic fit.
+
+        Parameters
+        ----------
+        x0 : np.ndarray
+            Initial solution vector.
+        f0 : float
+            Function value at the initial solution.
+        dv : np.ndarray
+            Direction vector.
+        Npmin : int, optional
+            Minimum number of points for the line scan. Defaults to 6.
+        step : float, optional
+            Step size for the bracket minimum. Defaults to None.
+        it : int, optional
+            Iteration number. Defaults to None.
+        idx : int, optional
+            Index of the direction. Defaults to None.
+        replaced : bool, optional
+            Flag indicating if the direction was replaced. Defaults to False.
+
+        Returns
+        -------
+        x1 : np.ndarray
+            The updated solution vector.
+        f1 : float
+            The function value at the updated solution.
+        ndf : int
+            Number of function evaluations.
+        """
         gen_bm = self.bracketmin(x0, f0, dv, step)
         while True:
             try:
@@ -190,20 +261,38 @@ class RCDS:
 
         return x1, f1, ndf1 + ndf2
 
-    def bracketmin(self, x0, f0, dv, step):
-        """bracket the minimum
-        Created by X. Huang, 10/5/2016
-        Input:
-                 self.func_obj is self.func_objtion handle,
-                 f0,step : floating number
-                 x0, dv: NumPy vector
-        Output:
-                 xm, fm
-                        a1, a2: floating
-                        xflist: Nx2 array
-                        nf: integer, number of evaluations
+    def bracketmin(
+        self, x0: np.ndarray, f0: float, dv: np.ndarray, step: float
+    ) -> tuple[np.ndarray, float, float, float, np.ndarray, int]:
         """
+        Bracket the minimum along a direction.
 
+        Parameters
+        ----------
+        x0 : np.ndarray
+            Initial solution vector.
+        f0 : float
+            Function value at the initial solution.
+        dv : np.ndarray
+            Direction vector.
+        step : float
+            Initial step size for the bracket minimum.
+
+        Returns
+        -------
+        xm : np.ndarray
+            The updated solution vector.
+        fm : float
+            The function value at the updated solution.
+        a1 : float
+            Lower bound of the bracket.
+        a2 : float
+            Upper bound of the bracket.
+        xflist : np.ndarray
+            Array of evaluated points and their function values.
+        nf : int
+            Number of function evaluations.
+        """
         nf = 0
         if math.isnan(f0):
             yield x0
@@ -229,7 +318,6 @@ class RCDS:
             xm = x1
 
         gold_r = 1.618
-        #         gold_r = 1.3
         while f1 < fm + self.noise * 3:
             step0 = step
             if abs(step) < 0.1:  # maximum step
@@ -300,23 +388,49 @@ class RCDS:
         a2 -= am
         xflist[:, 0] -= am
         # sort by alpha
-        # logger.debug(xflist)
         xflist = xflist[np.argsort(xflist[:, 0])]
 
         return xm, fm, a1, a2, xflist, nf
 
-    def linescan(self, x0, f0, dv, alo, ahi, Np, xflist):
-        """Line optimizer for RCDS
-        Created by X. Huang, 10/3/2016
-        Input:
-                 self.func_obj is self.func_objtion handle,
-                 f0, alo, ahi: floating number
-                 x0, dv: NumPy vector
-                 xflist: Nx2 array
-        Output:
-                 x1, f1, nf
+    def linescan(
+        self,
+        x0: np.ndarray,
+        f0: float,
+        dv: np.ndarray,
+        alo: float,
+        ahi: float,
+        Np: int,
+        xflist: np.ndarray,
+    ) -> tuple[np.ndarray, float, int]:
         """
-        # global g_noise
+        Line optimizer for RCDS.
+
+        Parameters
+        ----------
+        x0 : np.ndarray
+            Initial solution vector.
+        f0 : float
+            Function value at the initial solution.
+        dv : np.ndarray
+            Direction vector.
+        alo : float
+            Lower bound of the bracket.
+        ahi : float
+            Upper bound of the bracket.
+        Np : int
+            Number of points for the line scan.
+        xflist : np.ndarray
+            Array of evaluated points and their function values.
+
+        Returns
+        -------
+        x1 : np.ndarray
+            The updated solution vector.
+        f1 : float
+            The function value at the updated solution.
+        nf : int
+            Number of function evaluations.
+        """
         nf = 0
         if math.isnan(f0):
             yield x0
@@ -333,18 +447,16 @@ class RCDS:
             logger.debug("Error: x0 and dv dimension do not match.")
             return x0, f0, nf
 
-        if math.isnan(Np) | (Np < 6):
+        if math.isnan(Np) or Np < 6:
             Np = 6
         delta = (ahi - alo) / (Np - 1.0)
 
-        #         alist = np.arange(alo,ahi,(ahi-alo)/(Np-1))
         alist = np.linspace(alo, ahi, Np)
         flist = alist * float("nan")
         Nlist = np.shape(xflist)[0]
         for ii in range(Nlist):
             if xflist[ii, 1] >= alo and xflist[ii, 1] <= ahi:
                 ik = round((xflist[ii, 1] - alo) / delta)
-                # logger.debug('test', ik, ii, len(alist),len(xflist),xflist[ii,0])
                 alist[ik] = xflist[ii, 0]
                 flist[ik] = xflist[ii, 1]
 
@@ -359,7 +471,6 @@ class RCDS:
             if math.isnan(flist[ii]):
                 mask[ii] = False
 
-        # filter out NaNs
         alist = alist[mask]
         flist = flist[mask]
         if len(alist) <= 0:
@@ -370,11 +481,8 @@ class RCDS:
             fm = flist[imin]
             return xm, fm, nf
         else:
-            # logger.debug(np.c_[alist,flist])
-            (p) = np.polyfit(alist, flist, 2)
+            p = np.polyfit(alist, flist, 2)
             pf = np.poly1d(p)
-
-            # remove outlier and re-fit here, to be done later
 
             MP = 101
             av = np.linspace(alist[0], alist[-1], MP - 1)
@@ -382,7 +490,6 @@ class RCDS:
             imin = yv.argmin()
             xm = x0 + av[imin] * dv
             fm = yv[imin]
-            # logger.debug(x0, xm, fm)
             return xm, fm, nf
 
     def update_obj(self, obj):
@@ -404,7 +511,7 @@ class RCDS:
         return obj, obj_raw
 
 
-class RCDSGenerator(Generator):
+class RCDSGenerator(SequentialGenerator):
     """
     RCDS algorithm.
 
@@ -414,71 +521,93 @@ class RCDSGenerator(Generator):
     doi: 10.1016/j.nima.2013.05.046
 
     This algorithm must be stepped serially.
+
+    Attributes
+    ----------
+    name : str
+        Name of the generator.
+    x0 : Optional[list]
+        Initial solution vector.
+    init_mat : Optional[np.ndarray]
+        Initial direction matrix.
+    noise : PositiveFloat
+        Estimated noise level.
+    step : PositiveFloat
+        Step size for the optimization.
+    _ub : np.ndarray
+        Upper bounds of the variables.
+    _lb : np.ndarray
+        Lower bounds of the variables.
+    _rcds : RCDS
+        Instance of the RCDS algorithm.
+    _generator : generator
+        Generator for the RCDS algorithm.
+    _sign : int
+        Sign of the objective function (1 for MINIMIZE, -1 for MAXIMIZE).
     """
 
     name = "rcds"
-    x0: Optional[list] = Field(None)
     init_mat: Optional[np.ndarray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
     step: PositiveFloat = Field(1e-2)
-    tol: PositiveFloat = Field(1e-5)
 
-    _ub = 0
-    _lb = 0
     _rcds: RCDS = None
     _generator = None
+    _sign = 1
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def _reset(self):
+        """reset the rcds object"""
 
-        bound_low, bound_up = self.vocs.bounds
-        self._ub = bound_up
-        self._lb = bound_low
-        x_ave = (bound_up + bound_low) / 2
-        if self.x0 is None:
-            x0 = x_ave
-        else:
-            x0 = self.x0
+        objective_name = self.vocs.objective_names[
+            0
+        ]  # rcds only supports one objective
+        direction = self.vocs.objectives[objective_name]
+        if direction == "MINIMIZE":
+            self._sign = 1
+        elif direction == "MAXIMIZE":
+            self._sign = -1
+
+        x0, f0 = self._get_initial_point()
+
+        # RCDS assume a normalized problem
+        lb, ub = self.vocs.bounds
+        _x0 = (x0 - lb) / (ub - lb)
 
         self._rcds = RCDS(
-            x0=x0,
+            x0=_x0,
             init_mat=self.init_mat,
             noise=self.noise,
             step=self.step,
-            tol=self.tol,
         )
+        self._rcds.update_obj(self._sign * float(f0))
         self._generator = self._rcds.powellmain()
 
-    def add_data(self, new_data: pd.DataFrame):
-        assert (
-            len(new_data) == 1
-        ), f"length of new_data must be 1, found: {len(new_data)}"
+    def _add_data(self, new_data: pd.DataFrame):
+        # first update the rcds object from the last measurement
+        res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
 
-        res = self.vocs.objective_data(new_data).to_numpy()
-        assert res.shape == (1, 1)
-        obj = res[0, 0]
-        self._rcds.update_obj(obj)
+        if self._rcds is not None:
+            self._rcds.update_obj(self._sign * res)
 
-    def generate(self, n_candidates) -> list[dict]:
-        if n_candidates != 1:
-            raise NotImplementedError("rcds can only produce one candidate at a time")
+    def _generate(self, first_gen: bool = False):
+        """generate a new candidate"""
+        if first_gen:
+            self.reset()
 
-        x_next = np.array(next(self._generator))  # note that x_next is a np.matrix!
-
+        _x_next = next(self._generator)
         # Verify the candidate here
-        while np.any(x_next > self._ub) or np.any(x_next < self._lb):
+        while np.any(_x_next > 1) or np.any(_x_next < 0):
             self._rcds.update_obj(
                 np.nan
             )  # notify RCDS that the search reached the bound
-            x_next = np.array(next(self._generator))  # request next candidate
+            _x_next = next(self._generator)  # request next candidate
 
-        # Return the next value
-        try:
-            pd.DataFrame(dict(zip(self.vocs.variable_names, x_next)))
-        except Exception as e:
-            print(self.vocs.variable_names, x_next, type(x_next), x_next.shape)
-            raise e
+        # RCDS generator yields normalized x so denormalize it here
+        _x_next = np.array(_x_next).flatten()  # convert 2D matrix to 1D array
+        lb, ub = self.vocs.bounds
+        x_next = (ub - lb) * _x_next + lb
 
+        x_next = [float(ele) for ele in x_next]
         return [dict(zip(self.vocs.variable_names, x_next))]

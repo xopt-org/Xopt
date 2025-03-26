@@ -1,7 +1,7 @@
 import logging
 import pickle
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List
 
 from botorch.models import ModelListGP, SingleTaskGP
 from pydantic import Field, field_validator
@@ -11,12 +11,39 @@ from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformatio
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
-from xopt.generators.bayesian.utils import validate_turbo_controller_base
 
 logger = logging.getLogger()
 
 
 class BaxGenerator(BayesianGenerator):
+    """
+    BAX Generator for Bayesian optimization.
+
+    Attributes:
+    -----------
+    name : str
+        The name of the generator.
+    algorithm : Algorithm
+        Algorithm evaluated in the BAX process.
+    algorithm_results : Dict
+        Dictionary results from the algorithm.
+    algorithm_results_file : str
+        File name to save algorithm results at every step.
+    _n_calls : int
+        Internal counter for the number of calls to the generate method.
+
+    Methods:
+    --------
+    validate_turbo_controller(cls, value, info: ValidationInfo) -> Any
+        Validate the turbo controller.
+    validate_vocs(cls, v, info: ValidationInfo) -> VOCS
+        Validate the VOCS object.
+    generate(self, n_candidates: int) -> List[Dict]
+        Generate a specified number of candidate samples.
+    _get_acquisition(self, model) -> ModelListExpectedInformationGain
+        Get the acquisition function.
+    """
+
     name = "BAX"
     algorithm: Algorithm = Field(description="algorithm evaluated in the BAX process")
     algorithm_results: Dict = Field(
@@ -26,17 +53,7 @@ class BaxGenerator(BayesianGenerator):
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0
-
-    @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(cls, value, info: ValidationInfo):
-        """note default behavior is no use of turbo"""
-        controller_dict = {
-            "entropy": EntropyTurboController,
-            "safety": SafetyTurboController,
-        }
-        value = validate_turbo_controller_base(value, controller_dict, info)
-
-        return value
+    _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
@@ -44,11 +61,37 @@ class BaxGenerator(BayesianGenerator):
             raise ValueError("this generator only supports observables")
         return v
 
-    def generate(self, n_candidates: int) -> list[dict]:
+    def generate(self, n_candidates: int) -> List[Dict]:
+        """
+        Generate a specified number of candidate samples.
+
+        Parameters:
+        -----------
+        n_candidates : int
+            The number of candidate samples to generate.
+
+        Returns:
+        --------
+        List[Dict]
+            A list of dictionaries containing the generated samples.
+        """
         self._n_calls += 1
         return super().generate(n_candidates)
 
-    def _get_acquisition(self, model):
+    def _get_acquisition(self, model) -> ModelListExpectedInformationGain:
+        """
+        Get the acquisition function.
+
+        Parameters:
+        -----------
+        model : Model
+            The model to use for the acquisition function.
+
+        Returns:
+        --------
+        ModelListExpectedInformationGain
+            The acquisition function.
+        """
         bax_model_ids = [
             self.vocs.output_names.index(name)
             for name in self.algorithm.observable_names_ordered

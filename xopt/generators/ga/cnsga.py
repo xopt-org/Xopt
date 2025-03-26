@@ -13,14 +13,55 @@ from xopt.generator import Generator
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
 from xopt.generators.ga.visualization import CNSGA_GUI
-# xopt.utils.isotime() # works
-# from xopt.utils import isotime # circular import
-
 
 logger = logging.getLogger(__name__)
 
 
 class CNSGAGenerator(Generator):
+    """
+    Constrained Non-dominated Sorting Genetic Algorithm (CNSGA) generator.
+
+    Attributes:
+    -----------
+    name : str
+        The name of the generator.
+    supports_multi_objective : bool
+        Indicates if the generator supports multi-objective optimization.
+    population_size : int
+        The population size for the genetic algorithm.
+    crossover_probability : float
+        The probability of crossover.
+    mutation_probability : float
+        The probability of mutation.
+    population_file : Optional[str]
+        The file path to load the population from (CSV format).
+    output_path : Optional[str]
+        The directory path to save the population files.
+    _children : List[Dict]
+        The list of children generated.
+    _offspring : Optional[pd.DataFrame]
+        The DataFrame containing the offspring.
+    population : Optional[pd.DataFrame]
+        The DataFrame containing the population.
+
+    Methods:
+    --------
+    create_children(self) -> List[Dict]
+        Create children for the next generation.
+    add_data(self, new_data: pd.DataFrame)
+        Add new data to the generator.
+    generate(self, n_candidates: int) -> List[Dict]
+        Generate a specified number of candidate samples.
+    write_offspring(self, filename: Optional[str] = None)
+        Write the current offspring to a CSV file.
+    write_population(self, filename: Optional[str] = None)
+        Write the current population to a CSV file.
+    load_population_csv(self, filename: str)
+        Load a population from a CSV file.
+    n_pop(self) -> int
+        Convenience property for `population_size`.
+    """
+
     name = "cnsga"
     supports_multi_objective: bool = True
     population_size: int = Field(64, description="Population size")
@@ -58,10 +99,15 @@ class CNSGAGenerator(Generator):
         if self.output_path is not None:
             assert os.path.isdir(self.output_path), "Output directory does not exist"
 
-        # if data is not None:
-        #    self.population = cnsga_select(data, n_pop, vocs, self.toolbox)
-
     def create_children(self) -> List[Dict]:
+        """
+        Create children for the next generation.
+
+        Returns:
+        --------
+        List[Dict]
+            A list of dictionaries containing the generated children.
+        """
         # No population, so create random children
         if self.population is None:
             # Special case when pop is loaded from file
@@ -83,6 +129,14 @@ class CNSGAGenerator(Generator):
         return inputs.to_dict(orient="records")
 
     def add_data(self, new_data: pd.DataFrame):
+        """
+        Add new data to the generator.
+
+        Parameters:
+        -----------
+        new_data : pd.DataFrame
+            The new data to be added.
+        """
         if new_data is not None:
             self._offspring = pd.concat([self._offspring, new_data])
 
@@ -100,23 +154,34 @@ class CNSGAGenerator(Generator):
                 self._children = []  # reset children
                 self._offspring = None  # reset offspring
 
-    def generate(self, n_candidates) -> list[dict]:
+    def generate(self, n_candidates: int) -> List[Dict]:
         """
-        generate `n_candidates` candidates
+        Generate a specified number of candidate samples.
 
+        Parameters:
+        -----------
+        n_candidates : int
+            The number of candidate samples to generate.
+
+        Returns:
+        --------
+        List[Dict]
+            A list of dictionaries containing the generated samples.
         """
-
         # Make sure we have enough children to fulfill the request
         while len(self._children) < n_candidates:
             self._children.extend(self.create_children())
 
         return [self._children.pop() for _ in range(n_candidates)]
 
-    def write_offspring(self, filename=None):
+    def write_offspring(self, filename: Optional[str] = None):
         """
         Write the current offspring to a CSV file.
 
-        Similar to write_population
+        Parameters:
+        -----------
+        filename : str, optional
+            The file path to save the offspring. If None, a timestamped filename is generated.
         """
         if self._offspring is None:
             logger.warning("No offspring to write")
@@ -129,11 +194,14 @@ class CNSGAGenerator(Generator):
 
         self._offspring.to_csv(filename, index_label="xopt_index")
 
-    def write_population(self, filename=None):
+    def write_population(self, filename: Optional[str] = None):
         """
         Write the current population to a CSV file.
 
-        Similar to write_offspring
+        Parameters:
+        -----------
+        filename : str, optional
+            The file path to save the population. If None, a timestamped filename is generated.
         """
         if self.population is None:
             logger.warning("No population to write")
@@ -146,10 +214,14 @@ class CNSGAGenerator(Generator):
 
         self.population.to_csv(filename, index_label="xopt_index")
 
-    def load_population_csv(self, filename):
+    def load_population_csv(self, filename: str):
         """
-        Read a population from a CSV file.
-        These will be reverted back to children for re-evaluation.
+        Load a population from a CSV file.
+
+        Parameters:
+        -----------
+        filename : str
+            The file path to load the population from.
         """
         pop = pd.read_csv(filename, index_col="xopt_index")
         self._loaded_population = pop
@@ -160,9 +232,14 @@ class CNSGAGenerator(Generator):
         logger.info(f"Loaded population of len {len(pop)} from file: {filename}")
 
     @property
-    def n_pop(self):
+    def n_pop(self) -> int:
         """
-        Convenience name for `options.population_size`
+        Convenience property for `population_size`.
+
+        Returns:
+        --------
+        int
+            The population size.
         """
         return self.population_size
 
@@ -171,30 +248,52 @@ class CNSGAGenerator(Generator):
         return gui
 
 
-def uniform(low, up, size=None):
-    """ """
+def uniform(low: float, up: float, size: Optional[int] = None) -> List[float]:
+    """
+    Generate a list of uniform random numbers.
+
+    Parameters:
+    -----------
+    low : float
+        The lower bound of the uniform distribution.
+    up : float
+        The upper bound of the uniform distribution.
+    size : int, optional
+        The number of random numbers to generate. If None, a single random number is generated.
+
+    Returns:
+    --------
+    List[float]
+        A list of uniform random numbers.
+    """
     try:
         return [random.uniform(a, b) for a, b in zip(low, up)]
     except TypeError:
         return [random.uniform(a, b) for a, b in zip([low] * size, [up] * size)]
 
 
-def cnsga_toolbox(vocs, selection="auto"):
+def cnsga_toolbox(vocs: VOCS, selection: str = "auto") -> deap_base.Toolbox:
     """
-    Creates a DEAP toolbox from VOCS dict for use with cnsga.
+    Creates a DEAP toolbox from VOCS dict for use with CNSGA.
 
-    Selection options:
+    Parameters:
+    -----------
+    vocs : VOCS
+        The VOCS object containing the variables, objectives, and constraints.
+    selection : str, optional
+        The selection algorithm to use. Options are "nsga2", "nsga3", "spea2", and "auto".
+        Defaults to "auto".
 
-    nsga2: Standard NSGA2 [Deb2002] selection
-    nsga3: NSGA3 [Deb2014] selection
-    spea2: SPEA-II [Zitzler2001] selection
-    auto: will choose nsga2 for <= 2 objectives, otherwise nsga3
+    Returns:
+    --------
+    deap_base.Toolbox
+        The DEAP toolbox.
 
-
-    See DEAP code for details.
-
+    Raises:
+    -------
+    ValueError
+        If an invalid selection algorithm is specified.
     """
-
     var, obj, con = vocs.variables, vocs.objectives, vocs.constraints
     n_var = len(var)
     n_obj = len(obj)
@@ -294,9 +393,21 @@ def cnsga_toolbox(vocs, selection="auto"):
     return toolbox
 
 
-def pop_from_data(data, vocs):
+def pop_from_data(data: pd.DataFrame, vocs: VOCS) -> List:
     """
-    Return a list of DEAP deap_creator.Individual from a dataframe
+    Return a list of DEAP deap_creator.Individual from a dataframe.
+
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        The DataFrame containing the data.
+    vocs : VOCS
+        The VOCS object containing the variables, objectives, and constraints.
+
+    Returns:
+    --------
+    List[deap_creator.Individual]
+        A list of DEAP individuals.
     """
     v = vocs.variable_data(data).to_numpy()
     o = vocs.objective_data(data).to_numpy()
@@ -313,11 +424,31 @@ def pop_from_data(data, vocs):
     return pop
 
 
-def cnsga_select(data, n, vocs, toolbox):
+def cnsga_select(
+    data: pd.DataFrame, n: int, vocs: VOCS, toolbox: deap_base.Toolbox
+) -> pd.DataFrame:
     """
     Applies DEAP's select algorithm to the population in data.
 
-    Note that this can be slow for large populations:
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        The DataFrame containing the data.
+    n : int
+        The number of individuals to select.
+    vocs : VOCS
+        The VOCS object containing the variables, objectives, and constraints.
+    toolbox : deap_base.Toolbox
+        The DEAP toolbox.
+
+    Returns:
+    --------
+    pd.DataFrame
+        The DataFrame containing the selected individuals.
+
+    Note:
+    -----
+    This can be slow for large populations:
         NSGA2: Order(M N^2) for M objectives, N individuals
     """
     pop = pop_from_data(data, vocs)
@@ -326,15 +457,37 @@ def cnsga_select(data, n, vocs, toolbox):
 
 
 def cnsga_variation(
-    data, vocs, toolbox, crossover_probability=0.9, mutation_probability=1.0
-):
+    data: pd.DataFrame,
+    vocs: VOCS,
+    toolbox: deap_base.Toolbox,
+    crossover_probability: float = 0.9,
+    mutation_probability: float = 1.0,
+) -> pd.DataFrame:
     """
     Varies the population (from variables in data) by applying crossover and mutation
     using DEAP's varAnd algorithm.
 
-    Returns an input dataframe with the new individuals to evaluate.
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        The DataFrame containing the data.
+    vocs : VOCS
+        The VOCS object containing the variables, objectives, and constraints.
+    toolbox : deap_base.Toolbox
+        The DEAP toolbox.
+    crossover_probability : float, optional
+        The probability of crossover. Defaults to 0.9.
+    mutation_probability : float, optional
+        The probability of mutation. Defaults to 1.0.
 
-    See: https://deap.readthedocs.io/en/master/api/algo.html#deap.algorithms.varAnd
+    Returns:
+    --------
+    pd.DataFrame
+        The DataFrame containing the new individuals to evaluate.
+
+    See:
+    ----
+    https://deap.readthedocs.io/en/master/api/algo.html#deap.algorithms.varAnd
     """
     v = vocs.variable_data(data).to_numpy()
     pop = list(map(deap_creator.Individual, v))

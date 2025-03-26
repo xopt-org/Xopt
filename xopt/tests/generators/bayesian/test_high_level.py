@@ -63,7 +63,9 @@ class TestHighLevel:
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
-        X.step()  # actually evaluates mobo
+
+        for _ in range(3):
+            X.step()
 
     def test_mobo(self):
         YAML = """

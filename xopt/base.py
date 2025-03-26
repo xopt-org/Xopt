@@ -16,8 +16,9 @@ from pydantic import (
 )
 
 from xopt.evaluator import Evaluator, validate_outputs
-from xopt.generator import Generator
+from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
+from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
@@ -124,6 +125,9 @@ class Xopt(XoptBaseModel):
     @model_validator(mode="before")
     @classmethod
     def validate_model(cls, data: Any):
+        """
+        Validate the Xopt model by checking the generator and evaluator.
+        """
         if isinstance(data, dict):
             # validate vocs
             if isinstance(data["vocs"], dict):
@@ -166,7 +170,13 @@ class Xopt(XoptBaseModel):
                 raise ValueError("dataframe index must be integer")
         # also add data to generator
         # TODO: find a more robust way of doing this
-        info.data["generator"].add_data(v)
+        generator = info.data["generator"]
+
+        # Some generators need to maintain their own state (such as sequential generators)
+        if not isinstance(generator, StateOwner):
+            generator.add_data(v)
+        else:
+            generator.set_data(v)
 
         return v
 
@@ -246,7 +256,12 @@ class Xopt(XoptBaseModel):
         Run until the maximum number of evaluations is reached or the generator is done.
 
         """
-        while not self.generator.is_done:
+        # TODO: implement stopping criteria class
+        logger.info("Running Xopt")
+        if self.max_evaluations is None:
+            raise ValueError("max_evaluations must be set to call Xopt.run()")
+
+        while True:
             # Stopping criteria
             if self.max_evaluations is not None:
                 if self.n_data >= self.max_evaluations:
@@ -323,6 +338,11 @@ class Xopt(XoptBaseModel):
         for name, value in self.vocs.constants.items():
             input_data[name] = value
 
+        # if we are using a sequential generator that is active, make sure that the evaluated data matches the last candidate
+        if isinstance(self.generator, SequentialGenerator):
+            if self.generator.is_active:
+                self.generator.validate_point(input_data)
+
         output_data = self.evaluator.evaluate_data(input_data)
 
         if self.strict:
@@ -356,7 +376,6 @@ class Xopt(XoptBaseModel):
         if self.data is not None:
             new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
             new_data.index = np.arange(len(self.data), len(self.data) + len(new_data))
-
             self.data = pd.concat([self.data, new_data], axis=0)
         else:
             if new_data.index.dtype != np.int64:
@@ -434,6 +453,32 @@ class Xopt(XoptBaseModel):
             n_samples, seed=seed, custom_bounds=custom_bounds, include_constants=True
         )
         result = self.evaluate_data(random_inputs)
+        return result
+
+    def grid_evaluate(
+        self,
+        n_samples: Union[int, Dict[str, int]],
+        custom_bounds: dict = None,
+    ):
+        """
+        Evaluate a meshgrid of points using the VOCS and add the results to the internal
+        DataFrame.
+
+        Parameters
+        ----------
+        n_samples : int or dict
+            The number of samples along each axis to evaluate on a meshgrid.
+            If an int is provided, the same number of samples is used for all axes.
+        custom_bounds : dict, optional
+            Dictionary of vocs-like ranges for mesh sampling.
+
+        Returns
+        -------
+        pd.DataFrame
+            The results of the evaluations added to the internal DataFrame.
+        """
+        grid_inputs = self.vocs.grid_inputs(n_samples, custom_bounds=custom_bounds)
+        result = self.evaluate_data(grid_inputs)
         return result
 
     def yaml(self, **kwargs):

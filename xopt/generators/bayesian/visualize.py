@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict, Tuple, Union
 
 import numpy as np
 import torch
@@ -14,7 +14,9 @@ from xopt.vocs import VOCS
 from .objectives import feasibility
 
 
-def visualize_generator_model(generator, **kwargs) -> tuple:
+def visualize_generator_model(
+    generator, **kwargs
+) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Visualizes GP model predictions for the specified output(s).
 
     This function generates a visualization of the Gaussian Process (GP) models associated with the provided generator.
@@ -79,11 +81,11 @@ def visualize_model(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
-    acquisition_function: AcquisitionFunction = None,
-    output_names: list[str] = None,
-    variable_names: list[str] = None,
+    acquisition_function: Optional[AcquisitionFunction] = None,
+    output_names: Optional[List[str]] = None,
+    variable_names: Optional[List[str]] = None,
     idx: int = -1,
-    reference_point: dict[str, float] = None,
+    reference_point: Optional[Dict[str, float]] = None,
     show_samples: bool = True,
     show_prior_mean: bool = False,
     show_feasibility: bool = False,
@@ -91,7 +93,7 @@ def visualize_model(
     n_grid: int = 50,
     axes: Optional[Axes] = None,
     exponentiate: bool = True,
-) -> tuple:
+) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Displays GP model predictions for the selected output(s).
 
     The GP models are displayed with respect to the named variables. If None are given, the list of variables in
@@ -150,7 +152,7 @@ def visualize_model(
     dim_x, dim_y = len(variable_names), len(output_names)
     # plot configuration
     figure_config = _get_figure_config(min_ncols=dim_x, min_nrows=dim_y, **kwargs)
-    plots: tuple[Figure, Axes | np.ndarray] = None
+    plots: Tuple[Figure, Union[Axes, np.ndarray]] = None
     if axes is None:
         from matplotlib import pyplot as plt  # lazy import
 
@@ -278,19 +280,19 @@ def plot_model_prediction(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
-    output_name: str = None,
-    variable_names: list[str] = None,
-    prediction_type: str = None,
+    output_name: Optional[str] = None,
+    variable_names: Optional[List[str]] = None,
+    prediction_type: Optional[str] = None,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: Optional[Dict[str, Any]] = None,
     show_samples: bool = True,
     show_prior_mean: bool = False,
     show_legend: bool = True,
     n_grid: int = 100,
     color: str = "C0",
-    axis=None,
+    axis: Optional[Axes] = None,
     **_,
-):
+) -> Axes:
     """Displays the GP model prediction for the selected output.
 
     Parameters
@@ -436,17 +438,17 @@ def plot_acquisition_function(
     acquisition_function: AcquisitionFunction,
     vocs: VOCS,
     data: DataFrame,
-    variable_names: list[str] = None,
+    variable_names: Optional[List[str]] = None,
     only_base_acq: bool = False,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: Optional[Dict[str, Any]] = None,
     show_samples: bool = False,
     show_legend: bool = True,
     n_grid: int = 100,
-    axis=None,
+    axis: Optional[Axes] = None,
     exponentiate: bool = True,
     **_,
-):
+) -> Axes:
     """Displays the given acquisition function.
 
     Parameters
@@ -566,15 +568,15 @@ def plot_feasibility(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
-    variable_names: list[str] = None,
+    variable_names: Optional[List[str]] = None,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: Optional[Dict[str, Any]] = None,
     show_samples: bool = False,
     show_legend: bool = True,
     n_grid: int = 100,
-    axis=None,
+    axis: Optional[Axes] = None,
     **_,
-):
+) -> Axes:
     """Displays the feasibility region for the given model.
 
     Parameters
