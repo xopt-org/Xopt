@@ -13,6 +13,7 @@ from xopt.generator import Generator
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
 from xopt.generators.ga.visualization import CNSGA_GUI
+from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
 
