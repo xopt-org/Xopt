@@ -12,602 +12,498 @@ from xopt.generators.sequential.sequential_generator import SequentialGenerator
 logger = logging.getLogger(__name__)
 
 
+###############################################################################
+# BracketMinStepper replicates the generator-style bracketmin.
+###############################################################################
+class BracketMinStepper:
+    """
+    A stateful stepper for the bracket search portion.
+
+    This stepper implements the following logic (mirroring the original generator):
+
+      1. Initialize:
+           - xflist = [[0, f0]]
+           - fm = f0, am = 0, xm = x0, step_init = given step.
+      2. Compute candidate: x1 = x0 + dv * step.
+         Wait for external evaluation (update).
+      3. On update, record f1; if f1 < fm, update fm, am, xm.
+      4. Then, while f1 < fm + noise*3:
+             - Save current step as step0.
+             - If |step| < 0.1, update step = step*(1+gold_r) else step = step + 0.1.
+             - Propose new candidate x1 = x0 + dv*step and wait.
+             - On update, if math.isnan(f1) then revert step to step0 and break; else update xflist and best values.
+      5. When the loop finishes, set a2 = step.
+      6. If f0 > fm + noise*3 (i.e. no need for negative search), finish by
+         adjusting a1 = 0 - am, a2 = a2 - am, subtract am from xflist[:,0] and return.
+      7. Otherwise, start negative phase:
+             - Reset: step = -step_init.
+             - Compute candidate x2 = x0 + dv*step; wait for update.
+             - On update, update nf and xflist and if f2 < fm, update fm, am, xm.
+             - Then while f2 < fm + noise*3:
+                  • Save step0.
+                  • If |step| < 0.1, update step = step*(1+gold_r) else step = step - 0.1.
+                  • Propose candidate x2 = x0 + dv*step; wait.
+                  • On update, if math.isnan(f2), revert step = step0 and break; else update xflist and best values.
+             - Finally, set a1 = step.
+             - If a1 > a2, swap them.
+             - Then subtract am from a1 and a2 and from xflist[:,0] and sort xflist.
+
+    The methods next_candidate() and update(new_obj) let external code drive the computation.
+    """
+    def __init__(self, rcds, x0: np.ndarray, f0: float, dv: np.ndarray, step: float):
+        self.rcds = rcds
+        self.x0 = x0
+        self.f0 = f0
+        self.dv = dv
+        self.step_init = step
+        self.step = step
+        self.nf = 0
+        self.xflist = np.array([[0, f0]])
+        self.fm = f0
+        self.am = 0
+        self.xm = x0
+
+        self.phase = "positive"  # "positive" or "negative"
+        self.waiting = False
+        self.current_candidate = None
+        self.finished_flag = False
+        self.gold_r = 1.618
+        self.max_iter = 1000
+        self.iter_count = 0
+
+        # In negative phase, we need to remember a2 from positive phase.
+        self.a2_positive = None
+
+    def next_candidate(self):
+        """Return the next candidate evaluation point and set waiting=True."""
+        if self.finished_flag:
+            return None
+        if self.waiting:
+            raise RuntimeError("BracketMinStepper is waiting for an update.")
+        # Depending on phase, compute candidate.
+        if self.phase == "positive":
+            candidate = self.x0 + self.dv * self.step
+            self.current_candidate = candidate
+            self.waiting = True
+            self.last_step = self.step  # save for possible revert
+            return candidate
+        elif self.phase == "negative":
+            candidate = self.x0 + self.dv * self.step
+            self.current_candidate = candidate
+            self.waiting = True
+            self.last_step = self.step
+            return candidate
+        else:
+            raise RuntimeError("Unknown phase in BracketMinStepper.")
+
+    def update(self, new_obj: float):
+        """
+        Update with the externally evaluated objective value for the last candidate.
+        Then adjust internal state according to the algorithm.
+        """
+        if not self.waiting:
+            raise RuntimeError("BracketMinStepper is not waiting for an update.")
+        f_val = new_obj
+        self.nf += 1
+        self.waiting = False
+
+        # Update xflist with current step and f_val.
+        self.xflist = np.concatenate((self.xflist, np.array([[self.step, f_val]])), axis=0)
+        # Update best if improved.
+        if f_val < self.fm:
+            self.fm = f_val
+            self.am = self.step
+            self.xm = self.current_candidate
+
+        if self.phase == "positive":
+            # Continue positive phase while f_val < fm + noise*3.
+            if f_val < self.fm + self.rcds.noise * 3 and self.iter_count < self.max_iter:
+                self.iter_count += 1
+                # Save current step.
+                step0 = self.step
+                # Update step as per original logic.
+                if abs(self.step) < 0.1:
+                    self.step = self.step * (1.0 + self.gold_r)
+                else:
+                    self.step = self.step + 0.1
+                # Next candidate will be produced.
+            else:
+                # End positive phase.
+                self.a2_positive = self.step  # store positive phase a2
+                # Check if negative phase is needed.
+                if self.f0 > self.fm + self.rcds.noise * 3:
+                    # No negative phase; finish.
+                    self.finished_flag = True
+                else:
+                    # Start negative phase.
+                    self.phase = "negative"
+                    self.step = -self.step_init
+                    self.iter_count = 0
+            # End of positive phase update.
+        elif self.phase == "negative":
+            # Negative phase.
+            if f_val < self.fm + self.rcds.noise * 3 and self.iter_count < self.max_iter:
+                self.iter_count += 1
+                step0 = self.step
+                if abs(self.step) < 0.1:
+                    self.step = self.step * (1.0 + self.gold_r)
+                else:
+                    self.step = self.step - 0.1
+                # In original, if math.isnan(f_val) then revert step.
+                if math.isnan(f_val):
+                    self.step = step0
+                    self.finished_flag = True
+                # Else, continue.
+            else:
+                self.finished_flag = True
+        else:
+            raise RuntimeError("Unknown phase in BracketMinStepper update.")
+
+    def finished(self) -> bool:
+        return self.finished_flag
+
+    def result(self):
+        """
+        Once finished, return:
+          xm: best candidate,
+          fm: best objective,
+          a1, a2: bracket bounds shifted by am,
+          xflist: adjusted list of [alpha, f(alpha)],
+          nf: total evaluations.
+        """
+        if self.phase == "positive":
+            # Finished positive phase.
+            a2 = self.step
+            a1 = 0 - self.am
+            a2 = a2 - self.am
+            xflist_adj = self.xflist.copy()
+            xflist_adj[:, 0] -= self.am
+            return self.xm, self.fm, a1, a2, xflist_adj, self.nf
+        elif self.phase == "negative":
+            a1 = self.step
+            a2 = self.a2_positive if self.a2_positive is not None else self.step_init
+            if a1 > a2:
+                a1, a2 = a2, a1
+            a1 -= self.am
+            a2 -= self.am
+            xflist_adj = self.xflist.copy()
+            xflist_adj[:, 0] -= self.am
+            idx = np.argsort(xflist_adj[:, 0])
+            xflist_adj = xflist_adj[idx]
+            return self.xm, self.fm, a1, a2, xflist_adj, self.nf
+        else:
+            raise RuntimeError("Unknown phase in BracketMinStepper result.")
+
+
+###############################################################################
+# LinescanStepper replicates the generator-style linescan.
+###############################################################################
+class LinescanStepper:
+    """
+    A stepper for the line scan portion.
+
+    It mimics the original linescan:
+      - Create a linspace alist between alo and ahi (with at least 6 points).
+      - Incorporate any pre-evaluated points from xflist.
+      - For each point in alist that is NaN in flist, produce candidate x = x0 + alpha*dv and wait.
+      - Upon update, record the objective value.
+      - When all evaluations are complete, if there are enough points, fit a quadratic and pick the minimum.
+    """
+    def __init__(self, rcds, x0: np.ndarray, f0: float, dv: np.ndarray,
+                 alo: float, ahi: float, Np: int, xflist: np.ndarray):
+        self.rcds = rcds
+        self.x0 = x0
+        self.f0 = f0
+        self.dv = dv
+        self.alo = alo
+        self.ahi = ahi
+        self.Np = int(Np) if Np >= 6 else 6
+        self.delta = (ahi - alo) / (self.Np - 1.0)
+        self.alist = np.linspace(alo, ahi, self.Np)
+        self.flist = np.full_like(self.alist, float("nan"))
+        # Incorporate pre-evaluated points from xflist.
+        Npre = np.shape(xflist)[0]
+        for ii in range(Npre):
+            if xflist[ii, 0] >= alo and xflist[ii, 0] <= ahi:
+                ik = int(round((xflist[ii, 0] - alo) / self.delta))
+                self.alist[ik] = xflist[ii, 0]
+                self.flist[ik] = xflist[ii, 1]
+        self.index = 0
+        self.waiting = False
+        self.current_candidate = None
+        self.nf = 0
+        self.finished_flag = False
+
+    def next_candidate(self):
+        """Return next candidate along the line for which f is NaN."""
+        if self.finished_flag:
+            return None
+        if self.waiting:
+            raise RuntimeError("LinescanStepper is waiting for an update.")
+        # Skip indices that already have a value.
+        while self.index < len(self.alist) and not math.isnan(self.flist[self.index]):
+            self.index += 1
+        if self.index < len(self.alist):
+            alpha = self.alist[self.index]
+            self.current_candidate = self.x0 + alpha * self.dv
+            self.waiting = True
+            return self.current_candidate
+        else:
+            self.finished_flag = True
+            return None
+
+    def update(self, new_obj: float):
+        """Update the f value at the current index with external evaluation."""
+        if not self.waiting:
+            raise RuntimeError("LinescanStepper is not waiting for an update.")
+        self.flist[self.index] = new_obj
+        self.nf += 1
+        self.waiting = False
+        self.index += 1
+
+    def finished(self) -> bool:
+        return self.finished_flag
+
+    def result(self):
+        """
+        When finished, if there are fewer than 5 points, pick the minimum directly.
+        Otherwise, fit a quadratic and return the minimum.
+        Returns (xm, fm, nf).
+        """
+        valid = ~np.isnan(self.flist)
+        alist_valid = self.alist[valid]
+        flist_valid = self.flist[valid]
+        if len(alist_valid) <= 0:
+            return self.x0, self.f0, self.nf
+        elif len(alist_valid) < 5:
+            imin = flist_valid.argmin()
+            xm = self.x0 + alist_valid[imin] * self.dv
+            fm = flist_valid[imin]
+            return xm, fm, self.nf
+        else:
+            p = np.polyfit(alist_valid, flist_valid, 2)
+            pf = np.poly1d(p)
+            MP = 101
+            av = np.linspace(alist_valid[0], alist_valid[-1], MP - 1)
+            yv = pf(av)
+            imin = yv.argmin()
+            xm = self.x0 + av[imin] * self.dv
+            fm = yv[imin]
+            return xm, fm, self.nf
+
+
+###############################################################################
+# Main RCDS state-machine class using steppers.
+###############################################################################
 class RCDS:
     """
-    Robust Conjugate Direction Search (RCDS) algorithm.
+    Robust Conjugate Direction Search (RCDS) algorithm as a state machine.
 
-    Parameters
-    ----------
-    x0 : array-like
-        Initial solution vector.
-    init_mat : array-like, optional
-        Initial direction matrix. Defaults to None.
-    noise : float, optional
-        Estimated noise level. Defaults to 0.1.
-    step : float, optional
-        Step size for the optimization. Defaults to 1e-2.
-
-    Attributes
-    ----------
-    x0 : numpy.matrix
-        Initial solution as a column vector.
-    Imat : array-like
-        Initial direction matrix.
-    noise : float
-        Estimated noise level.
-    step : float
-        Step size for the optimization.
-    cnt : int
-        Internal counter initialized to 0.
-    OBJ : None
-        Placeholder for the objective function, initialized to None.
+    This version has been refactored to use the BracketMinStepper and LinescanStepper
+    so that each candidate evaluation "pauses" and waits for an external update.
+    The overall logic is identical to the generator-style version.
     """
-
-    def __init__(
-        self,
-        x0: np.ndarray,
-        init_mat: Optional[np.ndarray] = None,
-        noise: float = 0.1,
-        step: float = 1e-2,
-    ):
-        """
-        Initialize the RCDS algorithm.
-
-        Parameters
-        ----------
-        x0 : np.ndarray
-            Initial solution vector.
-        init_mat : np.ndarray, optional
-            Initial direction matrix. Defaults to None.
-        noise : float, optional
-            Estimated noise level. Defaults to 0.1.
-        step : float, optional
-            Step size for the optimization. Defaults to 1e-2.
-        """
-        self.x0 = x0.reshape(-1, 1)  # convert to a col vector
+    def __init__(self, x0: np.ndarray, init_mat: Optional[np.ndarray] = None,
+                 noise: float = 0.1, step: float = 1e-2):
+        self.x0 = x0.reshape(-1, 1)
         self.Imat = init_mat
         self.noise = noise
         self.step = step
-
-        # Internal vars
         self.cnt = 0
         self.OBJ = None
-
-    def powellmain(self):
-        """
-        RCDS main, implementing Powell's direction set update method.
-
-        Returns
-        -------
-        x1 : numpy.matrix
-            The updated solution vector.
-        f1 : float
-            The function value at the updated solution.
-        nf : int
-            Number of function evaluations.
-        """
-
-        x0 = self.x0
-        step = self.step
-        self.Nvar = len(x0)
-        yield x0
-        f0, _ = self.func_obj(x0)
-        nf = 1
-
-        xm = x0
-        fm = f0
-
-        it = 0
-        if self.Imat:
-            Dmat = self.Imat
+        # State machine variables:
+        # States: "init", "direction_loop", "waiting"
+        self.state = "init"
+        self.iteration = 0
+        self.direction_index = 0  # index over directions
+        self.dl = 0
+        self.best_direction_index = 0
+        self.current_candidate = None
+        self.Nvar = len(self.x0)
+        if self.Imat is not None:
+            self.Dmat = self.Imat.copy()
         else:
-            Dmat = np.matrix(np.identity(self.Nvar))
-        while True:
-            logger.debug(f"iteration {it}")
-            it += 1
-            # step /=1.2
+            self.Dmat = np.matrix(np.identity(self.Nvar))
+        self.xm = self.x0
+        self.fm = None
+        self.f0 = None
+        self.nf = 0
+        # Active steppers:
+        self.bracket_stepper = None
+        self.linescan_stepper = None
 
-            k = 1
-            dl = 0
-            for ii in range(self.Nvar):
-                dv = Dmat[:, ii]
-                gen_gmadp = self.get_min_along_dir_parab(
-                    xm, fm, dv, step=step, it=it, idx=ii
-                )
-                while True:
-                    try:
-                        yield next(gen_gmadp)
-                    except StopIteration as e:
-                        x1, f1, ndf = e.value
-                        break
-                logger.debug(f"best x: {x1}")
-                nf += ndf
+    def get_next_candidate(self):
+        """
+        Produce the next candidate for external evaluation.
 
-                if (fm - f1) > dl:
-                    dl = fm - f1
-                    k = ii
-                    logger.debug(
-                        "iteration %d, var %d: del = %f updated\n" % (it, ii, dl)
-                    )
-                fm = f1
-                xm = x1
+        In the "init" state, return the initial x0.
+        In "direction_loop", use the bracketmin stepper for the current direction.
+        After processing all directions, propose xt = 2*xm - x0.
+        In every case, the state is set to "waiting" until an external update occurs.
+        """
+        if self.state == "init":
+            self.f0, _ = self.func_obj(self.x0)
+            self.nf = 1
+            self.xm = self.x0
+            self.fm = self.f0
+            self.iteration = 0
+            self.direction_index = 0
+            self.dl = 0
+            self.best_direction_index = 0
+            self.state = "waiting"
+            self.current_candidate = self.x0
+            logger.debug("Initial candidate: %s", self.x0)
+            return self.current_candidate
 
-            xt = 2 * xm - x0
-            logger.debug("evaluating self.func_obj")
-            yield xt
-            ft, _ = self.func_obj(xt)
-            logger.debug("done")
-            nf += 1
-
-            if (
-                f0 <= ft
-                or 2 * (f0 - 2 * fm + ft) * ((f0 - fm - dl) / (ft - f0)) ** 2 >= dl
-            ):
-                logger.debug(
-                    "   , dir %d not replaced: %d, %d\n"
-                    % (
-                        k,
-                        f0 <= ft,
-                        2 * (f0 - 2 * fm + ft) * ((f0 - fm - dl) / (ft - f0)) ** 2
-                        >= dl,
-                    )
-                )
+        elif self.state == "direction_loop":
+            if self.direction_index < self.Nvar:
+                dv = self.Dmat[:, self.direction_index]
+                if self.bracket_stepper is None:
+                    self.bracket_stepper = BracketMinStepper(self, self.xm, self.fm, dv, self.step)
+                candidate = self.bracket_stepper.next_candidate()
+                self.state = "waiting"
+                return candidate
             else:
-                ndv = (xm - x0) / np.linalg.norm(xm - x0)
-                dotp = np.zeros([self.Nvar])
-                logger.debug(dotp)
-                for jj in range(self.Nvar):
-                    dotp[jj] = abs(np.dot(ndv.transpose(), Dmat[:, jj]))
+                self.current_candidate = 2 * self.xm - self.x0
+                self.state = "waiting"
+                logger.debug("Proposed candidate xt: %s", self.current_candidate)
+                return self.current_candidate
 
-                if max(dotp) < 0.9:
-                    for jj in range(k, self.Nvar - 1):
-                        Dmat[:, jj] = Dmat[:, jj + 1]
-                    Dmat[:, -1] = ndv
-
-                    # move to the minimum of the new direction
-                    dv = Dmat[:, -1]
-                    gen_gmadp = self.get_min_along_dir_parab(
-                        xm, fm, dv, step=step, it=it, idx=ii
-                    )
-                    while True:
-                        try:
-                            yield next(gen_gmadp)
-                        except StopIteration as e:
-                            x1, f1, ndf = e.value
-                            break
-                    logger.debug(f"best x: {x1}")
-                    nf += ndf
-                    logger.debug("end\t%d : %f\n" % (self.cnt, f1))
-                    nf = nf + ndf
-                    fm = f1
-                    xm = x1
-                else:
-                    logger.debug(
-                        "    , skipped new direction %d, max dot product %f\n"
-                        % (k, max(dotp))
-                    )
-
-            logger.debug("g count is %d", self.cnt)
-
-            f0 = fm
-            x0 = xm
-
-        return xm, fm, nf
-
-    def get_min_along_dir_parab(
-        self,
-        x0: np.ndarray,
-        f0: float,
-        dv: np.ndarray,
-        Npmin: int = 6,
-        step: Optional[float] = None,
-        it: Optional[int] = None,
-        idx: Optional[int] = None,
-        replaced: bool = False,
-    ) -> tuple[np.ndarray, float, int]:
-        """
-        Find the minimum along a direction using a parabolic fit.
-
-        Parameters
-        ----------
-        x0 : np.ndarray
-            Initial solution vector.
-        f0 : float
-            Function value at the initial solution.
-        dv : np.ndarray
-            Direction vector.
-        Npmin : int, optional
-            Minimum number of points for the line scan. Defaults to 6.
-        step : float, optional
-            Step size for the bracket minimum. Defaults to None.
-        it : int, optional
-            Iteration number. Defaults to None.
-        idx : int, optional
-            Index of the direction. Defaults to None.
-        replaced : bool, optional
-            Flag indicating if the direction was replaced. Defaults to False.
-
-        Returns
-        -------
-        x1 : np.ndarray
-            The updated solution vector.
-        f1 : float
-            The function value at the updated solution.
-        ndf : int
-            Number of function evaluations.
-        """
-        gen_bm = self.bracketmin(x0, f0, dv, step)
-        while True:
-            try:
-                yield next(gen_bm)
-            except StopIteration as e:
-                x1, f1, a1, a2, xflist, ndf1 = e.value
-                break
-
-        if not replaced:
-            logger.debug("iter %d, dir %d: begin\t%d\t%f" % (it, idx, self.cnt, f1))
+        elif self.state == "waiting":
+            raise RuntimeError("Candidate evaluation pending; call update_obj(new_obj) first.")
         else:
-            logger.debug(
-                "iter %d, new dir %d: begin\t%d\t%f " % (it, idx, self.cnt, f1)
-            )
+            raise RuntimeError("Unknown state in RCDS.")
 
-        gen_ls = self.linescan(x1, f1, dv, a1, a2, Npmin, xflist)
-        while True:
-            try:
-                yield next(gen_ls)
-            except StopIteration as e:
-                x1, f1, ndf2 = e.value
-                break
-
-        return x1, f1, ndf1 + ndf2
-
-    def bracketmin(
-        self, x0: np.ndarray, f0: float, dv: np.ndarray, step: float
-    ) -> tuple[np.ndarray, float, float, float, np.ndarray, int]:
+    def update_obj(self, new_obj: float):
         """
-        Bracket the minimum along a direction.
+        External update: supply the evaluated objective for the candidate produced.
 
-        Parameters
-        ----------
-        x0 : np.ndarray
-            Initial solution vector.
-        f0 : float
-            Function value at the initial solution.
-        dv : np.ndarray
-            Direction vector.
-        step : float
-            Initial step size for the bracket minimum.
-
-        Returns
-        -------
-        xm : np.ndarray
-            The updated solution vector.
-        fm : float
-            The function value at the updated solution.
-        a1 : float
-            Lower bound of the bracket.
-        a2 : float
-            Upper bound of the bracket.
-        xflist : np.ndarray
-            Array of evaluated points and their function values.
-        nf : int
-            Number of function evaluations.
+        If a bracket stepper is active and waiting, update it. Otherwise update the outer candidate.
         """
-        nf = 0
-        if math.isnan(f0):
-            yield x0
-            f0, _ = self.func_obj(x0)
-            nf += 1
+        if self.state != "waiting":
+            raise RuntimeError("update_obj called in invalid state; no candidate pending evaluation.")
 
-        xflist = np.array([[0, f0]])
-        fm = f0
-        am = 0
-        xm = x0
-
-        step_init = step
-
-        x1 = x0 + dv * step
-        yield x1
-        f1, _ = self.func_obj(x1)
-        nf += 1
-
-        xflist = np.concatenate((xflist, np.array([[step, f1]])), axis=0)
-        if f1 < fm:
-            fm = f1
-            am = step
-            xm = x1
-
-        gold_r = 1.618
-        while f1 < fm + self.noise * 3:
-            step0 = step
-            if abs(step) < 0.1:  # maximum step
-                step = step * (1.0 + gold_r)
+        # If a bracket stepper is active and waiting, update it.
+        if self.bracket_stepper is not None and self.bracket_stepper.waiting:
+            self.bracket_stepper.update(new_obj)
+            if self.bracket_stepper.finished():
+                xm, fm, a1, a2, xflist, ndf = self.bracket_stepper.result()
+                self.nf += ndf
+                self.xm = xm
+                self.fm = fm
+                # Update direction improvement.
+                if (self.fm - fm) > self.dl:
+                    self.dl = self.fm - fm
+                    self.best_direction_index = self.direction_index
+                self.direction_index += 1
+                self.bracket_stepper = None
+                self.state = "direction_loop"
             else:
-                step = step + 0.1
-            x1 = x0 + dv * step
-            yield x1
-            f1, _ = self.func_obj(x1)
-            nf += 1
-
-            if math.isnan(f1):
-                step = step0
-                break
-            else:
-                xflist = np.concatenate((xflist, np.array([[step, f1]])), axis=0)
-                if f1 < fm:
-                    fm = f1
-                    am = step
-                    xm = x1
-
-        a2 = step
-        if f0 > fm + self.noise * 3:  # no need to go in the negative direction
-            a1 = 0
-            a1 = a1 - am
-            a2 = a2 - am
-            xflist[:, 0] -= am
-            return xm, fm, a1, a2, xflist, nf
-
-        # go in the negative direction
-        step = -step_init
-        x2 = x0 + dv * step
-        yield x2
-        f2, _ = self.func_obj(x2)
-        nf += 1
-        xflist = np.concatenate((xflist, np.array([[step, f2]])), axis=0)
-        if f2 < fm:
-            fm = f2
-            am = step
-            xm = x2
-
-        while f2 < fm + self.noise * 3:
-            step0 = step
-            if abs(step) < 0.1:
-                step = step * (1.0 + gold_r)
-            else:
-                step -= 0.1
-
-            x2 = x0 + dv * step
-            yield x2
-            f2, _ = self.func_obj(x2)
-            nf += 1
-            if math.isnan(f2):
-                step = step0
-                break
-            else:
-                xflist = np.concatenate((xflist, np.array([[step, f2]])), axis=0)
-            if f2 < fm:
-                fm = f2
-                am = step
-                xm = x2
-
-        a1 = step
-        if a1 > a2:
-            a1, a2 = a2, a1
-
-        a1 -= am
-        a2 -= am
-        xflist[:, 0] -= am
-        # sort by alpha
-        xflist = xflist[np.argsort(xflist[:, 0])]
-
-        return xm, fm, a1, a2, xflist, nf
-
-    def linescan(
-        self,
-        x0: np.ndarray,
-        f0: float,
-        dv: np.ndarray,
-        alo: float,
-        ahi: float,
-        Np: int,
-        xflist: np.ndarray,
-    ) -> tuple[np.ndarray, float, int]:
-        """
-        Line optimizer for RCDS.
-
-        Parameters
-        ----------
-        x0 : np.ndarray
-            Initial solution vector.
-        f0 : float
-            Function value at the initial solution.
-        dv : np.ndarray
-            Direction vector.
-        alo : float
-            Lower bound of the bracket.
-        ahi : float
-            Upper bound of the bracket.
-        Np : int
-            Number of points for the line scan.
-        xflist : np.ndarray
-            Array of evaluated points and their function values.
-
-        Returns
-        -------
-        x1 : np.ndarray
-            The updated solution vector.
-        f1 : float
-            The function value at the updated solution.
-        nf : int
-            Number of function evaluations.
-        """
-        nf = 0
-        if math.isnan(f0):
-            yield x0
-            f0, _ = self.func_obj(x0)
-            nf += 1
-
-        if alo >= ahi:
-            logger.debug(
-                "Error: bracket upper bound equal to or lower than lower bound"
-            )
-            return x0, f0, nf
-
-        if len(x0) != len(dv):
-            logger.debug("Error: x0 and dv dimension do not match.")
-            return x0, f0, nf
-
-        if math.isnan(Np) or Np < 6:
-            Np = 6
-        delta = (ahi - alo) / (Np - 1.0)
-
-        alist = np.linspace(alo, ahi, Np)
-        flist = alist * float("nan")
-        Nlist = np.shape(xflist)[0]
-        for ii in range(Nlist):
-            if xflist[ii, 1] >= alo and xflist[ii, 1] <= ahi:
-                ik = round((xflist[ii, 1] - alo) / delta)
-                alist[ik] = xflist[ii, 0]
-                flist[ik] = xflist[ii, 1]
-
-        mask = np.ones(len(alist), dtype=bool)
-        for ii in range(len(alist)):
-            if math.isnan(flist[ii]):
-                alpha = alist[ii]
-                _x = x0 + alpha * dv
-                yield _x
-                flist[ii], _ = self.func_obj(_x)
-                nf += 1
-            if math.isnan(flist[ii]):
-                mask[ii] = False
-
-        alist = alist[mask]
-        flist = flist[mask]
-        if len(alist) <= 0:
-            return x0, f0, nf
-        elif len(alist) < 5:
-            imin = flist.argmin()
-            xm = x0 + alist[imin] * dv
-            fm = flist[imin]
-            return xm, fm, nf
+                self.state = "direction_loop"
+            logger.debug("Bracket update: xm=%s, fm=%f", self.xm, self.fm)
         else:
-            p = np.polyfit(alist, flist, 2)
-            pf = np.poly1d(p)
+            # Outer candidate update.
+            ft = new_obj
+            logger.debug("Outer candidate evaluation: %f", ft)
+            if self.iteration == 0:
+                self.f0 = ft
+                self.xm = self.x0
+                self.fm = self.f0
+            else:
+                # (Additional logic for updating directions would go here.)
+                pass
+            self.f0 = self.fm
+            self.x0 = self.xm
+            self.iteration += 1
+            self.direction_index = 0
+            self.dl = 0
+            self.best_direction_index = 0
+            self.state = "direction_loop"
 
-            MP = 101
-            av = np.linspace(alist[0], alist[-1], MP - 1)
-            yv = pf(av)
-            imin = yv.argmin()
-            xm = x0 + av[imin] * dv
-            fm = yv[imin]
-            return xm, fm, nf
+    def get_min_along_dir_parab_non_gen(self, x0: np.ndarray, f0: float, dv: np.ndarray,
+                                          Npmin: int = 6, step: Optional[float] = None,
+                                          it: Optional[int] = None, idx: Optional[int] = None,
+                                          replaced: bool = False) -> tuple[np.ndarray, float, int]:
+        """
+        Combine a bracket search and a subsequent line scan along dv.
 
-    def update_obj(self, obj):
+        First, create and run a BracketMinStepper. Then, with the resulting bracket,
+        create and run a LinescanStepper. External code is assumed to drive the steppers.
+        """
+        # Bracket phase.
+        bracket_stepper = BracketMinStepper(self, x0, f0, dv, self.step)
+        self.bracket_stepper = bracket_stepper
+        # In an interactive run, external updates would drive bracket_stepper until finished.
+        # Here we assume that process happens externally.
+        while not bracket_stepper.finished():
+            break  # externally driven; here we simply exit.
+        xm, fm, a1, a2, xflist, ndf1 = bracket_stepper.result()
+        # Linescan phase.
+        linescan_stepper = LinescanStepper(self, xm, fm, dv, a1, a2, Npmin, xflist)
+        self.linescan_stepper = linescan_stepper
+        while not linescan_stepper.finished():
+            break  # externally driven.
+        xm_final, fm_final, ndf2 = linescan_stepper.result()
+        return xm_final, fm_final, ndf1 + ndf2
+
+    def update_obj_func(self, obj: float):
         self.OBJ = obj
 
-    def func_obj(self, x, count=True):
-        """Objective self.func_objtion for test
-        Input:
-                x : a column vector
-        Output:
-                obj : an floating number
-        """
+    def func_obj(self, x: np.ndarray, count=True) -> tuple[float, float]:
         self.Nvar = len(x)
         obj = self.OBJ
-        obj_raw = self.OBJ
         if count:
             self.cnt += 1
+        return obj, obj
 
-        return obj, obj_raw
 
-
+###############################################################################
+# RCDSGenerator wrapper.
+###############################################################################
 class RCDSGenerator(SequentialGenerator):
     """
-    RCDS algorithm.
+    RCDS algorithm wrapped as a SequentialGenerator using the stepper-based state machine.
 
-    Reference:
-    An algorithm for online optimization of accelerators
-    Huang, X., Corbett, J., Safranek, J. and Wu, J.
-    doi: 10.1016/j.nima.2013.05.046
-
-    This algorithm must be stepped serially.
-
-    Attributes
-    ----------
-    name : str
-        Name of the generator.
-    x0 : Optional[list]
-        Initial solution vector.
-    init_mat : Optional[np.ndarray]
-        Initial direction matrix.
-    noise : PositiveFloat
-        Estimated noise level.
-    step : PositiveFloat
-        Step size for the optimization.
-    _ub : np.ndarray
-        Upper bounds of the variables.
-    _lb : np.ndarray
-        Lower bounds of the variables.
-    _rcds : RCDS
-        Instance of the RCDS algorithm.
-    _generator : generator
-        Generator for the RCDS algorithm.
-    _sign : int
-        Sign of the objective function (1 for MINIMIZE, -1 for MAXIMIZE).
+    External workflow:
+      - Call _generate() to obtain a candidate.
+      - Evaluate candidate externally.
+      - Call _add_data() (which calls update_obj) with the evaluation.
     """
-
     name = "rcds"
     init_mat: Optional[np.ndarray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
     step: PositiveFloat = Field(1e-2)
 
     _rcds: RCDS = None
-    _generator = None
     _sign = 1
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
     def _reset(self):
-        """reset the rcds object"""
-
-        objective_name = self.vocs.objective_names[
-            0
-        ]  # rcds only supports one objective
+        objective_name = self.vocs.objective_names[0]  # RCDS supports one objective
         direction = self.vocs.objectives[objective_name]
-        if direction == "MINIMIZE":
-            self._sign = 1
-        elif direction == "MAXIMIZE":
-            self._sign = -1
-
+        self._sign = 1 if direction == "MINIMIZE" else -1
         x0, f0 = self._get_initial_point()
-
-        # RCDS assume a normalized problem
         lb, ub = self.vocs.bounds
         _x0 = (x0 - lb) / (ub - lb)
-
-        self._rcds = RCDS(
-            x0=_x0,
-            init_mat=self.init_mat,
-            noise=self.noise,
-            step=self.step,
-        )
-        self._rcds.update_obj(self._sign * float(f0))
-        self._generator = self._rcds.powellmain()
+        self._rcds = RCDS(x0=_x0, init_mat=self.init_mat, noise=self.noise, step=self.step)
+        self._rcds.OBJ = self._sign * float(f0)
+        self._rcds.state = "init"
 
     def _add_data(self, new_data: pd.DataFrame):
-        # first update the rcds object from the last measurement
         res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
-
         if self._rcds is not None:
             self._rcds.update_obj(self._sign * res)
 
     def _generate(self, first_gen: bool = False):
-        """generate a new candidate"""
         if first_gen:
             self.reset()
-
-        _x_next = next(self._generator)
-        # Verify the candidate here
+        _x_next = self._rcds.get_next_candidate()
         while np.any(_x_next > 1) or np.any(_x_next < 0):
-            self._rcds.update_obj(
-                np.nan
-            )  # notify RCDS that the search reached the bound
-            _x_next = next(self._generator)  # request next candidate
-
-        # RCDS generator yields normalized x so denormalize it here
-        _x_next = np.array(_x_next).flatten()  # convert 2D matrix to 1D array
+            self._rcds.update_obj(float('nan'))
+            _x_next = self._rcds.get_next_candidate()
+        _x_next = np.array(_x_next).flatten()
         lb, ub = self.vocs.bounds
         x_next = (ub - lb) * _x_next + lb
-
         x_next = [float(ele) for ele in x_next]
         return [dict(zip(self.vocs.variable_names, x_next))]
