@@ -22,7 +22,6 @@ nav:
             - Single Objective Bayesian Optimization:
                 - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
                 - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
-                - Log-transformed optimization: examples/single_objective_bayes_opt/log_transformed_tutorial.ipynb
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
                 - Trust region: examples/single_objective_bayes_opt/turbo_tutorial.ipynb
@@ -38,8 +37,10 @@ nav:
                 - Expected hypervolume improvement: examples/multi_objective_bayes_opt/mobo.ipynb
                 - Multi-fidelity expected hypervolume improvement: examples/multi_objective_bayes_opt/multi_fidelity_mobo.ipynb
                 - Multi-generation gaussian process optimization: examples/multi_objective_bayes_opt/mggpo.ipynb
-        - Evolutionary:
-            - CNSGA: examples/cnsga/cnsga_tnk.ipynb
+        - Evolutionary / Genetic:
+            - CNSGA: examples/ga/cnsga_tnk.ipynb
+            - NSGA-II: examples/ga/nsga2_tnk.ipynb
+
         - Sequential:
             - Nelder-Mead: examples/sequential/neldermead.ipynb
             - Extremum seeking: examples/sequential/extremum_seeking.ipynb
