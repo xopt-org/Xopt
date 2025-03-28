@@ -289,7 +289,7 @@ def test_nsga2_all_individuals_in_data():
 
         # Get all candidate indices from the generator's history
         all_history_indices = []
-        for gen_indices in generator.history_idx:
+        for gen_indices in X.generator.history_idx:
             all_history_indices.extend(gen_indices)
 
         # Check that all individuals in the history are in the data file
@@ -298,10 +298,10 @@ def test_nsga2_all_individuals_in_data():
 
         # Check that the number of unique candidate indices in the data file
         # matches the generator's n_candidates counter
-        assert len(data_df["xopt_candidate_idx"]) == generator.n_candidates
+        assert len(data_df["xopt_candidate_idx"]) == X.generator.n_candidates
 
         # Close log file before exiting context
-        generator.close_log_file()
+       X. generator.close_log_file()
 
 
 def test_resume_consistency(pop_size=5, n_steps=128, check_step=10):
