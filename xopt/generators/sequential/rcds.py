@@ -50,6 +50,7 @@ class BracketMinStepper:
 
     The methods next_candidate() and update(new_obj) let external code drive the computation.
     """
+
     def __init__(self, rcds, x0: np.ndarray, f0: float, dv: np.ndarray, step: float):
         self.rcds = rcds
         self.x0 = x0
@@ -108,7 +109,9 @@ class BracketMinStepper:
         self.waiting = False
 
         # Update xflist with current step and f_val.
-        self.xflist = np.concatenate((self.xflist, np.array([[self.step, f_val]])), axis=0)
+        self.xflist = np.concatenate(
+            (self.xflist, np.array([[self.step, f_val]])), axis=0
+        )
         # Update best if improved.
         if f_val < self.fm:
             self.fm = f_val
@@ -117,7 +120,10 @@ class BracketMinStepper:
 
         if self.phase == "positive":
             # Continue positive phase while f_val < fm + noise*3.
-            if f_val < self.fm + self.rcds.noise * 3 and self.iter_count < self.max_iter:
+            if (
+                f_val < self.fm + self.rcds.noise * 3
+                and self.iter_count < self.max_iter
+            ):
                 self.iter_count += 1
                 # Save current step.
                 step0 = self.step
@@ -142,7 +148,10 @@ class BracketMinStepper:
             # End of positive phase update.
         elif self.phase == "negative":
             # Negative phase.
-            if f_val < self.fm + self.rcds.noise * 3 and self.iter_count < self.max_iter:
+            if (
+                f_val < self.fm + self.rcds.noise * 3
+                and self.iter_count < self.max_iter
+            ):
                 self.iter_count += 1
                 step0 = self.step
                 if abs(self.step) < 0.1:
@@ -209,8 +218,18 @@ class LinescanStepper:
       - Upon update, record the objective value.
       - When all evaluations are complete, if there are enough points, fit a quadratic and pick the minimum.
     """
-    def __init__(self, rcds, x0: np.ndarray, f0: float, dv: np.ndarray,
-                 alo: float, ahi: float, Np: int, xflist: np.ndarray):
+
+    def __init__(
+        self,
+        rcds,
+        x0: np.ndarray,
+        f0: float,
+        dv: np.ndarray,
+        alo: float,
+        ahi: float,
+        Np: int,
+        xflist: np.ndarray,
+    ):
         self.rcds = rcds
         self.x0 = x0
         self.f0 = f0
@@ -303,8 +322,14 @@ class RCDS:
     so that each candidate evaluation "pauses" and waits for an external update.
     The overall logic is identical to the generator-style version.
     """
-    def __init__(self, x0: np.ndarray, init_mat: Optional[np.ndarray] = None,
-                 noise: float = 0.1, step: float = 1e-2):
+
+    def __init__(
+        self,
+        x0: np.ndarray,
+        init_mat: Optional[np.ndarray] = None,
+        noise: float = 0.1,
+        step: float = 1e-2,
+    ):
         self.x0 = x0.reshape(-1, 1)
         self.Imat = init_mat
         self.noise = noise
@@ -359,7 +384,9 @@ class RCDS:
             if self.direction_index < self.Nvar:
                 dv = self.Dmat[:, self.direction_index]
                 if self.bracket_stepper is None:
-                    self.bracket_stepper = BracketMinStepper(self, self.xm, self.fm, dv, self.step)
+                    self.bracket_stepper = BracketMinStepper(
+                        self, self.xm, self.fm, dv, self.step
+                    )
                 candidate = self.bracket_stepper.next_candidate()
                 self.state = "waiting"
                 return candidate
@@ -370,7 +397,9 @@ class RCDS:
                 return self.current_candidate
 
         elif self.state == "waiting":
-            raise RuntimeError("Candidate evaluation pending; call update_obj(new_obj) first.")
+            raise RuntimeError(
+                "Candidate evaluation pending; call update_obj(new_obj) first."
+            )
         else:
             raise RuntimeError("Unknown state in RCDS.")
 
@@ -381,7 +410,9 @@ class RCDS:
         If a bracket stepper is active and waiting, update it. Otherwise update the outer candidate.
         """
         if self.state != "waiting":
-            raise RuntimeError("update_obj called in invalid state; no candidate pending evaluation.")
+            raise RuntimeError(
+                "update_obj called in invalid state; no candidate pending evaluation."
+            )
 
         # If a bracket stepper is active and waiting, update it.
         if self.bracket_stepper is not None and self.bracket_stepper.waiting:
@@ -420,10 +451,17 @@ class RCDS:
             self.best_direction_index = 0
             self.state = "direction_loop"
 
-    def get_min_along_dir_parab_non_gen(self, x0: np.ndarray, f0: float, dv: np.ndarray,
-                                          Npmin: int = 6, step: Optional[float] = None,
-                                          it: Optional[int] = None, idx: Optional[int] = None,
-                                          replaced: bool = False) -> tuple[np.ndarray, float, int]:
+    def get_min_along_dir_parab_non_gen(
+        self,
+        x0: np.ndarray,
+        f0: float,
+        dv: np.ndarray,
+        Npmin: int = 6,
+        step: Optional[float] = None,
+        it: Optional[int] = None,
+        idx: Optional[int] = None,
+        replaced: bool = False,
+    ) -> tuple[np.ndarray, float, int]:
         """
         Combine a bracket search and a subsequent line scan along dv.
 
@@ -469,6 +507,7 @@ class RCDSGenerator(SequentialGenerator):
       - Evaluate candidate externally.
       - Call _add_data() (which calls update_obj) with the evaluation.
     """
+
     name = "rcds"
     init_mat: Optional[np.ndarray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
@@ -486,7 +525,9 @@ class RCDSGenerator(SequentialGenerator):
         x0, f0 = self._get_initial_point()
         lb, ub = self.vocs.bounds
         _x0 = (x0 - lb) / (ub - lb)
-        self._rcds = RCDS(x0=_x0, init_mat=self.init_mat, noise=self.noise, step=self.step)
+        self._rcds = RCDS(
+            x0=_x0, init_mat=self.init_mat, noise=self.noise, step=self.step
+        )
         self._rcds.OBJ = self._sign * float(f0)
         self._rcds.state = "init"
 
@@ -500,7 +541,7 @@ class RCDSGenerator(SequentialGenerator):
             self.reset()
         _x_next = self._rcds.get_next_candidate()
         while np.any(_x_next > 1) or np.any(_x_next < 0):
-            self._rcds.update_obj(float('nan'))
+            self._rcds.update_obj(float("nan"))
             _x_next = self._rcds.get_next_candidate()
         _x_next = np.array(_x_next).flatten()
         lb, ub = self.vocs.bounds
