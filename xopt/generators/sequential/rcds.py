@@ -518,6 +518,14 @@ class RCDSGenerator(SequentialGenerator):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
+    def _set_data(self, data: pd.DataFrame):
+        # just store data
+        self.data = data
+
+        new_data_df = self.vocs.objective_data(data)
+        res = new_data_df.iloc[-1:, :].to_numpy()
+        assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
+
     def _reset(self):
         objective_name = self.vocs.objective_names[0]  # RCDS supports one objective
         direction = self.vocs.objectives[objective_name]
@@ -537,7 +545,7 @@ class RCDSGenerator(SequentialGenerator):
             self._rcds.update_obj(self._sign * res)
 
     def _generate(self, first_gen: bool = False):
-        if first_gen:
+        if first_gen or self._rcds is None:
             self.reset()
         _x_next = self._rcds.get_next_candidate()
         while np.any(_x_next > 1) or np.any(_x_next < 0):
