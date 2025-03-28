@@ -99,7 +99,7 @@ def test_nsga2_output_data():
             assert len(log_content) > 0
 
         # Close log file before exiting context
-        generator.close_log_file()
+        X.generator.close_log_file()
 
 
 def test_generate_child_binary_tournament():
@@ -238,10 +238,10 @@ def test_nsga2_checkpoint_reload():
         )
 
         # Verify that the restored generator has the same state as the original
-        assert restored_generator.n_generations == generator.n_generations
-        assert restored_generator.n_candidates == generator.n_candidates
-        assert restored_generator.fevals == generator.fevals
-        assert len(restored_generator.pop) == len(generator.pop)
+        assert restored_generator.n_generations == X.generator.n_generations
+        assert restored_generator.n_candidates == X.generator.n_candidates
+        assert restored_generator.fevals == X.generator.fevals
+        assert len(restored_generator.pop) == len(X.generator.pop)
 
         # Run a few more steps with the restored generator
         X_restored = Xopt(
@@ -253,14 +253,14 @@ def test_nsga2_checkpoint_reload():
         X_restored.run()
 
         # Verify that the restored generator continues from where it left off
-        assert restored_generator.n_generations > generator.n_generations
-        assert restored_generator.n_candidates > generator.n_candidates
-        assert restored_generator.fevals > generator.fevals
+        assert X_restored.generator.n_generations > X.generator.n_generations
+        assert X_restored.generator.n_candidates > X.generator.n_candidates
+        assert X_restored.generator.fevals > X.generator.fevals
 
         # Close log files before exiting context
-        generator.close_log_file()
-        if hasattr(restored_generator, "close_log_file"):
-            restored_generator.close_log_file()
+        X.generator.close_log_file()
+        if hasattr(X_restored.generator, "close_log_file"):
+            X_restored.generator.close_log_file()
 
 
 def test_nsga2_all_individuals_in_data():
@@ -289,7 +289,7 @@ def test_nsga2_all_individuals_in_data():
 
         # Get all candidate indices from the generator's history
         all_history_indices = []
-        for gen_indices in generator.history_idx:
+        for gen_indices in X.generator.history_idx:
             all_history_indices.extend(gen_indices)
 
         # Check that all individuals in the history are in the data file
@@ -298,10 +298,10 @@ def test_nsga2_all_individuals_in_data():
 
         # Check that the number of unique candidate indices in the data file
         # matches the generator's n_candidates counter
-        assert len(data_df["xopt_candidate_idx"]) == generator.n_candidates
+        assert len(data_df["xopt_candidate_idx"]) == X.generator.n_candidates
 
         # Close log file before exiting context
-        generator.close_log_file()
+        X.generator.close_log_file()
 
 
 def test_resume_consistency(pop_size=5, n_steps=128, check_step=10):
