@@ -8,6 +8,8 @@ from xopt.vocs import VOCS
 
 
 class TestSequentialGenerator(SequentialGenerator):
+    supports_single_objective: bool = True
+
     def _add_data(self, new_data: pd.DataFrame):
         pass
 

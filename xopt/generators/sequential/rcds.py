@@ -547,6 +547,7 @@ class RCDSGenerator(SequentialGenerator):
     """
 
     name = "rcds"
+    supports_single_objective: bool = True
     init_mat: Optional[np.ndarray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
     step: PositiveFloat = Field(1e-2)
