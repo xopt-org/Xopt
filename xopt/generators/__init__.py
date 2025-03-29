@@ -145,6 +145,8 @@ def get_generator_defaults(
             "data",
             "supports_batch_generation",
             "supports_multi_objective",
+            "supports_single_objective",
+            "supports_constraints",
         ]:
             continue
 

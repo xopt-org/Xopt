@@ -274,6 +274,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     name = "nsga2"
     supports_multi_objective: bool = True
+    supports_constraints: bool = True
 
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[

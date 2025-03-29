@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, ValidationInfo, field_validator
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
@@ -99,6 +99,7 @@ class NelderMeadGenerator(SequentialGenerator):
     """
 
     name = "neldermead"
+    supports_single_objective: bool = True
 
     initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
     initial_simplex: Optional[Dict[str, Union[List[float], np.ndarray]]] = (
