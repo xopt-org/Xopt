@@ -23,36 +23,11 @@ class BayesianExplorationGenerator(BayesianGenerator):
 
     name = "bayesian_exploration"
     supports_batch_generation: bool = True
+    supports_constraints: bool = True
 
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 
     _compatible_turbo_controllers = [SafetyTurboController]
-
-    @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info: ValidationInfo):
-        """
-        Validate the VOCS for the generator.
-
-        Parameters:
-        -----------
-        v : VOCS
-            The VOCS to be validated.
-        info : ValidationInfo
-            Additional validation information.
-
-        Returns:
-        --------
-        VOCS
-            The validated VOCS.
-
-        Raises:
-        -------
-        ValueError
-            If the number of objectives in the VOCS is not zero.
-        """
-        if v.n_objectives != 0:
-            raise ValueError("this generator only supports observables")
-        return v
 
     def _get_acquisition(self, model: Model) -> MCAcquisitionFunction:
         """
