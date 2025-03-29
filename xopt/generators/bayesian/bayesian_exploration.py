@@ -5,8 +5,6 @@ from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
-from pydantic import field_validator
-from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import (
@@ -28,6 +26,13 @@ class BayesianExplorationGenerator(BayesianGenerator):
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 
     _compatible_turbo_controllers = [SafetyTurboController]
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.vocs.n_observables == 0:
+            raise ValueError(
+                "BayesianExplorationGenerator requires at least one observable in the vocs (instead of specifying an objective)."
+            )
 
     def _get_acquisition(self, model: Model) -> MCAcquisitionFunction:
         """
