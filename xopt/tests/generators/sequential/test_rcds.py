@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -33,14 +34,20 @@ def eval_f_linear_offset(x):  # offset the optimal solution
 
 class TestRCDSGenerator:
     def test_rcds_generate_multiple_points(self):
-        gen = RCDSGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+
+        gen = RCDSGenerator(vocs=test_vocs)
 
         # Try to generate multiple samples
         with pytest.raises(SeqGeneratorError):
             gen.generate(2)
 
     def test_rcds_options(self):
-        gen = RCDSGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+
+        gen = RCDSGenerator(vocs=test_vocs)
 
         with pytest.raises(ValidationError):
             gen.step = 0
