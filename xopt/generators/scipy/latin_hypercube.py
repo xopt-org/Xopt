@@ -42,6 +42,9 @@ class LatinHypercubeGenerator(Generator):
     name = "latin_hypercube"
     supports_batch_generation: bool = True
     supports_multi_objective: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
+
     batch_size: Annotated[
         Optional[int],
         Field(

@@ -7,7 +7,7 @@ from typing import Optional, List
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from pydantic import Field, field_validator, PositiveFloat
+from pydantic import Field, ValidationInfo, field_validator, PositiveFloat
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
@@ -58,6 +58,12 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     forgetting_time: Optional[PositiveFloat] = Field(
         None, description="time period to forget historical data in seconds"
     )
+
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_objectives != 1:
+            raise ValueError("this generator only supports vocs with 1 objective")
+        return v
 
     @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(

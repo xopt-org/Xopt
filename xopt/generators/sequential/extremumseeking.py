@@ -66,6 +66,7 @@ class ExtremumSeekingGenerator(SequentialGenerator):
     k: PositiveFloat = Field(2.0, description="feedback gain")
     oscillation_size: PositiveFloat = Field(0.1, description="oscillation size")
     decay_rate: PositiveFloat = Field(1.0, description="decay rate")
+    supports_single_objective: bool = True
 
     _nES: int = 0
     _wES: np.ndarray = np.array([])
