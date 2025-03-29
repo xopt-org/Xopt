@@ -1,5 +1,4 @@
 from pandas import DataFrame
-from pydantic import ValidationInfo, field_validator
 import torch
 from botorch.acquisition import (
     ScalarizedPosteriorTransform,
