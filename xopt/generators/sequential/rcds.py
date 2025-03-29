@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from pydantic import ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator

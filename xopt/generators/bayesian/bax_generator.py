@@ -4,8 +4,7 @@ from copy import deepcopy
 from typing import Dict, List
 
 from botorch.models import ModelListGP, SingleTaskGP
-from pydantic import Field, field_validator
-from pydantic_core.core_schema import ValidationInfo
+from pydantic import Field
 
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm

@@ -1,6 +1,5 @@
 import json
 from copy import deepcopy
-from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -12,6 +11,7 @@ from xopt.generators import (
     list_available_generators,
 )
 from xopt.resources.testing import TEST_VOCS_BASE
+
 
 class PatchGenerator(Generator):
     """
@@ -25,6 +25,7 @@ class PatchGenerator(Generator):
 
     def generate(self, n_candidates) -> list[dict]:
         pass
+
 
 class TestGenerator:
     def test_init(self):
@@ -44,7 +45,7 @@ class TestGenerator:
         if name in ["mobo", "cnsga", "mggpo"]:
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.objectives.update({"y2": "MINIMIZE"})
-            gen_config["reference_point"] = {"y1": 10.0,"y2": 1.5}
+            gen_config["reference_point"] = {"y1": 10.0, "y2": 1.5}
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
@@ -53,7 +54,7 @@ class TestGenerator:
             test_vocs.objectives.update({"y2": "MINIMIZE"})
             json.dumps(gen_config)
 
-            gen_class(vocs=test_vocs, **gen_config)            
+            gen_class(vocs=test_vocs, **gen_config)
 
         elif name in ["multi_fidelity"]:
             test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -74,6 +75,3 @@ class TestGenerator:
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
-
-
-
