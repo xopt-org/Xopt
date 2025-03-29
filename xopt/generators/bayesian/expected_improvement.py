@@ -27,6 +27,8 @@ class ExpectedImprovementGenerator(BayesianGenerator):
 
     name = "expected_improvement"
     supports_batch_generation: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
 
     __doc__ = (
         "Bayesian optimization generator using Expected improvement\n"

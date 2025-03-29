@@ -25,6 +25,8 @@ from xopt.vocs import VOCS
 
 class DummyGenerator(Generator, ABC):
     name = "dummy"
+    supports_constraints: bool = True
+    supports_single_objective: bool = True
 
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)

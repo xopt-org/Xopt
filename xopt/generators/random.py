@@ -9,6 +9,8 @@ class RandomGenerator(Generator):
     name = "random"
     supports_batch_generation: bool = True
     supports_multi_objective: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
 
     def generate(self, n_candidates) -> list[dict]:
         """generate uniform random data points"""

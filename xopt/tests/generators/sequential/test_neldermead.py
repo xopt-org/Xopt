@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 
 import numpy as np
@@ -41,7 +42,9 @@ def eval_f_linear_neg(x):
 
 class TestNelderMeadGenerator:
     def test_simplex_generate_multiple_points(self):
-        gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        gen = NelderMeadGenerator(vocs=test_vocs)
 
         # Try to generate multiple samples
         with pytest.raises(SeqGeneratorError):
@@ -146,7 +149,9 @@ class TestNelderMeadGenerator:
         X2.step()
 
     def test_simplex_options(self):
-        gen = NelderMeadGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        gen = NelderMeadGenerator(vocs=test_vocs)
 
         with pytest.raises(ValidationError):
             gen.initial_point = {"x1": None, "x2": 0}

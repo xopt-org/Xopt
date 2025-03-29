@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -12,14 +13,19 @@ from xopt.vocs import VOCS
 
 class TestExtremumSeekingGenerator:
     def test_es_generate_multiple_points(self):
-        gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        gen = ExtremumSeekingGenerator(vocs=test_vocs)
 
         # Try to generate multiple samples
         with pytest.raises(SeqGeneratorError):
             gen.generate(2)
 
     def test_es_options(self):
-        gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+
+        gen = ExtremumSeekingGenerator(vocs=test_vocs)
 
         with pytest.raises(ValidationError):
             gen.k = "yo"

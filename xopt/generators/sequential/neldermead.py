@@ -99,6 +99,7 @@ class NelderMeadGenerator(SequentialGenerator):
     """
 
     name = "neldermead"
+    supports_single_objective: bool = True
 
     initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
     initial_simplex: Optional[Dict[str, Union[List[float], np.ndarray]]] = (
