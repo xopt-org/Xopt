@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
-from pydantic import ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel

@@ -5,7 +5,7 @@ from botorch.acquisition import (
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
 )
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -42,7 +42,7 @@ beta : float, default 2.0
         super().__init__(**kwargs)
         if self.vocs.n_constraints > 0:
             warnings.warn(
-                f"Using upper confidence bound with constraints may lead to invalid values "
+                "Using upper confidence bound with constraints may lead to invalid values "
                 "if the base acquisition function has negative values. Use with "
                 "caution."
             )

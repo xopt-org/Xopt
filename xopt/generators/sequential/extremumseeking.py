@@ -2,7 +2,7 @@ from typing import List, Dict
 
 import numpy as np
 import pandas as pd
-from pydantic import Field, PositiveFloat, ValidationInfo, field_validator
+from pydantic import Field, PositiveFloat
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
