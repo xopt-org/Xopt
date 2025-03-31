@@ -105,6 +105,26 @@ class TestMOBOGenerator:
             torch.tensor([[1.0, 2.0, 0.0], [0.5, 0.1, 1.5]], dtype=torch.double).T, pfy
         )
 
+        # test where all the points are dominated by the reference point
+        test_data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.4, 0.4],
+                "x2": [0.1, 0.2, 0.3, 0.2],
+                "y1": [100.0, 2.0, 100.0, 10.0],
+                "y2": [0.5, 2.0, 2.0, 1.5],
+            }
+        )
+        gen = MOBOGenerator(
+            vocs=vocs,
+            reference_point=reference_point,
+            use_pf_as_initial_points=True,
+        )
+        gen.add_data(test_data)
+
+        pfx, pfy = gen.get_pareto_front()
+        assert pfx is None
+        assert pfy is None
+
         # test with constraints
         vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
         test_data = pd.DataFrame(
@@ -271,6 +291,8 @@ class TestMOBOGenerator:
         gen = MOBOGenerator(
             vocs=vocs,
             reference_point=reference_point,
+            n_monte_carlo_samples=1,
         )
+        gen.numerical_optimizer.max_iter = 1
         gen.add_data(test_data)
         gen.generate(1)
