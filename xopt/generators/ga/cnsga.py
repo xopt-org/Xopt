@@ -12,6 +12,7 @@ import xopt.utils
 from xopt.generator import Generator
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
+from xopt.generators.ga.visualization import CNSGA_GUI
 from xopt.vocs import VOCS
 
 logger = logging.getLogger(__name__)
@@ -243,6 +244,10 @@ class CNSGAGenerator(Generator):
             The population size.
         """
         return self.population_size
+
+    def visualize(self):
+        gui = CNSGA_GUI(self.vocs, self.output_path)
+        return gui
 
 
 def uniform(low: float, up: float, size: Optional[int] = None) -> List[float]:
