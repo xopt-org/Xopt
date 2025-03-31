@@ -916,7 +916,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         )
         non_dominated = is_non_dominated(obj_data)
 
-        # get varaible data corresponding to objective data
+        # get variable data corresponding to objective data
         # note that the reference point should have nan values
         var_data = torch.vstack(
             (
