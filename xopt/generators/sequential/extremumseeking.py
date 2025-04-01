@@ -109,6 +109,10 @@ class ExtremumSeekingGenerator(SequentialGenerator):
 
     def _set_data(self, data: pd.DataFrame):
         self.data = data.iloc[-1:]
+
+        self._i = 0
+        self._last_input = self.vocs.variable_data(self.data).to_numpy()[-1]
+        self._last_outcome = self.vocs.objective_data(self.data).to_numpy()[-1, 0]
         # TODO: add proper reload tests
 
     def p_normalize(self, p: np.ndarray) -> np.ndarray:
