@@ -794,7 +794,8 @@ class RCDSGenerator(SequentialGenerator):
 
     def _generate(self, first_gen: bool = False):
         """generate a new candidate"""
-        if first_gen:
+        if first_gen or self._powell is None:
+            # first generation or no powell object
             self.reset()
 
         _x_next = self._powell.propose()
