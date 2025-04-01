@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class StateMachineFinishedError(Exception):
     """Raised when the state machine has finished. Contains the result tuple."""
+
     def __init__(self, result):
         self.result = result
         super().__init__(f"State machine finished with result: {result}")
@@ -60,7 +61,9 @@ class BracketMinStateMachine:
         if self.phase == "finished":
             raise StateMachineFinishedError(self.result)
         if self.pending:
-            raise Exception("A candidate is already pending; please call update_obj() first.")
+            raise Exception(
+                "A candidate is already pending; please call update_obj() first."
+            )
 
         # --- INITIAL NAN CASE ---
         if self.phase == "initial_nan_wait":
@@ -125,7 +128,7 @@ class BracketMinStateMachine:
         # --- FINALIZE NEGATIVE PHASE ---
         elif self.phase == "finalize_negative":
             a1 = self.step  # current negative step
-            a2 = self.a2   # a2 was set in the forward phase
+            a2 = self.a2  # a2 was set in the forward phase
             if a1 > a2:
                 a1, a2 = a2, a1
             a1 -= self.am
@@ -195,8 +198,16 @@ class BracketMinStateMachine:
 
 
 class LineScanStateMachine:
-    def __init__(self, x0: np.ndarray, f0: float, dv: np.ndarray,
-                 alo: float, ahi: float, Np: int, xflist: np.ndarray):
+    def __init__(
+        self,
+        x0: np.ndarray,
+        f0: float,
+        dv: np.ndarray,
+        alo: float,
+        ahi: float,
+        Np: int,
+        xflist: np.ndarray,
+    ):
         """
         Initialize the state machine with parameters.
 
@@ -273,13 +284,16 @@ class LineScanStateMachine:
             # Create alist: a linear space between alo and ahi.
             self.alist = np.linspace(self.alo, self.ahi, self.Np)
             # Create flist: same shape, all values NaN.
-            self.flist = np.full_like(self.alist, float('nan'))
+            self.flist = np.full_like(self.alist, float("nan"))
 
             # Incorporate previous evaluations from xflist_input.
             Nlist = np.shape(self.xflist_input)[0]
             for ii in range(Nlist):
                 # If the stored evaluation is within bounds...
-                if self.xflist_input[ii, 1] >= self.alo and self.xflist_input[ii, 1] <= self.ahi:
+                if (
+                    self.xflist_input[ii, 1] >= self.alo
+                    and self.xflist_input[ii, 1] <= self.ahi
+                ):
                     ik = round((self.xflist_input[ii, 1] - self.alo) / self.delta)
                     self.alist[ik] = self.xflist_input[ii, 0]
                     self.flist[ik] = self.xflist_input[ii, 1]
@@ -386,10 +400,19 @@ class GetMinAlongDirParabStateMachine:
     Use propose() to get a candidate and update_obj() to send back the evaluated value.
     When finished, propose() raises StateMachineFinishedError with the final result.
     """
-    def __init__(self, x0: np.ndarray, f0: float, dv: np.ndarray,
-                 Npmin: int = 6, step: float = 1.0,
-                 it: int = None, idx: int = None, replaced: bool = False,
-                 noise: float = 0.1):
+
+    def __init__(
+        self,
+        x0: np.ndarray,
+        f0: float,
+        dv: np.ndarray,
+        Npmin: int = 6,
+        step: float = 1.0,
+        it: int = None,
+        idx: int = None,
+        replaced: bool = False,
+        noise: float = 0.1,
+    ):
         self.x0 = x0
         self.f0 = f0
         self.dv = dv
@@ -404,7 +427,9 @@ class GetMinAlongDirParabStateMachine:
         # We initialize the bracketmin phase first.
         # For the OBJ member variable, we use a dummy initial value (NaN); external code
         # is expected to evaluate candidates and then update this value.
-        self.bm = BracketMinStateMachine(self.noise, self.x0, self.f0, self.dv, self.step)
+        self.bm = BracketMinStateMachine(
+            self.noise, self.x0, self.f0, self.dv, self.step
+        )
         self.ls = None  # Will hold the LineScanStateMachine instance later.
         self.phase = "bracketmin"  # Current phase: "bracketmin", then "linescan", then "finished".
         self.ndf1 = None  # To store function eval count from bracketmin.
@@ -420,7 +445,9 @@ class GetMinAlongDirParabStateMachine:
         if self.phase == "finished":
             raise StateMachineFinishedError(self.result)
         if self.pending:
-            raise Exception("A candidate is already pending evaluation; please call update_obj() first.")
+            raise Exception(
+                "A candidate is already pending evaluation; please call update_obj() first."
+            )
 
         # --- Phase 1: BracketMin ---
         if self.phase == "bracketmin":
@@ -434,7 +461,9 @@ class GetMinAlongDirParabStateMachine:
                 x1, f1, a1, a2, xflist, ndf1 = e.result
                 self.ndf1 = ndf1
                 # Now start the linescan phase with these values.
-                self.ls = LineScanStateMachine(x1, f1, self.dv, a1, a2, self.Npmin, xflist)
+                self.ls = LineScanStateMachine(
+                    x1, f1, self.dv, a1, a2, self.Npmin, xflist
+                )
                 self.phase = "linescan"
                 # Immediately delegate to the linescan machine.
                 return self.propose()
@@ -453,7 +482,9 @@ class GetMinAlongDirParabStateMachine:
                 self.phase = "finished"
                 raise StateMachineFinishedError(self.result)
 
-        raise Exception("Invalid phase in GetMinAlongDirParabStateMachine: " + self.phase)
+        raise Exception(
+            "Invalid phase in GetMinAlongDirParabStateMachine: " + self.phase
+        )
 
     def update_obj(self, obj):
         """
@@ -480,27 +511,29 @@ class PowellMainStateMachine:
           - step: initial step size
           - Imat: optional initial direction matrix; if None, the identity is used.
         """
-        self.x0 = x0.copy()         # previous iteration's starting point
+        self.x0 = x0.copy()  # previous iteration's starting point
         self.step = step
         self.Nvar = len(x0)
         self.Imat = Imat
         self.noise = noise
         # State variables:
-        self.phase = "init"         # phases: "init", "iteration_start", "line_search", "extrapolation",
-                                    # "direction_update", "iteration_end", "finished"
-        self.pending = False        # True if a candidate is waiting evaluation update
-        self.nf = 0                 # total function evaluation counter
-        self.iteration = 0          # iteration counter
-        self.x_current = None       # current best point (xm)
-        self.f_current = None       # current best function value (fm)
-        self.Dmat = None            # direction matrix
+        self.phase = (
+            "init"  # phases: "init", "iteration_start", "line_search", "extrapolation",
+        )
+        # "direction_update", "iteration_end", "finished"
+        self.pending = False  # True if a candidate is waiting evaluation update
+        self.nf = 0  # total function evaluation counter
+        self.iteration = 0  # iteration counter
+        self.x_current = None  # current best point (xm)
+        self.f_current = None  # current best function value (fm)
+        self.Dmat = None  # direction matrix
         # For inner loop over directions:
-        self.inner_index = 0        # which coordinate (column) we are scanning
-        self.inner_dl = 0           # best improvement (delta) in this iteration
-        self.inner_k = 0            # index of direction giving maximum improvement
-        self.current_gmadp = None   # current GetMinAlongDirParab state machine instance
+        self.inner_index = 0  # which coordinate (column) we are scanning
+        self.inner_dl = 0  # best improvement (delta) in this iteration
+        self.inner_k = 0  # index of direction giving maximum improvement
+        self.current_gmadp = None  # current GetMinAlongDirParab state machine instance
         # For extrapolation phase:
-        self.xt = None              # extrapolated candidate
+        self.xt = None  # extrapolated candidate
 
     def propose(self):
         if self.phase == "finished":
@@ -534,9 +567,14 @@ class PowellMainStateMachine:
                     dv = self.Dmat[:, self.inner_index]
                     # Create the get_min_along_dir_parab state machine.
                     self.current_gmadp = GetMinAlongDirParabStateMachine(
-                        self.x_current, self.f_current, dv,
-                        Npmin=6, step=self.step, it=self.iteration, idx=self.inner_index,
-                        noise=self.noise
+                        self.x_current,
+                        self.f_current,
+                        dv,
+                        Npmin=6,
+                        step=self.step,
+                        it=self.iteration,
+                        idx=self.inner_index,
+                        noise=self.noise,
                     )
                 try:
                     candidate = self.current_gmadp.propose()
@@ -576,7 +614,9 @@ class PowellMainStateMachine:
                 norm_diff = np.linalg.norm(diff)
                 ndv = diff / norm_diff if norm_diff != 0 else diff
                 # Compute dot products of ndv with each column of Dmat.
-                dotp = np.array([abs(np.dot(ndv.T, self.Dmat[:, j])) for j in range(self.Nvar)])
+                dotp = np.array(
+                    [abs(np.dot(ndv.T, self.Dmat[:, j])) for j in range(self.Nvar)]
+                )
                 if max(dotp) < 0.9:
                     # Replace the direction corresponding to inner_k:
                     for j in range(self.inner_k, self.Nvar - 1):
@@ -584,9 +624,14 @@ class PowellMainStateMachine:
                     self.Dmat[:, -1] = ndv
                     dv = self.Dmat[:, -1]
                     self.current_gmadp = GetMinAlongDirParabStateMachine(
-                        self.x_current, self.f_current, dv,
-                        Npmin=6, step=self.step, it=self.iteration, idx=self.inner_index,
-                        noise=self.noise
+                        self.x_current,
+                        self.f_current,
+                        dv,
+                        Npmin=6,
+                        step=self.step,
+                        it=self.iteration,
+                        idx=self.inner_index,
+                        noise=self.noise,
                     )
                 else:
                     # No new direction update; skip to iteration end.
@@ -646,8 +691,14 @@ class PowellMainStateMachine:
             self.nf += 1
             # Test the condition from the original code:
             # If f0 <= ft or 2*(f0-2*fm+ft)*((f0-fm-dl)/(ft-f0))**2 >= dl then no new direction update.
-            if (self.f0 <= self.ft or
-                2 * (self.f0 - 2*self.f_current + self.ft) * (((self.f0 - self.f_current - self.inner_dl)/(self.ft - self.f0)))**2 >= self.inner_dl):
+            if (
+                self.f0 <= self.ft
+                or 2
+                * (self.f0 - 2 * self.f_current + self.ft)
+                * ((self.f0 - self.f_current - self.inner_dl) / (self.ft - self.f0))
+                ** 2
+                >= self.inner_dl
+            ):
                 self.phase = "iteration_end"
             else:
                 self.phase = "direction_update"
