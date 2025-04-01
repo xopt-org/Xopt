@@ -9,7 +9,6 @@ import yaml
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
-from pydantic import ValidationError
 
 from xopt.base import Xopt
 from xopt.errors import XoptError
@@ -31,7 +30,7 @@ class TestMOBOGenerator:
         vocs.objectives.update({"y2": "MINIMIZE"})
         reference_point = {"y1": 1.5, "y2": 1.5}
 
-        gen = MOBOGenerator(vocs=vocs, reference_point=reference_point)
+        MOBOGenerator(vocs=vocs, reference_point=reference_point)
 
         # test bad reference point
         with pytest.raises(XoptError):

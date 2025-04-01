@@ -292,6 +292,6 @@ class TestBayesianGenerator(TestCase):
         gen = MultiObjectivePatchBayesianGenerator(
             vocs=vocs2, reference_point={"y1": 0.5, "y2": 0.5}
         )
-        assert gen.supports_single_objective == False
+        assert not gen.supports_single_objective
         with pytest.raises(VOCSError):
             gen.vocs = vocs

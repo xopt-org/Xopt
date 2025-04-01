@@ -2,7 +2,6 @@ from copy import deepcopy
 
 import pytest
 
-from pydantic import ValidationError
 
 from xopt.base import Xopt
 from xopt.errors import VOCSError
