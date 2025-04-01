@@ -2,8 +2,8 @@ import json
 from copy import deepcopy
 
 import pytest
-from pydantic import ValidationError
 
+from xopt.errors import VOCSError
 from xopt.generator import Generator
 from xopt.generators import (
     get_generator,
@@ -34,7 +34,7 @@ class TestGenerator:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives.update({"y2": "MINIMIZE"})
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(VOCSError):
             PatchGenerator(vocs=test_vocs)
 
     @pytest.mark.parametrize("name", list_available_generators())

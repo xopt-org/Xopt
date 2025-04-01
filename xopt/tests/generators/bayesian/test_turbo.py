@@ -90,9 +90,12 @@ class TestTurbo(TestCase):
         gen.from_dict(gen_dict | {"vocs": test_vocs})
 
         # test invalid turbo controller type
+        test_vocs_2 = test_vocs.copy()
+        test_vocs_2.objectives = {}
+        test_vocs_2.observables = ["o1"]
         with pytest.raises(ValueError):
             gen = BayesianExplorationGenerator(
-                vocs=test_vocs, turbo_controller="OptimizeTurboController"
+                vocs=test_vocs_2, turbo_controller="OptimizeTurboController"
             )
 
     def test_get_trust_region(self):

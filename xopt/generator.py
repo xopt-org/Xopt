@@ -6,6 +6,7 @@ import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
+from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
@@ -76,14 +77,14 @@ class Generator(XoptBaseModel, ABC):
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
-            raise ValueError("this generator does not support constraints")
+            raise VOCSError("this generator does not support constraints")
         if v.n_objectives == 1:
             if not info.data["supports_single_objective"]:
-                raise ValueError(
+                raise VOCSError(
                     "this generator does not support single objective optimization"
                 )
         elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
-            raise ValueError(
+            raise VOCSError(
                 "this generator does not support multi-objective optimization"
             )
 

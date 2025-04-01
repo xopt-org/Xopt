@@ -9,9 +9,9 @@ from botorch.models import SingleTaskGP
 from botorch.models.model import ModelList
 from botorch.models.transforms import Normalize, Standardize
 
-from pydantic import ValidationError
 
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax.algorithms import (
     Algorithm,
@@ -214,5 +214,5 @@ class TestBaxGenerator:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         alg = GridOptimize()
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(VOCSError):
             BaxGenerator(vocs=test_vocs, algorithm=alg)
