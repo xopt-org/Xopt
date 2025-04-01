@@ -10,9 +10,13 @@ from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
 
+from xopt import VOCS
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.bayesian_generator import (
+    BayesianGenerator,
+    MultiObjectiveBayesianGenerator,
+)
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
@@ -23,8 +27,12 @@ class PatchBayesianGenerator(BayesianGenerator):
     """
 
     supports_batch_generation: bool = True
-    supports_multi_objective: bool = True
+    #supports_multi_objective: bool = True
     supports_single_objective: bool = True
+    supports_constraints: bool = True
+
+
+class MultiObjectivePatchBayesianGenerator(MultiObjectiveBayesianGenerator):
     supports_constraints: bool = True
 
 
@@ -262,3 +270,27 @@ class TestBayesianGenerator(TestCase):
 
         with pytest.raises(KeyError):
             gen.train_model()
+
+    @patch.multiple(MultiObjectivePatchBayesianGenerator, __abstractmethods__=set())
+    def test_bad_mo_vocs(self):
+        vocs = VOCS(
+            **{
+                "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
+                "objectives": {"y1": "MINIMIZE"},
+                "constraints": {"c1": ["GREATER_THAN", 0.5]},
+                "constants": {"constant1": 1.0},
+            }
+        )
+        vocs2 = vocs.model_copy()
+        vocs2.objectives = {"y1": "MINIMIZE", "y2": "MAXIMIZE"}
+        with pytest.raises(ValueError):
+            gen = MultiObjectivePatchBayesianGenerator(
+                vocs=vocs, reference_point={"y1": 0.5, "y2": 0.5}
+            )
+
+        gen = MultiObjectivePatchBayesianGenerator(
+            vocs=vocs2, reference_point={"y1": 0.5, "y2": 0.5}
+        )
+        assert gen.supports_single_objective == False
+        with pytest.raises(ValueError):
+            gen.vocs = vocs
