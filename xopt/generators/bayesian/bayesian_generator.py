@@ -18,7 +18,13 @@ from botorch.sampling import get_sampler
 from botorch.utils.multi_objective import is_non_dominated
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, field_validator, PositiveInt, SerializeAsAny
+from pydantic import (
+    Field,
+    field_validator,
+    PositiveInt,
+    SerializeAsAny,
+    model_validator,
+)
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
@@ -850,12 +856,10 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
     supports_multi_objective: bool = True
 
-    @field_validator("reference_point")
-    def validate_reference_point(cls, v, info: ValidationInfo):
-        objective_names = info.data["vocs"].objective_names
-        assert set(v.keys()) == set(objective_names)
-
-        return v
+    @model_validator(mode="after")
+    def validate_reference_point(self):
+        objective_names = self.vocs.objective_names
+        assert set(self.reference_point.keys()) == set(objective_names)
 
     @property
     def torch_reference_point(self):
