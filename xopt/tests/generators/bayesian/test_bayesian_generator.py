@@ -12,6 +12,7 @@ from gpytorch.kernels import PeriodicKernel
 
 from xopt import VOCS
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -27,7 +28,7 @@ class PatchBayesianGenerator(BayesianGenerator):
     """
 
     supports_batch_generation: bool = True
-    #supports_multi_objective: bool = True
+    # supports_multi_objective: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
 
@@ -283,7 +284,7 @@ class TestBayesianGenerator(TestCase):
         )
         vocs2 = vocs.model_copy()
         vocs2.objectives = {"y1": "MINIMIZE", "y2": "MAXIMIZE"}
-        with pytest.raises(ValueError):
+        with pytest.raises(VOCSError):
             gen = MultiObjectivePatchBayesianGenerator(
                 vocs=vocs, reference_point={"y1": 0.5, "y2": 0.5}
             )
@@ -292,5 +293,5 @@ class TestBayesianGenerator(TestCase):
             vocs=vocs2, reference_point={"y1": 0.5, "y2": 0.5}
         )
         assert gen.supports_single_objective == False
-        with pytest.raises(ValueError):
+        with pytest.raises(VOCSError):
             gen.vocs = vocs

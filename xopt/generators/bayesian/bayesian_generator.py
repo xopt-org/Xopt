@@ -858,8 +858,12 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
     @model_validator(mode="after")
     def validate_reference_point(self):
+        # Note: this is called for EVERY field change and is bad for performance
+        # but we need to check in model validator to ensure vocs field has been set by field validators
         objective_names = self.vocs.objective_names
-        assert set(self.reference_point.keys()) == set(objective_names)
+        if not set(self.reference_point.keys()) == set(objective_names):
+            raise XoptError("reference point must contain all objective names in vocs")
+        return self
 
     @property
     def torch_reference_point(self):
