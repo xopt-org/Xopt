@@ -789,6 +789,9 @@ class RCDSGenerator(SequentialGenerator):
         if self._powell is not None:
             self._powell.update_obj(self._sign * res)
 
+    def _set_data(self, data):
+        self.data = data
+
     def _generate(self, first_gen: bool = False):
         """generate a new candidate"""
         if first_gen:
