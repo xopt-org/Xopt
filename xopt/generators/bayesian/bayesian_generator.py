@@ -908,22 +908,30 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def get_pareto_front(self):
         """compute the pareto front x/y values given data"""
         variable_data, objective_data, weights = self._get_scaled_data()
+
+        # get indices of non-dominated points
+        # make sure to include the reference point
         obj_data = torch.vstack(
             (self.torch_reference_point.unsqueeze(0), objective_data)
         )
+        non_dominated = is_non_dominated(obj_data)
+
+        # get variable data corresponding to objective data
+        # note that the reference point should have nan values
         var_data = torch.vstack(
             (
                 torch.full_like(variable_data[0], float("Nan")).unsqueeze(0),
                 variable_data,
             )
         )
-        non_dominated = is_non_dominated(obj_data)
 
-        # note need to undo weights for real number output
-        # only return values if non nan values exist
-        if torch.all(torch.isnan(var_data[non_dominated])):
+        # if the reference point is in the non dominated set then
+        # none of the points dominate over the reference
+        # thus they should not be included in the PF --> return None
+        if torch.any(torch.isnan(var_data[non_dominated])):
             return None, None
         else:
+            # note need to undo weights for real number output
             return var_data[non_dominated], obj_data[non_dominated] / weights
 
 
