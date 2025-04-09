@@ -62,7 +62,7 @@ class StandardModelConstructor(ModelConstructor):
 
     name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
-        True, description="specify if model should assume a low noise environment"
+        False, description="specify if model should assume a low noise environment"
     )
     covar_modules: Dict[str, Kernel] = Field(
         {}, description="covariance modules for GP models"
