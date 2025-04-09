@@ -16,3 +16,4 @@
 - minimize
 ::: xopt.generators.bayesian.turbo.SafetyTurboController
 ::: xopt.generators.bayesian.turbo.EntropyTurboController
+::: xopt.generators.bayesian.bax_generator.BaxGenerator
