@@ -1,18 +1,21 @@
+import json
 from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 import pytest
 import torch
+import yaml
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
-from pydantic import ValidationError
 
 from xopt.base import Xopt
+from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.numerical_optimizer import GridOptimizer
+from xopt.pydantic import remove_none_values
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
     tnk_reference_point,
@@ -30,8 +33,22 @@ class TestMOBOGenerator:
         MOBOGenerator(vocs=vocs, reference_point=reference_point)
 
         # test bad reference point
-        with pytest.raises(ValidationError):
+        with pytest.raises(XoptError):
             MOBOGenerator(vocs=vocs, reference_point={})
+
+    def test_round_trip(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.objectives.update({"y2": "MINIMIZE"})
+        reference_point = {"y1": 1.5, "y2": 1.5}
+        gen = MOBOGenerator(vocs=vocs, reference_point=reference_point)
+        dump = gen.json()
+        gen2 = MOBOGenerator(vocs=vocs, **json.loads(dump))
+        assert dump == gen2.json()
+        assert gen.model_dump() == gen2.model_dump()
+        dump = gen.yaml()
+        gen2 = MOBOGenerator(vocs=vocs, **remove_none_values(yaml.safe_load(dump)))
+        assert dump == gen2.yaml()
+        assert gen.model_dump() == gen2.model_dump()
 
     def test_script(self):
         evaluator = Evaluator(function=evaluate_TNK)
