@@ -18,7 +18,13 @@ from botorch.sampling import get_sampler
 from botorch.utils.multi_objective import is_non_dominated
 from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
-from pydantic import Field, field_validator, PositiveInt, SerializeAsAny
+from pydantic import (
+    Field,
+    field_validator,
+    PositiveInt,
+    SerializeAsAny,
+    model_validator,
+)
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
@@ -850,12 +856,14 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
     supports_multi_objective: bool = True
 
-    @field_validator("reference_point")
-    def validate_reference_point(cls, v, info: ValidationInfo):
-        objective_names = info.data["vocs"].objective_names
-        assert set(v.keys()) == set(objective_names)
-
-        return v
+    @model_validator(mode="after")
+    def validate_reference_point(self):
+        # Note: this is called for EVERY field change and is bad for performance
+        # but we need to check in model validator to ensure vocs field has been set by field validators
+        objective_names = self.vocs.objective_names
+        if not set(self.reference_point.keys()) == set(objective_names):
+            raise XoptError("reference point must contain all objective names in vocs")
+        return self
 
     @property
     def torch_reference_point(self):
@@ -908,22 +916,30 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def get_pareto_front(self):
         """compute the pareto front x/y values given data"""
         variable_data, objective_data, weights = self._get_scaled_data()
+
+        # get indices of non-dominated points
+        # make sure to include the reference point
         obj_data = torch.vstack(
             (self.torch_reference_point.unsqueeze(0), objective_data)
         )
+        non_dominated = is_non_dominated(obj_data)
+
+        # get variable data corresponding to objective data
+        # note that the reference point should have nan values
         var_data = torch.vstack(
             (
                 torch.full_like(variable_data[0], float("Nan")).unsqueeze(0),
                 variable_data,
             )
         )
-        non_dominated = is_non_dominated(obj_data)
 
-        # note need to undo weights for real number output
-        # only return values if non nan values exist
-        if torch.all(torch.isnan(var_data[non_dominated])):
+        # if the reference point is in the non dominated set then
+        # none of the points dominate over the reference
+        # thus they should not be included in the PF --> return None
+        if torch.any(torch.isnan(var_data[non_dominated])):
             return None, None
         else:
+            # note need to undo weights for real number output
             return var_data[non_dominated], obj_data[non_dominated] / weights
 
 

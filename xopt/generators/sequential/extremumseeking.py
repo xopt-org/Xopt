@@ -66,6 +66,7 @@ class ExtremumSeekingGenerator(SequentialGenerator):
     k: PositiveFloat = Field(2.0, description="feedback gain")
     oscillation_size: PositiveFloat = Field(0.1, description="oscillation size")
     decay_rate: PositiveFloat = Field(1.0, description="decay rate")
+    supports_single_objective: bool = True
 
     _nES: int = 0
     _wES: np.ndarray = np.array([])
@@ -108,6 +109,10 @@ class ExtremumSeekingGenerator(SequentialGenerator):
 
     def _set_data(self, data: pd.DataFrame):
         self.data = data.iloc[-1:]
+
+        self._i = 0
+        self._last_input = self.vocs.variable_data(self.data).to_numpy()[-1]
+        self._last_outcome = self.vocs.objective_data(self.data).to_numpy()[-1, 0]
         # TODO: add proper reload tests
 
     def p_normalize(self, p: np.ndarray) -> np.ndarray:

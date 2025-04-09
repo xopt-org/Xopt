@@ -44,6 +44,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
     name = "mobo"
     supports_batch_generation: bool = True
+    supports_constraints: bool = True
     use_pf_as_initial_points: bool = Field(
         False,
         description="flag to specify if pareto front points are to be used during "
