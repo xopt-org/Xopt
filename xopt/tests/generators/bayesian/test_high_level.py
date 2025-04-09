@@ -19,6 +19,7 @@ class TestHighLevel:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {}
         ucb_gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+        ucb_gen.gp_constructor.use_low_noise_prior = True
         ucb_gen.beta = 0.0
         ucb_gen.n_monte_carlo_samples = 512
         # add data

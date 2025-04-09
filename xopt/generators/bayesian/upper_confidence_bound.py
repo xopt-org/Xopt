@@ -5,7 +5,7 @@ from botorch.acquisition import (
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
 )
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -24,6 +24,8 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
     _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound
@@ -36,15 +38,14 @@ beta : float, default 2.0
 
     """ + formatted_base_docstring()
 
-    @field_validator("vocs")
-    def validate_vocs_without_constraints(cls, v):
-        if v.constraints:
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.vocs.n_constraints > 0:
             warnings.warn(
-                f"Using {cls.__name__} with constraints will lead to invalid values "
-                f"if the base acquisition function has negative values. Use with "
-                f"caution."
+                "Using upper confidence bound with constraints may lead to invalid values "
+                "if the base acquisition function has negative values. Use with "
+                "caution."
             )
-        return v
 
     def _get_acquisition(self, model):
         objective = self._get_objective()
