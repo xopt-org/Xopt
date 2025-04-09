@@ -2,9 +2,9 @@ from copy import deepcopy
 
 import pytest
 
-from pydantic import ValidationError
 
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
@@ -104,5 +104,5 @@ class TestBayesianExplorationGenerator:
     def test_vocs_validation(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(VOCSError):
             BayesianExplorationGenerator(vocs=test_vocs)
