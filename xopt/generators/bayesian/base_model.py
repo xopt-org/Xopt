@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Union
+import warnings
 
 import pandas as pd
 import torch
@@ -183,7 +184,12 @@ class ModelConstructor(XoptBaseModel, ABC):
         suppressed within this method.
 
         """
-        import warnings
+        warnings.warn(
+            "Heteroskedastic modeling has been removed from botorch due "
+            "to numerical stability issues. A copy of the implementation "
+            "is included in Xopt, however it may be unstable / buggy. "
+            "Your results may vary."
+        )
 
         warnings.filterwarnings("ignore")
 
