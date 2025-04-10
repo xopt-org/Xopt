@@ -71,15 +71,19 @@ class TurboController(XoptBaseModel, ABC):
         Reset the controller to the initial state.
     """
 
-    vocs: VOCS = Field(exclude=True)
-    dim: PositiveInt
+    vocs: VOCS = Field(exclude=True, description="VOCS object")
+    dim: PositiveInt = Field(
+        None, description="number of dimensions in the optimization problem"
+    )
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")
     length: float = Field(
         0.25,
         description="base length of trust region",
         ge=0.0,
     )
-    length_min: PositiveFloat = 0.5**7
+    length_min: PositiveFloat = Field(
+        0.5**7, description="minimum base length of trust region"
+    )
     length_max: PositiveFloat = Field(
         2.0,
         description="maximum base length of trust region",
@@ -93,7 +97,9 @@ class TurboController(XoptBaseModel, ABC):
         None,
         description="number of successes to trigger a trust region contraction",
     )
-    center_x: Optional[Dict[str, float]] = Field(None)
+    center_x: Optional[Dict[str, float]] = Field(
+        None, description="center point of trust region"
+    )
     scale_factor: float = Field(
         2.0, description="multiplier to increase or decrease trust region", ge=1.0
     )
@@ -268,8 +274,14 @@ class OptimizeTurboController(TurboController):
         Update the state of the controller.
     """
 
-    name: str = Field("OptimizeTurboController", frozen=True)
-    best_value: Optional[float] = None
+    name: str = Field(
+        "OptimizeTurboController",
+        frozen=True,
+        description="name of the Turbo controller",
+    )
+    best_value: Optional[float] = Field(
+        None, description="best objective value found so far"
+    )
 
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, info):
@@ -358,7 +370,8 @@ class OptimizeTurboController(TurboController):
             Y_last = recent_f_data_minform[self.vocs.objective_names[0]].min()
             best_value = self.best_value if self.minimize else -self.best_value
 
-            if Y_last < best_value + 1e-3 * math.fabs(best_value):
+            # note: add in small tolerance to account for numerical issues
+            if Y_last <= best_value + 1e-40:
                 self.success_counter += 1
                 self.failure_counter = 0
             else:
@@ -387,11 +400,25 @@ class SafetyTurboController(TurboController):
         Validate the VOCS for the controller.
     update_state(self, generator, previous_batch_size: int = 1)
         Update the state of the controller.
+
+
+    Notes:
+    ------
+    The trust region of the safety turbo controller is expanded or contracted based on the feasibility of the observed points.
+    In cases where multiple samples are taken at once, the feasibility fraction is calculated based on the last
+    `previous_batch_size` samples. If the feasibility fraction is above `min_feasible_fraction`,
+    the observation is considered a success, otherwise it is a failure.
+
     """
 
-    name: str = Field("SafetyTurboController", frozen=True)
+    name: str = Field(
+        "SafetyTurboController", frozen=True, description="name of the Turbo controller"
+    )
     scale_factor: PositiveFloat = 1.25
-    min_feasible_fraction: PositiveFloat = 0.75
+    min_feasible_fraction: PositiveFloat = Field(
+        0.75,
+        description="minimum feasible fraction to trigger trust region expansion/contraction",
+    )
 
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, info):
