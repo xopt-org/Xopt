@@ -370,7 +370,8 @@ class OptimizeTurboController(TurboController):
             Y_last = recent_f_data_minform[self.vocs.objective_names[0]].min()
             best_value = self.best_value if self.minimize else -self.best_value
 
-            if Y_last <= best_value:
+            # note: add in small tolerance to account for numerical issues
+            if Y_last <= best_value + 1e-40:
                 self.success_counter += 1
                 self.failure_counter = 0
             else:
