@@ -5,12 +5,14 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.nsga2 import (
     NSGA2Generator,
     generate_child_binary_tournament,
+    crowded_comparison_argsort,
 )
 from xopt.generators.ga.operators import PolynomialMutation, SimulatedBinaryCrossover
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
@@ -397,3 +399,17 @@ def test_resume_consistency(pop_size=5, n_steps=128, check_step=10):
             np.random.seed(42)
             samples = X.generator.generate(1)
             X.evaluate_data(samples)
+
+
+@pytest.mark.parametrize(
+        "pop_f, pop_g",
+        [
+            (np.random.random((128, 4)), None),
+            (np.random.random((128, 4)), np.random.random((128, 4))),
+            (np.random.random((128, 4)), np.random.random((128, 2))),
+            (np.random.random((128, 4)), np.random.random((128, 1))),
+        ]
+    )
+def test_crowded_comparison_argsort(pop_f, pop_g):
+    """Confirm no errors on running with variety of inputs"""
+    crowded_comparison_argsort(pop_f, pop_g)
