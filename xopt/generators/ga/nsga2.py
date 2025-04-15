@@ -86,7 +86,7 @@ def crowded_comparison_argsort(
     """
     # Deal with NaNs
     pop_f = np.copy(pop_f)
-    pop_f[~np.isfinite(pop_g)] = 1e300
+    pop_f[~np.isfinite(pop_f)] = 1e300
     if pop_g is not None:
         pop_g = np.copy(pop_g)
         pop_g[~np.isfinite(pop_g)] = 1e300
