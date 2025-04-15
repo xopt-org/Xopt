@@ -72,6 +72,8 @@ def crowded_comparison_argsort(
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
     Indices to individuals are returned in order of increasing value by crowded comparison operator.
 
+    Notes: individuals containing `nan` values will be assigned the last domination rank.
+
     Parameters
     ----------
     pop_f : np.ndarray
@@ -86,10 +88,10 @@ def crowded_comparison_argsort(
     """
     # Deal with NaNs
     pop_f = np.copy(pop_f)
-    pop_f[~np.isfinite(pop_f)] = 1e300
+    pop_f[~np.isfinite(pop_f)] = np.inf
     if pop_g is not None:
         pop_g = np.copy(pop_g)
-        pop_g[~np.isfinite(pop_g)] = 1e300
+        pop_g[~np.isfinite(pop_g)] = np.inf
 
     ranks = fast_dominated_argsort(pop_f, pop_g)
     inds = []
