@@ -24,6 +24,18 @@ from .operators import (
 # Helper functions
 ########################################################################################################################
 
+def vocs_data_to_arr(data: list | np.ndarray) -> np.ndarray:
+    """Force data coming from VOCS object into 2D numpy array (or None) for compatibility with helper functions"""
+    if isinstance(data, list):
+        data = np.ndarray(list)
+    if len(data.shape) == 0:
+        return None
+    if len(data.shape) == 1:
+        return data[:, None]
+    if len(data.shape) == 2:
+        return data
+    raise ValueError(f"Unrecognized shape from VOCS data: {data.shape}")
+
 
 def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
     """
@@ -368,7 +380,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             candidates = []
             pop_x = self.vocs.variable_data(self.pop).to_numpy()
             pop_f = self.vocs.objective_data(self.pop).to_numpy()
-            pop_g = self.vocs.constraint_data(self.pop).to_numpy() if self.vocs.constraint_names else None
+            pop_g = vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy())
             fitness = get_fitness(pop_f, pop_g)
             for _ in range(n_candidates):
                 candidates.append(
@@ -440,7 +452,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             idx = cull_population(
                 self.vocs.variable_data(self.pop).to_numpy(),
                 self.vocs.objective_data(self.pop).to_numpy(),
-                self.vocs.constraint_data(self.pop).to_numpy() if self.vocs.constraint_names else None,
+                vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy()),
                 self.population_size,
             )
             self.pop = [self.pop[i] for i in idx]
