@@ -124,7 +124,7 @@ def crowded_comparison_argsort(
     return final_sorted_indices[::-1]
 
 
-def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray) -> np.ndarray:
+def get_fitness(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.ndarray:
     """
     Get the "fitness" of each individual according to domination and crowding distance.
 
@@ -132,23 +132,21 @@ def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray) -> np.ndarray:
     ----------
     pop_f : np.ndarray
         The objectives
-    pop_g : np.ndarray
-        The constraints
+    pop_g : np.ndarray / None
+        The constraints, or None of no constraints
 
     Returns
     -------
     np.ndarray
         The fitness of each individual
     """
-    sort_ind = crowded_comparison_argsort(pop_f, pop_g)
-    fitness = np.argsort(sort_ind)
-    return fitness
+    return np.argsort(crowded_comparison_argsort(pop_f, pop_g))
 
 
 def generate_child_binary_tournament(
     pop_x: np.ndarray,
     pop_f: np.ndarray,
-    pop_g: np.ndarray,
+    pop_g: Optional[np.ndarray],
     bounds: np.ndarray,
     mutate: MutationOperator,
     crossover: CrossoverOperator,
@@ -167,8 +165,9 @@ def generate_child_binary_tournament(
         Decision variables of the population, shape (n_individuals, n_variables).
     pop_f : numpy.ndarray
         Objective function values of the population, shape (n_individuals, n_objectives).
-    pop_g : numpy.ndarray
+    pop_g : numpy.ndarray / None
         Constraint violation values of the population, shape (n_individuals, n_constraints).
+        None if no constraints.
     bounds : numpy.ndarray
         Bounds for decision variables, shape (2, n_variables) where bounds[0] are lower bounds
         and bounds[1] are upper bounds.
@@ -210,7 +209,7 @@ def generate_child_binary_tournament(
 
 
 def cull_population(
-    pop_x: np.ndarray, pop_f: np.ndarray, pop_g: np.ndarray, population_size: int
+    pop_x: np.ndarray, pop_f: np.ndarray, pop_g: Optional[np.ndarray], population_size: int
 ) -> np.ndarray:
     """
     Reduce population size by selecting the best individuals based on crowded comparison.
@@ -222,8 +221,8 @@ def cull_population(
     ----------
     pop_x : numpy.ndarray
         Decision variables of the population, shape (n_individuals, n_variables).
-    pop_f : numpy.ndarray
-        Objective function values of the population, shape (n_individuals, n_objectives).
+    pop_f : numpy.ndarray / None
+        Objective function values of the population, shape (n_individuals, n_objectives), None if no constraints.
     pop_g : numpy.ndarray
         Constraint violation values of the population, shape (n_individuals, n_constraints).
     population_size : int
@@ -369,7 +368,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             candidates = []
             pop_x = self.vocs.variable_data(self.pop).to_numpy()
             pop_f = self.vocs.objective_data(self.pop).to_numpy()
-            pop_g = self.vocs.constraint_data(self.pop).to_numpy()
+            pop_g = self.vocs.constraint_data(self.pop).to_numpy() if self.vocs.constraint_names else None
             fitness = get_fitness(pop_f, pop_g)
             for _ in range(n_candidates):
                 candidates.append(
@@ -441,7 +440,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             idx = cull_population(
                 self.vocs.variable_data(self.pop).to_numpy(),
                 self.vocs.objective_data(self.pop).to_numpy(),
-                self.vocs.constraint_data(self.pop).to_numpy(),
+                self.vocs.constraint_data(self.pop).to_numpy() if self.vocs.constraint_names else None,
                 self.population_size,
             )
             self.pop = [self.pop[i] for i in idx]
