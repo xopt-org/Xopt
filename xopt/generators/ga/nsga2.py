@@ -1,6 +1,6 @@
 import numpy as np
 from pydantic import Field, Discriminator
-from typing import Dict, List, Optional, Annotated, Union
+from typing import Annotated
 import pandas as pd
 import os
 from datetime import datetime
@@ -66,7 +66,7 @@ def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
 
 
 def crowded_comparison_argsort(
-    pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None
+    pop_f: np.ndarray, pop_g: np.ndarray | None = None
 ) -> np.ndarray:
     """
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
@@ -124,7 +124,7 @@ def crowded_comparison_argsort(
     return final_sorted_indices[::-1]
 
 
-def get_fitness(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.ndarray:
+def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray | None = None) -> np.ndarray:
     """
     Get the "fitness" of each individual according to domination and crowding distance.
 
@@ -146,11 +146,11 @@ def get_fitness(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.nda
 def generate_child_binary_tournament(
     pop_x: np.ndarray,
     pop_f: np.ndarray,
-    pop_g: Optional[np.ndarray],
+    pop_g: np.ndarray | None,
     bounds: np.ndarray,
     mutate: MutationOperator,
     crossover: CrossoverOperator,
-    fitness: Optional[np.ndarray] = None,
+    fitness: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Creates a single child from the population using binary tournament selection, crossover, and mutation.
@@ -209,7 +209,7 @@ def generate_child_binary_tournament(
 
 
 def cull_population(
-    pop_x: np.ndarray, pop_f: np.ndarray, pop_g: Optional[np.ndarray], population_size: int
+    pop_x: np.ndarray, pop_f: np.ndarray, pop_g: np.ndarray | None, population_size: int
 ) -> np.ndarray:
     """
     Reduce population size by selecting the best individuals based on crowded comparison.
@@ -299,20 +299,20 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[
-        Union[
-            SimulatedBinaryCrossover, DummyCrossover
-        ],  # Dummy placeholder to keep discriminator code from failing
+        (
+            SimulatedBinaryCrossover | DummyCrossover
+        ),  # Dummy placeholder to keep discriminator code from failing
         Discriminator("name"),
     ] = SimulatedBinaryCrossover()
     mutation_operator: Annotated[
-        Union[
-            PolynomialMutation, DummyMutation
-        ],  # Dummy placeholder to keep discriminator code from failing
+        (
+            PolynomialMutation | DummyMutation
+        ),  # Dummy placeholder to keep discriminator code from failing
         Discriminator("name"),
     ] = PolynomialMutation()
 
     # Output options
-    output_dir: Optional[str] = None
+    output_dir: str | None = None
     checkpoint_freq: int = Field(
         -1,
         description="How often (in generations) to save checkpoints (set to -1 to disable)",
@@ -323,7 +323,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     _output_dir_setup: bool = (
         False  # Used in initializing the directory. PLEASE DO NOT CHANGE
     )
-    _logger: Optional[logging.Logger] = None
+    _logger: logging.Logger | None = None
 
     # Metadata
     fevals: int = Field(
@@ -336,7 +336,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     n_candidates: int = Field(
         0, description="The number of candidate solutions generated so far"
     )
-    history_idx: List[List[int]] = Field(
+    history_idx: list[list[int]] = Field(
         default=[],
         description="Xopt indices of the individuals in each population",
     )
@@ -347,15 +347,15 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     )
 
     # The population and returned children
-    pop: List[Dict] = Field(default=[])
-    child: List[Dict] = Field(default=[])
+    pop: list[dict] = Field(default=[])
+    child: list[dict] = Field(default=[])
 
     def model_post_init(self, context):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
 
-    def _generate(self, n_candidates: int) -> List[Dict]:
+    def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
         start_t = time.perf_counter()
 
