@@ -24,6 +24,7 @@ from .operators import (
 # Helper functions
 ########################################################################################################################
 
+
 def vocs_data_to_arr(data: list | np.ndarray) -> np.ndarray:
     """Force data coming from VOCS object into 2D numpy array (or None) for compatibility with helper functions"""
     if isinstance(data, list):
@@ -106,33 +107,33 @@ def crowded_comparison_argsort(
         has_nan = has_nan | np.any(~np.isfinite(pop_g), axis=1)
     nan_indices = np.where(has_nan)[0]
     finite_indices = np.where(~has_nan)[0]
-    
+
     # If all values are non-finite, return the original indices
     if len(finite_indices) == 0:
         return np.arange(pop_f.shape[0])
-    
+
     # Extract only finite values for processing
     pop_f_finite = pop_f[finite_indices, :]
-    
+
     # Handle constraints if provided
     pop_g_finite = None
     if pop_g is not None:
         pop_g_finite = pop_g[finite_indices, :]
-    
+
     # Apply domination ranking
     ranks = fast_dominated_argsort(pop_f_finite, pop_g_finite)
-    
+
     # Calculate crowding distance and sort within each rank
     sorted_finite_indices = []
     for rank in ranks:
         dist = get_crowding_distance(pop_f_finite[rank, :])
         sorted_rank = np.array(rank)[np.argsort(dist)[::-1]]
         sorted_finite_indices.extend(sorted_rank)
-    
+
     # Map back to original indices and put nans at end
     sorted_original_indices = finite_indices[sorted_finite_indices]
     final_sorted_indices = np.concatenate([sorted_original_indices, nan_indices])
-    
+
     return final_sorted_indices[::-1]
 
 
