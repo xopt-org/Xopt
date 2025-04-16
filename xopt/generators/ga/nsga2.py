@@ -70,14 +70,16 @@ def crowded_comparison_argsort(
 ) -> np.ndarray:
     """
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
-    Indices to individuals are returned in order of increasing value by crowded comparison operator.
+    Indices to individuals are returned in order of increasing value of fitness by crowded comparison operator.
+    That is, the least fit individuals are returned first.
 
-    Notes: individuals containing `nan` values will be assigned the last domination rank.
+    Notes: NaN values are removed from the comparison and added back at the beginning (least fit direction) of
+    the sorted indices.
 
     Parameters
     ----------
     pop_f : np.ndarray
-        (M, N) numpy array where N is the number of individuals and M is the number of objectives
+        (N, M) numpy array where N is the number of individuals and M is the number of objectives
     pop_g : np.ndarray, optional
         The constraints, by default None
 
@@ -86,20 +88,40 @@ def crowded_comparison_argsort(
     np.ndarray
         Numpy array of indices to sorted individuals
     """
-    # Deal with NaNs
-    pop_f = np.copy(pop_f)
-    pop_f[~np.isfinite(pop_f)] = np.inf
+    # Check for non-finite values in both pop_f and pop_g
+    has_nan = np.any(~np.isfinite(pop_f), axis=1)
     if pop_g is not None:
-        pop_g = np.copy(pop_g)
-        pop_g[~np.isfinite(pop_g)] = np.inf
-
-    ranks = fast_dominated_argsort(pop_f, pop_g)
-    inds = []
+        has_nan = has_nan | np.any(~np.isfinite(pop_g), axis=1)
+    nan_indices = np.where(has_nan)[0]
+    finite_indices = np.where(~has_nan)[0]
+    
+    # If all values are non-finite, return the original indices
+    if len(finite_indices) == 0:
+        return np.arange(pop_f.shape[0])
+    
+    # Extract only finite values for processing
+    pop_f_finite = pop_f[finite_indices, :]
+    
+    # Handle constraints if provided
+    pop_g_finite = None
+    if pop_g is not None:
+        pop_g_finite = pop_g[finite_indices, :]
+    
+    # Apply domination ranking
+    ranks = fast_dominated_argsort(pop_f_finite, pop_g_finite)
+    
+    # Calculate crowding distance and sort within each rank
+    sorted_finite_indices = []
     for rank in ranks:
-        dist = get_crowding_distance(pop_f[rank, :])
-        inds.extend(np.array(rank)[np.argsort(dist)[::-1]])
-
-    return np.array(inds)[::-1]
+        dist = get_crowding_distance(pop_f_finite[rank, :])
+        sorted_rank = np.array(rank)[np.argsort(dist)[::-1]]
+        sorted_finite_indices.extend(sorted_rank)
+    
+    # Map back to original indices and put nans at end
+    sorted_original_indices = finite_indices[sorted_finite_indices]
+    final_sorted_indices = np.concatenate([sorted_original_indices, nan_indices])
+    
+    return final_sorted_indices[::-1]
 
 
 def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray) -> np.ndarray:
@@ -212,9 +234,7 @@ def cull_population(
     numpy.ndarray
         Indices of selected individuals, shape (population_size,).
     """
-    inds = crowded_comparison_argsort(pop_f, pop_g)[::-1]
-    inds = inds[:population_size]
-    return inds
+    return crowded_comparison_argsort(pop_f, pop_g)[-population_size:]
 
 
 ########################################################################################################################

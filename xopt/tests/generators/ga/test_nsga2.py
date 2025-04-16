@@ -402,14 +402,79 @@ def test_resume_consistency(pop_size=5, n_steps=128, check_step=10):
 
 
 @pytest.mark.parametrize(
-        "pop_f, pop_g",
-        [
-            (np.random.random((128, 4)), None),
-            (np.random.random((128, 4)), np.random.random((128, 4))),
-            (np.random.random((128, 4)), np.random.random((128, 2))),
-            (np.random.random((128, 4)), np.random.random((128, 1))),
-        ]
-    )
-def test_crowded_comparison_argsort(pop_f, pop_g):
-    """Confirm no errors on running with variety of inputs"""
-    crowded_comparison_argsort(pop_f, pop_g)
+    "pop_f, pop_g, expected_indices_options",
+    [
+        # Two individuals in different ranks
+        (
+            np.array([[1.0, 2.0], [2.0, 3.0]]),
+            None,
+            [np.array([1, 0])]
+        ),
+        # Non-dominated, different crowding distances
+        (
+            np.array([[1.0, 3.0], [2.0, 2.0], [3.0, 1.0]]),
+            None,
+            [np.array([1, 2, 0]), np.array([1, 0, 2])]
+        ),
+        # NaN values
+        (
+            np.array([[1.0, 2.0], [np.nan, 3.0], [2.0, 1.0]]),
+            None,
+            [np.array([1, 2, 0]), np.array([1, 0, 2])]
+        ),
+        # Constrained
+        (
+            np.array([[2.0, 2.0], [1.0, 1.0]]),
+            np.array([[-1.0, -1.0], [1.0, -1.0]]),
+            [np.array([1, 0])]
+        ),
+        # Multiple individuals with same rank but potentially same crowding distances
+        (
+            np.array([[1.0, 3.0], [2.0, 2.0], [3.0, 1.0], [1.5, 2.5]]),
+            None,
+            [
+                np.array([3, 1, 2, 0]),
+                np.array([1, 3, 2, 0]),
+                np.array([3, 1, 0, 2]),
+                np.array([1, 3, 0, 2]),
+            ]
+        ),
+        # NaN values and constraints
+        (
+            np.array([[1.0, 2.0], [np.nan, 3.0], [2.0, 1.0]]),
+            np.array([[-1.0, -1.0, -1.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+            [np.array([1, 2, 0])]
+        ),
+        # All NaN
+        (
+            np.array([[np.nan, np.nan], [np.nan, np.nan]]),
+            None,
+            [np.array([0, 1]), np.array([1, 0])]
+        ),
+    ],
+)
+def test_crowded_comparison_argsort(pop_f, pop_g, expected_indices_options):
+    """
+    Test the crowded_comparison_argsort function with various explicit input.
+    
+    Parameters
+    ----------
+    pop_f : numpy.ndarray
+        Objective values
+    pop_g : numpy.ndarray or None
+        Constraint values
+    expected_indices_options : list of numpy.ndarray
+        List of valid expected sorted indices
+    """
+    # Call the function
+    result = crowded_comparison_argsort(pop_f, pop_g)
+    
+    # Check if the result matches any of the expected options
+    matches_any = any(np.array_equal(result, expected) for expected in expected_indices_options)
+    
+    if not matches_any:
+        message = (
+            f"Result {result} doesn't match any expected ordering.\n"
+            f"Expected one of: {expected_indices_options}"
+        )
+        assert False, message
