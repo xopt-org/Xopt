@@ -49,7 +49,7 @@ class StandardModelConstructor(ModelConstructor):
 
     Methods
     -------
-    likelihood
+    get_likelihood
         Get the likelihood for the model, considering the low noise prior.
 
     build_model(input_names, outcome_names, data, input_bounds, dtype, device)
@@ -112,8 +112,11 @@ class StandardModelConstructor(ModelConstructor):
             assert name in info.data["mean_modules"]
         return v
 
-    @property
-    def likelihood(self) -> Likelihood:
+    def get_likelihood(
+        self,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
+    ) -> Likelihood:
         """
         Get the likelihood for the model, considering the low noise prior and or a
         custom noise prior.
@@ -124,13 +127,13 @@ class StandardModelConstructor(ModelConstructor):
             The likelihood for the model.
 
         """
+        tkwargs = {"dtype": dtype, "device": device}
         if self.custom_noise_prior is not None:
-            return GaussianLikelihood(
+            likelihood = GaussianLikelihood(
                 noise_prior=self.custom_noise_prior,
             )
-
-        if self.use_low_noise_prior:
-            return GaussianLikelihood(
+        elif self.use_low_noise_prior:
+            likelihood = GaussianLikelihood(
                 noise_prior=GammaPrior(1.0, 100.0),
             )
         else:
@@ -144,7 +147,8 @@ class StandardModelConstructor(ModelConstructor):
                     initial_value=noise_prior_mode,
                 ),
             )
-            return likelihood
+        likelihood = likelihood.to(**tkwargs)
+        return likelihood
 
     def build_model(
         self,
@@ -221,7 +225,7 @@ class StandardModelConstructor(ModelConstructor):
                     self.build_single_task_gp(
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
-                        likelihood=self.likelihood,
+                        likelihood=self.get_likelihood(**tkwargs),
                         train=not self.use_cached_hyperparameters,
                         **kwargs,
                     )
