@@ -1,15 +1,23 @@
 import warnings
 
 from botorch.acquisition import (
+    AcquisitionFunction,
     qUpperConfidenceBound,
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
 )
 from pydantic import Field
+from gpytorch import Module
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
+)
+from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
+    ConstrainedMCAcquisitionFunction,
+)
+from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
+    LogAcquisitionFunction,
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
@@ -47,6 +55,34 @@ beta : float, default 2.0
                 "caution."
             )
 
+    def get_acquisition(self, model: Module) -> AcquisitionFunction:
+        if model is None:
+            raise ValueError("model cannot be None")
+
+        # get base acquisition function
+        acq = self._get_acquisition(model)
+
+        # TODO: is log necessary? can do just softplus - that logei paper did not try logucb
+        if len(self.vocs.constraints):
+            try:
+                sampler = acq.sampler
+            except AttributeError:
+                sampler = self._get_sampler(model)
+
+            acq = ConstrainedMCAcquisitionFunction(
+                model, acq, self._get_constraint_callables(), sampler=sampler
+            )
+
+            # log transform the result to handle the constraints
+            acq = LogAcquisitionFunction(acq)
+        else:
+            # if no constraints, still do log_softplus to match contrained case
+            acq = LogAcquisitionFunction(acq)
+
+        acq = self._apply_fixed_features(acq)
+        acq.to(**self.tkwargs)
+        return acq
+
     def _get_acquisition(self, model):
         objective = self._get_objective()
         if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
@@ -61,10 +97,12 @@ beta : float, default 2.0
         else:
             # analytic acquisition function for single candidate generation
             weights = set_botorch_weights(self.vocs)
-            posterior_transform = ScalarizedPosteriorTransform(weights)
+            posterior_transform = ScalarizedPosteriorTransform(weights).to(
+                **self.tkwargs
+            )
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
-            )
+            ).to(**self.tkwargs)
 
         return acq
 

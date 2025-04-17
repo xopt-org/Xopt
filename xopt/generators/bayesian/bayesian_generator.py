@@ -701,6 +701,22 @@ class BayesianGenerator(Generator, ABC):
             constraint_callables = None
         return constraint_callables
 
+    def _apply_fixed_features(self, acq):
+        """apply fixed features to the acquisition function or do nothing"""
+        if self.fixed_features is not None:
+            # get input dim
+            dim = len(self.model_input_names)
+            columns = []
+            values = []
+            for name, value in self.fixed_features.items():
+                columns += [self.model_input_names.index(name)]
+                values += [value]
+
+            acq = FixedFeatureAcquisitionFunction(
+                acq_function=acq, d=dim, columns=columns, values=values
+            )
+        return acq
+
     @property
     def tkwargs(self):
         # set device and data type for generator

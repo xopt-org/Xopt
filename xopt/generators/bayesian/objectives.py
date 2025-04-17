@@ -173,7 +173,7 @@ def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
     GenericMCObjective
         The objective object.
     """
-    weights = set_botorch_weights(vocs)
+    weights = set_botorch_weights(vocs).to(**tkwargs)
 
     def obj_callable(Z: Tensor, X: Optional[Tensor] = None) -> Tensor:
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
@@ -181,7 +181,7 @@ def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
     return GenericMCObjective(obj_callable)
 
 
-def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
+def create_mobo_objective(vocs: VOCS, tkwargs: dict) -> WeightedMCMultiOutputObjective:
     """
     Create the multi-objective Bayesian optimization objective.
 
@@ -203,5 +203,7 @@ def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
     weights = set_botorch_weights(vocs)[objective_indices]
 
     return WeightedMCMultiOutputObjective(
-        weights, outcomes=objective_indices, num_outcomes=vocs.n_objectives
+        weights.to(**tkwargs),
+        outcomes=objective_indices.to(**tkwargs),
+        num_outcomes=vocs.n_objectives,
     )

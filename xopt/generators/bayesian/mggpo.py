@@ -142,7 +142,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         Callable
             The multi-objective Bayesian optimization objective.
         """
-        return create_mobo_objective(self.vocs)
+        return create_mobo_objective(self.vocs, self.tkwargs)
 
     def _get_acquisition(
         self, model: torch.nn.Module
