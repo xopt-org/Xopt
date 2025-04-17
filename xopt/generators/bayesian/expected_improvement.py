@@ -72,6 +72,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
                 acq_function=acq, d=dim, columns=columns, values=values
             )
 
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def _get_acquisition(self, model: torch.nn.Module):

@@ -173,12 +173,13 @@ def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
     GenericMCObjective
         The objective object.
     """
-    weights = set_botorch_weights(vocs).to(**tkwargs)
+    weights = set_botorch_weights(vocs)
 
     def obj_callable(Z: Tensor, X: Optional[Tensor] = None) -> Tensor:
         return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
-    return GenericMCObjective(obj_callable)
+    objective = GenericMCObjective(obj_callable)
+    return objective.to(**tkwargs)
 
 
 def create_mobo_objective(vocs: VOCS, tkwargs: dict) -> WeightedMCMultiOutputObjective:
@@ -202,8 +203,10 @@ def create_mobo_objective(vocs: VOCS, tkwargs: dict) -> WeightedMCMultiOutputObj
     objective_indices = [output_names.index(name) for name in vocs.objectives]
     weights = set_botorch_weights(vocs)[objective_indices]
 
-    return WeightedMCMultiOutputObjective(
-        weights.to(**tkwargs),
-        outcomes=objective_indices.to(**tkwargs),
+    # Note that objective_indices gets registered as buffer with no device specified by botorch
+    objective = WeightedMCMultiOutputObjective(
+        weights,
+        outcomes=objective_indices,
         num_outcomes=vocs.n_objectives,
     )
+    return objective.to(**tkwargs)

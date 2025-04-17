@@ -578,6 +578,7 @@ class BayesianGenerator(Generator, ABC):
                 acq_function=acq, d=dim, columns=columns, values=values
             )
 
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def get_optimum(self):

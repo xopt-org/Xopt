@@ -2,6 +2,7 @@ from typing import Optional, Callable
 
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
+from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -53,7 +54,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
 
-    def _get_objective(self) -> Callable:
+    def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
 
@@ -64,9 +65,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         """
         return create_mobo_objective(self.vocs, self.tkwargs)
 
-    def get_acquisition(
-        self, model: torch.nn.Module
-    ) -> FixedFeatureAcquisitionFunction:
+    def get_acquisition(self, model: torch.nn.Module):
         """
         Get the acquisition function for Bayesian Optimization.
 
@@ -100,6 +99,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
                 acq_function=acq, d=dim, columns=columns, values=values
             )
 
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def _get_acquisition(
