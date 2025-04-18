@@ -1,9 +1,8 @@
 # from xopt.generator import Generator
 import numpy as np
-from typing import List, Optional
 
 
-def get_domination(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.ndarray:
+def get_domination(pop_f: np.ndarray, pop_g: np.ndarray | None = None) -> np.ndarray:
     """
     Compute domination matrix for a population based on objective values and constraints. Determines domination
     relationships between all pairs of individuals in a population.
@@ -46,7 +45,7 @@ def get_domination(pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None) -> np.
     return dom
 
 
-def fast_dominated_argsort_internal(dom: np.ndarray) -> List[np.ndarray]:
+def fast_dominated_argsort_internal(dom: np.ndarray) -> list[np.ndarray]:
     """
     Used inside of `fast_dominated_argsort`. Call that function instead.
 
@@ -83,8 +82,8 @@ def fast_dominated_argsort_internal(dom: np.ndarray) -> List[np.ndarray]:
 
 
 def fast_dominated_argsort(
-    pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None
-) -> List[np.ndarray]:
+    pop_f: np.ndarray, pop_g: np.ndarray | None = None
+) -> list[np.ndarray]:
     """
     Performs a dominated sort on matrix of objective function values O.  This is a numpy implementation of the algorithm
     described in [1].
