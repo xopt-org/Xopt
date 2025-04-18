@@ -3,7 +3,11 @@ from functools import partial
 from typing import Optional, Callable, List
 
 import torch
-from botorch.acquisition import GenericMCObjective, MCAcquisitionObjective
+from botorch.acquisition import (
+    GenericMCObjective,
+    LinearMCObjective,
+    MCAcquisitionObjective,
+)
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
 from torch import Tensor
@@ -157,7 +161,7 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
         return None
 
 
-def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
+def create_mc_objective(vocs: VOCS) -> LinearMCObjective:
     """
     Create a monte carlo objective object.
 
@@ -165,24 +169,18 @@ def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
     -----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
-    tkwargs : dict
-        Tensor keyword arguments.
 
     Returns:
     --------
-    GenericMCObjective
+    LinearMCObjective
         The objective object.
     """
     weights = set_botorch_weights(vocs)
-
-    def obj_callable(Z: Tensor, X: Optional[Tensor] = None) -> Tensor:
-        return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
-
-    objective = GenericMCObjective(obj_callable)
-    return objective.to(**tkwargs)
+    objective = LinearMCObjective(weights=weights)
+    return objective
 
 
-def create_mobo_objective(vocs: VOCS, tkwargs: dict) -> WeightedMCMultiOutputObjective:
+def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
     """
     Create the multi-objective Bayesian optimization objective.
 
@@ -200,13 +198,18 @@ def create_mobo_objective(vocs: VOCS, tkwargs: dict) -> WeightedMCMultiOutputObj
         The multi-objective Bayesian optimization objective.
     """
     output_names = vocs.output_names
-    objective_indices = [output_names.index(name) for name in vocs.objectives]
-    weights = set_botorch_weights(vocs)[objective_indices]
+    if vocs.n_outputs == vocs.n_objectives:
+        objective_indices = None
+        weights = set_botorch_weights(vocs)
+    else:
+        objective_indices = [output_names.index(name) for name in vocs.objectives]
+        weights = set_botorch_weights(vocs)[objective_indices]
 
     # Note that objective_indices gets registered as buffer with no device specified by botorch
+    # If it is None, a lot of checks are skipped so we do this for performance
     objective = WeightedMCMultiOutputObjective(
-        weights,
+        weights=weights,
         outcomes=objective_indices,
         num_outcomes=vocs.n_objectives,
     )
-    return objective.to(**tkwargs)
+    return objective

@@ -5,10 +5,14 @@ import numpy as np
 import pandas as pd
 import torch
 import yaml
+from torch import nn
 
 from xopt import Generator
 from xopt.pydantic import remove_none_values
 from xopt.vocs import VOCS
+
+# A manual flag to trigger verification of torch device in some locations
+XOPT_VERIFY_TORCH_DEVICE = True
 
 
 def xtest_callable(input_dict: dict, a=0) -> dict:
@@ -36,12 +40,13 @@ def xtest_callable_mo(input_dict: dict) -> dict:
     return {"y1": y1, "y2": y2, "c1": c1}
 
 
-def verify_state_device(state: dict, device: torch.device):
+def verify_state_device(module: nn.Module, device: torch.device, prefix=""):
+    state = module.state_dict(keep_vars=True)
     for k, v in state.items():
         if isinstance(v, torch.Tensor):
             if v.device != device:
                 raise ValueError(
-                    f"Tensor {k} is on device {v.device}, expected {device}"
+                    f"Tensor {k} from [{module.__class__=}] [{prefix=}] is on device {v.device}, expected {device}"
                 )
 
 
@@ -124,23 +129,20 @@ def recursive_torch_device_scan(
 def check_generator_tensor_locations(gen, device):
     # print("Checking objective")
     objective = gen._get_objective()
-    state = objective.state_dict()
-    verify_state_device(state, device)
+    verify_state_device(objective, device, "objective")
 
     if gen.data is not None and not gen.data.empty:
         # print("Checking model state dict")
         model = gen.train_model(gen.data)
-        state = model.state_dict()
-        verify_state_device(state, device)
+        verify_state_device(model, device)
 
         # print("Checking sampler state dict")
-        state = gen._get_sampler(model).state_dict()
-        verify_state_device(state, device)
+        sampler = gen._get_sampler(model)
+        verify_state_device(sampler, device)
 
         # print("Checking acquisition state dict")
         acqf = gen.get_acquisition(model)
-        state = acqf.state_dict()
-        verify_state_device(state, device)
+        verify_state_device(acqf, device)
 
     # print("Recursing into generator")
     visited = set()

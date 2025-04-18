@@ -9,6 +9,7 @@ from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_valida
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
+from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
 from xopt.vocs import VOCS
 
 logger = logging.getLogger()
@@ -143,6 +144,8 @@ class TurboController(XoptBaseModel, ABC):
         given by the `length` parameter and are scaled according to the generator
         model lengthscales (if available).
 
+        Tensor is kept on the CPU regardless of generator settings.
+
         Parameters
         ----------
         generator : BayesianGenerator
@@ -155,7 +158,7 @@ class TurboController(XoptBaseModel, ABC):
             The trust region bounds.
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds, **generator.tkwargs)
+        bounds = torch.tensor(self.vocs.bounds)
 
         if self.center_x is not None:
             # get bounds width
@@ -164,7 +167,6 @@ class TurboController(XoptBaseModel, ABC):
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
                 [self.center_x[ele] for ele in self.vocs.variable_names],
-                **generator.tkwargs,
             ).unsqueeze(dim=0)
 
             # default weights are 1 (if there is no model or a model without
@@ -173,7 +175,9 @@ class TurboController(XoptBaseModel, ABC):
 
             if model is not None:
                 if model.models[0].covar_module.lengthscale is not None:
-                    lengthscales = model.models[0].covar_module.lengthscale.detach()
+                    lengthscales = (
+                        model.models[0].covar_module.lengthscale.detach().cpu()
+                    )
 
                     # calculate the ratios of lengthscales for each axis
                     weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
@@ -219,6 +223,9 @@ class TurboController(XoptBaseModel, ABC):
         variable_data = torch.tensor(self.vocs.variable_data(data).to_numpy())
 
         bounds = self.get_trust_region(generator)
+
+        if XOPT_VERIFY_TORCH_DEVICE:
+            assert bounds.device == torch.device("cpu")
 
         mask = torch.ones(len(variable_data), dtype=torch.bool)
         for dim in range(variable_data.shape[1]):

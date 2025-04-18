@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Dict, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import torch
 from botorch.acquisition import (
@@ -679,8 +680,10 @@ class BayesianGenerator(Generator, ABC):
         pass
 
     def _get_objective(self):
-        """return default objective (scalar objective) determined by vocs or if
-        defined in custom_objective"""
+        """
+        Return default objective (scalar objective) determined by vocs or if
+        defined in custom_objective. Module is already on target device.
+        """
         # check to make sure that if we specify a custom objective that no objectives
         # are specified in vocs
         if self.custom_objective is not None:
@@ -691,19 +694,21 @@ class BayesianGenerator(Generator, ABC):
                     "same time"
                 )
 
-            return self.custom_objective
+            objective = self.custom_objective
         else:
-            return create_mc_objective(self.vocs, self.tkwargs)
+            objective = create_mc_objective(self.vocs)
+
+        return objective.to(**self.tkwargs)
 
     def _get_constraint_callables(self):
-        """return constratint callable determined by vocs"""
+        """return constraint callable determined by vocs"""
         constraint_callables = create_constraint_callables(self.vocs)
         if len(constraint_callables) == 0:
             constraint_callables = None
         return constraint_callables
 
     def _apply_fixed_features(self, acq):
-        """apply fixed features to the acquisition function or do nothing"""
+        """apply fixed features to the acquisition function if needed"""
         if self.fixed_features is not None:
             # get input dim
             dim = len(self.model_input_names)
@@ -754,8 +759,12 @@ class BayesianGenerator(Generator, ABC):
         return variable_names
 
     def _get_bounds(self):
-        """convert bounds from vocs to torch tensors"""
-        return torch.tensor(self.vocs.bounds, **self.tkwargs)
+        """
+        Convert bounds from vocs to torch tensors
+
+        Tensor stays on CPU
+        """
+        return torch.tensor(self.vocs.bounds)
 
     def _get_optimization_bounds(self):
         """
@@ -778,7 +787,7 @@ class BayesianGenerator(Generator, ABC):
             the bounds associated with those features are removed.
 
         """
-        bounds = deepcopy(self._get_bounds())
+        bounds = self._get_bounds()
 
         # if specified modify bounds to limit maximum travel distances
         if self.max_travel_distances is not None:
@@ -803,12 +812,15 @@ class BayesianGenerator(Generator, ABC):
             # grab indexed bounds
             bounds = bounds.T[indicies].T
 
+        bounds = bounds.to(**self.tkwargs)
         return bounds
 
     def _get_max_travel_distances_region(self, bounds):
         """
         Calculate the region for maximum travel distances based on the current bounds
         and the last observation.
+
+        Tensor stays on CPU.
 
         Parameters:
         -----------
@@ -847,22 +859,20 @@ class BayesianGenerator(Generator, ABC):
                 "No data exists to specify max_travel_distances "
                 "from, add data first to use during BO"
             )
-        last_point = torch.tensor(
-            self.data[self.vocs.variable_names].iloc[-1].to_numpy(), **self.tkwargs
-        )
+        last_point = self.data[self.vocs.variable_names].iloc[-1].to_numpy()
 
         # bound lengths based on vocs for normalization
-        lengths = self.vocs.bounds[1, :] - self.vocs.bounds[0, :]
+        vocs_bounds = self.vocs.bounds
+        lengths = vocs_bounds[1, :] - vocs_bounds[0, :]
 
         # get maximum travel distances
-        max_travel_distances = torch.tensor(
-            self.max_travel_distances, **self.tkwargs
-        ) * torch.tensor(lengths, **self.tkwargs)
-        max_travel_bounds = torch.stack(
+        max_travel_distances = np.array(self.max_travel_distances) * lengths
+
+        max_travel_bounds = np.stack(
             (last_point - max_travel_distances, last_point + max_travel_distances)
         )
 
-        return max_travel_bounds
+        return torch.tensor(max_travel_bounds)
 
 
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):

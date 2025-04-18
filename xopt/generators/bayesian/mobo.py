@@ -58,7 +58,19 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         """
         Create the multi-objective Bayesian optimization objective.
         """
-        return create_mobo_objective(self.vocs, self.tkwargs)
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
+                raise RuntimeError(
+                    "cannot specify objectives in VOCS "
+                    "and a custom objective for the generator at the "
+                    "same time"
+                )
+
+            objective = self.custom_objective
+        else:
+            objective = create_mobo_objective(self.vocs)
+
+        return objective.to(**self.tkwargs)
 
     def get_acquisition(self, model: torch.nn.Module):
         """

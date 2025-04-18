@@ -39,6 +39,7 @@ class TestUpperConfidenceBoundGenerator:
 
         # test init from dict
         gen2 = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE.dict())
+        gen2.use_cuda = use_cuda
         check_generator_tensor_locations(gen2, device_map[use_cuda])
 
         with pytest.raises(ValueError):
@@ -62,18 +63,6 @@ class TestUpperConfidenceBoundGenerator:
         # test time tracking
         assert isinstance(gen.computation_time, pd.DataFrame)
         assert len(gen.computation_time) == 2
-
-        check_generator_tensor_locations(gen, device_map[use_cuda])
-
-    @pytest.mark.parametrize("use_cuda", cuda_combinations)
-    def test_cuda(self, use_cuda):
-        gen = UpperConfidenceBoundGenerator(
-            vocs=TEST_VOCS_BASE,
-        )
-        set_options(gen, use_cuda, add_data=True)
-
-        candidate = gen.generate(1)
-        assert len(candidate) == 1
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
 

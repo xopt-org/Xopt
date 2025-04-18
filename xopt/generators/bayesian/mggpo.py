@@ -140,7 +140,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         """
         Create the multi-objective Bayesian optimization objective.
         """
-        return create_mobo_objective(self.vocs, self.tkwargs)
+        return create_mobo_objective(self.vocs).to(**self.tkwargs)
 
     def _get_acquisition(
         self, model: torch.nn.Module
