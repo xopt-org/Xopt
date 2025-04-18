@@ -1,4 +1,4 @@
-from typing import Optional, Callable
+from typing import Optional
 
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
@@ -57,11 +57,6 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
-
-        Returns:
-        --------
-        Callable
-            The multi-objective Bayesian optimization objective.
         """
         return create_mobo_objective(self.vocs, self.tkwargs)
 

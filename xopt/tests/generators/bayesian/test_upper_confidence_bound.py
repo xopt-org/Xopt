@@ -23,8 +23,8 @@ device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 def set_options(gen, use_cuda=False):
     gen.use_cuda = use_cuda
-    gen.numerical_optimizer.n_restarts = 1
-    gen.n_monte_carlo_samples = 8
+    gen.numerical_optimizer.n_restarts = 2
+    gen.n_monte_carlo_samples = 4
 
 
 class TestUpperConfidenceBoundGenerator:

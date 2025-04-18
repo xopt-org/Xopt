@@ -1,9 +1,13 @@
+import json
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
+import yaml
 
+from xopt import Generator
+from xopt.pydantic import remove_none_values
 from xopt.vocs import VOCS
 
 
@@ -143,6 +147,77 @@ def check_generator_tensor_locations(gen, device):
     recursive_torch_device_scan(gen, visited, device)
 
 
+def check_dict_equal(dict1, dict2, excluded_keys=None):
+    """
+    Compare two dictionaries for equality, ignoring specified keys.
+    """
+    if excluded_keys is None:
+        excluded_keys = []
+
+    if set(dict1.keys()) != set(dict2.keys()):
+        raise KeyError(f"Keys in dict1: {dict1.keys()} not in dict2: {dict2.keys()}")
+
+    for key in dict1.keys():
+        if key in excluded_keys:
+            continue
+        if key not in dict2:
+            raise KeyError(f"Key {key} not in {dict2}")
+        if dict1[key] != dict2[key]:
+            raise ValueError(
+                f"Key {key} has different values: {dict1[key]} != {dict2[key]}"
+            )
+
+
+def check_dict_allclose(dict1, dict2, excluded_keys=None, rtol=1e-5, atol=1e-8):
+    """
+    Compare two dictionaries approximately, ignoring specified keys.
+    """
+    if excluded_keys is None:
+        excluded_keys = []
+
+    if set(dict1.keys()) != set(dict2.keys()):
+        raise KeyError(f"Keys in dict1: {dict1.keys()} not in dict2: {dict2.keys()}")
+
+    for key in dict1.keys():
+        if key in excluded_keys:
+            continue
+        if isinstance(dict1[key], torch.Tensor):
+            v1 = dict1[key].cpu().numpy()
+            v2 = dict2[key].cpu().numpy()
+            if not np.allclose(v1, v2, rtol=rtol, atol=atol):
+                raise ValueError(
+                    f"Key {key} has different values: {dict1[key]} != {dict2[key]}"
+                )
+        elif isinstance(dict1[key], (float, int, np.ndarray)):
+            v1 = dict1[key]
+            v2 = dict2[key]
+            if not np.allclose(v1, v2, rtol=rtol, atol=atol):
+                raise ValueError(
+                    f"Key {key} has different values: {dict1[key]} != {dict2[key]}"
+                )
+        else:
+            if dict1[key] != dict2[key]:
+                raise ValueError(
+                    f"Key {key} has different values: {dict1[key]} != {dict2[key]}"
+                )
+
+
+def reload_gen_from_json(gen):
+    assert isinstance(gen, Generator)
+    gen_class = gen.__class__
+    gen_new = gen_class(vocs=gen.vocs, **json.loads(gen.json()))
+    gen_new.add_data(gen.data.copy())
+    return gen_new
+
+
+def reload_gen_from_yaml(gen):
+    assert isinstance(gen, Generator)
+    gen_class = gen.__class__
+    gen_new = gen_class(vocs=gen.vocs, **remove_none_values(yaml.safe_load(gen.yaml())))
+    gen_new.add_data(gen.data.copy())
+    return gen_new
+
+
 TEST_VOCS_BASE = VOCS(
     **{
         "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
@@ -151,8 +226,11 @@ TEST_VOCS_BASE = VOCS(
         "constants": {"constant1": 1.0},
     }
 )
-TEST_VOCS_BASE_MO = TEST_VOCS_BASE.model_copy()
+TEST_VOCS_BASE_MO = TEST_VOCS_BASE.model_copy(deep=True)
 TEST_VOCS_BASE_MO.objectives["y2"] = "MINIMIZE"
+TEST_VOCS_BASE_MO_NC = TEST_VOCS_BASE_MO.model_copy(deep=True)
+TEST_VOCS_BASE_MO_NC.constraints = {}
+TEST_VOCS_REF_POINT = {"y1": 1.5, "y2": 1.5}
 
 cnames = (
     list(TEST_VOCS_BASE.variables.keys())

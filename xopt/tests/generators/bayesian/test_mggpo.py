@@ -1,12 +1,32 @@
 from copy import deepcopy
 
 import pandas as pd
+import pytest
+import torch
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.resources.testing import (
+    TEST_VOCS_BASE,
+    TEST_VOCS_BASE_MO,
+    TEST_VOCS_BASE_MO_NC,
+    TEST_VOCS_DATA_MO,
+    TEST_VOCS_REF_POINT,
+    check_generator_tensor_locations,
+)
+
+cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
+device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
+
+
+def set_options(gen, use_cuda=False, add_data=False):
+    gen.use_cuda = use_cuda
+    gen.numerical_optimizer.n_restarts = 2
+    gen.n_monte_carlo_samples = 4
+    if add_data:
+        gen.add_data(TEST_VOCS_DATA_MO)
 
 
 class TestMGGPO:
@@ -15,6 +35,34 @@ class TestMGGPO:
         vocs.objectives.update({"y2": "MINIMIZE"})
         reference_point = {"y1": 3.14, "y2": 3.14}
         MGGPOGenerator(vocs=vocs, reference_point=reference_point)
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate(self, use_cuda):
+        gen = MGGPOGenerator(
+            vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT
+        )
+        set_options(gen, use_cuda, add_data=True)
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+
+        candidate = gen.generate(2)
+        assert len(candidate) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+
+        gen = MGGPOGenerator(
+            vocs=TEST_VOCS_BASE_MO_NC, reference_point=TEST_VOCS_REF_POINT
+        )
+        set_options(gen, use_cuda, add_data=True)
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+
+        candidate = gen.generate(2)
+        assert len(candidate) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
 
     def test_serial(self):
         evaluator = Evaluator(function=evaluate_TNK)
