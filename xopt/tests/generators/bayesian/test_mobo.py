@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-import yaml
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -15,7 +14,6 @@ from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.numerical_optimizer import GridOptimizer
-from xopt.pydantic import remove_none_values
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
     tnk_reference_point,

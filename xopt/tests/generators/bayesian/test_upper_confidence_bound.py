@@ -21,10 +21,12 @@ cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 
-def set_options(gen, use_cuda=False):
+def set_options(gen, use_cuda=False, add_data=False):
     gen.use_cuda = use_cuda
     gen.numerical_optimizer.n_restarts = 2
     gen.n_monte_carlo_samples = 4
+    if add_data:
+        gen.add_data(TEST_VOCS_DATA)
 
 
 class TestUpperConfidenceBoundGenerator:
@@ -49,8 +51,7 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        set_options(gen, use_cuda)
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, use_cuda, add_data=True)
 
         candidate = gen.generate(1)
         assert len(candidate) == 1
@@ -69,8 +70,7 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        set_options(gen, use_cuda)
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, use_cuda, add_data=True)
 
         candidate = gen.generate(1)
         assert len(candidate) == 1
@@ -83,8 +83,7 @@ class TestUpperConfidenceBoundGenerator:
         gen = UpperConfidenceBoundGenerator(
             vocs=test_vocs,
         )
-        set_options(gen)
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, add_data=True)
 
         candidate = gen.generate(1)
         assert len(candidate) == 1
