@@ -29,7 +29,7 @@ def vocs_data_to_arr(data: list | np.ndarray) -> np.ndarray:
     """Force data coming from VOCS object into 2D numpy array (or None) for compatibility with helper functions"""
     if isinstance(data, list):
         data = np.ndarray(list)
-    if len(data.shape) == 0:
+    if data.size == 0:
         return None
     if len(data.shape) == 1:
         return data[:, None]
