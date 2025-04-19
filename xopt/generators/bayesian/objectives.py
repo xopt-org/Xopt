@@ -4,7 +4,6 @@ from typing import Optional, Callable, List
 
 import torch
 from botorch.acquisition import (
-    GenericMCObjective,
     LinearMCObjective,
     MCAcquisitionObjective,
 )

@@ -59,7 +59,6 @@ from xopt.pydantic import decode_torch_module
 
 logger = logging.getLogger()
 
-
 # It seems pydantic v2 does not auto-register models anymore
 # So one option is to have explicit unions for model subclasses
 # The other is to define a descriminated union with name as key, but that stops name field from
@@ -429,6 +428,7 @@ class BayesianGenerator(Generator, ABC):
 
         if update_internal:
             self.model = _model
+
         return _model
 
     def propose_candidates(self, model: Module, n_candidates: int = 1) -> Tensor:

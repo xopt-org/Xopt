@@ -1,9 +1,12 @@
 from copy import deepcopy
 from typing import List
 
+import gpytorch
 import numpy as np
 import pandas as pd
 import torch
+from botorch.models import ModelListGP
+from botorch.models.model import Model
 
 from xopt.vocs import VOCS
 
@@ -234,3 +237,40 @@ def validate_turbo_controller_base(value, valid_controller_types, info):
         )
 
     return value
+
+
+class MeanVarModelWrapper(torch.nn.Module):
+    def __init__(self, gp):
+        super().__init__()
+        self.gp = gp
+
+    def forward(self, x):
+        output_dist = self.gp(x)
+        return output_dist.mean, output_dist.variance
+
+
+def jit_gp_model(model: Model, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
+    if isinstance(model, ModelListGP):
+        raise ValueError(
+            "ModelListGP is not supported for JIT tracing - use individual models"
+        )
+    rand_point = vocs.random_inputs()[0]
+    rand_vec = torch.stack(
+        [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
+    )
+    test_x = rand_vec.to(**tkwargs)
+
+    # with torch.no_grad():
+    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
+        model.eval()
+        pred = model(test_x)
+        traced_model = torch.jit.trace(MeanVarModelWrapper(model), test_x)
+        traced_mean, traced_var = traced_model(test_x)
+        assert pred.mean == traced_mean, (
+            "JIT traced mean does not match original model mean"
+        )
+        assert pred.variance == traced_var, (
+            "JIT traced variance does not match original model variance"
+        )
+
+    return traced_model

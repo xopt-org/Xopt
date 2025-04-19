@@ -62,7 +62,7 @@ beta : float, default 2.0
         # get base acquisition function
         acq = self._get_acquisition(model)
 
-        # TODO: is log necessary? can do just softplus - that logei paper did not try logucb
+        # TODO: is log necessary? can do just softplus - logei paper did not try logucb
         if len(self.vocs.constraints):
             try:
                 sampler = acq.sampler
@@ -76,8 +76,9 @@ beta : float, default 2.0
             # log transform the result to handle the constraints
             acq = LogAcquisitionFunction(acq)
         else:
-            # if no constraints, still do log_softplus to match contrained case
-            acq = LogAcquisitionFunction(acq)
+            # TODO: if no constraints, still do log_softplus to match contrained case? need to bench
+            # acq = LogAcquisitionFunction(acq)
+            pass
 
         acq = self._apply_fixed_features(acq)
         acq.to(**self.tkwargs)
@@ -97,14 +98,12 @@ beta : float, default 2.0
         else:
             # analytic acquisition function for single candidate generation
             weights = set_botorch_weights(self.vocs)
-            posterior_transform = ScalarizedPosteriorTransform(weights).to(
-                **self.tkwargs
-            )
+            posterior_transform = ScalarizedPosteriorTransform(weights)
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
-            ).to(**self.tkwargs)
+            )
 
-        return acq
+        return acq.to(**self.tkwargs)
 
 
 class TDUpperConfidenceBoundGenerator(

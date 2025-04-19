@@ -249,6 +249,16 @@ test_init_data = {
     "constant1": 1.0,
 }
 
+
+def test_init_data_gen(n):
+    test_init_data = {
+        "x1": np.linspace(0.01, 1.0, n),
+        "x2": np.linspace(0.01, 1.0, n) * 10.0,
+        "constant1": 1.0,
+    }
+    return pd.DataFrame({**test_init_data, **xtest_callable(test_init_data)})
+
+
 TEST_VOCS_DATA = pd.DataFrame({**test_init_data, **xtest_callable(test_init_data)})
 TEST_VOCS_DATA_MO = pd.DataFrame(
     {**test_init_data, **xtest_callable_mo(test_init_data)}
