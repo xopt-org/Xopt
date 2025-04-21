@@ -14,7 +14,8 @@ from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.bayesian.utils import (
     torch_compile_acqf,
     torch_compile_gp_model,
-    torch_jittrace_acqf, torch_jittrace_gp_model,
+    torch_jittrace_acqf,
+    torch_jittrace_gp_model,
 )
 from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
@@ -41,44 +42,68 @@ class TestUtils:
         assert torch.allclose(output[..., 0], -test_samples[..., 0])
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
-    def test_jit(self, use_cuda):
+    def test_model_jit(self, use_cuda):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.constraints = {}
         evaluator = Evaluator(function=xtest_callable)
         gen = UpperConfidenceBoundGenerator(
-            vocs=TEST_VOCS_BASE,
+            vocs=vocs,
         )
         gen.use_cuda = use_cuda
-        gen.numerical_optimizer.n_restarts = 2
-        gen.n_monte_carlo_samples = 4
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
-        X.random_evaluate(1000)
-        for _ in range(1):
-            X.step()
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
         gen = X.generator
+        X.random_evaluate(200)
+        gen.train_model()
+        X.random_evaluate(5000)
+        gen.gp_constructor.use_cached_hyperparameters = True
+        gen.train_model()
+        gen.model.eval()
+
+        def get_model():
+            return deepcopy(gen.model.models[0])
 
         t1 = time.perf_counter()
         model_jit = torch_jittrace_gp_model(
-            gen.model.models[0], gen.vocs, gen.tkwargs
+            get_model(), gen.vocs, gen.tkwargs, posterior=False, batch_size=500
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
         print(f"JIT compile: {t2 - t1:.4f} seconds")
 
+        t1 = time.perf_counter()
+        model_jit_posterior = torch_jittrace_gp_model(
+            get_model(), gen.vocs, gen.tkwargs, batch_size=500
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"JIT posterior compile: {t2 - t1:.4f} seconds")
+
         x_grid = torch.tensor(
-            gen.vocs.grid_inputs(50, include_constants=False).to_numpy()
+                pd.DataFrame(
+                        gen.vocs.random_inputs(500, include_constants=False)
+                ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
 
-        t1 = time.perf_counter()
-        gen.model.models[0](x_grid)
-        t2 = time.perf_counter()
-        print(f"Original time: {t2 - t1:.4f} seconds")
+        m = get_model()
+        t, values1 = time_call(lambda: m(x_grid), 3)
+        t = np.array(t)
+        print(f"Original time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
 
-        t1 = time.perf_counter()
-        model_jit(x_grid)
-        t2 = time.perf_counter()
-        print(f"JIT time: {t2 - t1:.4f} seconds")
+        m = get_model()
+        t, values1 = time_call(lambda: m.posterior(x_grid), 3)
+        t = np.array(t)
+        print(f"Original posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
+
+        t, values1 = time_call(lambda: model_jit(x_grid), 3)
+        t = np.array(t)
+        print(f"JIT time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
+
+        t, values1 = time_call(lambda: model_jit_posterior(x_grid), 3)
+        t = np.array(t)
+        print(f"JIT posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_compile(self, use_cuda):
+        # For inductor + windows any, MSVC 2022 build tools are required
         # For inductor + windows GPU, triton-windows package is required
         # For inductor + linux GPU, triton package is required
         print(f"{torch._dynamo.list_backends()=}")
@@ -237,9 +262,9 @@ class TestUtils:
 
         acqf = make_acqf().to(device_map[use_cuda])
         t1 = time.perf_counter()
-        model_jit = torch_jittrace_acqf(
-            acqf, gen.vocs, gen.tkwargs
-        ).to(device_map[use_cuda])
+        model_jit = torch_jittrace_acqf(acqf, gen.vocs, gen.tkwargs).to(
+            device_map[use_cuda]
+        )
         t2 = time.perf_counter()
         print(f"JIT trace: {t2 - t1:.4f} seconds")
 

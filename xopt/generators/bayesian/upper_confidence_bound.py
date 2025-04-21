@@ -1,7 +1,11 @@
 import warnings
 
-from botorch.acquisition import (AcquisitionFunction, ScalarizedPosteriorTransform, UpperConfidenceBound,
-                                 qUpperConfidenceBound)
+from botorch.acquisition import (
+    AcquisitionFunction,
+    ScalarizedPosteriorTransform,
+    UpperConfidenceBound,
+    qUpperConfidenceBound,
+)
 from gpytorch import Module
 from pydantic import Field
 
@@ -21,7 +25,7 @@ from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
     SafetyTurboController,
 )
-from xopt.generators.bayesian.utils import (set_botorch_weights, torch_compile_acqf)
+from xopt.generators.bayesian.utils import set_botorch_weights, torch_compile_acqf
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):

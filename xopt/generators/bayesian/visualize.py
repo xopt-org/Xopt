@@ -1,5 +1,6 @@
 from typing import Any, Optional, List, Dict, Tuple, Union
 
+import gpytorch
 import numpy as np
 import torch
 from botorch.acquisition import AcquisitionFunction
@@ -12,6 +13,7 @@ from matplotlib.axes import Axes
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
+from .utils import torch_compile_gp_model, torch_jittrace_gp_model
 
 
 def visualize_generator_model(
@@ -73,6 +75,7 @@ def visualize_generator_model(
         vocs=generator.vocs,
         data=generator.data,
         acquisition_function=generator.get_acquisition(generator.model),
+        tkwargs=generator.tkwargs,
         **kwargs,
     )
 
@@ -93,6 +96,8 @@ def visualize_model(
     n_grid: int = 50,
     axes: Optional[Axes] = None,
     exponentiate: bool = True,
+    model_compile_mode: Optional[str] = None,
+    tkwargs: dict = None,
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Displays GP model predictions for the selected output(s).
 
@@ -142,6 +147,7 @@ def visualize_model(
     tuple
         The matplotlib figure and axes objects.
     """
+    tkwargs = tkwargs or {}
     output_names, variable_names = _validate_names(output_names, variable_names, vocs)
     reference_point_names = [
         name for name in vocs.variable_names if name not in variable_names
@@ -196,7 +202,9 @@ def visualize_model(
             variable_names=variable_names,
             vocs=vocs,
             n_grid=n_grid,
+            tkwargs=tkwargs,
         )
+        input_mesh.to(**tkwargs)
         for i, output_name in enumerate(output_names):
             posterior_mean, posterior_std, prior_mean = _get_model_predictions(
                 input_mesh=input_mesh,
@@ -204,6 +212,8 @@ def visualize_model(
                 model=model,
                 vocs=vocs,
                 include_prior_mean=show_prior_mean,
+                model_compile_mode=model_compile_mode,
+                tkwargs=tkwargs,
             )
             for j in range(ncols):
                 ax_ij: Axes = ax[i, j] if nrows > 1 else ax[0, j]
@@ -280,6 +290,7 @@ def plot_model_prediction(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
+    tkwargs: dict,
     output_name: Optional[str] = None,
     variable_names: Optional[List[str]] = None,
     prediction_type: Optional[str] = None,
@@ -438,6 +449,7 @@ def plot_acquisition_function(
     acquisition_function: AcquisitionFunction,
     vocs: VOCS,
     data: DataFrame,
+    tkwargs: dict,
     variable_names: Optional[List[str]] = None,
     only_base_acq: bool = False,
     idx: int = -1,
@@ -537,11 +549,16 @@ def plot_acquisition_function(
                 acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
                 .detach()
                 .squeeze()
+                .cpu()
                 .numpy()
             )
         else:
             acq = (
-                acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+                acquisition_function(input_mesh.unsqueeze(1))
+                .detach()
+                .squeeze()
+                .cpu()
+                .numpy()
             )
 
         if exponentiate:
@@ -568,6 +585,7 @@ def plot_feasibility(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
+    tkwargs: dict,
     variable_names: Optional[List[str]] = None,
     idx: int = -1,
     reference_point: Optional[Dict[str, Any]] = None,
@@ -613,11 +631,18 @@ def plot_feasibility(
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
     kwargs = locals()
     input_mesh = _generate_input_mesh(**kwargs)
-    feas = feasibility(input_mesh.unsqueeze(1), model, vocs).detach().squeeze().numpy()
+    feas = (
+        feasibility(input_mesh.unsqueeze(1), model, vocs)
+        .detach()
+        .squeeze()
+        .cpu()
+        .numpy()
+    )
     if len(variable_names) == 1:
         x_axis = (
             input_mesh[:, vocs.variable_names.index(variable_names[0])]
             .squeeze()
+            .cpu()
             .numpy()
         )
         axis.plot(x_axis, feas, "C0-")
@@ -757,9 +782,11 @@ def _plot2d_prediction(
     pcm = axis.pcolormesh(
         input_mesh[:, vocs.variable_names.index(variable_names[0])]
         .reshape(n_grid, n_grid)
+        .cpu()
         .numpy(),
         input_mesh[:, vocs.variable_names.index(variable_names[1])]
         .reshape(n_grid, n_grid)
+        .cpu()
         .numpy(),
         prediction.reshape(n_grid, n_grid),
         rasterized=True,
@@ -797,6 +824,7 @@ def _generate_input_mesh(
     variable_names: list[str],
     reference_point: dict[str, Any],
     n_grid: int,
+    tkwargs: dict,
     **_,
 ) -> torch.Tensor:
     """Generates an input mesh for visualization.
@@ -833,6 +861,7 @@ def _generate_input_mesh(
         ],
         dim=-1,
     )
+    x = x.to(**tkwargs)
     return x
 
 
@@ -874,6 +903,7 @@ def _get_model_predictions(
     output_name: str,
     input_mesh: torch.Tensor,
     include_prior_mean: bool = True,
+    model_compile_mode: Optional[str] = None,
     **_,
 ) -> tuple:
     """Returns the model predictions for the given output name and input mesh.
@@ -898,7 +928,39 @@ def _get_model_predictions(
         The model predictions.
     """
     gp = model.models[vocs.output_names.index(output_name)]
-    with torch.no_grad():
+    #input_mesh = input_mesh.unsqueeze(-2)
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        if model_compile_mode == "jittrace":
+            if hasattr(model, "_jit"):
+                jitgp = model._jit
+                print("Using cached JIT trace.")
+            else:
+                jitgp = torch_jittrace_gp_model(
+                    gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False,
+                        batch_size=input_mesh.shape[-1]
+                )
+                model._jit = jitgp
+            mean, std = jitgp(input_mesh)
+            posterior_mean = mean.detach().squeeze().cpu().numpy()
+            posterior_std = torch.sqrt(std.detach()).squeeze().cpu().numpy()
+        elif model_compile_mode == "inductor":
+            jitgp = torch_compile_gp_model(
+                gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False
+            )
+            posterior = jitgp(input_mesh)
+            posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
+            posterior_std = (
+                torch.sqrt(posterior.variance).detach().squeeze().cpu().numpy()
+            )
+        elif model_compile_mode is None:
+            posterior = gp.posterior(input_mesh)
+            posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
+            posterior_std = (
+                torch.sqrt(posterior.mvn.variance.detach()).squeeze().cpu().numpy()
+            )
+        else:
+            raise ValueError(f"Unrecognized model_compile_mode: {model_compile_mode}.")
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
         prior_mean = None
         if include_prior_mean:
             _x = gp.input_transform.transform(input_mesh)
@@ -906,9 +968,6 @@ def _get_model_predictions(
             prior_mean = (
                 gp.outcome_transform.untransform(_x)[0].detach().squeeze().numpy()
             )
-        posterior = gp.posterior(input_mesh)
-        posterior_mean = posterior.mean.detach().squeeze().numpy()
-        posterior_std = torch.sqrt(posterior.mvn.variance).detach().squeeze().numpy()
     return posterior_mean, posterior_std, prior_mean
 
 

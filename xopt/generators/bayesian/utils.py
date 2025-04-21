@@ -1,3 +1,5 @@
+import time
+from contextlib import nullcontext
 from copy import deepcopy
 from typing import List
 
@@ -249,8 +251,19 @@ class MeanVarModelWrapper(torch.nn.Module):
         return output_dist.mean, output_dist.variance
 
 
+class MeanVarModelWrapperPosterior(torch.nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, x):
+        output_dist = self.model.posterior(x)
+        return output_dist.mean, output_dist.variance
+
+
 def torch_jittrace_gp_model(
-    model: Model, vocs: VOCS, tkwargs: dict
+    model: Model, vocs: VOCS, tkwargs: dict, posterior: bool = True, grad: bool = False,
+        batch_size: int = 1, verify_trace: bool = False
 ) -> torch.jit.ScriptModule:
     if isinstance(model, ModelListGP):
         raise ValueError(
@@ -258,28 +271,44 @@ def torch_jittrace_gp_model(
         )
     rand_point = vocs.random_inputs()[0]
     rand_vec = torch.stack(
-        [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
+        [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
     )
     test_x = rand_vec.to(**tkwargs)
+    #test_x_1 = test_x[:1,...]
 
-    # with torch.no_grad():
-    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        model.eval()
-        pred = model(test_x)
-        traced_model = torch.jit.trace(MeanVarModelWrapper(model), test_x)
-        traced_mean, traced_var = traced_model(test_x)
-        assert torch.allclose(pred.mean, traced_mean, rtol=0), (
-            f"JIT traced mean != original {pred.mean=} {traced_mean=}"
-        )
-        assert torch.allclose(pred.variance, traced_var, rtol=0), (
-            f"JIT traced variance != original: {pred.variance=} {traced_var=}"
-        )
+    gradctx = nullcontext if grad else torch.no_grad()
+    model.eval()
+    with gradctx, gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
+        if posterior:
+            pred = model.posterior(test_x)
+            traced_model = torch.jit.trace(MeanVarModelWrapperPosterior(model), test_x,
+                                           check_trace=False)
+            traced_model = torch.jit.optimize_for_inference(traced_model)
+        else:
+            pred = model(test_x)
+            traced_model = torch.jit.trace(MeanVarModelWrapper(model), test_x,
+                                           check_trace=False)
+            traced_model = torch.jit.optimize_for_inference(traced_model)
+        if verify_trace:
+            traced_mean, traced_var = traced_model(test_x)
+            assert torch.allclose(pred.mean, traced_mean, rtol=0), (
+                f"JIT traced mean != original {pred.mean=} {traced_mean=}"
+            )
+            assert torch.allclose(pred.variance, traced_var, rtol=0), (
+                f"JIT traced variance != original: {pred.variance=} {traced_var=}"
+            )
 
-    return traced_model
+    return traced_model.to(**tkwargs)
 
 
 def torch_compile_gp_model(
-    model: Model, vocs: VOCS, tkwargs: dict, backend: str = "inductor", mode="default"
+    model: Model,
+    vocs: VOCS,
+    tkwargs: dict,
+    backend: str = "inductor",
+    mode="default",
+    posterior=True,
+    grad=False,
 ):
     if isinstance(model, ModelListGP):
         raise ValueError("ModelListGP is not supported - use individual models")
@@ -289,13 +318,22 @@ def torch_compile_gp_model(
     )
     test_x = rand_vec.to(**tkwargs)
 
-    # with torch.no_grad():
+    gradctx = nullcontext if grad else torch.no_grad()
     # TODO: check if trace mode faster
-    with gpytorch.settings.fast_pred_var():
-        # model.eval()
-        pred = model(test_x)
-        traced_model = torch.compile(model, backend=backend, mode=mode, dynamic=None)
-        mvn = traced_model(test_x)
+    with gradctx, gpytorch.settings.fast_pred_var():
+        model.eval()
+        if posterior:
+            pred = model.posterior(test_x)
+            traced_model = torch.compile(
+                model, backend=backend, mode=mode, dynamic=None
+            )
+            mvn = traced_model.posterior(test_x)
+        else:
+            pred = model(test_x)
+            traced_model = torch.compile(
+                model, backend=backend, mode=mode, dynamic=None
+            )
+            mvn = traced_model(test_x)
         traced_mean, traced_var = mvn.mean, mvn.variance
         assert torch.allclose(pred.mean, traced_mean, rtol=0), (
             f"Compiled mean != original {pred.mean=} {traced_mean=}"
@@ -307,7 +345,7 @@ def torch_compile_gp_model(
     return traced_model
 
 
-def torch_jittrace_acqf(acq, vocs:VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
+def torch_jittrace_acqf(acq, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
     # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
     rand_point = vocs.random_inputs()[0]
     rand_vec = torch.stack(
@@ -317,16 +355,19 @@ def torch_jittrace_acqf(acq, vocs:VOCS, tkwargs: dict) -> torch.jit.ScriptModule
     test_x = test_x.unsqueeze(-2)
     print(f"{test_x.shape=}")
     with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        #acq.eval()
+        # acq.eval()
         # Need dummy eval to set caches
         acq(test_x.clone().detach())
-        saqcf = torch.jit.trace(acq, example_inputs=test_x.clone().detach(), check_trace=True,
-                                check_tolerance=1e-8
-                                )
-        #sacq_value = saqcf(test_x.clone().detach())
-        #assert acq_value == sacq_value, (
+        saqcf = torch.jit.trace(
+            acq,
+            example_inputs=test_x.clone().detach(),
+            check_trace=True,
+            check_tolerance=1e-8,
+        )
+        # sacq_value = saqcf(test_x.clone().detach())
+        # assert acq_value == sacq_value, (
         #    "JIT traced acquisition function does not match original acquisition function"
-        #)
+        # )
     return saqcf
 
 

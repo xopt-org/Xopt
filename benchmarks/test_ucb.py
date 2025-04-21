@@ -45,7 +45,7 @@ class TestUpperConfidenceBoundGenerator:
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_ucb_c(self, use_cuda):
         gen = UpperConfidenceBoundGenerator(
-                vocs=TEST_VOCS_BASE,
+            vocs=TEST_VOCS_BASE,
         )
         set_options(gen, use_cuda, add_data=True)
         for _ in range(200):
@@ -55,18 +55,18 @@ class TestUpperConfidenceBoundGenerator:
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
         gen = UpperConfidenceBoundGenerator(
-                vocs=vocs,
+            vocs=vocs,
         )
         set_options(gen, use_cuda, add_data=True)
         for _ in range(200):
             gen.generate(1)
 
     def test_ucb_c_xopt(self):
-        os.environ['OMP_NUM_THREADS'] = "1"
+        os.environ["OMP_NUM_THREADS"] = "1"
         torch.set_num_threads(1)
         evaluator = Evaluator(function=xtest_callable)
         gen = UpperConfidenceBoundGenerator(
-                vocs=TEST_VOCS_BASE,
+            vocs=TEST_VOCS_BASE,
         )
         set_options(gen)
 
