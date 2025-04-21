@@ -1,6 +1,6 @@
 import numpy as np
 from pydantic import Field, Discriminator
-from typing import Dict, List, Optional, Annotated, Union
+from typing import Annotated
 import pandas as pd
 import os
 from datetime import datetime
@@ -23,6 +23,19 @@ from .operators import (
 ########################################################################################################################
 # Helper functions
 ########################################################################################################################
+
+
+def vocs_data_to_arr(data: list | np.ndarray) -> np.ndarray:
+    """Force data coming from VOCS object into 2D numpy array (or None) for compatibility with helper functions"""
+    if isinstance(data, list):
+        data = np.ndarray(list)
+    if data.size == 0:
+        return None
+    if len(data.shape) == 1:
+        return data[:, None]
+    if len(data.shape) == 2:
+        return data
+    raise ValueError(f"Unrecognized shape from VOCS data: {data.shape}")
 
 
 def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
@@ -66,16 +79,20 @@ def get_crowding_distance(pop_f: np.ndarray) -> np.ndarray:
 
 
 def crowded_comparison_argsort(
-    pop_f: np.ndarray, pop_g: Optional[np.ndarray] = None
+    pop_f: np.ndarray, pop_g: np.ndarray | None = None
 ) -> np.ndarray:
     """
     Sorts the objective functions by domination rank and then by crowding distance (crowded comparison operator).
-    Indices to individuals are returned in order of increasing value by crowded comparison operator.
+    Indices to individuals are returned in order of increasing value of fitness by crowded comparison operator.
+    That is, the least fit individuals are returned first.
+
+    Notes: NaN values are removed from the comparison and added back at the beginning (least fit direction) of
+    the sorted indices.
 
     Parameters
     ----------
     pop_f : np.ndarray
-        (M, N) numpy array where N is the number of individuals and M is the number of objectives
+        (N, M) numpy array where N is the number of individuals and M is the number of objectives
     pop_g : np.ndarray, optional
         The constraints, by default None
 
@@ -84,23 +101,43 @@ def crowded_comparison_argsort(
     np.ndarray
         Numpy array of indices to sorted individuals
     """
-    # Deal with NaNs
-    pop_f = np.copy(pop_f)
-    pop_f[~np.isfinite(pop_g)] = 1e300
+    # Check for non-finite values in both pop_f and pop_g
+    has_nan = np.any(~np.isfinite(pop_f), axis=1)
     if pop_g is not None:
-        pop_g = np.copy(pop_g)
-        pop_g[~np.isfinite(pop_g)] = 1e300
+        has_nan = has_nan | np.any(~np.isfinite(pop_g), axis=1)
+    nan_indices = np.where(has_nan)[0]
+    finite_indices = np.where(~has_nan)[0]
 
-    ranks = fast_dominated_argsort(pop_f, pop_g)
-    inds = []
+    # If all values are non-finite, return the original indices
+    if len(finite_indices) == 0:
+        return np.arange(pop_f.shape[0])
+
+    # Extract only finite values for processing
+    pop_f_finite = pop_f[finite_indices, :]
+
+    # Handle constraints if provided
+    pop_g_finite = None
+    if pop_g is not None:
+        pop_g_finite = pop_g[finite_indices, :]
+
+    # Apply domination ranking
+    ranks = fast_dominated_argsort(pop_f_finite, pop_g_finite)
+
+    # Calculate crowding distance and sort within each rank
+    sorted_finite_indices = []
     for rank in ranks:
-        dist = get_crowding_distance(pop_f[rank, :])
-        inds.extend(np.array(rank)[np.argsort(dist)[::-1]])
+        dist = get_crowding_distance(pop_f_finite[rank, :])
+        sorted_rank = np.array(rank)[np.argsort(dist)[::-1]]
+        sorted_finite_indices.extend(sorted_rank)
 
-    return np.array(inds)[::-1]
+    # Map back to original indices and put nans at end
+    sorted_original_indices = finite_indices[sorted_finite_indices]
+    final_sorted_indices = np.concatenate([sorted_original_indices, nan_indices])
+
+    return final_sorted_indices[::-1]
 
 
-def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray) -> np.ndarray:
+def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray | None = None) -> np.ndarray:
     """
     Get the "fitness" of each individual according to domination and crowding distance.
 
@@ -108,27 +145,25 @@ def get_fitness(pop_f: np.ndarray, pop_g: np.ndarray) -> np.ndarray:
     ----------
     pop_f : np.ndarray
         The objectives
-    pop_g : np.ndarray
-        The constraints
+    pop_g : np.ndarray / None
+        The constraints, or None of no constraints
 
     Returns
     -------
     np.ndarray
         The fitness of each individual
     """
-    sort_ind = crowded_comparison_argsort(pop_f, pop_g)
-    fitness = np.argsort(sort_ind)
-    return fitness
+    return np.argsort(crowded_comparison_argsort(pop_f, pop_g))
 
 
 def generate_child_binary_tournament(
     pop_x: np.ndarray,
     pop_f: np.ndarray,
-    pop_g: np.ndarray,
+    pop_g: np.ndarray | None,
     bounds: np.ndarray,
     mutate: MutationOperator,
     crossover: CrossoverOperator,
-    fitness: Optional[np.ndarray] = None,
+    fitness: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Creates a single child from the population using binary tournament selection, crossover, and mutation.
@@ -143,8 +178,9 @@ def generate_child_binary_tournament(
         Decision variables of the population, shape (n_individuals, n_variables).
     pop_f : numpy.ndarray
         Objective function values of the population, shape (n_individuals, n_objectives).
-    pop_g : numpy.ndarray
+    pop_g : numpy.ndarray / None
         Constraint violation values of the population, shape (n_individuals, n_constraints).
+        None if no constraints.
     bounds : numpy.ndarray
         Bounds for decision variables, shape (2, n_variables) where bounds[0] are lower bounds
         and bounds[1] are upper bounds.
@@ -186,7 +222,7 @@ def generate_child_binary_tournament(
 
 
 def cull_population(
-    pop_x: np.ndarray, pop_f: np.ndarray, pop_g: np.ndarray, population_size: int
+    pop_x: np.ndarray, pop_f: np.ndarray, pop_g: np.ndarray | None, population_size: int
 ) -> np.ndarray:
     """
     Reduce population size by selecting the best individuals based on crowded comparison.
@@ -198,8 +234,8 @@ def cull_population(
     ----------
     pop_x : numpy.ndarray
         Decision variables of the population, shape (n_individuals, n_variables).
-    pop_f : numpy.ndarray
-        Objective function values of the population, shape (n_individuals, n_objectives).
+    pop_f : numpy.ndarray / None
+        Objective function values of the population, shape (n_individuals, n_objectives), None if no constraints.
     pop_g : numpy.ndarray
         Constraint violation values of the population, shape (n_individuals, n_constraints).
     population_size : int
@@ -210,9 +246,7 @@ def cull_population(
     numpy.ndarray
         Indices of selected individuals, shape (population_size,).
     """
-    inds = crowded_comparison_argsort(pop_f, pop_g)[::-1]
-    inds = inds[:population_size]
-    return inds
+    return crowded_comparison_argsort(pop_f, pop_g)[-population_size:]
 
 
 ########################################################################################################################
@@ -278,20 +312,20 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[
-        Union[
-            SimulatedBinaryCrossover, DummyCrossover
-        ],  # Dummy placeholder to keep discriminator code from failing
+        (
+            SimulatedBinaryCrossover | DummyCrossover
+        ),  # Dummy placeholder to keep discriminator code from failing
         Discriminator("name"),
     ] = SimulatedBinaryCrossover()
     mutation_operator: Annotated[
-        Union[
-            PolynomialMutation, DummyMutation
-        ],  # Dummy placeholder to keep discriminator code from failing
+        (
+            PolynomialMutation | DummyMutation
+        ),  # Dummy placeholder to keep discriminator code from failing
         Discriminator("name"),
     ] = PolynomialMutation()
 
     # Output options
-    output_dir: Optional[str] = None
+    output_dir: str | None = None
     checkpoint_freq: int = Field(
         -1,
         description="How often (in generations) to save checkpoints (set to -1 to disable)",
@@ -302,7 +336,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     _output_dir_setup: bool = (
         False  # Used in initializing the directory. PLEASE DO NOT CHANGE
     )
-    _logger: Optional[logging.Logger] = None
+    _logger: logging.Logger | None = None
 
     # Metadata
     fevals: int = Field(
@@ -315,7 +349,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     n_candidates: int = Field(
         0, description="The number of candidate solutions generated so far"
     )
-    history_idx: List[List[int]] = Field(
+    history_idx: list[list[int]] = Field(
         default=[],
         description="Xopt indices of the individuals in each population",
     )
@@ -326,15 +360,15 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     )
 
     # The population and returned children
-    pop: List[Dict] = Field(default=[])
-    child: List[Dict] = Field(default=[])
+    pop: list[dict] = Field(default=[])
+    child: list[dict] = Field(default=[])
 
     def model_post_init(self, context):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
 
-    def _generate(self, n_candidates: int) -> List[Dict]:
+    def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
         start_t = time.perf_counter()
 
@@ -347,7 +381,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             candidates = []
             pop_x = self.vocs.variable_data(self.pop).to_numpy()
             pop_f = self.vocs.objective_data(self.pop).to_numpy()
-            pop_g = self.vocs.constraint_data(self.pop).to_numpy()
+            pop_g = vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy())
             fitness = get_fitness(pop_f, pop_g)
             for _ in range(n_candidates):
                 candidates.append(
@@ -419,7 +453,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             idx = cull_population(
                 self.vocs.variable_data(self.pop).to_numpy(),
                 self.vocs.objective_data(self.pop).to_numpy(),
-                self.vocs.constraint_data(self.pop).to_numpy(),
+                vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy()),
                 self.population_size,
             )
             self.pop = [self.pop[i] for i in idx]
