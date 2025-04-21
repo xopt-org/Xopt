@@ -257,7 +257,7 @@ class StandardModelConstructor(ModelConstructor):
         full_model = ModelListGP(*models)
 
         # if specified, use cached model hyperparameters
-        if self.use_cached_hyperparameters:
+        if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
             store = {
                 name: ele.to(**tkwargs)
                 for name, ele in self._hyperparameter_store.items()
@@ -267,7 +267,7 @@ class StandardModelConstructor(ModelConstructor):
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
-        return full_model
+        return full_model.to(**tkwargs)
 
     def build_mean_module(
         self, name, mean_modules, input_transform, outcome_transform

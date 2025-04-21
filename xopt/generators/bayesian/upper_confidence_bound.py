@@ -1,13 +1,9 @@
 import warnings
 
-from botorch.acquisition import (
-    AcquisitionFunction,
-    qUpperConfidenceBound,
-    ScalarizedPosteriorTransform,
-    UpperConfidenceBound,
-)
-from pydantic import Field
+from botorch.acquisition import (AcquisitionFunction, ScalarizedPosteriorTransform, UpperConfidenceBound,
+                                 qUpperConfidenceBound)
 from gpytorch import Module
+from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -25,7 +21,7 @@ from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
     SafetyTurboController,
 )
-from xopt.generators.bayesian.utils import set_botorch_weights
+from xopt.generators.bayesian.utils import (set_botorch_weights, torch_compile_acqf)
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
@@ -34,6 +30,7 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     supports_batch_generation: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
+    acquisition_function_mode: str = "eager"
     _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound
@@ -76,12 +73,12 @@ beta : float, default 2.0
             # log transform the result to handle the constraints
             acq = LogAcquisitionFunction(acq)
         else:
-            # TODO: if no constraints, still do log_softplus to match contrained case? need to bench
+            # TODO: if no constraints, still do log_softplus to match constrained case? need to bench
             # acq = LogAcquisitionFunction(acq)
             pass
 
         acq = self._apply_fixed_features(acq)
-        acq.to(**self.tkwargs)
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def _get_acquisition(self, model):
@@ -102,7 +99,9 @@ beta : float, default 2.0
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
             )
-
+            if self.acquisition_function_mode == "inductor":
+                scripted_acq = torch_compile_acqf(acq, self.vocs, self.tkwargs)
+                acq = scripted_acq
         return acq.to(**self.tkwargs)
 
 

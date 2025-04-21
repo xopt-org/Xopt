@@ -144,7 +144,7 @@ class TurboController(XoptBaseModel, ABC):
         given by the `length` parameter and are scaled according to the generator
         model lengthscales (if available).
 
-        Tensor is kept on the CPU regardless of generator settings.
+        Lives on CPU always.
 
         Parameters
         ----------

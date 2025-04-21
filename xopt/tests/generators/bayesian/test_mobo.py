@@ -1,4 +1,5 @@
 import json
+import os
 from copy import deepcopy
 
 import numpy as np
@@ -76,6 +77,17 @@ class TestMOBOGenerator:
         assert len(candidate) == 2
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
+
+    # @pytest.mark.skip(reason="works but compile too slow")
+    def test_jit(self):
+        gen = MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)
+        set_options(gen, add_data=True)
+        torch.manual_seed(42)
+        candidate1 = gen.generate(1)
+        gen.acquisition_function_mode = "inductor"
+        torch.manual_seed(42)
+        candidate2 = gen.generate(1)
+        check_dict_allclose(candidate1[0], candidate2[0], rtol=0)
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_round_trip(self, use_cuda):

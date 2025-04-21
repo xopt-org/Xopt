@@ -528,6 +528,8 @@ class BayesianGenerator(Generator, ABC):
         """
         Define the acquisition function based on the given GP model.
 
+        Lives on target device.
+
         Parameters:
         -----------
         model : Module

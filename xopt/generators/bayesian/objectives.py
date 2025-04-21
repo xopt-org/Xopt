@@ -99,36 +99,6 @@ def feasibility(
     return torch.mean(objective(samples, X), dim=0)
 
 
-def constraint_function(Z: Tensor, vocs: VOCS, name: str) -> Tensor:
-    """
-    Create constraint function.
-
-    Constraint functions should return negative values for feasible values and
-    positive values for infeasible values.
-
-    Parameters:
-    -----------
-    Z : Tensor
-        The input tensor.
-    vocs : VOCS
-        The VOCS (Variables, Objectives, Constraints, Statics) object.
-    name : str
-        The name of the constraint.
-
-    Returns:
-    --------
-    Tensor
-        The constraint values.
-    """
-    output_names = vocs.output_names
-    constraint = vocs.constraints[name]
-
-    if constraint[0] == "LESS_THAN":
-        return Z[..., output_names.index(name)] - constraint[1]
-    elif constraint[0] == "GREATER_THAN":
-        return -(Z[..., output_names.index(name)] - constraint[1])
-
-
 def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
     """
     Create a list of constraint callables.
@@ -146,14 +116,17 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
     if vocs.constraints is not None:
         constraint_names = vocs.constraint_names
         constraint_callables = []
+        output_names = vocs.output_names
         for name in constraint_names:
-            constraint_callables += [
-                partial(
-                    constraint_function,
-                    vocs=vocs,
-                    name=name,
-                )
-            ]
+            constraint = vocs.constraints[name]
+            index = output_names.index(name)
+            value = constraint[1]
+            sign = 1 if constraint[0] == "LESS_THAN" else -1
+
+            def cbf(Z: Tensor) -> Tensor:
+                return sign * (Z[..., index] - value)
+
+            constraint_callables.append(cbf)
         return constraint_callables
 
     else:

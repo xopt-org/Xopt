@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Any, Callable
 
 import pandas as pd
 
@@ -119,3 +120,18 @@ class BenchMOBO:
         outputs["hvf"] = X.generator.calculate_hypervolume()
 
         return outputs
+
+
+def time_call(f: Callable, n: int = 1) -> tuple[list[float], list[Any]]:
+    """
+    Time a function call
+    """
+    times = []
+    results = []
+    for _ in range(n):
+        start = time.perf_counter()
+        v = f()
+        end = time.perf_counter()
+        times.append(end - start)
+        results.append(v)
+    return times, results

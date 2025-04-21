@@ -11,8 +11,11 @@ from xopt import Generator
 from xopt.pydantic import remove_none_values
 from xopt.vocs import VOCS
 
+# TODO: make a config module like gpytorch has
 # A manual flag to trigger verification of torch device in some locations
 XOPT_VERIFY_TORCH_DEVICE = True
+# Disable the check + softplus in case of negative values in the base acquisition function
+XOPT_VERIFY_CONSTRAINED_ACQF_POSITIVE = True
 
 
 def xtest_callable(input_dict: dict, a=0) -> dict:
@@ -248,15 +251,6 @@ test_init_data = {
     "x2": np.linspace(0.01, 1.0, 10) * 10.0,
     "constant1": 1.0,
 }
-
-
-def test_init_data_gen(n):
-    test_init_data = {
-        "x1": np.linspace(0.01, 1.0, n),
-        "x2": np.linspace(0.01, 1.0, n) * 10.0,
-        "constant1": 1.0,
-    }
-    return pd.DataFrame({**test_init_data, **xtest_callable(test_init_data)})
 
 
 TEST_VOCS_DATA = pd.DataFrame({**test_init_data, **xtest_callable(test_init_data)})

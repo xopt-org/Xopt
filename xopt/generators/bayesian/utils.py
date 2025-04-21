@@ -240,16 +240,18 @@ def validate_turbo_controller_base(value, valid_controller_types, info):
 
 
 class MeanVarModelWrapper(torch.nn.Module):
-    def __init__(self, gp):
+    def __init__(self, model):
         super().__init__()
-        self.gp = gp
+        self.model = model
 
     def forward(self, x):
-        output_dist = self.gp(x)
+        output_dist = self.model(x)
         return output_dist.mean, output_dist.variance
 
 
-def jit_gp_model(model: Model, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
+def torch_jittrace_gp_model(
+    model: Model, vocs: VOCS, tkwargs: dict
+) -> torch.jit.ScriptModule:
     if isinstance(model, ModelListGP):
         raise ValueError(
             "ModelListGP is not supported for JIT tracing - use individual models"
@@ -266,11 +268,90 @@ def jit_gp_model(model: Model, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptMod
         pred = model(test_x)
         traced_model = torch.jit.trace(MeanVarModelWrapper(model), test_x)
         traced_mean, traced_var = traced_model(test_x)
-        assert pred.mean == traced_mean, (
-            "JIT traced mean does not match original model mean"
+        assert torch.allclose(pred.mean, traced_mean, rtol=0), (
+            f"JIT traced mean != original {pred.mean=} {traced_mean=}"
         )
-        assert pred.variance == traced_var, (
-            "JIT traced variance does not match original model variance"
+        assert torch.allclose(pred.variance, traced_var, rtol=0), (
+            f"JIT traced variance != original: {pred.variance=} {traced_var=}"
         )
 
     return traced_model
+
+
+def torch_compile_gp_model(
+    model: Model, vocs: VOCS, tkwargs: dict, backend: str = "inductor", mode="default"
+):
+    if isinstance(model, ModelListGP):
+        raise ValueError("ModelListGP is not supported - use individual models")
+    rand_point = vocs.random_inputs()[0]
+    rand_vec = torch.stack(
+        [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
+    )
+    test_x = rand_vec.to(**tkwargs)
+
+    # with torch.no_grad():
+    # TODO: check if trace mode faster
+    with gpytorch.settings.fast_pred_var():
+        # model.eval()
+        pred = model(test_x)
+        traced_model = torch.compile(model, backend=backend, mode=mode, dynamic=None)
+        mvn = traced_model(test_x)
+        traced_mean, traced_var = mvn.mean, mvn.variance
+        assert torch.allclose(pred.mean, traced_mean, rtol=0), (
+            f"Compiled mean != original {pred.mean=} {traced_mean=}"
+        )
+        assert torch.allclose(pred.variance, traced_var, rtol=0), (
+            f"Compiled variance != original: {pred.variance=} {traced_var=}"
+        )
+
+    return traced_model
+
+
+def torch_jittrace_acqf(acq, vocs:VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
+    # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
+    rand_point = vocs.random_inputs()[0]
+    rand_vec = torch.stack(
+        [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
+    )
+    test_x = rand_vec.to(**tkwargs)
+    test_x = test_x.unsqueeze(-2)
+    print(f"{test_x.shape=}")
+    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
+        #acq.eval()
+        # Need dummy eval to set caches
+        acq(test_x.clone().detach())
+        saqcf = torch.jit.trace(acq, example_inputs=test_x.clone().detach(), check_trace=True,
+                                check_tolerance=1e-8
+                                )
+        #sacq_value = saqcf(test_x.clone().detach())
+        #assert acq_value == sacq_value, (
+        #    "JIT traced acquisition function does not match original acquisition function"
+        #)
+    return saqcf
+
+
+def torch_compile_acqf(
+    acq,
+    vocs: VOCS,
+    tkwargs: dict,
+    backend: str = "inductor",
+    mode="default",
+    skip_verify: bool = False,
+):
+    # TODO: check if trace mode better
+    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
+        # assume that only a few shapes will happen - batch=1 and batch=nsamples
+        saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
+        if not skip_verify:
+            rand_point = vocs.random_inputs()[0]
+            rand_vec = torch.stack(
+                [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
+            )
+            test_x = rand_vec
+            test_x = test_x.unsqueeze(-2).to(**tkwargs)  # 1 x 1 x d
+            acq_value = acq(test_x.clone().detach())
+            sacq_value = saqcf(test_x.clone().detach())
+            assert torch.allclose(acq_value, sacq_value, rtol=1e-10), (
+                f"Compiled acquisition != original {acq_value=} {sacq_value=}"
+            )
+    return saqcf

@@ -1,13 +1,22 @@
+import logging
 import time
 from copy import deepcopy
 
+import gpytorch
+import numpy as np
+import pandas as pd
 import pytest
 import torch
 
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
-from xopt.generators.bayesian.utils import jit_gp_model
+from xopt.generators.bayesian.utils import (
+    torch_compile_acqf,
+    torch_compile_gp_model,
+    torch_jittrace_acqf, torch_jittrace_gp_model,
+)
+from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
@@ -47,9 +56,9 @@ class TestUtils:
         gen = X.generator
 
         t1 = time.perf_counter()
-        model_jit = jit_gp_model(gen.model.models[0], gen.vocs, gen.tkwargs).to(
-            device_map[use_cuda]
-        )
+        model_jit = torch_jittrace_gp_model(
+            gen.model.models[0], gen.vocs, gen.tkwargs
+        ).to(device_map[use_cuda])
         t2 = time.perf_counter()
         print(f"JIT compile: {t2 - t1:.4f} seconds")
 
@@ -67,3 +76,216 @@ class TestUtils:
         model_jit(x_grid)
         t2 = time.perf_counter()
         print(f"JIT time: {t2 - t1:.4f} seconds")
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_model_compile(self, use_cuda):
+        # For inductor + windows GPU, triton-windows package is required
+        # For inductor + linux GPU, triton package is required
+        print(f"{torch._dynamo.list_backends()=}")
+        print(f"{torch._dynamo.is_dynamo_supported()=}")
+        torch._dynamo.reset()
+        torch._dynamo.config.cache_size_limit = 32
+
+        evaluator = Evaluator(function=xtest_callable)
+        gen = UpperConfidenceBoundGenerator(
+            vocs=TEST_VOCS_BASE,
+        )
+        gen.use_cuda = use_cuda
+        gen.numerical_optimizer.n_restarts = 2
+        gen.n_monte_carlo_samples = 4
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X.random_evaluate(200)
+        for _ in range(1):
+            X.step()
+
+        gen = X.generator
+        model = gen.train_model().models[0]
+
+        t1 = time.perf_counter()
+        model_compile = torch_compile_gp_model(
+            gen.train_model().models[0], gen.vocs, gen.tkwargs
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile: {t2 - t1:.4f} seconds")
+
+        t1 = time.perf_counter()
+        model_compile_reduce_overhead = torch_compile_gp_model(
+            gen.train_model().models[0], gen.vocs, gen.tkwargs, mode="reduce-overhead"
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile RO: {t2 - t1:.4f} seconds")
+
+        t1 = time.perf_counter()
+        model_compile_max_autotune = torch_compile_gp_model(
+            gen.train_model().models[0], gen.vocs, gen.tkwargs, mode="max-autotune"
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile AT: {t2 - t1:.4f} seconds")
+
+        def fmodel(m, x):
+            mvn = m(x)
+            return mvn.mean, mvn.variance
+
+        t1 = time.perf_counter()
+        model_jit = torch_jittrace_gp_model(
+            gen.train_model().models[0], gen.vocs, gen.tkwargs
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"JIT trace: {t2 - t1:.4f} seconds")
+
+        x_grid = torch.tensor(
+            pd.DataFrame(
+                gen.vocs.random_inputs(2000, include_constants=False)
+            ).to_numpy()
+        )
+        x_grid = x_grid.to(device_map[use_cuda])
+
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            t1, values1 = time_call(lambda: fmodel(model, x_grid), 10)
+            t1 = np.array(t1)
+
+            t2, values2 = time_call(lambda: model_jit(x_grid), 10)
+            t2 = np.array(t2)
+
+            t3, values3 = time_call(lambda: fmodel(model_compile, x_grid), 10)
+            t3 = np.array(t3)
+
+            t4, values4 = time_call(
+                lambda: fmodel(model_compile_reduce_overhead, x_grid), 10
+            )
+            t4 = np.array(t4)
+
+            t5, values5 = time_call(
+                lambda: fmodel(model_compile_max_autotune, x_grid), 10
+            )
+            t5 = np.array(t5)
+
+            print(f"Original time: {t1} seconds")
+            print(f"JIT time: {t2} seconds")
+            print(f"Compiled time: {t3} seconds")
+            print(f"Compiled RO time: {t4} seconds")
+            print(f"Compiled AT time: {t5} seconds")
+            print(f"Avg: {t1[1:].mean():.6f}  +- {t1[1:].std():.6f}")
+            print(f"Avg: {t2[1:].mean():.6f}  +- {t2[1:].std():.6f}")
+            print(f"Avg: {t3[1:].mean():.6f}  +- {t3[1:].std():.6f}")
+            print(f"Avg: {t4[1:].mean():.6f}  +- {t4[1:].std():.6f}")
+            print(f"Avg: {t5[1:].mean():.6f}  +- {t5[1:].std():.6f}")
+
+        for v1, v2, v3 in zip(values1, values2, values3):
+            m1, var1 = v1
+            m2, var2 = v2
+            m3, var3 = v3
+            assert torch.allclose(m1, m2, rtol=0)
+            assert torch.allclose(var1, var2, rtol=0)
+            assert torch.allclose(m1, m3, rtol=0)
+            assert torch.allclose(var1, var3, rtol=0)
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_acqf_compile(self, use_cuda):
+        print(f"{torch._dynamo.list_backends()=}")
+        print(f"{torch._dynamo.is_dynamo_supported()=}")
+        torch._dynamo.reset()
+        torch._dynamo.config.cache_size_limit = 32
+        # enable to see all the problems with compilation
+        # torch._logging.set_logs(graph_breaks=True, recompiles=True)
+        # torch._dynamo.config.capture_scalar_outputs = True
+
+        evaluator = Evaluator(function=xtest_callable)
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.constraints = {}
+        gen = UpperConfidenceBoundGenerator(
+            vocs=vocs,
+        )
+        gen.use_cuda = use_cuda
+        gen.numerical_optimizer.n_restarts = 3
+        gen.n_monte_carlo_samples = 4
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X.random_evaluate(200)
+        for _ in range(1):
+            X.step()
+
+        gen = X.generator
+
+        def make_acqf():
+            return gen.get_acquisition(gen.train_model())
+
+        model = make_acqf()
+
+        acqf = make_acqf().to(device_map[use_cuda])
+        t1 = time.perf_counter()
+        model_compile = torch_compile_acqf(acqf, gen.vocs, gen.tkwargs).to(
+            device_map[use_cuda]
+        )
+        t2 = time.perf_counter()
+        print(f"Compile: {t2 - t1:.4f} seconds")
+
+        acqf = make_acqf().to(device_map[use_cuda])
+        t1 = time.perf_counter()
+        model_compile_reduce_overhead = torch_compile_acqf(
+            acqf, gen.vocs, gen.tkwargs, mode="reduce-overhead"
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile RO: {t2 - t1:.4f} seconds")
+
+        acqf = make_acqf().to(device_map[use_cuda])
+        t1 = time.perf_counter()
+        model_compile_max_autotune = torch_compile_acqf(
+            acqf, gen.vocs, gen.tkwargs, mode="max-autotune"
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile AT: {t2 - t1:.4f} seconds")
+
+        acqf = make_acqf().to(device_map[use_cuda])
+        t1 = time.perf_counter()
+        model_jit = torch_jittrace_acqf(
+            acqf, gen.vocs, gen.tkwargs
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"JIT trace: {t2 - t1:.4f} seconds")
+
+        def fmodel(m, x):
+            return m(x)
+
+        # batch x 1 x d
+        x_grid = torch.tensor(
+            pd.DataFrame(gen.vocs.random_inputs(4, include_constants=False)).to_numpy()
+        ).unsqueeze(-2)
+        x_grid = x_grid.to(device_map[use_cuda])
+
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            t1, values1 = time_call(lambda: fmodel(model, x_grid), 10)
+            t1 = np.array(t1)
+
+            t2, values2 = time_call(lambda: fmodel(model_jit, x_grid), 10)
+            t2 = np.array(t2)
+
+            t3, values3 = time_call(lambda: fmodel(model_compile, x_grid), 10)
+            t3 = np.array(t3)
+
+            t4, values4 = time_call(
+                lambda: fmodel(model_compile_reduce_overhead, x_grid), 10
+            )
+            t4 = np.array(t4)
+
+            t5, values5 = time_call(
+                lambda: fmodel(model_compile_max_autotune, x_grid), 10
+            )
+            t5 = np.array(t5)
+
+            print(f"Original time: {t1} seconds")
+            print(f"JIT time: {t2} seconds")
+            print(f"Compiled time: {t3} seconds")
+            print(f"Compiled RO time: {t4} seconds")
+            print(f"Compiled AT time: {t5} seconds")
+            print(f"Original Avg: {t1[1:].mean():.6f}  +- {t1[1:].std():.6f}")
+            print(f"JIT Avg: {t2[1:].mean():.6f}  +- {t2[1:].std():.6f}")
+            print(f"Compiled Avg: {t3[1:].mean():.6f}  +- {t3[1:].std():.6f}")
+            print(f"Compiled RO Avg: {t4[1:].mean():.6f}  +- {t4[1:].std():.6f}")
+            print(f"Compiled AT Avg: {t5[1:].mean():.6f}  +- {t5[1:].std():.6f}")
+
+        for v1, v2, v3 in zip(values1, values2, values3):
+            m1 = v1
+            m2 = v2
+            m3 = v3
+            assert torch.allclose(m1, m2, rtol=1e-5)
+            assert torch.allclose(m1, m3, rtol=1e-5)

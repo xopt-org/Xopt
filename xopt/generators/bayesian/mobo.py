@@ -12,6 +12,7 @@ from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
+from xopt.generators.bayesian.utils import torch_compile_acqf
 from xopt.numerical_optimizer import LBFGSOptimizer
 
 
@@ -46,6 +47,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     name = "mobo"
     supports_batch_generation: bool = True
     supports_constraints: bool = True
+    acquisition_function_mode: str = "eager"
     use_pf_as_initial_points: bool = Field(
         False,
         description="flag to specify if pareto front points are to be used during "
@@ -138,7 +140,9 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
             cache_root=False,
             prune_baseline=True,
         )
-
+        if self.acquisition_function_mode == "inductor":
+            scripted_acq = torch_compile_acqf(acq, self.vocs, self.tkwargs)
+            acq = scripted_acq
         return acq
 
     def _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]:
