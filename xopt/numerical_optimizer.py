@@ -74,9 +74,11 @@ class LBFGSOptimizer(NumericalOptimizer):
     n_restarts: PositiveInt = Field(
         20, description="number of restarts during acquisition function optimization"
     )
-    max_iter: PositiveInt = Field(2000)
+    max_iter: PositiveInt = Field(
+        None, description="maximum number of optimization steps"
+    )
     max_time: Optional[PositiveFloat] = Field(
-        None, description="maximum time for optimizing"
+        5.0, description="maximum time for optimization in seconds"
     )
 
     model_config = ConfigDict(validate_assignment=True)
