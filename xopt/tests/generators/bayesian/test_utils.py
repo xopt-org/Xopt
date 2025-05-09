@@ -14,8 +14,8 @@ from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.bayesian.utils import (
     torch_compile_acqf,
     torch_compile_gp_model,
-    torch_jittrace_acqf,
-    torch_jittrace_gp_model,
+    torch_trace_acqf,
+    torch_trace_gp_model,
 )
 from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
@@ -63,14 +63,14 @@ class TestUtils:
             return deepcopy(gen.model.models[0])
 
         t1 = time.perf_counter()
-        model_jit = torch_jittrace_gp_model(
+        model_jit = torch_trace_gp_model(
             get_model(), gen.vocs, gen.tkwargs, posterior=False, batch_size=500
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
         print(f"JIT compile: {t2 - t1:.4f} seconds")
 
         t1 = time.perf_counter()
-        model_jit_posterior = torch_jittrace_gp_model(
+        model_jit_posterior = torch_trace_gp_model(
             get_model(), gen.vocs, gen.tkwargs, batch_size=500
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
@@ -152,7 +152,7 @@ class TestUtils:
             return mvn.mean, mvn.variance
 
         t1 = time.perf_counter()
-        model_jit = torch_jittrace_gp_model(
+        model_jit = torch_trace_gp_model(
             gen.train_model().models[0], gen.vocs, gen.tkwargs
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
@@ -262,7 +262,7 @@ class TestUtils:
 
         acqf = make_acqf().to(device_map[use_cuda])
         t1 = time.perf_counter()
-        model_jit = torch_jittrace_acqf(acqf, gen.vocs, gen.tkwargs).to(
+        model_jit = torch_trace_acqf(acqf, gen.vocs, gen.tkwargs).to(
             device_map[use_cuda]
         )
         t2 = time.perf_counter()

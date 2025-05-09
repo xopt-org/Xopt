@@ -13,7 +13,7 @@ from matplotlib.axes import Axes
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
-from .utils import torch_compile_gp_model, torch_jittrace_gp_model
+from .utils import torch_compile_gp_model, torch_trace_gp_model
 
 
 def visualize_generator_model(
@@ -141,6 +141,8 @@ def visualize_model(
         Axes object used for plotting.
     exponentiate : bool, optional
         Flag to exponentiate acquisition function before plotting.
+    model_compile_mode : str, optional
+        Compilation mode for the model. If None (default), the model is not compiled.
 
     Returns
     -------
@@ -920,6 +922,8 @@ def _get_model_predictions(
         Input mesh for which model predictions are computed.
     include_prior_mean : bool, optional
         Whether to include the prior mean in the predictions.
+    model_compile_mode: str, optional
+        Compilation mode for the model. If None (default), the model is not compiled.
     _
 
     Returns
@@ -930,12 +934,11 @@ def _get_model_predictions(
     gp = model.models[vocs.output_names.index(output_name)]
     #input_mesh = input_mesh.unsqueeze(-2)
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        if model_compile_mode == "jittrace":
+        if model_compile_mode == "trace":
             if hasattr(model, "_jit"):
                 jitgp = model._jit
-                print("Using cached JIT trace.")
             else:
-                jitgp = torch_jittrace_gp_model(
+                jitgp = torch_trace_gp_model(
                     gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False,
                         batch_size=input_mesh.shape[-1]
                 )

@@ -261,7 +261,7 @@ class MeanVarModelWrapperPosterior(torch.nn.Module):
         return output_dist.mean, output_dist.variance
 
 
-def torch_jittrace_gp_model(
+def torch_trace_gp_model(
     model: Model, vocs: VOCS, tkwargs: dict, posterior: bool = True, grad: bool = False,
         batch_size: int = 1, verify_trace: bool = False
 ) -> torch.jit.ScriptModule:
@@ -345,7 +345,7 @@ def torch_compile_gp_model(
     return traced_model
 
 
-def torch_jittrace_acqf(acq, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
+def torch_trace_acqf(acq, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
     # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
     rand_point = vocs.random_inputs()[0]
     rand_vec = torch.stack(
