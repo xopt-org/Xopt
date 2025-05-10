@@ -516,9 +516,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         self.ensure_output_dir_setup()
 
         # Create a base filename
-        os.makedirs(
-            os.path.join(self.output_dir, "checkpoints"), exist_ok=True
-        )
+        os.makedirs(os.path.join(self.output_dir, "checkpoints"), exist_ok=True)
         base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
         checkpoint_path = os.path.join(
             self.output_dir,
