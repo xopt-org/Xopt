@@ -507,31 +507,39 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 if self.checkpoint_freq > 0 and (
                     self.n_generations % self.checkpoint_freq == 0
                 ):
-                    # Create a base filename
-                    os.makedirs(
-                        os.path.join(self.output_dir, "checkpoints"), exist_ok=True
-                    )
-                    base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    checkpoint_path = os.path.join(
-                        self.output_dir,
-                        "checkpoints",
-                        f"{base_checkpoint_filename}_1.txt",
-                    )
+                    self._save_checkpoint()
 
-                    # Check if file exists and increment counter until we find a free filename
-                    counter = 2
-                    while os.path.exists(checkpoint_path):
-                        checkpoint_path = os.path.join(
-                            self.output_dir,
-                            "checkpoints",
-                            f"{base_checkpoint_filename}_{counter}.txt",
-                        )
-                        counter += 1
+    def _save_checkpoint(self):
+        # Confirm we are ready to save checkpoint
+        if self.output_dir is None:
+            raise ValueError("Cannot save checkpoint without an output directory")
+        self.ensure_output_dir_setup()
 
-                    # Now we have a unique filename
-                    with open(checkpoint_path, "w") as f:
-                        f.write(self.to_json())
-                    self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
+        # Create a base filename
+        os.makedirs(
+            os.path.join(self.output_dir, "checkpoints"), exist_ok=True
+        )
+        base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
+        checkpoint_path = os.path.join(
+            self.output_dir,
+            "checkpoints",
+            f"{base_checkpoint_filename}_1.txt",
+        )
+
+        # Check if file exists and increment counter until we find a free filename
+        counter = 2
+        while os.path.exists(checkpoint_path):
+            checkpoint_path = os.path.join(
+                self.output_dir,
+                "checkpoints",
+                f"{base_checkpoint_filename}_{counter}.txt",
+            )
+            counter += 1
+
+        # Now we have a unique filename
+        with open(checkpoint_path, "w") as f:
+            f.write(self.to_json())
+        self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
         self.data = data
