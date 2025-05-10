@@ -327,7 +327,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     # Output options
     output_dir: str | None = None
     checkpoint_freq: int = Field(
-        -1,
+        1,
         description="How often (in generations) to save checkpoints (set to -1 to disable)",
     )
     log_level: int = Field(
