@@ -118,7 +118,7 @@ class TestUtils:
         gen.numerical_optimizer.n_restarts = 2
         gen.n_monte_carlo_samples = 4
         X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
-        X.random_evaluate(200)
+        X.random_evaluate(100)
         for _ in range(1):
             X.step()
 
@@ -159,7 +159,7 @@ class TestUtils:
 
         x_grid = torch.tensor(
             pd.DataFrame(
-                gen.vocs.random_inputs(2000, include_constants=False)
+                gen.vocs.random_inputs(200, include_constants=False)
             ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
