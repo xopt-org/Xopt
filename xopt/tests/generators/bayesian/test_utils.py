@@ -1,4 +1,3 @@
-import logging
 import time
 from copy import deepcopy
 
@@ -77,9 +76,9 @@ class TestUtils:
         print(f"JIT posterior compile: {t2 - t1:.4f} seconds")
 
         x_grid = torch.tensor(
-                pd.DataFrame(
-                        gen.vocs.random_inputs(500, include_constants=False)
-                ).to_numpy()
+            pd.DataFrame(
+                gen.vocs.random_inputs(500, include_constants=False)
+            ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
 

@@ -11,11 +11,8 @@ from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
-from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import (
     TEST_VOCS_BASE,
-    TEST_VOCS_DATA,
-    check_generator_tensor_locations,
     xtest_callable,
 )
 

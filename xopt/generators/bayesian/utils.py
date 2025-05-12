@@ -1,4 +1,3 @@
-import time
 from contextlib import nullcontext
 from copy import deepcopy
 from typing import List
@@ -262,8 +261,13 @@ class MeanVarModelWrapperPosterior(torch.nn.Module):
 
 
 def torch_trace_gp_model(
-    model: Model, vocs: VOCS, tkwargs: dict, posterior: bool = True, grad: bool = False,
-        batch_size: int = 1, verify_trace: bool = False
+    model: Model,
+    vocs: VOCS,
+    tkwargs: dict,
+    posterior: bool = True,
+    grad: bool = False,
+    batch_size: int = 1,
+    verify_trace: bool = False,
 ) -> torch.jit.ScriptModule:
     if isinstance(model, ModelListGP):
         raise ValueError(
@@ -274,20 +278,22 @@ def torch_trace_gp_model(
         [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
     )
     test_x = rand_vec.to(**tkwargs)
-    #test_x_1 = test_x[:1,...]
+    # test_x_1 = test_x[:1,...]
 
     gradctx = nullcontext if grad else torch.no_grad()
     model.eval()
     with gradctx, gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
         if posterior:
             pred = model.posterior(test_x)
-            traced_model = torch.jit.trace(MeanVarModelWrapperPosterior(model), test_x,
-                                           check_trace=False)
+            traced_model = torch.jit.trace(
+                MeanVarModelWrapperPosterior(model), test_x, check_trace=False
+            )
             traced_model = torch.jit.optimize_for_inference(traced_model)
         else:
             pred = model(test_x)
-            traced_model = torch.jit.trace(MeanVarModelWrapper(model), test_x,
-                                           check_trace=False)
+            traced_model = torch.jit.trace(
+                MeanVarModelWrapper(model), test_x, check_trace=False
+            )
             traced_model = torch.jit.optimize_for_inference(traced_model)
         if verify_trace:
             traced_mean, traced_var = traced_model(test_x)

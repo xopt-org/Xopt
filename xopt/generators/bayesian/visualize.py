@@ -932,15 +932,19 @@ def _get_model_predictions(
         The model predictions.
     """
     gp = model.models[vocs.output_names.index(output_name)]
-    #input_mesh = input_mesh.unsqueeze(-2)
+    # input_mesh = input_mesh.unsqueeze(-2)
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         if model_compile_mode == "trace":
             if hasattr(model, "_jit"):
                 jitgp = model._jit
             else:
                 jitgp = torch_trace_gp_model(
-                    gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False,
-                        batch_size=input_mesh.shape[-1]
+                    gp,
+                    vocs,
+                    {"device": input_mesh.device},
+                    posterior=True,
+                    grad=False,
+                    batch_size=input_mesh.shape[-1],
                 )
                 model._jit = jitgp
             mean, std = jitgp(input_mesh)
