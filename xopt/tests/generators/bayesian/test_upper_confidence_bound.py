@@ -87,6 +87,21 @@ class TestUpperConfidenceBoundGenerator:
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
 
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_get_optimum(self, use_cuda):
+        # Putting optimum test here for now since need an actual optimizer to fully test model fit
+        vocs = TEST_VOCS_BASE
+        gen = UpperConfidenceBoundGenerator(
+            vocs=vocs,
+        )
+        set_options(gen, use_cuda=False, add_data=True)
+        evaluator = Evaluator(function=xtest_callable)
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X.random_evaluate(10)
+        for _ in range(1):
+            X.step()
+        X.generator.get_optimum()
+
     def test_jit(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
