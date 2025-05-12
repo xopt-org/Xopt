@@ -280,7 +280,7 @@ def torch_trace_gp_model(
     test_x = rand_vec.to(**tkwargs)
     # test_x_1 = test_x[:1,...]
 
-    gradctx = nullcontext if grad else torch.no_grad()
+    gradctx = nullcontext() if grad else torch.no_grad()
     model.eval()
     with gradctx, gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
         if posterior:

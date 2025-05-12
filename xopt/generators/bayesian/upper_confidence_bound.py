@@ -25,7 +25,7 @@ from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
     SafetyTurboController,
 )
-from xopt.generators.bayesian.utils import set_botorch_weights, torch_compile_acqf
+from xopt.generators.bayesian.utils import set_botorch_weights
 
 
 class UpperConfidenceBoundGenerator(BayesianGenerator):
@@ -34,7 +34,6 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
     supports_batch_generation: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
-    acquisition_function_mode: str = "eager"
     _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound
@@ -103,9 +102,6 @@ beta : float, default 2.0
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
             )
-            if self.acquisition_function_mode == "inductor":
-                scripted_acq = torch_compile_acqf(acq, self.vocs, self.tkwargs)
-                acq = scripted_acq
         return acq.to(**self.tkwargs)
 
 

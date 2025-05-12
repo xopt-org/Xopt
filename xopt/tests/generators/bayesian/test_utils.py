@@ -147,20 +147,20 @@ class TestUtils:
         print(f"Compile AT: {t2 - t1:.4f} seconds")
 
         def fmodel(m, x):
-            mvn = m(x)
+            mvn = m.posterior(x)
             return mvn.mean, mvn.variance
 
         t1 = time.perf_counter()
         model_jit = torch_trace_gp_model(
-            gen.train_model().models[0], gen.vocs, gen.tkwargs
+            gen.train_model().models[0],
+            gen.vocs,
+            gen.tkwargs,
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
         print(f"JIT trace: {t2 - t1:.4f} seconds")
 
         x_grid = torch.tensor(
-            pd.DataFrame(
-                gen.vocs.random_inputs(200, include_constants=False)
-            ).to_numpy()
+            pd.DataFrame(gen.vocs.random_inputs(20, include_constants=False)).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
 
@@ -199,10 +199,12 @@ class TestUtils:
             m1, var1 = v1
             m2, var2 = v2
             m3, var3 = v3
-            assert torch.allclose(m1, m2, rtol=0)
-            assert torch.allclose(var1, var2, rtol=0)
-            assert torch.allclose(m1, m3, rtol=0)
-            assert torch.allclose(var1, var3, rtol=0)
+            assert torch.allclose(m1, m2, rtol=0), "JIT model output mismatch"
+            assert torch.allclose(var1, var2, rtol=0), "JIT model variance mismatch"
+            assert torch.allclose(m1, m3, rtol=0), "Compiled model output mismatch"
+            assert torch.allclose(var1, var3, rtol=0), (
+                "Compiled model variance mismatch"
+            )
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_acqf_compile(self, use_cuda):

@@ -10,7 +10,6 @@ from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
-from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import (
     TEST_VOCS_BASE,
     TEST_VOCS_DATA,
@@ -39,13 +38,14 @@ class TestUpperConfidenceBoundGenerator:
         check_generator_tensor_locations(gen, device_map[use_cuda])
 
         # test init from dict
-        gen2 = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE.dict())
+        gen2 = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE.model_dump())
         gen2.use_cuda = use_cuda
         check_generator_tensor_locations(gen2, device_map[use_cuda])
 
         with pytest.raises(ValueError):
             UpperConfidenceBoundGenerator(
-                vocs=TEST_VOCS_BASE.dict(), log_transform_acquisition_function=True
+                vocs=TEST_VOCS_BASE.model_dump(),
+                log_transform_acquisition_function=True,
             )
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
@@ -102,38 +102,36 @@ class TestUpperConfidenceBoundGenerator:
             X.step()
         X.generator.get_optimum()
 
-    def test_jit(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = {}
-        gen = UpperConfidenceBoundGenerator(
-            vocs=vocs,
-        )
-        set_options(gen, use_cuda=False, add_data=True)
-        evaluator = Evaluator(function=xtest_callable)
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
-        X.random_evaluate(100)
-        for _ in range(1):
-            X.step()
-
-        model = gen.train_model()
-        rand_point = gen.vocs.random_inputs()[0]
-        rand_vec = torch.stack(
-            [rand_point[k] * torch.ones(1) for k in gen.vocs.variable_names], dim=1
-        )
-        test_x = rand_vec
-        test_x = test_x.unsqueeze(0)
-
-        acq = gen.get_acquisition(model)
-        t_nojit, vals_nojit = time_call(lambda: acq(test_x), 5)
-
-        gen.acquisition_function_mode = "inductor"
-        acq = gen.get_acquisition(model)
-        t_jit, vals_jit = time_call(lambda: acq(test_x), 5)
-
-        print(np.mean(t_nojit))
-        print(np.mean(t_jit))
-
-        # check_generator_tensor_locations(gen, device_map[use_cuda])
+    # def test_jit(self):
+    #     vocs = deepcopy(TEST_VOCS_BASE)
+    #     vocs.constraints = {}
+    #     gen = UpperConfidenceBoundGenerator(
+    #         vocs=vocs,
+    #     )
+    #     set_options(gen, use_cuda=False, add_data=True)
+    #     evaluator = Evaluator(function=xtest_callable)
+    #     X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+    #     X.random_evaluate(100)
+    #     for _ in range(1):
+    #         X.step()
+    #
+    #     model = gen.train_model()
+    #     rand_point = gen.vocs.random_inputs()[0]
+    #     rand_vec = torch.stack(
+    #         [rand_point[k] * torch.ones(1) for k in gen.vocs.variable_names], dim=1
+    #     )
+    #     test_x = rand_vec
+    #     test_x = test_x.unsqueeze(0)
+    #
+    #     acq = gen.get_acquisition(model)
+    #     t_nojit, vals_nojit = time_call(lambda: acq(test_x), 5)
+    #
+    #     gen.acquisition_function_mode = "inductor"
+    #     acq = gen.get_acquisition(model)
+    #     t_jit, vals_jit = time_call(lambda: acq(test_x), 5)
+    #
+    #     print(np.mean(t_nojit))
+    #     print(np.mean(t_jit))
 
     def test_generate_w_overlapping_objectives_constraints(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)

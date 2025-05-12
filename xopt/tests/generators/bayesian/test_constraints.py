@@ -54,7 +54,9 @@ class TestConstraints:
             constraints={"c": ["LESS_THAN", 0]},
         )
         feas = feasibility(test_x, gp, vocs)
-        assert torch.allclose(feas.flatten(), 0.5 * torch.ones(25, dtype=torch.float64), rtol=1e-2)
+        assert torch.allclose(
+            feas.flatten(), 0.5 * torch.ones(25, dtype=torch.float64), rtol=1e-2
+        )
 
         gp = ModelListGP(SingleTaskGP(train_x, train_y), SingleTaskGP(train_x, train_y))
 
@@ -64,7 +66,9 @@ class TestConstraints:
             constraints={"c": ["LESS_THAN", -1]},
         )
         feas = feasibility(test_x, gp, vocs)
-        assert torch.allclose(feas.flatten(), 0.1 * torch.ones(25, dtype=torch.float64), atol=1e-1)
+        assert torch.allclose(
+            feas.flatten(), 0.1 * torch.ones(25, dtype=torch.float64), atol=1e-1
+        )
 
         gp = ModelListGP(SingleTaskGP(train_x, train_y), SingleTaskGP(train_x, train_y))
 
@@ -74,4 +78,6 @@ class TestConstraints:
             constraints={"c": ["GREATER_THAN", -1]},
         )
         feas = feasibility(test_x, gp, vocs)
-        assert torch.allclose(feas.flatten(), 0.9 * torch.ones(25, dtype=torch.float64), atol=1e-1)
+        assert torch.allclose(
+            feas.flatten(), 0.9 * torch.ones(25, dtype=torch.float64), atol=1e-1
+        )
