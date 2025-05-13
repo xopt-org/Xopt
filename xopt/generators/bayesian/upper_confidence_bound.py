@@ -76,7 +76,7 @@ beta : float, default 2.0
             # log transform the result to handle the constraints
             acq = LogAcquisitionFunction(acq)
         else:
-            # TODO: if no constraints, still do log_softplus to match constrained case? need to bench
+            # TODO: currently don't apply log_softplus, should we (to match constrained case)?
             # acq = LogAcquisitionFunction(acq)
             pass
 

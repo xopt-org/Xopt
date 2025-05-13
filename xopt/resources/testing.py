@@ -1,10 +1,12 @@
 import json
+import warnings
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
 import yaml
+from botorch.exceptions import OptimizationWarning
 from torch import nn
 
 from xopt import Generator
@@ -221,6 +223,20 @@ def reload_gen_from_yaml(gen):
     gen_new = gen_class(vocs=gen.vocs, **remove_none_values(yaml.safe_load(gen.yaml())))
     gen_new.add_data(gen.data.copy())
     return gen_new
+
+
+def generate_without_warnings(gen, n, warning_classes: list = None):
+    """ Check that generation/acqf optimization does not silently fail (raising botorch warnings)"""
+    warning_classes = warning_classes or [
+        RuntimeWarning,
+        OptimizationWarning,
+    ]  # UserWarning
+    with warnings.catch_warnings(record=True) as w:
+        candidates = gen.generate(n)
+        bad_warnings = [x for x in w if issubclass(x.category, tuple(warning_classes))]
+        if len(bad_warnings) > 0:
+            raise RuntimeError(f"Warnings: [{[x.message for x in bad_warnings]}]")
+        return candidates
 
 
 TEST_VOCS_BASE = VOCS(

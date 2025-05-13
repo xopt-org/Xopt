@@ -13,7 +13,7 @@ from xopt.resources.testing import (
     TEST_VOCS_BASE,
     TEST_VOCS_DATA,
     check_generator_tensor_locations,
-    xtest_callable,
+    generate_without_warnings, xtest_callable,
 )
 from xopt.vocs import ObjectiveEnum, VOCS
 
@@ -40,10 +40,10 @@ class TestExpectedImprovement:
         set_options(gen, use_cuda)
         gen.data = TEST_VOCS_DATA
 
-        candidate = gen.generate(1)
+        candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1
 
-        candidate = gen.generate(2)
+        candidate = generate_without_warnings(gen, 2)
         assert len(candidate) == 2
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
@@ -58,8 +58,11 @@ class TestExpectedImprovement:
         set_options(gen)
         gen.data = TEST_VOCS_DATA
 
-        candidate = gen.generate(1)
+        candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1
+
+        candidate = generate_without_warnings(gen, 2)
+        assert len(candidate) == 2
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)

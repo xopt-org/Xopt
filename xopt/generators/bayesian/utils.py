@@ -316,6 +316,26 @@ def torch_compile_gp_model(
     posterior=True,
     grad=False,
 ):
+    """
+    Compile a GPyTorch model using torch.compile, returning a compiled module
+
+    Parameters
+    ----------
+    model : Model
+        The GPyTorch model to compile.
+    vocs : VOCS
+        The variable object containing the input space.
+    tkwargs : dict
+        The keyword arguments for the torch tensor.
+    backend : str, optional
+        The backend for torch.compile, by default "inductor".
+    mode : str, optional
+        The mode for torch.compile, by default "default".
+    posterior : bool, optional
+        If True, prime the model by using posterior method, otherwise call directly (this invokes gpytorch posterior).
+    grad : bool, optional
+        If True, use gradient context, otherwise use no gradient context.
+    """
     if isinstance(model, ModelListGP):
         raise ValueError("ModelListGP is not supported - use individual models")
     rand_point = vocs.random_inputs()[0]
@@ -325,7 +345,7 @@ def torch_compile_gp_model(
     test_x = rand_vec.to(**tkwargs)
 
     gradctx = nullcontext if grad else torch.no_grad()
-    # TODO: check if trace mode faster
+    # TODO: check if gpytorch trace mode faster
     with gradctx, gpytorch.settings.fast_pred_var():
         model.eval()
         if posterior:

@@ -132,7 +132,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data["y1"].max()
+        data.loc[data.index[-1], "y1"] = data["y1"].max()
         gen.add_data(data)
         gen.train_model()
 
@@ -173,7 +173,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data["y1"].min()
+        data.loc[data.index[-1], "y1"] = data["y1"].min()
         gen.add_data(data)
         gen.train_model()
 
