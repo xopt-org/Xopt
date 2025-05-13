@@ -248,7 +248,7 @@ class TestUtils:
         acqf = make_acqf().to(device_map[use_cuda])
         t1 = time.perf_counter()
         model_compile_reduce_overhead = torch_compile_acqf(
-            acqf, gen.vocs, gen.tkwargs, mode="reduce-overhead"
+            acqf, gen.vocs, gen.tkwargs, mode="reduce-overhead", verify=True
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
         print(f"Compile RO: {t2 - t1:.4f} seconds")
@@ -256,7 +256,7 @@ class TestUtils:
         acqf = make_acqf().to(device_map[use_cuda])
         t1 = time.perf_counter()
         model_compile_max_autotune = torch_compile_acqf(
-            acqf, gen.vocs, gen.tkwargs, mode="max-autotune"
+            acqf, gen.vocs, gen.tkwargs, mode="max-autotune", verify=True
         ).to(device_map[use_cuda])
         t2 = time.perf_counter()
         print(f"Compile AT: {t2 - t1:.4f} seconds")

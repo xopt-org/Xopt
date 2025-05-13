@@ -752,15 +752,20 @@ class VOCS(XoptBaseModel):
         obj = self.objectives[self.objective_names[0]]
         obj_name = self.objective_names[0]
 
-        res = data.loc[feasible_data["feasible"], :].sort_values(
-            obj_name, ascending=ascending_flag[obj]
-        ).loc[:, obj_name].iloc[:n]
+        res = (
+            data.loc[feasible_data["feasible"], :]
+            .sort_values(obj_name, ascending=ascending_flag[obj])
+            .loc[:, obj_name]
+            .iloc[:n]
+        )
 
-        params = data.loc[res.index, self.variable_names].to_dict(
-            orient="records"
-        )[0]
+        params = data.loc[res.index, self.variable_names].to_dict(orient="records")[0]
 
-        return res.index.to_numpy(copy=True, dtype=int), res.to_numpy(copy=True, dtype=float), params
+        return (
+            res.index.to_numpy(copy=True, dtype=int),
+            res.to_numpy(copy=True, dtype=float),
+            params,
+        )
 
     def cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame:
         """

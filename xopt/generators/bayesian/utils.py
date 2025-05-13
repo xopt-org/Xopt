@@ -415,7 +415,7 @@ def torch_trace_acqf(
     )
     test_x = rand_vec.to(**tkwargs)
     test_x = test_x.unsqueeze(-2)
-    print(f"{test_x.shape=}")
+    # print(f"{test_x.shape=}")
     with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
         # acq.eval()
         # Need dummy eval to set caches
@@ -439,7 +439,7 @@ def torch_compile_acqf(
     tkwargs: dict,
     backend: str = "inductor",
     mode="default",
-    verify: bool = False,
+    verify: bool = True,
 ):
     """
     Compile an acquisition function using torch.compile.
@@ -457,9 +457,11 @@ def torch_compile_acqf(
     mode : str, optional
         The mode for torch.compile, by default "default".
     verify : bool, optional
-        If True, skip the verification vs eager mode, by default False.
+        If True, do the verification vs eager mode.
     """
     # TODO: check if trace mode better
+    # NOTE: is verify is False, you need to ensure tensors are copied before calling
+    # or RuntimeError: Error: accessing tensor output of CUDAGraphs that has been overwritten by a subsequent run
     with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)

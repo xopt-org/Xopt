@@ -170,7 +170,7 @@ class Xopt(XoptBaseModel):
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
         elif isinstance(v, DataFrame):
-            if not v.index.is_integer():
+            if not pd.api.types.is_integer_dtype(v.index):
                 raise ValueError("dataframe index must be integer")
         # also add data to generator
         # TODO: find a more robust way of doing this

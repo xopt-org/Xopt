@@ -50,6 +50,7 @@ class TestCustomConstructor(TestCase):
         )
 
         # specify a periodic kernel for each output (objectives and constraints)
+        # TODO: is this y1 a bug?
         covar_module = {"y1": ScaleKernel(PeriodicKernel())}
 
         gp_constructor = StandardModelConstructor(covar_modules=covar_module)
