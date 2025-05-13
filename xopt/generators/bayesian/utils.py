@@ -6,6 +6,7 @@ import gpytorch
 import numpy as np
 import pandas as pd
 import torch
+from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
 
@@ -267,8 +268,29 @@ def torch_trace_gp_model(
     posterior: bool = True,
     grad: bool = False,
     batch_size: int = 1,
-    verify_trace: bool = False,
+    verify: bool = False,
 ) -> torch.jit.ScriptModule:
+    """
+    Trace a GPyTorch model using torch.jit.trace. Note that resulting object will return mean and variance directly,
+    NOT a multivariate normal.
+
+    Parameters
+    ----------
+    model : Model
+        The GPyTorch model to compile.
+    vocs : VOCS
+        VOCS
+    tkwargs : dict
+        The keyword arguments for the torch tensor.
+    posterior : bool, optional
+        If True, prime the model by using posterior method, otherwise call directly (this invokes gpytorch posterior).
+    grad : bool, optional
+        If True, use gradient context, otherwise use no gradient context.
+    batch_size : int, optional
+        The batch size for the input tensor for tracing, by default 1.
+    verify : bool, optional
+        If True, request that torch verify the trace by comparing to eager mode, by default False.
+    """
     if isinstance(model, ModelListGP):
         raise ValueError(
             "ModelListGP is not supported for JIT tracing - use individual models"
@@ -295,7 +317,7 @@ def torch_trace_gp_model(
                 MeanVarModelWrapper(model), test_x, check_trace=False
             )
             traced_model = torch.jit.optimize_for_inference(traced_model)
-        if verify_trace:
+        if verify:
             traced_mean, traced_var = traced_model(test_x)
             assert torch.allclose(pred.mean, traced_mean, rtol=0), (
                 f"JIT traced mean != original {pred.mean=} {traced_mean=}"
@@ -324,7 +346,7 @@ def torch_compile_gp_model(
     model : Model
         The GPyTorch model to compile.
     vocs : VOCS
-        The variable object containing the input space.
+        VOCS
     tkwargs : dict
         The keyword arguments for the torch tensor.
     backend : str, optional
@@ -371,7 +393,21 @@ def torch_compile_gp_model(
     return traced_model
 
 
-def torch_trace_acqf(acq, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
+def torch_trace_acqf(
+    acq: AcquisitionFunction, vocs: VOCS, tkwargs: dict
+) -> torch.jit.ScriptModule:
+    """
+    Trace an acquisition function using torch.jit.trace.
+
+    Parameters
+    ----------
+    acq : AcquisitionFunction
+        The acquisition function to trace.
+    vocs : VOCS
+        VOCS
+    tkwargs : dict
+        The keyword arguments for the torch tensor.
+    """
     # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
     rand_point = vocs.random_inputs()[0]
     rand_vec = torch.stack(
@@ -398,18 +434,36 @@ def torch_trace_acqf(acq, vocs: VOCS, tkwargs: dict) -> torch.jit.ScriptModule:
 
 
 def torch_compile_acqf(
-    acq,
+    acq: AcquisitionFunction,
     vocs: VOCS,
     tkwargs: dict,
     backend: str = "inductor",
     mode="default",
-    skip_verify: bool = False,
+    verify: bool = False,
 ):
+    """
+    Compile an acquisition function using torch.compile.
+
+    Parameters
+    ----------
+    acq : AcquisitionFunction
+        The acquisition function to compile.
+    vocs : VOCS
+        VOCS
+    tkwargs : dict
+        The keyword arguments for the torch tensor.
+    backend : str, optional
+        The backend for torch.compile, by default "inductor".
+    mode : str, optional
+        The mode for torch.compile, by default "default".
+    verify : bool, optional
+        If True, skip the verification vs eager mode, by default False.
+    """
     # TODO: check if trace mode better
     with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
-        if not skip_verify:
+        if verify:
             rand_point = vocs.random_inputs()[0]
             rand_vec = torch.stack(
                 [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1

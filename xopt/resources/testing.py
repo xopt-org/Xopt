@@ -226,7 +226,7 @@ def reload_gen_from_yaml(gen):
 
 
 def generate_without_warnings(gen, n, warning_classes: list = None):
-    """ Check that generation/acqf optimization does not silently fail (raising botorch warnings)"""
+    """Check that generation/acqf optimization does not silently fail (raising botorch warnings)"""
     warning_classes = warning_classes or [
         RuntimeWarning,
         OptimizationWarning,

@@ -107,13 +107,13 @@ class TestBayesianGenerator(TestCase):
         # try with input data that contains Nans due to xopt raising an error
         # currently we drop all rows containing Nans
         test_data = deepcopy(TEST_VOCS_DATA)
-        test_data["y1"].iloc[5] = np.nan
+        test_data.loc[test_data.index[5], "y1"] = np.nan
         model = gen.train_model(test_data)
         assert len(model.models[0].train_inputs[0]) == len(test_data) - 1
 
         # test with input data that is only Nans
         test_data = deepcopy(TEST_VOCS_DATA)
-        test_data["y1"].iloc[:] = np.nan
+        test_data.loc[:, "y1"] = np.nan
         with pytest.raises(ValueError):
             gen.train_model(test_data)
 
@@ -155,7 +155,7 @@ class TestBayesianGenerator(TestCase):
             assert torch.allclose(
                 inputs[0].unsqueeze(-1).T,
                 input_transform(
-                    torch.from_numpy(X.data["x1"].to_numpy()).unsqueeze(-1)
+                    torch.from_numpy(X.data["x1"].to_numpy(copy=True)).unsqueeze(-1)
                 ).T,
             )
 
@@ -166,7 +166,7 @@ class TestBayesianGenerator(TestCase):
             model.train_targets[0],
             torch.flatten(
                 outcome_transform(
-                    torch.from_numpy(X.data["y1"].to_numpy()).unsqueeze(-1)
+                    torch.from_numpy(X.data["y1"].to_numpy(copy=True)).unsqueeze(-1)
                 )[0]
             ),
         )

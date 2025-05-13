@@ -13,7 +13,8 @@ from xopt.resources.testing import (
     TEST_VOCS_BASE,
     TEST_VOCS_DATA,
     check_generator_tensor_locations,
-    generate_without_warnings, xtest_callable,
+    generate_without_warnings,
+    xtest_callable,
 )
 from xopt.vocs import ObjectiveEnum, VOCS
 
