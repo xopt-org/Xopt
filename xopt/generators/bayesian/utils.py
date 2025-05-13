@@ -415,10 +415,8 @@ def torch_trace_acqf(
     )
     test_x = rand_vec.to(**tkwargs)
     test_x = test_x.unsqueeze(-2)
-    # print(f"{test_x.shape=}")
     with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        # acq.eval()
-        # Need dummy eval to set caches
+        # Need dummy evaluation to set caches
         acq(test_x.clone().detach())
         saqcf = torch.jit.trace(
             acq,
@@ -426,10 +424,6 @@ def torch_trace_acqf(
             check_trace=True,
             check_tolerance=1e-8,
         )
-        # sacq_value = saqcf(test_x.clone().detach())
-        # assert acq_value == sacq_value, (
-        #    "JIT traced acquisition function does not match original acquisition function"
-        # )
     return saqcf
 
 
