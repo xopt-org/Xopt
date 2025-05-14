@@ -21,6 +21,7 @@ XOPT_VERIFY_CONSTRAINED_ACQF_POSITIVE = True
 
 
 def xtest_callable(input_dict: dict, a=0) -> dict:
+    """Single-objective callable test function"""
     assert isinstance(input_dict, dict)
     x1 = input_dict["x1"]
     x2 = input_dict["x2"]
@@ -33,6 +34,7 @@ def xtest_callable(input_dict: dict, a=0) -> dict:
 
 
 def xtest_callable_mo(input_dict: dict) -> dict:
+    """Multi-objective callable test function"""
     assert isinstance(input_dict, dict)
     x1 = input_dict["x1"]
     x2 = input_dict["x2"]
@@ -46,6 +48,9 @@ def xtest_callable_mo(input_dict: dict) -> dict:
 
 
 def verify_state_device(module: nn.Module, device: torch.device, prefix=""):
+    """
+    Verify that all tensors in the module's state_dict are on the specified device.
+    """
     state = module.state_dict(keep_vars=True)
     for k, v in state.items():
         if isinstance(v, torch.Tensor):
@@ -58,6 +63,9 @@ def verify_state_device(module: nn.Module, device: torch.device, prefix=""):
 def recursive_torch_device_scan(
     obj: Any, visited: set, device: torch.device, depth=0, verbose=False
 ):
+    """
+    Recursively scan an object for torch tensors and check their device.
+    """
     if isinstance(obj, (float, int, str, bool, type, pd.DataFrame)):
         if verbose:
             print(f"{'    ' * depth}skipping basic type {type(obj)}")
@@ -132,6 +140,9 @@ def recursive_torch_device_scan(
 
 
 def check_generator_tensor_locations(gen, device):
+    """
+    Check that all tensors in the generator are on the specified device.
+    """
     # print("Checking objective")
     objective = gen._get_objective()
     verify_state_device(objective, device, "objective")
@@ -226,7 +237,9 @@ def reload_gen_from_yaml(gen):
 
 
 def generate_without_warnings(gen, n, warning_classes: list = None):
-    """Check that generation/acqf optimization does not silently fail (raising botorch warnings)"""
+    """
+    Check that generation/acqf optimization does not silently fail (raising botorch warnings)
+    """
     warning_classes = warning_classes or [
         RuntimeWarning,
         OptimizationWarning,
@@ -239,6 +252,7 @@ def generate_without_warnings(gen, n, warning_classes: list = None):
         return candidates
 
 
+# Single-objective VOCS with constraints
 TEST_VOCS_BASE = VOCS(
     **{
         "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
@@ -247,10 +261,16 @@ TEST_VOCS_BASE = VOCS(
         "constants": {"constant1": 1.0},
     }
 )
+
+# Multi-objective VOCS with constraints
 TEST_VOCS_BASE_MO = TEST_VOCS_BASE.model_copy(deep=True)
 TEST_VOCS_BASE_MO.objectives["y2"] = "MINIMIZE"
+
+# Multi-objective VOCS without constraints
 TEST_VOCS_BASE_MO_NC = TEST_VOCS_BASE_MO.model_copy(deep=True)
 TEST_VOCS_BASE_MO_NC.constraints = {}
+
+# Multi-objective reference point for MOBO
 TEST_VOCS_REF_POINT = {"y1": 1.5, "y2": 1.5}
 
 cnames = (
