@@ -15,18 +15,14 @@ from xopt.resources.testing import (
     TEST_VOCS_DATA_MO,
     TEST_VOCS_REF_POINT,
     check_generator_tensor_locations,
+    create_set_options_helper,
 )
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 
-def set_options(gen, use_cuda=False, add_data=False):
-    gen.use_cuda = use_cuda
-    gen.numerical_optimizer.n_restarts = 2
-    gen.n_monte_carlo_samples = 4
-    if add_data:
-        gen.add_data(TEST_VOCS_DATA_MO)
+set_options = create_set_options_helper(data=TEST_VOCS_DATA_MO)
 
 
 class TestMGGPO:

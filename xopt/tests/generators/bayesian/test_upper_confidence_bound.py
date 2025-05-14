@@ -1,3 +1,4 @@
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -6,6 +7,7 @@ import pytest
 import torch
 
 from xopt.base import Xopt
+from xopt.errors import GeneratorWarning
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
@@ -14,6 +16,7 @@ from xopt.resources.testing import (
     TEST_VOCS_BASE,
     TEST_VOCS_DATA,
     check_generator_tensor_locations,
+    create_set_options_helper,
     generate_without_warnings,
     xtest_callable,
 )
@@ -22,12 +25,7 @@ cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 
-def set_options(gen, use_cuda=False, add_data=False):
-    gen.use_cuda = use_cuda
-    gen.numerical_optimizer.n_restarts = 2
-    gen.n_monte_carlo_samples = 4
-    if add_data:
-        gen.add_data(TEST_VOCS_DATA)
+set_options = create_set_options_helper(data=TEST_VOCS_DATA)
 
 
 class TestUpperConfidenceBoundGenerator:
@@ -60,8 +58,10 @@ class TestUpperConfidenceBoundGenerator:
         assert len(candidate) == 1
 
         # This will fail to converge most of the time - log softplus for q=2 is really unstable
-        # TODO: forbid this in the generator to prevent user issues?
-        candidate = gen.generate(2)
+        with warnings.catch_warnings(record=True) as w:
+            candidate = gen.generate(2)
+            print([x.category for x in w])
+            assert sum(issubclass(x.category, GeneratorWarning) for x in w) == 1
         assert len(candidate) == 2
 
         assert isinstance(gen.computation_time, pd.DataFrame)

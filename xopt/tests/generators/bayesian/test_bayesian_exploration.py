@@ -7,18 +7,18 @@ from xopt.base import Xopt
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
+from xopt.resources.testing import (
+    TEST_VOCS_BASE,
+    TEST_VOCS_DATA,
+    create_set_options_helper,
+    xtest_callable,
+)
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 
-def set_options(gen, use_cuda=False, add_data=False):
-    gen.use_cuda = use_cuda
-    gen.numerical_optimizer.n_restarts = 2
-    gen.n_monte_carlo_samples = 4
-    if add_data:
-        gen.add_data(TEST_VOCS_DATA)
+set_options = create_set_options_helper(data=TEST_VOCS_DATA)
 
 
 class TestBayesianExplorationGenerator:

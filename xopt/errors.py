@@ -16,3 +16,11 @@ class SeqGeneratorError(GeneratorError):
 
 class VOCSError(Exception):
     pass
+
+
+class XoptWarning(Warning):
+    pass
+
+
+class GeneratorWarning(XoptWarning):
+    pass

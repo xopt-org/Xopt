@@ -252,6 +252,21 @@ def generate_without_warnings(gen, n, warning_classes: list = None):
         return candidates
 
 
+def create_set_options_helper(
+    data,
+    n_restarts=2,
+    n_monte_carlo_samples=4,
+):
+    def set_options(gen, use_cuda=False, add_data=False):
+        gen.use_cuda = use_cuda
+        gen.numerical_optimizer.n_restarts = n_restarts
+        gen.n_monte_carlo_samples = n_monte_carlo_samples
+        if add_data:
+            gen.add_data(data)
+
+    return set_options
+
+
 # Single-objective VOCS with constraints
 TEST_VOCS_BASE = VOCS(
     **{
@@ -287,7 +302,6 @@ test_init_data = {
     "x2": np.linspace(0.01, 1.0, 10) * 10.0,
     "constant1": 1.0,
 }
-
 
 TEST_VOCS_DATA = pd.DataFrame({**test_init_data, **xtest_callable(test_init_data)})
 TEST_VOCS_DATA_MO = pd.DataFrame(

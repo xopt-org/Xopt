@@ -13,6 +13,7 @@ from xopt.resources.testing import (
     TEST_VOCS_BASE,
     TEST_VOCS_DATA,
     check_generator_tensor_locations,
+    create_set_options_helper,
     generate_without_warnings,
     xtest_callable,
 )
@@ -22,10 +23,7 @@ cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 
-def set_options(gen, use_cuda=False):
-    gen.use_cuda = use_cuda
-    gen.numerical_optimizer.n_restarts = 2
-    gen.n_monte_carlo_samples = 4
+set_options = create_set_options_helper(data=TEST_VOCS_DATA)
 
 
 class TestExpectedImprovement:
@@ -38,8 +36,7 @@ class TestExpectedImprovement:
         gen = ExpectedImprovementGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        set_options(gen, use_cuda)
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, use_cuda, add_data=True)
 
         candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1
@@ -56,8 +53,7 @@ class TestExpectedImprovement:
         gen = ExpectedImprovementGenerator(
             vocs=test_vocs,
         )
-        set_options(gen)
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, add_data=True)
 
         candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1

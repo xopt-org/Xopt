@@ -5,8 +5,10 @@ from botorch.acquisition import (
     UpperConfidenceBound,
     qUpperConfidenceBound,
 )
+from gpytorch import Module
 from pydantic import Field
 
+from xopt.errors import GeneratorWarning
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
@@ -47,6 +49,16 @@ beta : float, default 2.0
                 "if the base acquisition function has negative values. Use with "
                 "caution."
             )
+
+    def propose_candidates(self, model: Module, n_candidates: int = 1):
+        # TODO: convert to exception in the future
+        if self.vocs.n_constraints > 0 and n_candidates > 1:
+            warnings.warn(
+                "Using UCB for constrained generation of multiple candidates is numerically unstable and "
+                "will raise error in the future. Try expected improvement instead.",
+                category=GeneratorWarning,
+            )
+        return super().propose_candidates(model, n_candidates)
 
     def _get_acquisition(self, model):
         objective = self._get_objective()
