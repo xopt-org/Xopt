@@ -57,10 +57,9 @@ class TestUpperConfidenceBoundGenerator:
         candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1
 
-        # This will fail to converge most of the time - log softplus for q=2 is really unstable
+        # Will fail to converge most of the time - log softplus for q=2 is really unstable
         with warnings.catch_warnings(record=True) as w:
             candidate = gen.generate(2)
-            print([x.category for x in w])
             assert sum(issubclass(x.category, GeneratorWarning) for x in w) == 1
         assert len(candidate) == 2
 
