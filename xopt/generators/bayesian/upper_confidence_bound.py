@@ -28,6 +28,7 @@ from xopt.generators.bayesian.turbo import (
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
+# TODO: is log necessary for numeric stability of constrained softplus case? need to benchmark
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
@@ -54,35 +55,6 @@ beta : float, default 2.0
                 "if the base acquisition function has negative values. Use with "
                 "caution."
             )
-
-    def get_acquisition(self, model: Module) -> AcquisitionFunction:
-        if model is None:
-            raise ValueError("model cannot be None")
-
-        # get base acquisition function
-        acq = self._get_acquisition(model)
-
-        # TODO: is log necessary? can do just softplus - logei paper did not try logucb
-        if len(self.vocs.constraints):
-            try:
-                sampler = acq.sampler
-            except AttributeError:
-                sampler = self._get_sampler(model)
-
-            acq = ConstrainedMCAcquisitionFunction(
-                model, acq, self._get_constraint_callables(), sampler=sampler
-            )
-
-            # log transform the result to handle the constraints
-            acq = LogAcquisitionFunction(acq)
-        else:
-            # TODO: currently don't apply log_softplus, should we (to match constrained case)?
-            # acq = LogAcquisitionFunction(acq)
-            pass
-
-        acq = self._apply_fixed_features(acq)
-        acq = acq.to(**self.tkwargs)
-        return acq
 
     def _get_acquisition(self, model):
         objective = self._get_objective()
