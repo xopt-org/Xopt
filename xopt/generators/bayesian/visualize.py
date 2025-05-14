@@ -143,6 +143,8 @@ def visualize_model(
         Flag to exponentiate acquisition function before plotting.
     model_compile_mode : str, optional
         Compilation mode for the model. If None (default), the model is not compiled.
+    tkwargs: dict, optional
+        kwargs for torch tensor creation
 
     Returns
     -------
