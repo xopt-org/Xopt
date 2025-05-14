@@ -528,7 +528,7 @@ class BayesianGenerator(Generator, ABC):
         """
         Define the acquisition function based on the given GP model.
 
-        Lives on target device.
+        Lives on target device specified by tkwargs / use_cuda.
 
         Parameters:
         -----------
