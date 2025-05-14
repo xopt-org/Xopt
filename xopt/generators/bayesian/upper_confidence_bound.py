@@ -1,23 +1,15 @@
 import warnings
 
 from botorch.acquisition import (
-    AcquisitionFunction,
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
     qUpperConfidenceBound,
 )
-from gpytorch import Module
 from pydantic import Field
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
-)
-from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
-    ConstrainedMCAcquisitionFunction,
-)
-from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
-    LogAcquisitionFunction,
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator

@@ -40,6 +40,7 @@ class TestUtils:
         assert torch.allclose(output[..., 1], test_samples[..., 1])
         assert torch.allclose(output[..., 0], -test_samples[..., 0])
 
+    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_jit(self, use_cuda):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -100,6 +101,7 @@ class TestUtils:
         t = np.array(t)
         print(f"JIT posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
 
+    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_compile(self, use_cuda):
         # For inductor + windows any, MSVC 2022 build tools are required
@@ -206,6 +208,7 @@ class TestUtils:
                 "Compiled model variance mismatch"
             )
 
+    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_acqf_compile(self, use_cuda):
         print(f"{torch._dynamo.list_backends()=}")
