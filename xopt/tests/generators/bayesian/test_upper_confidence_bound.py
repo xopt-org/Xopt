@@ -123,11 +123,7 @@ class TestUpperConfidenceBoundGenerator:
         set_options(gen)
 
         X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
-
-        # initialize with single initial candidate
         X.random_evaluate(5)
-
-        # now use bayes opt
         for _ in range(2):
             X.step()
 
