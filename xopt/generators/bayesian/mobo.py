@@ -93,18 +93,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         acq = self._get_acquisition(model)
 
         # apply fixed features if specified in the generator
-        if self.fixed_features is not None:
-            # get input dim
-            dim = len(self.model_input_names)
-            columns = []
-            values = []
-            for name, value in self.fixed_features.items():
-                columns += [self.model_input_names.index(name)]
-                values += [value]
-
-            acq = FixedFeatureAcquisitionFunction(
-                acq_function=acq, d=dim, columns=columns, values=values
-            )
+        acq = self._apply_fixed_features(acq)
 
         acq = acq.to(**self.tkwargs)
         return acq
