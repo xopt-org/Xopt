@@ -92,12 +92,12 @@ class TestMOBOGenerator:
         check_dict_equal(
             json.loads(gen.json()),
             json.loads(gen2.json()),
-            excluded_keys=["computation_time"],
+            excluded_keys=["computation_time", "pareto_front_history"],
         )
         check_dict_equal(
             json.loads(gen.json()),
             json.loads(gen3.json()),
-            excluded_keys=["computation_time"],
+            excluded_keys=["computation_time", "pareto_front_history"],
         )
 
         # this fails almost always without manual seed!
@@ -151,6 +151,10 @@ class TestMOBOGenerator:
         assert torch.allclose(
             torch.tensor([[1.0, 2.0, 0.0], [0.5, 0.1, 1.5]], dtype=torch.double).T, pfy
         )
+
+        # test pf history tracking
+        assert len(gen.pareto_front_history) == 1
+        assert gen.pareto_front_history.loc[3, "n_non_dominated"] == 3
 
         # test where all the points are dominated by the reference point
         test_data = pd.DataFrame(

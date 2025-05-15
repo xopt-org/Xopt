@@ -869,8 +869,16 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     reference_point: dict[str, float] = Field(
         description="dict specifying reference point for multi-objective optimization",
     )
+    pareto_front_history: Optional[pd.DataFrame] = Field(
+        None,
+        description="history of pareto front statistics every time points are added to the generator",
+    )
 
     supports_multi_objective: bool = True
+
+    @field_validator("pareto_front_history", mode="before")
+    def validate_pareto_front_history(cls, value):
+        return pd.DataFrame(value) if value is not None else None
 
     @model_validator(mode="after")
     def validate_reference_point(self):
@@ -903,6 +911,32 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                 )
 
         return torch.tensor(pt, **self.tkwargs)
+    
+    def add_data(self, new_data):
+        """
+        Modify the add_data method to compute hypervolume and add it to a pandas DataFrame.
+        """
+        # after adding new data, compute hypervolume
+        super().add_data(new_data)
+        hv = self.calculate_hypervolume()
+        pf = self.get_pareto_front()
+        
+        info = {
+            "hypervolume": hv,
+            "n_non_dominated": len(pf[0]) if pf[0] is not None else 0,
+        }
+
+        if self.pareto_front_history is None:
+            self.pareto_front_history = pd.DataFrame(
+                info, index=[self.data.index[-1]]
+            )
+        else:
+            self.pareto_front_history = pd.concat(
+                [
+                    self.pareto_front_history,
+                    pd.DataFrame(info, index=[self.data.index[-1]]),
+                ],
+            )
 
     def _get_scaled_data(self):
         """get scaled input/objective data for use with botorch logic which assumes
@@ -932,6 +966,10 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def get_pareto_front(self):
         """compute the pareto front x/y values given data"""
         variable_data, objective_data, weights = self._get_scaled_data()
+
+        # if there are no valid points skip PF calculation and return None
+        if len(variable_data) == 0:
+            return None, None
 
         # get indices of non-dominated points
         # make sure to include the reference point
