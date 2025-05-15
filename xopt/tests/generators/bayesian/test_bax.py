@@ -66,8 +66,8 @@ class TestBaxGenerator:
             alg = GridOptimize()
 
             # create a ModelList with a single output
-            train_X = torch.rand(10, ndim)
-            train_Y = torch.rand(10, 1)
+            train_X = torch.rand(10, ndim, dtype=torch.float64)
+            train_Y = torch.rand(10, 1, dtype=torch.float64)
 
             model = ModelList(
                 SingleTaskGP(

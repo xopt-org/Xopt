@@ -1,7 +1,8 @@
-from typing import Optional, Callable
+from typing import Optional
 
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
+from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -53,20 +54,25 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
 
-    def _get_objective(self) -> Callable:
+    def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
-
-        Returns:
-        --------
-        Callable
-            The multi-objective Bayesian optimization objective.
         """
-        return create_mobo_objective(self.vocs)
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
+                raise RuntimeError(
+                    "cannot specify objectives in VOCS "
+                    "and a custom objective for the generator at the "
+                    "same time"
+                )
 
-    def get_acquisition(
-        self, model: torch.nn.Module
-    ) -> FixedFeatureAcquisitionFunction:
+            objective = self.custom_objective
+        else:
+            objective = create_mobo_objective(self.vocs)
+
+        return objective.to(**self.tkwargs)
+
+    def get_acquisition(self, model: torch.nn.Module):
         """
         Get the acquisition function for Bayesian Optimization.
 
@@ -100,6 +106,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
                 acq_function=acq, d=dim, columns=columns, values=values
             )
 
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def _get_acquisition(
@@ -131,7 +138,6 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
             cache_root=False,
             prune_baseline=True,
         )
-
         return acq
 
     def _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]:

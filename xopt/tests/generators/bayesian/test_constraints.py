@@ -42,9 +42,9 @@ class TestConstraints:
         assert f[0](test_value).float() == -90
 
     def test_w_model(self):
-        train_x = torch.zeros(1).reshape(1, 1, 1)
-        train_y = torch.zeros(1).reshape(1, 1, 1)
-        test_x = torch.linspace(0, 1, 25).reshape(-1, 1, 1)
+        train_x = torch.zeros(1, dtype=torch.float64).reshape(1, 1, 1)
+        train_y = torch.zeros(1, dtype=torch.float64).reshape(1, 1, 1)
+        test_x = torch.linspace(0, 1, 25, dtype=torch.float64).reshape(-1, 1, 1)
 
         gp = ModelListGP(SingleTaskGP(train_x, train_y), SingleTaskGP(train_x, train_y))
 
@@ -54,7 +54,9 @@ class TestConstraints:
             constraints={"c": ["LESS_THAN", 0]},
         )
         feas = feasibility(test_x, gp, vocs)
-        assert torch.allclose(feas.flatten(), 0.5 * torch.ones(25), rtol=1e-2)
+        assert torch.allclose(
+            feas.flatten(), 0.5 * torch.ones(25, dtype=torch.float64), rtol=1e-2
+        )
 
         gp = ModelListGP(SingleTaskGP(train_x, train_y), SingleTaskGP(train_x, train_y))
 
@@ -64,7 +66,9 @@ class TestConstraints:
             constraints={"c": ["LESS_THAN", -1]},
         )
         feas = feasibility(test_x, gp, vocs)
-        assert torch.allclose(feas.flatten(), 0.1 * torch.ones(25), atol=1e-1)
+        assert torch.allclose(
+            feas.flatten(), 0.1 * torch.ones(25, dtype=torch.float64), atol=1e-1
+        )
 
         gp = ModelListGP(SingleTaskGP(train_x, train_y), SingleTaskGP(train_x, train_y))
 
@@ -74,4 +78,6 @@ class TestConstraints:
             constraints={"c": ["GREATER_THAN", -1]},
         )
         feas = feasibility(test_x, gp, vocs)
-        assert torch.allclose(feas.flatten(), 0.9 * torch.ones(25), atol=1e-1)
+        assert torch.allclose(
+            feas.flatten(), 0.9 * torch.ones(25, dtype=torch.float64), atol=1e-1
+        )

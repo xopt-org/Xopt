@@ -90,7 +90,7 @@ class TestTurbo(TestCase):
         gen.from_dict(gen_dict | {"vocs": test_vocs})
 
         # test invalid turbo controller type
-        test_vocs_2 = test_vocs.copy()
+        test_vocs_2 = test_vocs.model_copy()
         test_vocs_2.objectives = {}
         test_vocs_2.observables = ["o1"]
         with pytest.raises(ValueError):
@@ -132,7 +132,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data["y1"].max()
+        data.loc[data.index[-1], "y1"] = data["y1"].max()
         gen.add_data(data)
         gen.train_model()
 
@@ -173,7 +173,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data["y1"].min()
+        data.loc[data.index[-1], "y1"] = data["y1"].min()
         gen.add_data(data)
         gen.train_model()
 
@@ -254,7 +254,7 @@ class TestTurbo(TestCase):
 
         # test a case where the last point is invalid
         new_data = deepcopy(gen.data)
-        n_c = new_data["c1"].to_numpy()
+        n_c = new_data["c1"].to_numpy(copy=True)
         n_c[-1] = 1.0
         new_data["c1"] = n_c
         gen.add_data(new_data)

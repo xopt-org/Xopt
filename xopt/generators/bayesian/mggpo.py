@@ -2,6 +2,7 @@ from typing import Optional, Callable
 
 import pandas as pd
 import torch
+from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -126,23 +127,20 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         Callable
             The acquisition function.
         """
+        # TODO: add error if fixed features - why is this not supported?
         if model is None:
             raise ValueError("model cannot be None")
 
         # get base acquisition function
         acq = self._get_acquisition(model)
+        acq = acq.to(**self.tkwargs)
         return acq
 
-    def _get_objective(self) -> Callable:
+    def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
-
-        Returns:
-        --------
-        Callable
-            The multi-objective Bayesian optimization objective.
         """
-        return create_mobo_objective(self.vocs)
+        return create_mobo_objective(self.vocs).to(**self.tkwargs)
 
     def _get_acquisition(
         self, model: torch.nn.Module

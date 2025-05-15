@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-import yaml
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -15,40 +14,99 @@ from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.numerical_optimizer import GridOptimizer
-from xopt.pydantic import remove_none_values
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
     tnk_reference_point,
     tnk_vocs,
 )
-from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.resources.testing import (
+    TEST_VOCS_BASE_MO,
+    TEST_VOCS_BASE_MO_NC,
+    TEST_VOCS_DATA_MO,
+    TEST_VOCS_REF_POINT,
+    check_dict_allclose,
+    check_generator_tensor_locations,
+    check_dict_equal,
+    create_set_options_helper,
+    reload_gen_from_json,
+    reload_gen_from_yaml,
+)
+
+cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
+device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
+
+set_options = create_set_options_helper(data=TEST_VOCS_DATA_MO)
 
 
 class TestMOBOGenerator:
     def test_init(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        reference_point = {"y1": 1.5, "y2": 1.5}
-
-        MOBOGenerator(vocs=vocs, reference_point=reference_point)
+        MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)
 
         # test bad reference point
         with pytest.raises(XoptError):
-            MOBOGenerator(vocs=vocs, reference_point={})
+            MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point={})
 
-    def test_round_trip(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        reference_point = {"y1": 1.5, "y2": 1.5}
-        gen = MOBOGenerator(vocs=vocs, reference_point=reference_point)
-        dump = gen.json()
-        gen2 = MOBOGenerator(vocs=vocs, **json.loads(dump))
-        assert dump == gen2.json()
-        assert gen.model_dump() == gen2.model_dump()
-        dump = gen.yaml()
-        gen2 = MOBOGenerator(vocs=vocs, **remove_none_values(yaml.safe_load(dump)))
-        assert dump == gen2.yaml()
-        assert gen.model_dump() == gen2.model_dump()
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate(self, use_cuda):
+        gen = MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)
+        set_options(gen, use_cuda, add_data=True)
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+
+        candidate = gen.generate(2)
+        assert len(candidate) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+
+        gen = MOBOGenerator(
+            vocs=TEST_VOCS_BASE_MO_NC, reference_point=TEST_VOCS_REF_POINT
+        )
+        set_options(gen, use_cuda, add_data=True)
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+
+        candidate = gen.generate(2)
+        assert len(candidate) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_round_trip(self, use_cuda):
+        gen = MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)
+        set_options(gen, use_cuda)
+        gen.add_data(TEST_VOCS_DATA_MO)
+        gen.generate(1)
+
+        gen2 = reload_gen_from_json(gen)
+        gen3 = reload_gen_from_yaml(gen)
+
+        torch.manual_seed(42)
+        candidate1_2 = gen.generate(1)
+        torch.manual_seed(42)
+        candidate2_2 = gen2.generate(1)
+        torch.manual_seed(42)
+        candidate3_2 = gen3.generate(1)
+
+        check_dict_equal(
+            json.loads(gen.json()),
+            json.loads(gen2.json()),
+            excluded_keys=["computation_time"],
+        )
+        check_dict_equal(
+            json.loads(gen.json()),
+            json.loads(gen3.json()),
+            excluded_keys=["computation_time"],
+        )
+
+        # this fails almost always without manual seed!
+        check_dict_allclose(candidate1_2[0], candidate2_2[0], rtol=0)
+        check_dict_allclose(candidate1_2[0], candidate3_2[0], rtol=0)
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+        check_generator_tensor_locations(gen2, device_map[use_cuda])
+        check_generator_tensor_locations(gen3, device_map[use_cuda])
 
     def test_script(self):
         evaluator = Evaluator(function=evaluate_TNK)
@@ -69,35 +127,7 @@ class TestMOBOGenerator:
             X.random_evaluate(3)
             X.step()
 
-    def test_parallel(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        vocs.constraints = {}
-
-        test_data = pd.DataFrame(
-            {
-                "x1": [0.1, 0.2, 0.4, 0.4],
-                "x2": [0.1, 0.2, 0.3, 0.2],
-                "y1": [1.0, 2.0, 1.0, 0.0],
-                "y2": [0.5, 0.1, 1.0, 1.5],
-            }
-        )
-        reference_point = {"y1": 10.0, "y2": 1.5}
-        gen = MOBOGenerator(
-            vocs=vocs,
-            reference_point=reference_point,
-            use_pf_as_initial_points=True,
-        )
-        gen.n_monte_carlo_samples = 1
-        gen.add_data(test_data)
-
-        gen.generate(2)
-
     def test_pareto_front_calculation(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        vocs.constraints = {}
-
         test_data = pd.DataFrame(
             {
                 "x1": [0.1, 0.2, 0.4, 0.4],
@@ -108,7 +138,7 @@ class TestMOBOGenerator:
         )
         reference_point = {"y1": 10.0, "y2": 1.5}
         gen = MOBOGenerator(
-            vocs=vocs,
+            vocs=TEST_VOCS_BASE_MO_NC,
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
@@ -132,7 +162,7 @@ class TestMOBOGenerator:
             }
         )
         gen = MOBOGenerator(
-            vocs=vocs,
+            vocs=TEST_VOCS_BASE_MO_NC,
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
@@ -143,7 +173,6 @@ class TestMOBOGenerator:
         assert pfy is None
 
         # test with constraints
-        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
         test_data = pd.DataFrame(
             {
                 "x1": [0.1, 0.2, 0.4, 0.4],
@@ -154,7 +183,7 @@ class TestMOBOGenerator:
             }
         )
         gen = MOBOGenerator(
-            vocs=vocs,
+            vocs=TEST_VOCS_BASE_MO,
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
@@ -168,9 +197,7 @@ class TestMOBOGenerator:
         )
 
     def test_hypervolume_calculation(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        vocs.constraints = {}
+        vocs = deepcopy(TEST_VOCS_BASE_MO_NC)
 
         data = pd.DataFrame(
             {
@@ -193,10 +220,6 @@ class TestMOBOGenerator:
         assert gen.calculate_hypervolume() == 0.0
 
     def test_initial_conditions(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        vocs.constraints = {}
-
         test_data = pd.DataFrame(
             {
                 "x1": [0.1, 0.2, 0.4, 0.4],
@@ -207,7 +230,7 @@ class TestMOBOGenerator:
         )
         reference_point = {"y1": 10.0, "y2": 1.5}
         gen = MOBOGenerator(
-            vocs=vocs,
+            vocs=TEST_VOCS_BASE_MO_NC,
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
@@ -237,7 +260,6 @@ class TestMOBOGenerator:
         gen.generate(1)
 
         # test with constraints
-        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
         test_data = pd.DataFrame(
             {
                 "x1": [0.1, 0.2, 0.4, 0.4, 0.15],
@@ -248,7 +270,7 @@ class TestMOBOGenerator:
             }
         )
         gen = MOBOGenerator(
-            vocs=vocs,
+            vocs=TEST_VOCS_BASE_MO,
             reference_point=reference_point,
             use_pf_as_initial_points=True,
         )
@@ -266,7 +288,8 @@ class TestMOBOGenerator:
 
         gen.generate(1)
 
-    def test_log_mobo(self):
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_log_mobo(self, use_cuda):
         evaluator = Evaluator(function=evaluate_TNK)
         reference_point = tnk_reference_point
 
@@ -274,6 +297,7 @@ class TestMOBOGenerator:
             vocs=tnk_vocs,
             reference_point=reference_point,
         )
+        gen.use_cuda = use_cuda
         gen = deepcopy(gen)
         gen.n_monte_carlo_samples = 20
 
@@ -290,10 +314,9 @@ class TestMOBOGenerator:
                 qLogNoisyExpectedHypervolumeImprovement,
             )
 
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+
     def test_objective_constraint_nans(self):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.objectives.update({"y2": "MINIMIZE"})
-        vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
         test_data = pd.DataFrame(
             {
                 "x1": [0.1, 0.2, 0.4, 0.4, 0.15],
@@ -306,7 +329,7 @@ class TestMOBOGenerator:
 
         reference_point = {"y1": 10.0, "y2": 1.5}
         gen = MOBOGenerator(
-            vocs=vocs,
+            vocs=TEST_VOCS_BASE_MO,
             reference_point=reference_point,
             n_monte_carlo_samples=1,
         )

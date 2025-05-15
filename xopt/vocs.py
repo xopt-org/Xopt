@@ -707,10 +707,10 @@ class VOCS(XoptBaseModel):
         if return_valid:
             feasible_status = self.feasibility_data(data)["feasible"]
             return (
-                variable_data[feasible_status],
-                objective_data[feasible_status],
-                constraint_data[feasible_status],
-                observable_data[feasible_status],
+                variable_data.loc[feasible_status, :],
+                objective_data.loc[feasible_status, :],
+                constraint_data.loc[feasible_status, :],
+                observable_data.loc[feasible_status, :],
             )
 
         return variable_data, objective_data, constraint_data, observable_data
@@ -752,15 +752,20 @@ class VOCS(XoptBaseModel):
         obj = self.objectives[self.objective_names[0]]
         obj_name = self.objective_names[0]
 
-        res = data[feasible_data["feasible"]].sort_values(
-            obj_name, ascending=ascending_flag[obj]
-        )[obj_name][:n]
+        res = (
+            data.loc[feasible_data["feasible"], :]
+            .sort_values(obj_name, ascending=ascending_flag[obj])
+            .loc[:, obj_name]
+            .iloc[:n]
+        )
 
-        params = data.iloc[res.index.to_numpy(int)][self.variable_names].to_dict(
-            orient="records"
-        )[0]
+        params = data.loc[res.index, self.variable_names].to_dict(orient="records")[0]
 
-        return res.index.to_numpy(int), res.to_numpy(float), params
+        return (
+            res.index.to_numpy(copy=True, dtype=int),
+            res.to_numpy(copy=True, dtype=float),
+            params,
+        )
 
     def cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -853,7 +858,7 @@ def form_objective_data(
 
             weights[i] = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
 
-        oarr = data.loc[:, objectives_names].to_numpy(dtype=float) * weights
+        oarr = data.loc[:, objectives_names].to_numpy(copy=True, dtype=float) * weights
         oarr[np.isnan(oarr)] = np.inf
         odata = pd.DataFrame(
             oarr, columns=[prefix + k for k in objectives_names], index=data.index
@@ -872,7 +877,7 @@ def form_objective_data(
                 raise ValueError(f"Unknown objective operator: {operator}")
 
             weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
-            arr = data.loc[:, [k]].to_numpy(float) * weight
+            arr = data.loc[:, [k]].to_numpy(copy=True, dtype=float) * weight
             arr[np.isnan(arr)] = np.inf
             array_list.append(arr)
 

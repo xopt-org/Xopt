@@ -1,12 +1,14 @@
 import warnings
 
 from botorch.acquisition import (
-    qUpperConfidenceBound,
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
+    qUpperConfidenceBound,
 )
+from gpytorch import Module
 from pydantic import Field
 
+from xopt.errors import GeneratorWarning
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
@@ -20,6 +22,7 @@ from xopt.generators.bayesian.turbo import (
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
+# TODO: is log necessary for numeric stability of constrained softplus case? need to benchmark
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
@@ -47,6 +50,16 @@ beta : float, default 2.0
                 "caution."
             )
 
+    def propose_candidates(self, model: Module, n_candidates: int = 1):
+        # TODO: convert to exception in the future
+        if self.vocs.n_constraints > 0 and n_candidates > 1:
+            warnings.warn(
+                "Using UCB for constrained generation of multiple candidates is numerically unstable and "
+                "will raise error in the future. Try expected improvement instead.",
+                category=GeneratorWarning,
+            )
+        return super().propose_candidates(model, n_candidates)
+
     def _get_acquisition(self, model):
         objective = self._get_objective()
         if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
@@ -65,8 +78,7 @@ beta : float, default 2.0
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
             )
-
-        return acq
+        return acq.to(**self.tkwargs)
 
 
 class TDUpperConfidenceBoundGenerator(
