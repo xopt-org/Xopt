@@ -911,7 +911,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                 )
 
         return torch.tensor(pt, **self.tkwargs)
-    
+
     def add_data(self, new_data):
         """
         Modify the add_data method to compute hypervolume and add it to a pandas DataFrame.
@@ -920,16 +920,14 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         super().add_data(new_data)
         hv = self.calculate_hypervolume()
         pf = self.get_pareto_front()
-        
+
         info = {
             "hypervolume": hv,
             "n_non_dominated": len(pf[0]) if pf[0] is not None else 0,
         }
 
         if self.pareto_front_history is None:
-            self.pareto_front_history = pd.DataFrame(
-                info, index=[self.data.index[-1]]
-            )
+            self.pareto_front_history = pd.DataFrame(info, index=[self.data.index[-1]])
         else:
             self.pareto_front_history = pd.concat(
                 [
