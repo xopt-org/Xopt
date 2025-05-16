@@ -1,3 +1,4 @@
+import importlib
 import logging
 import time
 from typing import Any, Callable
@@ -11,7 +12,6 @@ from botorch.utils.multi_objective.box_decompositions import (
     FastNondominatedPartitioning,
 )
 from deap.tools._hypervolume.pyhv import _HyperVolume
-from pymoo.indicators.hv import HV
 
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import MOBOGenerator
@@ -131,6 +131,17 @@ class BenchMOBO:
         return outputs
 
 
+have_pymoo = False
+try:
+    import importlib.util
+
+    if importlib.util.find_spec("pymoo") is not None:
+        have_pymoo = True
+except ImportError:
+    logger.warning("pymoo not installed, skipping pymoo benchmarks")
+    pass
+
+
 class BenchHV:
     def __init__(self, n_obj_list, it=20, n_array=None):
         # self.n_var_list = n_var_list or [10, 20]
@@ -162,6 +173,8 @@ class BenchHV:
         ref_point_torch = torch.from_numpy(ref_point_numpy)
 
         def compute_hv_pymoo(Y: np.ndarray, ref_point):
+            from pymoo.indicators.hv import HV
+
             hv = HV(ref_point=ref_point)
             volume = float(hv(Y))
             return volume
@@ -210,9 +223,10 @@ class BenchHV:
             t2 = time.perf_counter()
             return vals, (t2 - t1) / it
 
-        v_hv_pymoo, t_pymoo = accumulate(
-            compute_hv_pymoo, it, Y=Y, ref_point=ref_point_numpy
-        )
+        if have_pymoo:
+            v_hv_pymoo, t_pymoo = accumulate(
+                compute_hv_pymoo, it, Y=Y, ref_point=ref_point_numpy
+            )
         v_hv_botorch, t_botorch_hypervolume = accumulate(
             compute_hv_botorch, it, Y=-Y_torch, ref_point=-ref_point_torch
         )
@@ -247,7 +261,10 @@ class BenchHV:
         #                                                                       Y=-Y_torch,
         #                                                                       ref_point=-ref_point_torch)
 
-        assert np.allclose(v_hv_pymoo, v_hv_botorch), f"{v_hv_pymoo} != {v_hv_botorch}"
+        if have_pymoo:
+            assert np.allclose(v_hv_pymoo, v_hv_botorch), (
+                f"{v_hv_pymoo} != {v_hv_botorch}"
+            )
         assert np.allclose(v_hv_pymoo, v_hv_botorch_gpu), (
             f"{v_hv_pymoo} != {v_hv_botorch_gpu}"
         )
@@ -283,7 +300,6 @@ class BenchHV:
             raise ValueError(f"{pf1} != {pf2}")
 
         r = {
-            "t_pymoo": t_pymoo,
             "t_botorch_hypervolume": t_botorch_hypervolume,
             "t_botorch_hypervolume_gpu": t_botorch_hypervolume_gpu,
             "t_botorch_partitioning": t_botorch_partitioning,
@@ -295,6 +311,8 @@ class BenchHV:
             "n_obj": n_obj,
             "n_points": n_points,
         }
+        if have_pymoo:
+            r["t_pymoo"] = t_pymoo
         return r
 
 
