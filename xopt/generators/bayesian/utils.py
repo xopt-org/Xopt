@@ -9,6 +9,7 @@ import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
+from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
 from xopt.vocs import VOCS
 
@@ -472,3 +473,53 @@ def torch_compile_acqf(
                 f"Compiled acquisition != original {acq_value=} {sacq_value=}"
             )
     return saqcf
+
+
+def compute_hypervolume_and_pf(
+    X: torch.Tensor,
+    Y: torch.Tensor,
+    reference_point: torch.Tensor,
+):
+    """
+    Compute the hypervolume and pareto front
+    given a set of points assuming maximization.
+
+    Parameters:
+    -----------
+    X : torch.Tensor
+        The input points.
+    Y : torch.Tensor
+        The objective values of the points.
+    reference_point : torch.Tensor
+        The reference point for hypervolume calculation.
+
+    Returns:
+    --------
+    hv : float
+        The computed hypervolume.
+    pf : torch.Tensor
+        The pareto front points.
+    """
+
+    hv = Hypervolume(reference_point)
+    if Y.shape[0] == 0:
+        return None, None, 0.0
+
+    # add the reference point to the objective values
+    # add a dummy point to the X values
+    X = torch.vstack((torch.zeros(1, X.shape[1], dtype=X.dtype), X))
+    Y = torch.vstack((reference_point.unsqueeze(0), Y))
+
+    pareto_mask = is_non_dominated(Y)
+
+    # if the first point is in the pareto front then
+    # none of the points dominate over the reference
+    if pareto_mask[0]:
+        return None, None, 0.0
+
+    # get pareto front points
+    pareto_front_X = X[pareto_mask]
+    pareto_front_Y = Y[pareto_mask]
+    hv_value = hv.compute(Y[pareto_mask].cpu())
+
+    return pareto_front_X, pareto_front_Y, hv_value

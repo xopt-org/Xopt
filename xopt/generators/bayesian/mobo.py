@@ -1,7 +1,6 @@
 from typing import Optional
 
 import torch
-from botorch.acquisition import FixedFeatureAcquisitionFunction
 from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
@@ -75,6 +74,8 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     def get_acquisition(self, model: torch.nn.Module):
         """
         Get the acquisition function for Bayesian Optimization.
+        Note that this needs to overwrite the base method due to
+        how qLogExpectedHypervolumeImprovement handles constraints.
 
         Parameters:
         -----------
@@ -93,18 +94,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         acq = self._get_acquisition(model)
 
         # apply fixed features if specified in the generator
-        if self.fixed_features is not None:
-            # get input dim
-            dim = len(self.model_input_names)
-            columns = []
-            values = []
-            for name, value in self.fixed_features.items():
-                columns += [self.model_input_names.index(name)]
-                values += [value]
-
-            acq = FixedFeatureAcquisitionFunction(
-                acq_function=acq, d=dim, columns=columns, values=values
-            )
+        acq = self._apply_fixed_features(acq)
 
         acq = acq.to(**self.tkwargs)
         return acq
@@ -166,7 +156,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
                 bounds = self._get_optimization_bounds()
                 num_restarts = self.numerical_optimizer.n_restarts
 
-                pf_locations, _ = self.get_pareto_front()
+                pf_locations, _, _ = self.get_pareto_front_and_hypervolume()
 
                 # if there is no pareto front just return None to revert back to
                 # default behavior

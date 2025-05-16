@@ -11,6 +11,7 @@ from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.bayesian.utils import (
+    compute_hypervolume_and_pf,
     torch_compile_acqf,
     torch_compile_gp_model,
     torch_trace_acqf,
@@ -39,6 +40,52 @@ class TestUtils:
         output = obj(test_samples)
         assert torch.allclose(output[..., 1], test_samples[..., 1])
         assert torch.allclose(output[..., 0], -test_samples[..., 0])
+
+    def test_compute_hypervolume_and_pf(self):
+        # Empty input
+        X = torch.empty((0, 2))
+        Y = torch.empty((0, 2))
+        reference_point = torch.tensor([0.0, 0.0])
+        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        assert pf_X is None
+        assert pf_Y is None
+        assert hv == 0.0
+
+        # No Pareto front (all points worse than reference)
+        X = torch.tensor([[1.0, 1.0], [2.0, 2.0]])
+        Y = -1 * torch.tensor([[1.0, 1.0], [2.0, 2.0]])
+        reference_point = torch.tensor([0.0, 0.0])
+        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        assert pf_X is None
+        assert pf_Y is None
+        assert hv == 0.0
+
+        # Simple 2D case, two non-dominated points
+        X = torch.tensor([[1.0, 2.0], [2.0, 1.0]])
+        Y = torch.tensor([[1.0, 2.0], [2.0, 1.0]])
+        reference_point = torch.tensor([0.0, 0.0])
+        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        assert pf_X.shape[1] == 2
+        assert pf_Y.shape[1] == 2
+        assert hv > 0
+
+        # Reference point is on the Pareto front
+        X = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
+        Y = -1 * torch.tensor([[0.0, 0.0], [1.0, 1.0]])
+        reference_point = torch.tensor([0.0, 0.0])
+        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        assert pf_X is None
+        assert pf_Y is None
+        assert hv == 0.0
+
+        # 3D case
+        X = torch.tensor([[1.0, 2.0, 3.0], [2.0, 1.0, 3.0], [3.0, 2.0, 1.0]])
+        Y = torch.tensor([[1.0, 2.0, 3.0], [2.0, 1.0, 3.0], [3.0, 2.0, 1.0]])
+        reference_point = torch.tensor([0.0, 0.0, 0.0])
+        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        assert pf_X.shape[1] == 3
+        assert pf_Y.shape[1] == 3
+        assert hv > 0
 
     @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)

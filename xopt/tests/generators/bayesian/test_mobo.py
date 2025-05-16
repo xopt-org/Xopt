@@ -92,12 +92,12 @@ class TestMOBOGenerator:
         check_dict_equal(
             json.loads(gen.json()),
             json.loads(gen2.json()),
-            excluded_keys=["computation_time"],
+            excluded_keys=["computation_time", "pareto_front_history"],
         )
         check_dict_equal(
             json.loads(gen.json()),
             json.loads(gen3.json()),
-            excluded_keys=["computation_time"],
+            excluded_keys=["computation_time", "pareto_front_history"],
         )
 
         # this fails almost always without manual seed!
@@ -144,13 +144,17 @@ class TestMOBOGenerator:
         )
         gen.add_data(test_data)
 
-        pfx, pfy = gen.get_pareto_front()
+        pfx, pfy, _ = gen.get_pareto_front_and_hypervolume()
         assert torch.allclose(
             torch.tensor([[0.1, 0.2, 0.4], [0.1, 0.2, 0.2]], dtype=torch.double).T, pfx
         )
         assert torch.allclose(
             torch.tensor([[1.0, 2.0, 0.0], [0.5, 0.1, 1.5]], dtype=torch.double).T, pfy
         )
+
+        # test pf history tracking
+        assert len(gen.pareto_front_history) == 1
+        assert gen.pareto_front_history.loc[3, "n_non_dominated"] == 3
 
         # test where all the points are dominated by the reference point
         test_data = pd.DataFrame(
@@ -168,7 +172,7 @@ class TestMOBOGenerator:
         )
         gen.add_data(test_data)
 
-        pfx, pfy = gen.get_pareto_front()
+        pfx, pfy, _ = gen.get_pareto_front_and_hypervolume()
         assert pfx is None
         assert pfy is None
 
@@ -188,7 +192,7 @@ class TestMOBOGenerator:
             use_pf_as_initial_points=True,
         )
         gen.add_data(test_data)
-        pfx, pfy = gen.get_pareto_front()
+        pfx, pfy, _ = gen.get_pareto_front_and_hypervolume()
         assert torch.allclose(
             torch.tensor([[0.1, 0.2], [0.1, 0.2]], dtype=torch.double).T, pfx
         )
@@ -211,13 +215,13 @@ class TestMOBOGenerator:
         gen = MOBOGenerator(vocs=vocs, reference_point=reference_point)
         gen.add_data(data)
 
-        assert gen.calculate_hypervolume() == 9.0
+        assert gen.get_pareto_front_and_hypervolume()[-1] == 9.0
 
         vocs.objectives["y1"] = "MAXIMIZE"
         gen = MOBOGenerator(vocs=vocs, reference_point=reference_point)
         gen.add_data(data)
 
-        assert gen.calculate_hypervolume() == 0.0
+        assert gen.get_pareto_front_and_hypervolume()[-1] == 0.0
 
     def test_initial_conditions(self):
         test_data = pd.DataFrame(

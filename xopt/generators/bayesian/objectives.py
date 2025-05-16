@@ -9,6 +9,7 @@ from botorch.acquisition import (
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
 from torch import Tensor
+from functools import partial
 
 from xopt import VOCS
 
@@ -122,10 +123,12 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
             value = constraint[1]
             sign = 1 if constraint[0] == "LESS_THAN" else -1
 
-            def cbf(Z: Tensor) -> Tensor:
+            def cbf(Z: Tensor, index: int, value: float, sign: float) -> Tensor:
                 return sign * (Z[..., index] - value)
 
-            constraint_callables.append(cbf)
+            constraint_callables.append(
+                partial(cbf, index=index, value=value, sign=sign)
+            )
         return constraint_callables
 
     else:
