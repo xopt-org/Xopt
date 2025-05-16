@@ -156,7 +156,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
                 bounds = self._get_optimization_bounds()
                 num_restarts = self.numerical_optimizer.n_restarts
 
-                pf_locations, _ = self.get_pareto_front()
+                pf_locations, _, _ = self.get_pareto_front_and_hypervolume()
 
                 # if there is no pareto front just return None to revert back to
                 # default behavior
