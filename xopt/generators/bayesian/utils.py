@@ -479,7 +479,7 @@ def compute_hypervolume_and_pf(
     X: torch.Tensor,
     Y: torch.Tensor,
     reference_point: torch.Tensor,
-):
+) -> tuple[torch.Tensor | None, torch.Tensor | None, float]:
     """
     Compute the hypervolume and pareto front
     given a set of points assuming maximization.
@@ -495,10 +495,12 @@ def compute_hypervolume_and_pf(
 
     Returns:
     --------
-    hv : float
-        The computed hypervolume.
-    pf : torch.Tensor
-        The pareto front points.
+    pareto_front_X : torch.Tensor
+        The points on the Pareto front. Returns None if no pareto front exists.
+    pareto_front_Y : torch.Tensor
+        The objective values of the points on the Pareto front. Returns None if no pareto front exists.
+    hv_value : float
+        The hypervolume value.
     """
 
     hv = Hypervolume(reference_point)
