@@ -153,8 +153,14 @@ class TestMOBOGenerator:
         )
 
         # test pf history tracking
-        assert len(gen.pareto_front_history) == 1
-        assert gen.pareto_front_history.loc[3, "n_non_dominated"] == 3
+        gen.update_pareto_front_history()
+        assert len(gen.pareto_front_history) == 4
+        assert gen.pareto_front_history["n_non_dominated"].to_list() == [1, 2, 2, 3]
+
+        # make sure that the pareto front is not updated if there are no new points
+        gen.update_pareto_front_history()
+        assert len(gen.pareto_front_history) == 4
+        assert gen.pareto_front_history["n_non_dominated"].to_list() == [1, 2, 2, 3]
 
         # test where all the points are dominated by the reference point
         test_data = pd.DataFrame(
@@ -175,6 +181,12 @@ class TestMOBOGenerator:
         pfx, pfy, _ = gen.get_pareto_front_and_hypervolume()
         assert pfx is None
         assert pfy is None
+
+        # test updating the historical pareto front
+        gen.update_pareto_front_history()
+        assert len(gen.pareto_front_history) == 4
+        assert gen.pareto_front_history["n_non_dominated"].to_list() == [0, 0, 0, 0]
+        assert gen.pareto_front_history["hypervolume"].to_list() == [0.0, 0.0, 0.0, 0.0]
 
         # test with constraints
         test_data = pd.DataFrame(
@@ -199,6 +211,11 @@ class TestMOBOGenerator:
         assert torch.allclose(
             torch.tensor([[1.0, 2.0], [0.5, 0.1]], dtype=torch.double).T, pfy
         )
+
+        # test pf history tracking
+        gen.update_pareto_front_history()
+        assert len(gen.pareto_front_history) == 4
+        assert gen.pareto_front_history["n_non_dominated"].to_list() == [1, 2, 2, 2]
 
     def test_hypervolume_calculation(self):
         vocs = deepcopy(TEST_VOCS_BASE_MO_NC)

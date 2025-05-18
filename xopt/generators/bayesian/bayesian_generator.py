@@ -871,6 +871,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     pareto_front_history: Optional[pd.DataFrame] = Field(
         None,
         description="history of pareto front statistics every time points are added to the generator",
+        exclude=True,
     )
 
     supports_multi_objective: bool = True
@@ -911,47 +912,6 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         return torch.tensor(pt, **self.tkwargs)
 
-    def add_data(self, new_data):
-        """
-        Modify the add_data method to compute hypervolume and add it to a pandas DataFrame.
-        """
-        # after adding new data, compute hypervolume
-        super().add_data(new_data)
-        pareto_front_variables, pareto_front_objectives, hv = (
-            self.get_pareto_front_and_hypervolume()
-        )
-
-        info = {
-            "hypervolume": hv,
-            "n_non_dominated": len(pareto_front_variables)
-            if pareto_front_variables is not None
-            else 0,
-        }
-
-        if self.pareto_front_history is None:
-            self.pareto_front_history = pd.DataFrame(info, index=[self.data.index[-1]])
-        else:
-            self.pareto_front_history = pd.concat(
-                [
-                    self.pareto_front_history,
-                    pd.DataFrame(info, index=[self.data.index[-1]]),
-                ],
-            )
-
-    def _get_scaled_data(self):
-        """get scaled input/objective data for use with botorch logic which assumes
-        maximization for each objective"""
-        var_df, obj_df, _, _ = self.vocs.extract_data(
-            self.data, return_valid=True, return_raw=True
-        )
-
-        variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
-        objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
-        weights = set_botorch_weights(self.vocs).to(**self.tkwargs)[
-            : self.vocs.n_objectives
-        ]
-        return variable_data, objective_data * weights, weights
-
     def get_pareto_front_and_hypervolume(self):
         """
         Get the pareto front and hypervolume of the current data.
@@ -969,7 +929,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         # get scaled data
         # note that the objective data is scaled by +/- 1
         # based on maximization / minimization
-        variable_data, objective_data, weights = self._get_scaled_data()
+        variable_data, objective_data, weights = self._get_scaled_data(data=self.data)
 
         # if there are no valid points skip PF calculation and return None
         if len(variable_data) == 0:
@@ -993,6 +953,72 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             hv,
         )
 
+    def update_pareto_front_history(self):
+        """
+        Update the historical pareto front statistics in the generator.
+
+        For each row of data in self.data, compute the pareto front stats
+        (hypervolume, number of non-dominated points) if there is no
+        corresponding entry exists in the `self.pareto_front_history` DataFrame.
+        """
+        if self.pareto_front_history is None:
+            self.pareto_front_history = pd.DataFrame()
+
+        # for each row of data, compute the cumulative pareto front stats
+        for i in range(len(self.data)):
+            # check if the pareto front stats already exist
+            if i in self.pareto_front_history.index:
+                continue
+
+            # get scaled data
+            variable_data, objective_data, _ = self._get_scaled_data(
+                data=self.data.iloc[: i + 1]
+            )
+
+            # compute the pareto front stats
+            pareto_front_variables, _, hv = compute_hypervolume_and_pf(
+                variable_data,
+                objective_data,
+                self.torch_reference_point,
+            )
+
+            # get the number of non-dominated points
+            n_non_dominated = (
+                len(pareto_front_variables) if pareto_front_variables is not None else 0
+            )
+
+            # create a new row for the pareto front stats
+            new_row = {
+                "iteration": i,
+                "hypervolume": hv,
+                "n_non_dominated": n_non_dominated,
+            }
+            # add the new row to the pareto front history
+            self.pareto_front_history = pd.concat(
+                [
+                    self.pareto_front_history,
+                    pd.DataFrame(new_row, index=[i]),
+                ],
+                ignore_index=False,
+            )
+
+    def _get_scaled_data(self, data: pd.DataFrame):
+        """get scaled input/objective data for use with botorch logic which assumes
+        maximization for each objective"""
+
+        # get raw data
+        var_df, obj_df, _, _ = self.vocs.extract_data(
+            data, return_raw=True, return_valid=True
+        )
+
+        variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
+        objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
+        weights = set_botorch_weights(self.vocs).to(**self.tkwargs)[
+            : self.vocs.n_objectives
+        ]
+        return variable_data, objective_data * weights, weights
+
 
 def formatted_base_docstring():
-    return "\nBase Generator\n---------------\n" + BayesianGenerator.__doc__
+    doc = BayesianGenerator.__doc__ or ""
+    return "\nBase Generator\n---------------\n" + doc
