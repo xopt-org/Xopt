@@ -698,6 +698,8 @@ class VOCS(XoptBaseModel):
                 Dataframe containing objective data
             constraint_data : DataFrame
                 Dataframe containing constraint data
+            observable_data : DataFrame
+                Dataframe containing observable data
         """
         variable_data = self.variable_data(data, "")
         objective_data = self.objective_data(data, "", return_raw)
