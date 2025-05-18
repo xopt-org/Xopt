@@ -961,6 +961,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         (hypervolume, number of non-dominated points) if there is no
         corresponding entry exists in the `self.pareto_front_history` DataFrame.
         """
+        # TODO: make sure this works when manually changing the data frame
         if self.pareto_front_history is None:
             self.pareto_front_history = pd.DataFrame()
 
