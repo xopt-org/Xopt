@@ -966,14 +966,14 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             self.pareto_front_history = pd.DataFrame()
 
         # for each row of data, compute the cumulative pareto front stats
-        for i in range(len(self.data)):
+        for i in self.data.index:
             # check if the pareto front stats already exist
             if i in self.pareto_front_history.index:
                 continue
 
             # get scaled data
             variable_data, objective_data, _ = self._get_scaled_data(
-                data=self.data.iloc[: i + 1]
+                data=self.data.loc[:i]
             )
 
             # compute the pareto front stats
@@ -1014,9 +1014,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
         objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
-        weights = set_botorch_weights(self.vocs).to(**self.tkwargs)[
-            : self.vocs.n_objectives
-        ]
+        weights = set_botorch_weights(self.vocs)[: self.vocs.n_objectives]
         return variable_data, objective_data * weights, weights
 
 
