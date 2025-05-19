@@ -16,8 +16,6 @@ from botorch.acquisition import (
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
-from botorch.utils.multi_objective import is_non_dominated
-from botorch.utils.multi_objective.box_decompositions import DominatedPartitioning
 from gpytorch import Module
 from pydantic import (
     Field,
@@ -52,6 +50,7 @@ from xopt.generators.bayesian.utils import (
     rectilinear_domain_union,
     set_botorch_weights,
     validate_turbo_controller_base,
+    compute_hypervolume_and_pf,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
@@ -869,8 +868,17 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     reference_point: dict[str, float] = Field(
         description="dict specifying reference point for multi-objective optimization",
     )
+    pareto_front_history: Optional[pd.DataFrame] = Field(
+        None,
+        description="history of pareto front statistics every time points are added to the generator",
+        exclude=True,
+    )
 
     supports_multi_objective: bool = True
+
+    @field_validator("pareto_front_history", mode="before")
+    def validate_pareto_front_history(cls, value):
+        return pd.DataFrame(value) if value is not None else None
 
     @model_validator(mode="after")
     def validate_reference_point(self):
@@ -904,60 +912,112 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         return torch.tensor(pt, **self.tkwargs)
 
-    def _get_scaled_data(self):
+    def get_pareto_front_and_hypervolume(self):
+        """
+        Get the pareto front and hypervolume of the current data.
+
+        Returns:
+        --------
+        pareto_front_variables : torch.Tensor
+            The pareto front variable data.
+        pareto_front_objectives : torch.Tensor
+            The pareto front objective data.
+        hv : float
+            The hypervolume of the pareto front.
+        """
+
+        # get scaled data
+        # note that the objective data is scaled by +/- 1
+        # based on maximization / minimization
+        variable_data, objective_data, weights = self._get_scaled_data(data=self.data)
+
+        # if there are no valid points skip PF calculation and return None
+        if len(variable_data) == 0:
+            return None, None, None
+
+        pareto_front_variables, pareto_front_objectives, hv = (
+            compute_hypervolume_and_pf(
+                variable_data,
+                objective_data,
+                self.torch_reference_point,
+            )
+        )
+
+        # scale the pareto front objectives back to original space
+        if pareto_front_objectives is not None:
+            pareto_front_objectives = pareto_front_objectives / weights
+
+        return (
+            pareto_front_variables,
+            pareto_front_objectives,
+            hv,
+        )
+
+    def update_pareto_front_history(self):
+        """
+        Update the historical pareto front statistics in the generator.
+
+        For each row of data in self.data, compute the pareto front stats
+        (hypervolume, number of non-dominated points) if there is no
+        corresponding entry exists in the `self.pareto_front_history` DataFrame.
+        """
+        # TODO: make sure this works when manually changing the data frame
+        if self.pareto_front_history is None:
+            self.pareto_front_history = pd.DataFrame()
+
+        # for each row of data, compute the cumulative pareto front stats
+        for i in self.data.index:
+            # check if the pareto front stats already exist
+            if i in self.pareto_front_history.index:
+                continue
+
+            # get scaled data
+            variable_data, objective_data, _ = self._get_scaled_data(
+                data=self.data.loc[:i]
+            )
+
+            # compute the pareto front stats
+            pareto_front_variables, _, hv = compute_hypervolume_and_pf(
+                variable_data,
+                objective_data,
+                self.torch_reference_point,
+            )
+
+            # get the number of non-dominated points
+            n_non_dominated = (
+                len(pareto_front_variables) if pareto_front_variables is not None else 0
+            )
+
+            # create a new row for the pareto front stats
+            new_row = {
+                "iteration": i,
+                "hypervolume": hv,
+                "n_non_dominated": n_non_dominated,
+            }
+            # add the new row to the pareto front history
+            self.pareto_front_history = pd.concat(
+                [
+                    self.pareto_front_history,
+                    pd.DataFrame(new_row, index=[i]),
+                ],
+                ignore_index=False,
+            )
+
+    def _get_scaled_data(self, data: pd.DataFrame):
         """get scaled input/objective data for use with botorch logic which assumes
         maximization for each objective"""
+
+        # get raw data
         var_df, obj_df, _, _ = self.vocs.extract_data(
-            self.data, return_valid=True, return_raw=True
+            data, return_raw=True, return_valid=True
         )
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())
         objective_data = torch.tensor(obj_df[self.vocs.objective_names].to_numpy())
-        weights = set_botorch_weights(self.vocs).to(**self.tkwargs)[
-            : self.vocs.n_objectives
-        ]
+        weights = set_botorch_weights(self.vocs)[: self.vocs.n_objectives]
         return variable_data, objective_data * weights, weights
-
-    def calculate_hypervolume(self):
-        """compute hypervolume given data"""
-
-        # compute hypervolume
-        bd = DominatedPartitioning(
-            ref_point=self.torch_reference_point, Y=self._get_scaled_data()[1]
-        )
-        volume = bd.compute_hypervolume().item()
-
-        return volume
-
-    def get_pareto_front(self):
-        """compute the pareto front x/y values given data"""
-        variable_data, objective_data, weights = self._get_scaled_data()
-
-        # get indices of non-dominated points
-        # make sure to include the reference point
-        obj_data = torch.vstack(
-            (self.torch_reference_point.unsqueeze(0), objective_data)
-        )
-        non_dominated = is_non_dominated(obj_data)
-
-        # get variable data corresponding to objective data
-        # note that the reference point should have nan values
-        var_data = torch.vstack(
-            (
-                torch.full_like(variable_data[0], float("Nan")).unsqueeze(0),
-                variable_data,
-            )
-        )
-
-        # if the reference point is in the non dominated set then
-        # none of the points dominate over the reference
-        # thus they should not be included in the PF --> return None
-        if torch.any(torch.isnan(var_data[non_dominated])):
-            return None, None
-        else:
-            # note need to undo weights for real number output
-            return var_data[non_dominated], obj_data[non_dominated] / weights
 
 
 def formatted_base_docstring():
-    return "\nBase Generator\n---------------\n" + BayesianGenerator.__doc__
+    doc = BayesianGenerator.__doc__ or ""
+    return "\nBase Generator\n---------------\n" + doc
