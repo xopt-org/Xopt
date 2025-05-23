@@ -140,8 +140,10 @@ class TestUpperConfidenceBoundGenerator:
         assert candidate["p"] == 3
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
+        gen.get_optimum()
 
         # test with fixed feature in vocs
+        data = deepcopy(TEST_VOCS_DATA)
         gen = UpperConfidenceBoundGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"x1": 3.0}
         set_options(gen, use_cuda)
@@ -151,6 +153,7 @@ class TestUpperConfidenceBoundGenerator:
         assert candidate["x1"] == 3
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
+        gen.get_optimum()
 
     def test_constraints_warning(self):
         with pytest.warns(UserWarning):

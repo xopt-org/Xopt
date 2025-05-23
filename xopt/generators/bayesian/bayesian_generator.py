@@ -573,17 +573,33 @@ class BayesianGenerator(Generator, ABC):
     def get_optimum(self):
         """select the best point(s) given by the
         model using the Posterior mean"""
-        c_posterior_mean = ConstrainedMCAcquisitionFunction(
-            self.model,
-            qUpperConfidenceBound(
-                model=self.model, beta=0.0, objective=self._get_objective()
-            ),
-            self._get_constraint_callables(),
+        acq = qUpperConfidenceBound(
+            model=self.model, beta=0.0, objective=self._get_objective()
         )
+        if len(self.vocs.constraints):
+            acq = ConstrainedMCAcquisitionFunction(
+                self.model,
+                acq,
+                self._get_constraint_callables(),
+                sampler=self._get_sampler(self.model),
+            )
+        bounds = self._get_bounds()
 
-        result = self.numerical_optimizer.optimize(
-            c_posterior_mean, self._get_bounds(), 1
-        )
+        if self.fixed_features is not None:
+            acq = self._apply_fixed_features(acq)
+
+            indices = []
+            for idx, name in enumerate(self.vocs.variable_names):
+                if name not in self.fixed_features:
+                    indices += [idx]
+
+            bounds = bounds[:, indices]
+
+        bounds = bounds.to(**self.tkwargs)
+        acq = acq.to(**self.tkwargs)
+
+        # use default initial conditions for a global search
+        result = self.numerical_optimizer.optimize(acq, bounds, 1)
 
         return self._process_candidates(result)
 
@@ -703,9 +719,11 @@ class BayesianGenerator(Generator, ABC):
             columns = []
             values = []
             for name, value in self.fixed_features.items():
-                columns += [self.model_input_names.index(name)]
-                values += [value]
+                columns.append(self.model_input_names.index(name))
+                values.append(value)
 
+            # necessary because fixed feature acq must get tensor - it searches for dtype/device
+            values = torch.tensor(values).to(**self.tkwargs)
             acq = FixedFeatureAcquisitionFunction(
                 acq_function=acq, d=dim, columns=columns, values=values
             )
@@ -746,9 +764,9 @@ class BayesianGenerator(Generator, ABC):
                     variable_names.remove(name)
         return variable_names
 
-    def _get_bounds(self):
+    def _get_bounds(self) -> torch.Tensor:
         """
-        Convert bounds from vocs to torch tensors
+        Convert bounds from vocs to torch tensors of shape 2 x d.
 
         Tensor stays on CPU
         """
@@ -792,13 +810,13 @@ class BayesianGenerator(Generator, ABC):
         # associated with that key
         if self.fixed_features is not None:
             # grab variable name indices that are NOT in fixed features
-            indicies = []
+            indices = []
             for idx, name in enumerate(self.vocs.variable_names):
                 if name not in self.fixed_features:
-                    indicies += [idx]
+                    indices += [idx]
 
             # grab indexed bounds
-            bounds = bounds.T[indicies].T
+            bounds = bounds[:, indices]
 
         bounds = bounds.to(**self.tkwargs)
         return bounds
