@@ -573,13 +573,16 @@ class BayesianGenerator(Generator, ABC):
     def get_optimum(self):
         """select the best point(s) given by the
         model using the Posterior mean"""
-        acq = ConstrainedMCAcquisitionFunction(
-            self.model,
-            qUpperConfidenceBound(
-                model=self.model, beta=0.0, objective=self._get_objective()
-            ),
-            self._get_constraint_callables(),
+        acq = qUpperConfidenceBound(
+            model=self.model, beta=0.0, objective=self._get_objective()
         )
+        if len(self.vocs.constraints):
+            acq = ConstrainedMCAcquisitionFunction(
+                self.model,
+                acq,
+                self._get_constraint_callables(),
+                sampler=self._get_sampler(self.model),
+            )
         bounds = self._get_bounds()
 
         if self.fixed_features is not None:
