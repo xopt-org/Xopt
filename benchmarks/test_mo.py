@@ -12,12 +12,12 @@ bmobo.N_STEPS = 5
 
 @pytest.mark.parametrize("row", df_bench_mobo.index.to_list())
 @pytest.mark.benchmark(
-        group="mobo",
-        min_time=1.0,
-        max_time=60.0,
-        min_rounds=2,
-        disable_gc=True,
-        warmup=False,
+    group="mobo",
+    min_time=1.0,
+    max_time=60.0,
+    min_rounds=2,
+    disable_gc=True,
+    warmup=False,
 )
 def test_mobo(benchmark, row):
     torch.set_num_threads(1)
