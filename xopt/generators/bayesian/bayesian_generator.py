@@ -719,9 +719,11 @@ class BayesianGenerator(Generator, ABC):
             columns = []
             values = []
             for name, value in self.fixed_features.items():
-                columns += [self.model_input_names.index(name)]
-                values += [value]
+                columns.append(self.model_input_names.index(name))
+                values.append(value)
 
+            # necessary because fixed feature acq must get tensor - it searches for dtype/device
+            values = torch.tensor(values).to(**self.tkwargs)
             acq = FixedFeatureAcquisitionFunction(
                 acq_function=acq, d=dim, columns=columns, values=values
             )
