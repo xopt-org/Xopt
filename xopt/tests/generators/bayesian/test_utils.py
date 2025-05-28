@@ -46,7 +46,7 @@ class TestUtils:
         X = torch.empty((0, 2))
         Y = torch.empty((0, 2))
         reference_point = torch.tensor([0.0, 0.0])
-        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        _, pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
         assert pf_X is None
         assert pf_Y is None
         assert hv == 0.0
@@ -55,7 +55,7 @@ class TestUtils:
         X = torch.tensor([[1.0, 1.0], [2.0, 2.0]])
         Y = -1 * torch.tensor([[1.0, 1.0], [2.0, 2.0]])
         reference_point = torch.tensor([0.0, 0.0])
-        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        _, pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
         assert pf_X is None
         assert pf_Y is None
         assert hv == 0.0
@@ -64,7 +64,7 @@ class TestUtils:
         X = torch.tensor([[1.0, 2.0], [2.0, 1.0]])
         Y = torch.tensor([[1.0, 2.0], [2.0, 1.0]])
         reference_point = torch.tensor([0.0, 0.0])
-        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        _, pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
         assert pf_X.shape[1] == 2
         assert pf_Y.shape[1] == 2
         assert hv > 0
@@ -73,7 +73,7 @@ class TestUtils:
         X = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
         Y = -1 * torch.tensor([[0.0, 0.0], [1.0, 1.0]])
         reference_point = torch.tensor([0.0, 0.0])
-        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        _, pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
         assert pf_X is None
         assert pf_Y is None
         assert hv == 0.0
@@ -82,7 +82,7 @@ class TestUtils:
         X = torch.tensor([[1.0, 2.0, 3.0], [2.0, 1.0, 3.0], [3.0, 2.0, 1.0]])
         Y = torch.tensor([[1.0, 2.0, 3.0], [2.0, 1.0, 3.0], [3.0, 2.0, 1.0]])
         reference_point = torch.tensor([0.0, 0.0, 0.0])
-        pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
+        _, pf_X, pf_Y, hv = compute_hypervolume_and_pf(X, Y, reference_point)
         assert pf_X.shape[1] == 3
         assert pf_Y.shape[1] == 3
         assert hv > 0
@@ -251,9 +251,9 @@ class TestUtils:
             assert torch.allclose(m1, m2, rtol=0), "JIT model output mismatch"
             assert torch.allclose(var1, var2, rtol=0), "JIT model variance mismatch"
             assert torch.allclose(m1, m3, rtol=0), "Compiled model output mismatch"
-            assert torch.allclose(var1, var3, rtol=0), (
-                "Compiled model variance mismatch"
-            )
+            assert torch.allclose(
+                var1, var3, rtol=0
+            ), "Compiled model variance mismatch"
 
     @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)

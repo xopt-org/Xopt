@@ -4,7 +4,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -1000,7 +1000,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             )
 
             # compute the pareto front stats
-            pareto_front_variables, _, hv = compute_hypervolume_and_pf(
+            _, pareto_front_variables, _, hv = compute_hypervolume_and_pf(
                 variable_data,
                 objective_data,
                 self.torch_reference_point,
@@ -1012,7 +1012,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             )
 
             # create a new row for the pareto front stats
-            new_row = {
+            new_row: dict[str, Any] = {
                 "iteration": i,
                 "hypervolume": hv,
                 "n_non_dominated": n_non_dominated,
