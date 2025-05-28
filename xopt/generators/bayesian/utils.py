@@ -505,7 +505,7 @@ def compute_hypervolume_and_pf(
 
     hv = Hypervolume(reference_point)
     if Y.shape[0] == 0:
-        return None, None, 0.0
+        return None, None, None, 0.0
 
     # add the reference point to the objective values
     # add a dummy point to the X values
@@ -517,7 +517,7 @@ def compute_hypervolume_and_pf(
     # if the first point is in the pareto front then
     # none of the points dominate over the reference
     if pareto_mask[0]:
-        return None, None, 0.0
+        return None, None, None, 0.0
 
     # get pareto front points
     pareto_front_X = X[pareto_mask]

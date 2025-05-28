@@ -932,9 +932,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
     def get_pareto_front_and_hypervolume(
         self,
-    ) -> tuple[
-        torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, float | None
-    ]:
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, float]:
         """
         Get the pareto front and hypervolume of the current data.
 
@@ -957,7 +955,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         # if there are no valid points skip PF calculation and return None
         if len(variable_data) == 0:
-            return None, None, None, None
+            return None, None, None, 0.0
 
         mask, pareto_front_variables, pareto_front_objectives, hv = (
             compute_hypervolume_and_pf(
