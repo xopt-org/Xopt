@@ -320,12 +320,12 @@ def torch_trace_gp_model(
             traced_model = torch.jit.optimize_for_inference(traced_model)
         if verify:
             traced_mean, traced_var = traced_model(test_x)
-            assert torch.allclose(
-                pred.mean, traced_mean, rtol=0
-            ), f"JIT traced mean != original {pred.mean=} {traced_mean=}"
-            assert torch.allclose(
-                pred.variance, traced_var, rtol=0
-            ), f"JIT traced variance != original: {pred.variance=} {traced_var=}"
+            assert torch.allclose(pred.mean, traced_mean, rtol=0), (
+                f"JIT traced mean != original {pred.mean=} {traced_mean=}"
+            )
+            assert torch.allclose(pred.variance, traced_var, rtol=0), (
+                f"JIT traced variance != original: {pred.variance=} {traced_var=}"
+            )
 
     return traced_model.to(**tkwargs)
 
@@ -384,12 +384,12 @@ def torch_compile_gp_model(
             )
             mvn = traced_model(test_x)
         traced_mean, traced_var = mvn.mean, mvn.variance
-        assert torch.allclose(
-            pred.mean, traced_mean, rtol=0
-        ), f"Compiled mean != original {pred.mean=} {traced_mean=}"
-        assert torch.allclose(
-            pred.variance, traced_var, rtol=0
-        ), f"Compiled variance != original: {pred.variance=} {traced_var=}"
+        assert torch.allclose(pred.mean, traced_mean, rtol=0), (
+            f"Compiled mean != original {pred.mean=} {traced_mean=}"
+        )
+        assert torch.allclose(pred.variance, traced_var, rtol=0), (
+            f"Compiled variance != original: {pred.variance=} {traced_var=}"
+        )
 
     return traced_model
 
@@ -469,9 +469,9 @@ def torch_compile_acqf(
             test_x = test_x.unsqueeze(-2).to(**tkwargs)  # 1 x 1 x d
             acq_value = acq(test_x.clone().detach())
             sacq_value = saqcf(test_x.clone().detach())
-            assert torch.allclose(
-                acq_value, sacq_value, rtol=1e-10
-            ), f"Compiled acquisition != original {acq_value=} {sacq_value=}"
+            assert torch.allclose(acq_value, sacq_value, rtol=1e-10), (
+                f"Compiled acquisition != original {acq_value=} {sacq_value=}"
+            )
     return saqcf
 
 

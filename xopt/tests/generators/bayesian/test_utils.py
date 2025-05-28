@@ -251,9 +251,9 @@ class TestUtils:
             assert torch.allclose(m1, m2, rtol=0), "JIT model output mismatch"
             assert torch.allclose(var1, var2, rtol=0), "JIT model variance mismatch"
             assert torch.allclose(m1, m3, rtol=0), "Compiled model output mismatch"
-            assert torch.allclose(
-                var1, var3, rtol=0
-            ), "Compiled model variance mismatch"
+            assert torch.allclose(var1, var3, rtol=0), (
+                "Compiled model variance mismatch"
+            )
 
     @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
