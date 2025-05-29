@@ -11,6 +11,7 @@ from torch import Tensor
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
 from xopt.vocs import VOCS
+from xopt.errors import FeasibilityError
 
 logger = logging.getLogger()
 
@@ -353,8 +354,9 @@ class OptimizeTurboController(TurboController):
         feas_data = self.vocs.feasibility_data(data)
 
         if len(data[feas_data["feasible"]]) == 0:
-            raise RuntimeError(
-                "turbo requires at least one valid point in the training dataset"
+            raise FeasibilityError(
+                "No points in the dataset satisfy the given constraints. "
+                "TuRBO requires at least one valid point in the training dataset. "
             )
         else:
             self._set_best_point_value(data[feas_data["feasible"]])

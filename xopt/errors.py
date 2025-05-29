@@ -24,3 +24,7 @@ class XoptWarning(Warning):
 
 class GeneratorWarning(XoptWarning):
     pass
+
+
+class FeasibilityError(Exception):
+    pass

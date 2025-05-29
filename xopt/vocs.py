@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from pydantic import ConfigDict, conlist, Field, field_validator
+from xopt.errors import FeasibilityError
 
 from xopt.pydantic import XoptBaseModel
 
@@ -745,9 +746,9 @@ class VOCS(XoptBaseModel):
             raise RuntimeError("cannot select best point if dataframe is empty")
 
         feasible_data = self.feasibility_data(data)
-        if feasible_data.empty:
-            raise RuntimeError(
-                "cannot select best point if no points satisfy the given constraints"
+        if feasible_data.empty or (~feasible_data["feasible"]).all():
+            raise FeasibilityError(
+                "Cannot select best point if no points satisfy the given constraints. "
             )
 
         ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
