@@ -938,12 +938,12 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         Returns:
         --------
-        mask : torch.Tensor
-            A mask indicating which points are part of the pareto front.
         pareto_front_variables : torch.Tensor
             The pareto front variable data.
         pareto_front_objectives : torch.Tensor
             The pareto front objective data.
+        pareto_mask : torch.Tensor
+            A mask indicating which points are part of the pareto front.
         hv : float
             The hypervolume of the pareto front.
         """
@@ -957,7 +957,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         if len(variable_data) == 0:
             return None, None, None, 0.0
 
-        mask, pareto_front_variables, pareto_front_objectives, hv = (
+        pareto_front_variables, pareto_front_objectives, pareto_mask, hv = (
             compute_hypervolume_and_pf(
                 variable_data,
                 objective_data,
@@ -970,9 +970,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             pareto_front_objectives = pareto_front_objectives / weights
 
         return (
-            mask,
             pareto_front_variables,
             pareto_front_objectives,
+            pareto_mask,
             hv,
         )
 

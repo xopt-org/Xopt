@@ -499,6 +499,9 @@ def compute_hypervolume_and_pf(
         The points on the Pareto front. Returns None if no pareto front exists.
     pareto_front_Y : torch.Tensor
         The objective values of the points on the Pareto front. Returns None if no pareto front exists.
+    pareto_mask : torch.Tensor
+        A boolean mask indicating which points are on the Pareto front.
+        Returns None if no pareto front exists.
     hv_value : float
         The hypervolume value.
     """
@@ -524,4 +527,4 @@ def compute_hypervolume_and_pf(
     pareto_front_Y = Y[pareto_mask]
     hv_value = hv.compute(Y[pareto_mask].cpu())
 
-    return pareto_mask, pareto_front_X, pareto_front_Y, hv_value
+    return pareto_front_X, pareto_front_Y, pareto_mask, hv_value
