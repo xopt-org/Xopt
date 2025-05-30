@@ -479,7 +479,7 @@ def compute_hypervolume_and_pf(
     X: torch.Tensor,
     Y: torch.Tensor,
     reference_point: torch.Tensor,
-) -> tuple[torch.Tensor | None, torch.Tensor | None, float]:
+) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, float]:
     """
     Compute the hypervolume and pareto front
     given a set of points assuming maximization.
@@ -499,13 +499,16 @@ def compute_hypervolume_and_pf(
         The points on the Pareto front. Returns None if no pareto front exists.
     pareto_front_Y : torch.Tensor
         The objective values of the points on the Pareto front. Returns None if no pareto front exists.
+    pareto_mask : torch.Tensor
+        A boolean mask indicating which points are on the Pareto front.
+        Returns None if no pareto front exists.
     hv_value : float
         The hypervolume value.
     """
 
     hv = Hypervolume(reference_point)
     if Y.shape[0] == 0:
-        return None, None, 0.0
+        return None, None, None, 0.0
 
     # add the reference point to the objective values
     # add a dummy point to the X values
@@ -517,11 +520,11 @@ def compute_hypervolume_and_pf(
     # if the first point is in the pareto front then
     # none of the points dominate over the reference
     if pareto_mask[0]:
-        return None, None, 0.0
+        return None, None, None, 0.0
 
     # get pareto front points
     pareto_front_X = X[pareto_mask]
     pareto_front_Y = Y[pareto_mask]
     hv_value = hv.compute(Y[pareto_mask].cpu())
 
-    return pareto_front_X, pareto_front_Y, hv_value
+    return pareto_front_X, pareto_front_Y, pareto_mask, hv_value

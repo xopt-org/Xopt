@@ -4,7 +4,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -930,7 +930,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         return torch.tensor(pt, **self.tkwargs)
 
-    def get_pareto_front_and_hypervolume(self):
+    def get_pareto_front_and_hypervolume(
+        self,
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, float]:
         """
         Get the pareto front and hypervolume of the current data.
 
@@ -940,6 +942,8 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             The pareto front variable data.
         pareto_front_objectives : torch.Tensor
             The pareto front objective data.
+        pareto_mask : torch.Tensor
+            A mask indicating which points are part of the pareto front.
         hv : float
             The hypervolume of the pareto front.
         """
@@ -951,9 +955,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
         # if there are no valid points skip PF calculation and return None
         if len(variable_data) == 0:
-            return None, None, None
+            return None, None, None, 0.0
 
-        pareto_front_variables, pareto_front_objectives, hv = (
+        pareto_front_variables, pareto_front_objectives, pareto_mask, hv = (
             compute_hypervolume_and_pf(
                 variable_data,
                 objective_data,
@@ -968,6 +972,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         return (
             pareto_front_variables,
             pareto_front_objectives,
+            pareto_mask,
             hv,
         )
 
@@ -995,7 +1000,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             )
 
             # compute the pareto front stats
-            pareto_front_variables, _, hv = compute_hypervolume_and_pf(
+            _, pareto_front_variables, _, hv = compute_hypervolume_and_pf(
                 variable_data,
                 objective_data,
                 self.torch_reference_point,
@@ -1007,7 +1012,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             )
 
             # create a new row for the pareto front stats
-            new_row = {
+            new_row: dict[str, Any] = {
                 "iteration": i,
                 "hypervolume": hv,
                 "n_non_dominated": n_non_dominated,
