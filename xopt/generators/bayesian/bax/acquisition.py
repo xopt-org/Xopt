@@ -37,7 +37,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         ) = self.algorithm.get_execution_paths(self.model, bounds)
 
         # Need to call the model on some data before we can condition_on_observations
-        self.model.posterior(*[self.xs_exe[:1, 0:1, 0:] for m in model.models])
+        self.model.posterior(self.xs_exe[:1, 0:1, 0:])
 
         # construct a batch of size n_samples fantasy models,
         # where each fantasy model is produced by taking the model
