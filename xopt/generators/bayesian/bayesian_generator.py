@@ -27,7 +27,7 @@ from pydantic import (
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from xopt.errors import XoptError
+from xopt.errors import XoptError, FeasibilityError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -497,7 +497,11 @@ class BayesianGenerator(Generator, ABC):
         if self.turbo_controller is not None:
             if self.turbo_controller.restrict_model_data:
                 data = self.turbo_controller.get_data_in_trust_region(data, self)
-
+                if data.empty:
+                    raise FeasibilityError(
+                        "No training data available to build model, because ",
+                        "no points in the dataset are within the TuRBO trust region. ",
+                    )
         return data
 
     def get_input_data(self, data: pd.DataFrame) -> torch.Tensor:

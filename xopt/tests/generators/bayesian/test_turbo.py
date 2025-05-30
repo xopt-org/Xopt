@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from xopt import Evaluator, VOCS, Xopt
+from xopt.errors import FeasibilityError
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
@@ -273,7 +274,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FeasibilityError):
             turbo_state.update_state(gen)
 
         # test best y value violates the constraint
