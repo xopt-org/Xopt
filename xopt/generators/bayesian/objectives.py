@@ -24,12 +24,12 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
     Custom objective function wrapper for use in Bayesian generators.
 
     Attributes
-    -----------
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
     Methods
-    --------
+    -------
     forward(samples: Tensor, X: Optional[Tensor] = None) -> Tensor
         Evaluate the objective on the samples.
     """
@@ -72,7 +72,7 @@ def feasibility(
     Calculate the feasibility of the given points.
 
     Parameters
-    -----------
+    ----------
     X : Tensor
         The input tensor.
     model : torch.nn.Module
@@ -83,7 +83,7 @@ def feasibility(
         The posterior transform, by default None.
 
     Returns
-    --------
+    -------
     Tensor
         The feasibility values.
     """
@@ -104,12 +104,12 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
     Create a list of constraint callables.
 
     Parameters
-    -----------
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
     Returns
-    --------
+    -------
     Optional[List[Callable]]
         A list of constraint callables, or None if there are no constraints.
     """
@@ -140,12 +140,12 @@ def create_mc_objective(vocs: VOCS) -> LinearMCObjective:
     Create a monte carlo objective object.
 
     Parameters
-    -----------
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
     Returns
-    --------
+    -------
     LinearMCObjective
         The objective object.
     """
@@ -162,12 +162,12 @@ def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
     the minimize keyword and zero out anything that is a constraint.
 
     Parameters
-    -----------
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
     Returns
-    --------
+    -------
     WeightedMCMultiOutputObjective
         The multi-objective Bayesian optimization objective.
     """

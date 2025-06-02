@@ -43,12 +43,12 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         Overwrites base `get_acquisition` method.
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model used for Bayesian Optimization.
 
         Returns
-        --------
+        -------
         acq : AcquisitionFunction
             The acquisition function.
         """
@@ -80,12 +80,12 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         Get the acquisition function for Bayesian Optimization.
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model used for Bayesian Optimization.
 
         Returns
-        --------
+        -------
         acq : AcquisitionFunction
             The acquisition function.
         """
@@ -119,14 +119,14 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         Get the best function value for Expected Improvement based on the objective.
 
         Parameters
-        -----------
+        ----------
         data : pd.DataFrame
             The data used for optimization.
         objective : Objective
             The objective function.
 
         Returns
-        --------
+        -------
         best_f : Tensor
             The best function value.
         """

@@ -14,14 +14,14 @@ class Algorithm(XoptBaseModel, ABC):
     Base class for algorithms used in BAX.
 
     Attributes
-    -----------
+    ----------
     name : ClassVar[str]
         The name of the algorithm.
     n_samples : PositiveInt
         Number of execution paths to generate.
 
     Methods
-    --------
+    -------
     get_execution_paths(self, model: Model, bounds: Tensor) -> Tuple[Tensor, Tensor, Dict]
         Get execution paths for the algorithm.
     evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
@@ -41,14 +41,14 @@ class Algorithm(XoptBaseModel, ABC):
         Get execution paths for the algorithm.
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model to use for generating execution paths.
         bounds : Tensor
             The bounds for the optimization.
 
         Returns
-        --------
+        -------
         Tuple[Tensor, Tensor, Dict]
             The execution paths, their corresponding values, and additional results.
         """
@@ -67,7 +67,7 @@ class Algorithm(XoptBaseModel, ABC):
         Evaluate the virtual objective at the given inputs.
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model to use for evaluating the virtual objective.
         x : Tensor
@@ -80,7 +80,7 @@ class Algorithm(XoptBaseModel, ABC):
             Additional keyword arguments for the evaluation.
 
         Returns
-        --------
+        -------
         Tensor
             The evaluated virtual objective values.
         """
@@ -92,14 +92,14 @@ class GridScanAlgorithm(Algorithm, ABC):
     Grid scan algorithm for BAX.
 
     Attributes
-    -----------
+    ----------
     name : str
         The name of the algorithm.
     n_mesh_points : PositiveInt
         Number of mesh points along each axis.
 
     Methods
-    --------
+    -------
     create_mesh(self, bounds: Tensor) -> Tensor
         Create a mesh for evaluating posteriors on.
     """
@@ -114,17 +114,17 @@ class GridScanAlgorithm(Algorithm, ABC):
         Create a mesh for evaluating posteriors on.
 
         Parameters
-        -----------
+        ----------
         bounds : Tensor
             The bounds for the optimization.
 
         Returns
-        --------
+        -------
         Tensor
             The mesh points.
 
         Raises
-        -------
+        ------
         ValueError
             If the bounds do not have the shape [2, ndim].
         """
@@ -148,14 +148,14 @@ class GridOptimize(GridScanAlgorithm):
     Grid optimization algorithm for BAX.
 
     Attributes
-    -----------
+    ----------
     observable_names_ordered : List[str]
         Names of observable/objective models used in this algorithm.
     minimize : bool
         Whether to minimize the objective function.
 
     Methods
-    --------
+    -------
     get_execution_paths(self, model: Model, bounds: Tensor) -> Tuple[Tensor, Tensor, Dict]
         Get execution paths that minimize the objective function.
     evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
@@ -175,14 +175,14 @@ class GridOptimize(GridScanAlgorithm):
         Get execution paths that minimize the objective function.
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model to use for generating execution paths.
         bounds : Tensor
             The bounds for the optimization.
 
         Returns
-        --------
+        -------
         Tuple[Tensor, Tensor, Dict]
             The execution paths, their corresponding values, and additional results.
         """
@@ -236,7 +236,7 @@ class GridOptimize(GridScanAlgorithm):
         Evaluate the virtual objective (samples).
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model to use for evaluating the virtual objective.
         x : Tensor
@@ -249,7 +249,7 @@ class GridOptimize(GridScanAlgorithm):
             Additional keyword arguments for the evaluation.
 
         Returns
-        --------
+        -------
         Tensor
             The evaluated virtual objective values.
         """
@@ -266,12 +266,12 @@ class CurvatureGridOptimize(GridOptimize):
     Curvature grid optimization algorithm for BAX.
 
     Attributes
-    -----------
+    ----------
     use_mean : bool
         Whether to use the mean of the posterior distribution.
 
     Methods
-    --------
+    -------
     evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
         Evaluate the virtual objective (samples) with curvature.
     """
@@ -290,7 +290,7 @@ class CurvatureGridOptimize(GridOptimize):
         Evaluate the virtual objective (samples) with curvature.
 
         Parameters
-        -----------
+        ----------
         model : Model
             The model to use for evaluating the virtual objective.
         x : Tensor
@@ -303,7 +303,7 @@ class CurvatureGridOptimize(GridOptimize):
             Additional keyword arguments for the evaluation.
 
         Returns
-        --------
+        -------
         Tensor
             The evaluated virtual objective values with curvature.
         """
