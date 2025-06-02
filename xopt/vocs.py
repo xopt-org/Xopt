@@ -43,7 +43,7 @@ class VOCS(XoptBaseModel):
     to describe optimization problems.
 
     Attributes
-    -----------
+    ----------
     variables : Dict[str, conlist(float, min_length=2, max_length=2)]
         Input variable names with a list of minimum and maximum values.
     constraints : Dict[str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)]
@@ -56,7 +56,7 @@ class VOCS(XoptBaseModel):
         Observation names tracked alongside objectives and constraints.
 
     Methods
-    --------
+    -------
     from_yaml(cls, yaml_text: str) -> 'VOCS'
         Create a VOCS object from a YAML string.
     as_yaml(self) -> str

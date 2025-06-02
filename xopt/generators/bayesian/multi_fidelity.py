@@ -26,7 +26,7 @@ class MultiFidelityGenerator(MOBOGenerator):
     Implements Multi-fidelity Bayesian optimization.
 
     Attributes
-    -----------
+    ----------
     name : str
         The name of the generator.
     fidelity_parameter : Literal["s"]
@@ -41,7 +41,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         Indicates if the generator supports batch candidate generation.
 
     Methods
-    --------
+    -------
     validate_vocs(cls, v: VOCS) -> VOCS
         Validate the VOCS for the generator.
     calculate_total_cost(self, data: pd.DataFrame = None) -> float
@@ -84,17 +84,17 @@ class MultiFidelityGenerator(MOBOGenerator):
         Validate the VOCS for the generator.
 
         Parameters
-        -----------
+        ----------
         v : VOCS
             The VOCS to be validated.
 
         Returns
-        --------
+        -------
         VOCS
             The validated VOCS.
 
         Raises
-        -------
+        ------
         ValueError
             If constraints are present in the VOCS.
         """
@@ -131,12 +131,12 @@ class MultiFidelityGenerator(MOBOGenerator):
         Calculate the total cost of data samples using the fidelity parameter.
 
         Parameters
-        -----------
+        ----------
         data : pd.DataFrame, optional
             The data samples, by default None.
 
         Returns
-        --------
+        -------
         float
             The total cost of the data samples.
         """
@@ -153,12 +153,12 @@ class MultiFidelityGenerator(MOBOGenerator):
         Get the acquisition function for Bayesian Optimization.
 
         Parameters
-        -----------
+        ----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
         Returns
-        --------
+        -------
         NMOMF
             The acquisition function.
         """
@@ -187,12 +187,12 @@ class MultiFidelityGenerator(MOBOGenerator):
         FixedFeatureAcquisitionFunction on top of a PosteriorMean.
 
         Parameters
-        -----------
+        ----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
         Returns
-        --------
+        -------
         NMOMF
             The Multi-Fidelity Knowledge Gradient acquisition function.
         """
@@ -220,12 +220,12 @@ class MultiFidelityGenerator(MOBOGenerator):
         Add new data to the generator.
 
         Parameters
-        -----------
+        ----------
         new_data : pd.DataFrame
             The new data to be added.
 
         Raises
-        -------
+        ------
         ValueError
             If the fidelity parameter is not in the new data or if the fidelity
             values are outside the range [0,1].
@@ -248,7 +248,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         Get the index of the fidelity variable.
 
         Returns
-        --------
+        -------
         int
             The index of the fidelity variable.
         """
@@ -260,7 +260,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         Get the index of the fidelity objective.
 
         Returns
-        --------
+        -------
         int
             The index of the fidelity objective.
         """
@@ -271,7 +271,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         Select the best point at the maximum fidelity.
 
         Returns
-        --------
+        -------
         pd.DataFrame
             The best point at the maximum fidelity.
         """

@@ -68,7 +68,7 @@ class NelderMeadGenerator(SequentialGenerator):
     Converted to use a state machine to resume in exactly the last state.
 
     Attributes
-    -----------
+    ----------
     name : str
         The name of the generator.
     initial_point : Optional[Dict[str, float]]
@@ -87,7 +87,7 @@ class NelderMeadGenerator(SequentialGenerator):
         Current y value.
 
     Methods
-    --------
+    -------
     add_data(self, new_data: pd.DataFrame)
         Add new data to the generator.
     generate(self, n_candidates: int) -> Optional[List[Dict[str, float]]]
@@ -142,7 +142,7 @@ class NelderMeadGenerator(SequentialGenerator):
         Generate candidate.
 
         Returns
-        --------
+        -------
         Optional[List[Dict[str, float]]]
             A list of dictionaries containing the generated samples.
         """
@@ -178,7 +178,7 @@ class NelderMeadGenerator(SequentialGenerator):
         If initial_point is set, it will be used. Otherwise, if data is set, the last point will be used.
 
         Returns
-        --------
+        -------
         np.ndarray
             The initial point as a NumPy array.
         """
@@ -198,7 +198,7 @@ class NelderMeadGenerator(SequentialGenerator):
         Add new data to the generator.
 
         Parameters
-        -----------
+        ----------
         new_data : pd.DataFrame
             The new data to be added.
         """
@@ -299,7 +299,7 @@ class NelderMeadGenerator(SequentialGenerator):
         Returns the simplex in the current state.
 
         Returns
-        --------
+        -------
         Dict[str, np.ndarray]
             The simplex in the current state.
         """

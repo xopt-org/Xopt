@@ -43,7 +43,7 @@ def visualize_virtual_objective(
         Additional keyword arguments for evaluating the virtual objective.
 
     Returns
-    --------
+    -------
         The matplotlib figure and axes objects.
     """
     vocs, data = generator.vocs, generator.data

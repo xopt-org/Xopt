@@ -73,7 +73,7 @@ class BayesianGenerator(Generator, ABC):
     """Bayesian Generator for Bayesian Optimization.
 
     Attributes
-    -----------
+    ----------
     name : str
         The name of the Bayesian Generator.
 
@@ -112,7 +112,7 @@ class BayesianGenerator(Generator, ABC):
         The number of candidates to generate in each optimization step.
 
     Methods
-    --------
+    -------
     generate(self, n_candidates: int) -> List[Dict]:
         Generate candidates for Bayesian Optimization.
 
@@ -247,12 +247,12 @@ class BayesianGenerator(Generator, ABC):
         Add new data to the generator for Bayesian Optimization.
 
         Parameters
-        -----------
+        ----------
         new_data : pd.DataFrame
             The new data to be added to the generator.
 
         Notes
-        ------
+        -----
         This method appends the new data to the existing data in the generator.
         """
         self.data = pd.concat([self.data, new_data], axis=0)
@@ -262,17 +262,17 @@ class BayesianGenerator(Generator, ABC):
         Generate candidates using Bayesian Optimization.
 
         Parameters
-        -----------
+        ----------
         n_candidates : int
             The number of candidates to generate in each optimization step.
 
         Returns
-        --------
+        -------
         List[Dict]
             A list of dictionaries containing the generated candidates.
 
         Raises
-        -------
+        ------
         NotImplementedError
             If the number of candidates is greater than 1, and the generator does not
             support batch candidate generation.
@@ -282,7 +282,7 @@ class BayesianGenerator(Generator, ABC):
             called to add data before generating candidates.
 
         Notes
-        ------
+        -----
         This method generates candidates for Bayesian Optimization based on the
         provided number of candidates. It updates the internal model with the current
         data and calculates the candidates by optimizing the acquisition function.
@@ -358,7 +358,7 @@ class BayesianGenerator(Generator, ABC):
         Train a Bayesian model for Bayesian Optimization.
 
         Parameters
-        -----------
+        ----------
         data : pd.DataFrame, optional
             The data to be used for training the model. If not provided, the internal
             data of the generator is used.
@@ -367,17 +367,17 @@ class BayesianGenerator(Generator, ABC):
             with the trained model (default is True).
 
         Returns
-        --------
+        -------
         Module
             The trained Bayesian model.
 
         Raises
-        -------
+        ------
         ValueError
             If no data is available to build the model.
 
         Notes
-        ------
+        -----
         This method trains a Bayesian model using the provided data or the internal
         data of the generator. It updates the internal model with the trained model
         if the 'update_internal' flag is set to True.
@@ -435,19 +435,19 @@ class BayesianGenerator(Generator, ABC):
         Propose candidates using Bayesian Optimization.
 
         Parameters
-        -----------
+        ----------
         model : Module
             The trained Bayesian model.
         n_candidates : int, optional
             The number of candidates to propose (default is 1).
 
         Returns
-        --------
+        -------
         Tensor
             A tensor containing the proposed candidates.
 
         Notes
-        ------
+        -----
         This method proposes candidates for Bayesian Optimization by numerically
         optimizing the acquisition function using the trained model. It updates the
         state of the Turbo controller if used and calculates the optimization bounds.
@@ -484,12 +484,12 @@ class BayesianGenerator(Generator, ABC):
         will return a subset of data that is inside the trust region.
 
         Parameters
-        -----------
+        ----------
         data : pd.DataFrame
             The data in the form of a pandas DataFrame.
 
         Returns
-        --------
+        -------
         data : pd.DataFrame
             A subset of data used to train the model form of a pandas DataFrame.
 
@@ -509,17 +509,17 @@ class BayesianGenerator(Generator, ABC):
         Convert input data to a torch tensor.
 
         Parameters
-        -----------
+        ----------
         data : pd.DataFrame
             The input data in the form of a pandas DataFrame.
 
         Returns
-        --------
+        -------
         torch.Tensor
             A torch tensor containing the input data.
 
         Notes
-        ------
+        -----
         This method takes a pandas DataFrame as input data and converts it into a
         torch tensor. It specifically selects columns corresponding to the model's
         input names (variables), and the resulting tensor is configured with the data
@@ -534,16 +534,16 @@ class BayesianGenerator(Generator, ABC):
         Lives on target device specified by tkwargs / use_cuda.
 
         Parameters
-        -----------
+        ----------
         model : Module
             The BoTorch model to be used for generating the acquisition function.
 
         Returns
-        --------
+        -------
         acqusition_function : AcquisitionFunction
 
         Raises
-        -------
+        ------
         ValueError
             If the provided 'model' is None. A valid model is required to create the
             acquisition function.
@@ -781,12 +781,12 @@ class BayesianGenerator(Generator, ABC):
         Get optimization bounds based on the union of several domains.
 
         Returns
-        --------
+        -------
         torch.Tensor
             Tensor containing the optimized bounds.
 
         Notes
-        ------
+        -----
         This method calculates the optimization bounds based on several factors:
 
         - If 'max_travel_distances' is specified, the bounds are modified to limit
@@ -833,23 +833,23 @@ class BayesianGenerator(Generator, ABC):
         Tensor stays on CPU.
 
         Parameters
-        -----------
+        ----------
         bounds : torch.Tensor
             The optimization bounds based on the union of several domains.
 
         Returns
-        --------
+        -------
         torch.Tensor
             The bounds for the maximum travel distances region.
 
         Raises
-        -------
+        ------
         ValueError
             If the length of max_travel_distances does not match the number of
             variables in bounds.
 
         Notes
-        ------
+        -----
         This method calculates the region in which the next candidates for
         optimization should be generated based on the maximum travel distances
         specified. The region is centered around the last observation in the
@@ -941,7 +941,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         Get the pareto front and hypervolume of the current data.
 
         Returns
-        --------
+        -------
         pareto_front_variables : torch.Tensor
             The pareto front variable data.
         pareto_front_objectives : torch.Tensor

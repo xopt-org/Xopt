@@ -21,7 +21,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     Hypervolume Improvement acquisition function.
 
     Attributes
-    -----------
+    ----------
     name : str
         The name of the generator.
     supports_batch_generation : bool
@@ -31,7 +31,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         of the acquisition function.
 
     Methods
-    --------
+    -------
     _get_objective(self) -> Callable
         Create the multi-objective Bayesian optimization objective.
     get_acquisition(self, model: torch.nn.Module) -> FixedFeatureAcquisitionFunction
@@ -81,12 +81,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         how qLogExpectedHypervolumeImprovement handles constraints.
 
         Parameters
-        -----------
+        ----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
         Returns
-        --------
+        -------
         FixedFeatureAcquisitionFunction
             The acquisition function.
         """
@@ -109,12 +109,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         Create the Log Expected Hypervolume Improvement acquisition function.
 
         Parameters
-        -----------
+        ----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
         Returns
-        --------
+        -------
         qLogNoisyExpectedHypervolumeImprovement
             The Log Expected Hypervolume Improvement acquisition function.
         """
@@ -144,12 +144,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         if `num_restarts` is greater than the number of points in the Pareto set).
 
         Parameters
-        -----------
+        ----------
         n_candidates : int, optional
             The number of candidates to generate, by default 1.
 
         Returns
-        --------
+        -------
         Optional[Tensor]
             A `num_restarts x q x d` tensor of initial conditions, or None if the
             Pareto front is not used.
