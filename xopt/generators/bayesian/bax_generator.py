@@ -18,7 +18,7 @@ class BaxGenerator(BayesianGenerator):
     """
     BAX Generator for Bayesian optimization.
 
-    Attributes:
+    Attributes
     -----------
     name : str
         The name of the generator.
@@ -31,7 +31,7 @@ class BaxGenerator(BayesianGenerator):
     _n_calls : int
         Internal counter for the number of calls to the generate method.
 
-    Methods:
+    Methods
     --------
     validate_turbo_controller(cls, value, info: ValidationInfo) -> Any
         Validate the turbo controller.
@@ -59,12 +59,12 @@ class BaxGenerator(BayesianGenerator):
         """
         Generate a specified number of candidate samples.
 
-        Parameters:
+        Parameters
         -----------
         n_candidates : int
             The number of candidate samples to generate.
 
-        Returns:
+        Returns
         --------
         List[Dict]
             A list of dictionaries containing the generated samples.
@@ -76,12 +76,12 @@ class BaxGenerator(BayesianGenerator):
         """
         Get the acquisition function.
 
-        Parameters:
+        Parameters
         -----------
         model : Model
             The model to use for the acquisition function.
 
-        Returns:
+        Returns
         --------
         ModelListExpectedInformationGain
             The acquisition function.

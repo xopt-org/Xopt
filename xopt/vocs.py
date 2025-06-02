@@ -42,7 +42,7 @@ class VOCS(XoptBaseModel):
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
     to describe optimization problems.
 
-    Attributes:
+    Attributes
     -----------
     variables : Dict[str, conlist(float, min_length=2, max_length=2)]
         Input variable names with a list of minimum and maximum values.
@@ -55,7 +55,7 @@ class VOCS(XoptBaseModel):
     observables : List[str]
         Observation names tracked alongside objectives and constraints.
 
-    Methods:
+    Methods
     --------
     from_yaml(cls, yaml_text: str) -> 'VOCS'
         Create a VOCS object from a YAML string.

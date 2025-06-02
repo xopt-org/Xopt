@@ -42,7 +42,7 @@ def visualize_virtual_objective(
     kwargs : dict, optional
         Additional keyword arguments for evaluating the virtual objective.
 
-    Returns:
+    Returns
     --------
         The matplotlib figure and axes objects.
     """
