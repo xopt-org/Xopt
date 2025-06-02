@@ -40,7 +40,7 @@ class FeasibilityObjective(GenericMCObjective):
             X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if
                 the objective depends on the inputs explicitly.
 
-        Returns:
+        Returns
             A `sample_shape x batch_shape x q`-dim Tensor of objective values
             weighted by feasibility (assuming maximization).
         """

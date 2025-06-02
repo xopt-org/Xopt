@@ -19,7 +19,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     Implements Multi-Objective Bayesian Optimization using the Log Expected
     Hypervolume Improvement acquisition function.
 
-    Attributes:
+    Attributes
     -----------
     name : str
         The name of the generator.
@@ -29,7 +29,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         Flag to specify if Pareto front points are to be used during optimization
         of the acquisition function.
 
-    Methods:
+    Methods
     --------
     _get_objective(self) -> Callable
         Create the multi-objective Bayesian optimization objective.
@@ -77,12 +77,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         Note that this needs to overwrite the base method due to
         how qLogExpectedHypervolumeImprovement handles constraints.
 
-        Parameters:
+        Parameters
         -----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
-        Returns:
+        Returns
         --------
         FixedFeatureAcquisitionFunction
             The acquisition function.
@@ -105,12 +105,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         """
         Create the Log Expected Hypervolume Improvement acquisition function.
 
-        Parameters:
+        Parameters
         -----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
-        Returns:
+        Returns
         --------
         qLogNoisyExpectedHypervolumeImprovement
             The Log Expected Hypervolume Improvement acquisition function.
@@ -140,12 +140,12 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         function instead of randomly selected points (random points fill in the set
         if `num_restarts` is greater than the number of points in the Pareto set).
 
-        Parameters:
+        Parameters
         -----------
         n_candidates : int, optional
             The number of candidates to generate, by default 1.
 
-        Returns:
+        Returns
         --------
         Optional[Tensor]
             A `num_restarts x q x d` tensor of initial conditions, or None if the

@@ -17,7 +17,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     """
     Time-dependent Bayesian generator for Bayesian Optimization.
 
-    Attributes:
+    Attributes
     -----------
     name : str
         The name of the generator.
@@ -30,7 +30,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     forgetting_time : Optional[PositiveFloat]
         Time period to forget historical data in seconds.
 
-    Methods:
+    Methods
     --------
     validate_gp_constructor(cls, value)
         Validate the Gaussian Process (GP) constructor.
@@ -72,17 +72,17 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         """
         Validate the Gaussian Process (GP) constructor.
 
-        Parameters:
+        Parameters
         -----------
         value : Optional[TimeDependentModelConstructor]
             The GP constructor to validate.
 
-        Returns:
+        Returns
         --------
         TimeDependentModelConstructor
             The validated GP constructor.
 
-        Raises:
+        Raises
         -------
         ValueError
             If the GP constructor is not found.
@@ -110,12 +110,12 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         """
         Window data based on the forgetting time.
 
-        Parameters:
+        Parameters
         -----------
         data : pd.DataFrame
             The input data.
 
-        Returns:
+        Returns
         --------
         pd.DataFrame
             The windowed data.
@@ -130,12 +130,12 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         """
         Generate candidates for Bayesian Optimization.
 
-        Parameters:
+        Parameters
         -----------
         n_candidates : int
             The number of candidates to generate.
 
-        Returns:
+        Returns
         --------
         List[dict]
             The generated candidates.
@@ -158,17 +158,17 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         """
         Convert input data to a torch tensor.
 
-        Parameters:
+        Parameters
         -----------
         data : pd.DataFrame
             The input data in the form of a pandas DataFrame.
 
-        Returns:
+        Returns
         --------
         torch.Tensor
             A torch tensor containing the input data.
 
-        Notes:
+        Notes
         ------
         This method takes a pandas DataFrame as input data and converts it into a
         torch tensor. It specifically selects columns corresponding to the model's
@@ -185,12 +185,12 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         """
         Get the acquisition function for Bayesian Optimization.
 
-        Parameters:
+        Parameters
         -----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
-        Returns:
+        Returns
         --------
         FixedFeatureAcquisitionFunction
             The acquisition function with fixed features.
