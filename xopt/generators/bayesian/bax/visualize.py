@@ -1,5 +1,6 @@
 import torch
 from matplotlib import pyplot as plt
+from botorch.models import ModelListGP, SingleTaskGP
 
 from xopt.generators.bayesian.visualize import (
     _generate_input_mesh,
@@ -12,7 +13,6 @@ def visualize_virtual_objective(
     variable_names: list[str] = None,
     idx: int = -1,
     reference_point: dict = None,
-    show_samples: bool = True,
     n_grid: int = 50,
     n_samples: int = 100,
     kwargs: dict = None,
@@ -35,8 +35,6 @@ def visualize_virtual_objective(
         Reference point determining the value of variables in
         generator.vocs.variable_names, but not in variable_names (slice plots in
         higher dimensions). Defaults to last used sample.
-    show_samples : bool, optional
-        Whether samples are shown.
     n_grid : int, optional
         Number of grid points per dimension used to display the model predictions.
     n_samples : int, optional
@@ -83,8 +81,8 @@ def visualize_virtual_objective(
             f"reference_point contains keys {invalid_names}, "
             f"which are not in generator.vocs.variable_names."
         )
-
-    x = _generate_input_mesh(vocs, variable_names, reference_point, n_grid)
+    tkwargs = {"dtype": torch.double, "device": "cpu"}
+    x = _generate_input_mesh(vocs, variable_names, reference_point, n_grid, tkwargs)
 
     # verify model exists
     if generator.model is None:
@@ -98,6 +96,8 @@ def visualize_virtual_objective(
         for name in generator.algorithm.observable_names_ordered
     ]
     bax_model = generator.model.subset_output(bax_model_ids)
+    if isinstance(bax_model, SingleTaskGP):
+        bax_model = ModelListGP(bax_model)
 
     # get virtual objective (sample) values
     bounds = generator._get_optimization_bounds()
