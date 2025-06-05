@@ -81,7 +81,7 @@ def visualize_virtual_objective(
             f"reference_point contains keys {invalid_names}, "
             f"which are not in generator.vocs.variable_names."
         )
-    tkwargs = {"dtype": torch.double, "device": "cpu"}
+    tkwargs = generator.tkwargs
     x = _generate_input_mesh(vocs, variable_names, reference_point, n_grid, tkwargs)
 
     # verify model exists
@@ -103,7 +103,7 @@ def visualize_virtual_objective(
     bounds = generator._get_optimization_bounds()
     kwargs = kwargs if kwargs else {}
     objective_values = generator.algorithm.evaluate_virtual_objective(
-        bax_model, x, bounds, tkwargs=generator.tkwargs, n_samples=n_samples, **kwargs
+        bax_model, x, bounds, tkwargs=tkwargs, n_samples=n_samples, **kwargs
     )
 
     # get sample stats
