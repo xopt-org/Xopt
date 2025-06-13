@@ -1,10 +1,11 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Optional
 
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -77,6 +78,17 @@ class LBFGSOptimizer(NumericalOptimizer):
         description="Use sequential (true) or joint (false) optimization when q > 1",
     )
     model_config = ConfigDict(validate_assignment=True)
+
+
+    @field_validator("n_raw_samples", mode="after")
+    def validate_n_raw_samples(cls, v):
+        if v is None:
+            return 128
+        if v < v.data.n_restarts:
+            warnings.warn("n_raw_samples should be greater than n_restarts, setting to n_restarts")
+            v = v.data.n_restarts
+        return v
+
 
     def optimize(self, function, bounds, n_candidates=1, **kwargs):
         """
