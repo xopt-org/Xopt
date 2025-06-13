@@ -41,7 +41,7 @@ class TestNumericalOptimizers:
                 np.random.seed(42)
                 torch.manual_seed(42)
                 candidates2 = optimizer2.optimize(
-                        function=f, bounds=bounds, n_candidates=ncandidate
+                    function=f, bounds=bounds, n_candidates=ncandidate
                 )
                 assert candidates.shape == torch.Size([ncandidate, ndim])
                 assert candidates2.shape == torch.Size([ncandidate, ndim])
