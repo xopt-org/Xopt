@@ -37,6 +37,16 @@ class TestNumericalOptimizers:
                 )
                 assert candidates.shape == torch.Size([ncandidate, ndim])
 
+        optimizer = LBFGSOptimizer(with_grad=False)
+        for ndim in [1, 3]:
+            bounds = torch.stack((torch.zeros(ndim), torch.ones(ndim)))
+            for ncandidate in [1, 3]:
+                candidates2 = optimizer.optimize(
+                    function=f, bounds=bounds, n_candidates=ncandidate
+                )
+                assert candidates2.shape == torch.Size([ncandidate, ndim])
+                assert torch.allequal(candidates, candidates2)
+
         # test max time
         max_time_optimizer = LBFGSOptimizer(max_time=1.0)
         ndim = 1
