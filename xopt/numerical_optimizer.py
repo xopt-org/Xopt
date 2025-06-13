@@ -79,16 +79,16 @@ class LBFGSOptimizer(NumericalOptimizer):
     )
     model_config = ConfigDict(validate_assignment=True)
 
-
     @field_validator("n_raw_samples", mode="after")
     def validate_n_raw_samples(cls, v):
         if v is None:
             return 128
         if v < v.data.n_restarts:
-            warnings.warn("n_raw_samples should be greater than n_restarts, setting to n_restarts")
+            warnings.warn(
+                "n_raw_samples should be greater than n_restarts, setting to n_restarts"
+            )
             v = v.data.n_restarts
         return v
-
 
     def optimize(self, function, bounds, n_candidates=1, **kwargs):
         """
