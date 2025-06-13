@@ -14,13 +14,6 @@ class NumericalOptimizer(XoptBaseModel, ABC):
     """
     Base class for numerical optimizers.
 
-    Attributes
-    ----------
-    name : str
-        The name of the optimizer. Default is "base_numerical_optimizer".
-    model_config : ConfigDict
-        Configuration dictionary with extra fields forbidden.
-
     Methods
     -------
     optimize(function, bounds, n_candidates=1, **kwargs)
@@ -42,37 +35,32 @@ class LBFGSOptimizer(NumericalOptimizer):
     Attributes
     ----------
     n_restarts : PositiveInt
-        Number of restarts during acquisition function optimization, default is 20.
+        Number of restarts (independent initial conditions) for optimization, default is 20.
+    n_raw_samples : PositiveInt
+        Number of raw samples used to pick the initial `n_restarts` points, default is 128.
     max_iter : PositiveInt
         Maximum number of iterations for the optimizer, default is 2000.
     max_time : Optional[PositiveFloat]
         Maximum time allowed for optimization, default is None (no time limit).
+    with_grad : bool
+        Whether to use autograd (True, default) or finite difference (False) for gradient computation.
+    sequential : bool
+        Use sequential (True) or joint (False, default) optimization when multiple candidates are requested.
 
     Methods
     -------
     optimize(function, bounds, n_candidates=1, **kwargs)
         Optimize the given acquisition function within the specified bounds.
-
-    Parameters
-    ----------
-    function : callable
-        The acquisition function to be optimized.
-    bounds : Tensor
-        The bounds within which to optimize the acquisition function. Must have shape [2, ndim].
-    n_candidates : int, optional
-        Number of candidates to return, default is 1.
-    **kwargs : dict
-        Additional keyword arguments to pass to the optimizer.
-
-    Returns
-    -------
-    candidates : Tensor
-        The optimized candidates.
     """
 
     name: str = Field("LBFGS", frozen=True)
     n_restarts: PositiveInt = Field(
-        20, description="number of restarts during acquisition function optimization"
+        20,
+        description="number of restarts (independent initial conditions) for optimization",
+    )
+    n_raw_samples: Optional[PositiveInt] = Field(
+        128,
+        description="number of raw samples - `n_restarts` best ones are selected from this set",
     )
     max_iter: PositiveInt = Field(
         2000, description="maximum number of optimization steps"
@@ -80,7 +68,14 @@ class LBFGSOptimizer(NumericalOptimizer):
     max_time: Optional[PositiveFloat] = Field(
         5.0, description="maximum time for optimization in seconds"
     )
-
+    with_grad: bool = Field(
+        True,
+        description="Use autograd (true) or finite difference (false) for gradient computation",
+    )
+    sequential: bool = Field(
+        False,
+        description="Use sequential (true) or joint (false) optimization when q > 1",
+    )
     model_config = ConfigDict(validate_assignment=True)
 
     def optimize(self, function, bounds, n_candidates=1, **kwargs):
@@ -108,7 +103,7 @@ class LBFGSOptimizer(NumericalOptimizer):
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
 
-        # emperical testing showed that the max time is overrun slightly on the botorch side
+        # empirical testing showed that the max time is overrun slightly on the botorch side
         # fix by slightly reducing the max time passed to this function
         if self.max_time is not None:
             max_time = self.max_time * 0.8 - 0.01
@@ -119,10 +114,10 @@ class LBFGSOptimizer(NumericalOptimizer):
             acq_function=function,
             bounds=bounds,
             q=n_candidates,
-            raw_samples=self.n_restarts,
+            raw_samples=self.n_raw_samples,
             num_restarts=self.n_restarts,
             timeout_sec=max_time,
-            options={"maxiter": self.max_iter},
+            options={"maxiter": self.max_iter, "with_grad": self.with_grad},
             **kwargs,
         )
         return candidates
