@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
+from botorch.optim.parameter_constraints import nonlinear_constraint_is_feasible
+
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 from torch import Tensor
 
@@ -164,7 +166,13 @@ class GridOptimizer(NumericalOptimizer):
         10, description="number of grid points per axis used for optimization"
     )
 
-    def optimize(self, function, bounds, n_candidates=1):
+    def optimize(
+        self,
+        function: Callable,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        nonlinear_inequality_constraints: (list[tuple[Callable, bool]] | None) = None,
+    ):
         """
         Optimize the given acquisition function within the specified bounds.
 
@@ -176,6 +184,10 @@ class GridOptimizer(NumericalOptimizer):
             A tensor specifying the bounds for the optimization. It must have the shape [2, ndim].
         n_candidates : int, optional
             The number of candidates to generate (default is 1).
+        nonlinear_inequality_constraints : Optional[list[Callable]]
+            A list of callables representing the nonlinear inequality constraints. Each callable represents a
+            constraint of the form callable(x) >= 0. Callable() takes in a one-dimensional tensor of shape `d`
+            and returns a scalar.
 
         Returns
         -------
@@ -202,6 +214,19 @@ class GridOptimizer(NumericalOptimizer):
 
         # evaluate the function on grid points
         f_values = function(mesh_pts.unsqueeze(1))
+
+        # Apply nonlinear constraints -- remove f_value point where constraints(x) does not satisfy the constraints
+        if nonlinear_inequality_constraints is not None:
+            mask = torch.ones(f_values.shape, dtype=torch.bool, device=f_values.device)
+            for constraint in nonlinear_inequality_constraints:
+                mask &= nonlinear_constraint_is_feasible(
+                    constraint, True, mesh_pts.unsqueeze(1)
+                )
+            f_values = f_values[mask]
+
+        # if no points are feasible, raise an error
+        if f_values.numel() == 0:
+            raise ValueError("No feasible points found")
 
         # get the best n_candidates
         _, indicies = torch.sort(f_values)

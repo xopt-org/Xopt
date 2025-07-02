@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from xopt import Evaluator, Xopt
@@ -54,6 +55,39 @@ class TestNumericalOptimizers:
             for ncandidate in [1, 3]:
                 candidates = optimizer.optimize(f, bounds, ncandidate)
                 assert candidates.shape == torch.Size([ncandidate, ndim])
+
+        # test nonlinear constraints
+        def constraint1(X):
+            return X[0] + X[1] - 1
+
+        def constraint2(X):
+            return X[0] - X[1] + 0.5
+
+        nonlinear_constraints = [constraint1, constraint2]
+
+        optimizer = GridOptimizer(n_grid_points=2)
+        bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
+        candidates = optimizer.optimize(
+            f,
+            bounds,
+            n_candidates=3,
+            nonlinear_inequality_constraints=nonlinear_constraints,
+        )
+        assert candidates.shape == torch.Size([2, 2])
+
+        # test case where no feasible points are found
+        def infeasible_constraint(X):
+            return X[0] + X[1] - 3
+
+        nonlinear_constraints.append(infeasible_constraint)
+
+        with pytest.raises(ValueError, match="No feasible points found"):
+            optimizer.optimize(
+                f,
+                bounds,
+                n_candidates=3,
+                nonlinear_inequality_constraints=nonlinear_constraints,
+            )
 
     def test_in_xopt(self):
         vocs = deepcopy(tnk_vocs)
