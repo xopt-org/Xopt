@@ -16,6 +16,7 @@ from botorch.acquisition import (
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
+from botorch.acquisition.logei import qLogProbabilityOfFeasibility
 from gpytorch import Module
 from pydantic import (
     Field,
@@ -165,6 +166,12 @@ class BayesianGenerator(Generator, ABC):
     custom_objective: Optional[CustomXoptObjective] = Field(
         None,
         description="custom objective for optimization, replaces objective specified by VOCS",
+    )
+    feasibility_tolerance: Optional[float] = Field(
+        None,
+        description="If specified, acquisition function will be optimized with a constraint on the feasibility tolerance. May substantially increase optimization time.",
+        min=0.0,
+        max=1.0,
     )
     n_interpolate_points: Optional[PositiveInt] = None
 
@@ -462,19 +469,29 @@ class BayesianGenerator(Generator, ABC):
         # get acquisition function
         acq_funct = self.get_acquisition(model)
 
-        # get initial candidates to start acquisition function optimization
-        initial_points = self._get_initial_conditions(n_candidates)
-
-        # get candidates -- grid optimizer does not support batch_initial_conditions
-        if isinstance(self.numerical_optimizer, GridOptimizer):
-            candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates
-            )
+        # get nonlinear inequality constraints if feasibility tolerance is set
+        if self.feasibility_tolerance is not None:
+            log_feasibility = self._get_log_feasibility(model)
+            nonlinear_inequality_constraints = [
+                lambda X: log_feasibility(torch.atleast_2d(X))
+                - torch.tensor(self.feasibility_tolerance).log(),
+            ]
         else:
-            candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
+            nonlinear_inequality_constraints = None
+
+        args = {
+            "bounds": bounds,
+            "n_candidates": n_candidates,
+            "nonlinear_inequality_constraints": nonlinear_inequality_constraints,
+        }
+
+        if isinstance(self.numerical_optimizer, LBFGSOptimizer):
+            # if using LBFGS get initial candidates to start acquisition function optimization
+            args["batch_initial_conditions"] = self._get_initial_conditions(
+                n_candidates
             )
-        return candidates
+
+        return self.numerical_optimizer.optimize(acq_funct, **args)
 
     def get_training_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -540,7 +557,7 @@ class BayesianGenerator(Generator, ABC):
 
         Returns:
         --------
-        acqusition_function : AcquisitionFunction
+        acquisition_function : AcquisitionFunction
 
         Raises:
         -------
@@ -572,6 +589,7 @@ class BayesianGenerator(Generator, ABC):
 
         acq = self._apply_fixed_features(acq)
         acq = acq.to(**self.tkwargs)
+
         return acq
 
     def get_optimum(self):
@@ -651,6 +669,39 @@ class BayesianGenerator(Generator, ABC):
             The matplotlib figure and axes objects.
         """
         return visualize_generator_model(self, **kwargs)
+
+    def _get_log_feasibility(self, model: Module) -> Optional[LogAcquisitionFunction]:
+        """
+        Get the log feasibility acquisition function for the model.
+
+        Parameters:
+        -----------
+        model : Module
+            The BoTorch model to be used for generating the log feasibility acquisition
+            function.
+
+        Returns:
+        --------
+        LogAcquisitionFunction or None
+            The log feasibility acquisition function if constraints are defined in VOCS,
+            otherwise None.
+        """
+        if len(self.vocs.constraints) == 0:
+            return None
+
+        sampler = self._get_sampler(model)
+
+        log_feasibility = qLogProbabilityOfFeasibility(
+            model, self._get_constraint_callables(), sampler=sampler
+        )
+
+        if self.fixed_features is not None:
+            # apply fixed features to the log feasibility acquisition function
+            log_feasibility = self._apply_fixed_features(log_feasibility)
+
+        log_feasibility = log_feasibility.to(**self.tkwargs)
+
+        return log_feasibility
 
     def _get_initial_conditions(self, n_candidates=1) -> Union[Tensor, None]:
         """overwrite if algorithm should specifiy initial candidates for optimizing
