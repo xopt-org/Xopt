@@ -77,7 +77,7 @@ class BenchMOBO:
             t2 = time.perf_counter()
             X.data.iloc[-1, X.data.columns.get_loc("gen_time")] = t2 - t1
             X.data.iloc[-1, X.data.columns.get_loc("hv")] = (
-                X.generator.calculate_hypervolume()
+                X.generator.get_pareto_front_and_hypervolume()[-1]
             )
         return X
 
@@ -117,7 +117,7 @@ class BenchMOBO:
         outputs["hv25"] = X.data.loc[1 * self.N_STEPS // 4, "hv"]
         outputs["hv50"] = X.data.loc[2 * self.N_STEPS // 4, "hv"]
         outputs["hv75"] = X.data.loc[3 * self.N_STEPS // 4, "hv"]
-        outputs["hvf"] = X.generator.calculate_hypervolume()
+        outputs["hvf"] = X.generator.get_pareto_front_and_hypervolume()[-1]
 
         return outputs
 

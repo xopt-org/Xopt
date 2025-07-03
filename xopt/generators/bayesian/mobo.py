@@ -56,6 +56,8 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
 
+    _compatible_turbo_controllers = [SafetyTurboController]
+
     def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
