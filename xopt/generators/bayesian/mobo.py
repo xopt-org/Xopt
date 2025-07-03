@@ -5,8 +5,6 @@ from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
-from botorch.acquisition.logei import qLogProbabilityOfFeasibility
-
 from botorch.utils import draw_sobol_samples
 from pydantic import Field
 from torch import Tensor

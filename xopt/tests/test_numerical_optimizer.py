@@ -76,7 +76,7 @@ class TestNumericalOptimizers:
         # test case where no feasible points are found
         def infeasible_constraint(X):
             return X[0] + X[1] - 3
-        
+
         nonlinear_constraints.append(infeasible_constraint)
         with pytest.raises(ValueError, match="No valid initial conditions found"):
             optimizer.optimize(
@@ -132,7 +132,8 @@ class TestNumericalOptimizers:
             nonlinear_inequality_constraints=nonlinear_constraints,
         )
         assert torch.allclose(
-            candidates, torch.tensor([[1.0, 1.0], [1.0, 0.75], [1.0, 0.5]]),
+            candidates,
+            torch.tensor([[1.0, 1.0], [1.0, 0.75], [1.0, 0.5]]),
             atol=1e-4,
         )
 
