@@ -16,6 +16,7 @@ from botorch.acquisition import (
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
+from botorch.acquisition.logei import qLogProbabilityOfFeasibility
 from gpytorch import Module
 from pydantic import (
     Field,
@@ -165,6 +166,12 @@ class BayesianGenerator(Generator, ABC):
     custom_objective: Optional[CustomXoptObjective] = Field(
         None,
         description="custom objective for optimization, replaces objective specified by VOCS",
+    )
+    feasibility_tolerance: Optional[float] = Field(
+        None,
+        description="If specified, acquisition function will be optimized with a constraint on the feasibility tolerance. May substantially increase optimization time.",
+        min=0.0,
+        max=1.0,
     )
     n_interpolate_points: Optional[PositiveInt] = None
 
@@ -460,19 +467,35 @@ class BayesianGenerator(Generator, ABC):
         bounds = self._get_optimization_bounds()
 
         # get acquisition function
-        acq_funct = self.get_acquisition(model)
+        acq_funct, log_feasibility = self.get_acquisition(model)
 
         # get initial candidates to start acquisition function optimization
         initial_points = self._get_initial_conditions(n_candidates)
 
+        # get nonlinear inequality constraints if specified
+        if self.feasibility_tolerance is not None:
+            nonlinear_inequality_constraints = [
+                lambda X: log_feasibility(torch.atleast_2d(X))
+                - torch.tensor(self.feasibility_tolerance).log(),
+            ]
+        else:
+            nonlinear_inequality_constraints = None
+
         # get candidates -- grid optimizer does not support batch_initial_conditions
         if isinstance(self.numerical_optimizer, GridOptimizer):
             candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates
+                acq_funct,
+                bounds,
+                n_candidates,
+                nonlinear_inequality_constraints=nonlinear_inequality_constraints,
             )
         else:
             candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
+                acq_funct,
+                bounds,
+                n_candidates,
+                batch_initial_conditions=initial_points,
+                nonlinear_inequality_constraints=nonlinear_inequality_constraints,
             )
         return candidates
 
@@ -563,16 +586,29 @@ class BayesianGenerator(Generator, ABC):
             except AttributeError:
                 sampler = self._get_sampler(model)
 
+            log_feasibility = qLogProbabilityOfFeasibility(
+                model,
+                self._get_constraint_callables(),
+                sampler=sampler,
+            )
+
             acq = ConstrainedMCAcquisitionFunction(
                 model, acq, self._get_constraint_callables(), sampler=sampler
             )
 
             # log transform the result to handle the constraints
             acq = LogAcquisitionFunction(acq)
+        else:
+            log_feasibility = None
 
         acq = self._apply_fixed_features(acq)
         acq = acq.to(**self.tkwargs)
-        return acq
+
+        if log_feasibility is not None:
+            log_feasibility = self._apply_fixed_features(log_feasibility)
+            log_feasibility = log_feasibility.to(**self.tkwargs)
+
+        return acq, log_feasibility
 
     def get_optimum(self):
         """select the best point(s) given by the
