@@ -11,6 +11,7 @@ from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
+from xopt.generators.bayesian.turbo import SafetyTurboController
 from xopt.numerical_optimizer import LBFGSOptimizer
 
 
@@ -52,6 +53,8 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     )
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
+
+    _compatible_turbo_controllers = [SafetyTurboController]
 
     def _get_objective(self) -> MCMultiOutputObjective:
         """
