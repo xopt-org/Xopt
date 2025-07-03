@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+import time
 from typing import Callable, Optional
+import warnings
 
 import torch
 from botorch.acquisition import AcquisitionFunction
@@ -55,17 +57,6 @@ class LBFGSOptimizer(NumericalOptimizer):
     optimize(function, bounds, n_candidates=1, **kwargs)
         Optimize the given acquisition function within the specified bounds.
 
-    Parameters
-    ----------
-    function : callable
-        The acquisition function to be optimized.
-    bounds : Tensor
-        The bounds within which to optimize the acquisition function. Must have shape [2, ndim].
-    n_candidates : int, optional
-        Number of candidates to return, default is 1.
-    **kwargs : dict
-        Additional keyword arguments to pass to the optimizer.
-
     Returns
     -------
     candidates : Tensor
@@ -85,7 +76,14 @@ class LBFGSOptimizer(NumericalOptimizer):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    def optimize(self, function, bounds, n_candidates=1, **kwargs):
+    def optimize(
+        self,
+        function: Callable,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        nonlinear_inequality_constraints: (list[tuple[Callable, bool]] | None) = None,
+        **kwargs,
+    ):
         """
         Optimize the given acquisition function within the specified bounds.
 
@@ -116,6 +114,27 @@ class LBFGSOptimizer(NumericalOptimizer):
             max_time = self.max_time * 0.8 - 0.01
         else:
             max_time = None
+
+        # if nonlinear constraints are provided, need to create an initial condition generator
+        full_nonlinear_inequality_constraints = []
+        if nonlinear_inequality_constraints is not None:
+            # add in the boolean flag for the interpoint constraints
+            for i, constraint in enumerate(nonlinear_inequality_constraints):
+                full_nonlinear_inequality_constraints.append((constraint, True))
+
+            warnings.warn(
+                "Nonlinear inequality constraints are provided for LBFGS numerical optimization, "
+                "using a random initial condition generator which may take a long time to sample enough points.",
+                UserWarning,
+            )
+            ic_generator = get_random_ic_generator(
+                full_nonlinear_inequality_constraints
+            )
+
+            kwargs["ic_generator"] = ic_generator
+            kwargs["nonlinear_inequality_constraints"] = (
+                full_nonlinear_inequality_constraints
+            )
 
         candidates, _ = optimize_acqf(
             acq_function=function,
@@ -232,3 +251,117 @@ class GridOptimizer(NumericalOptimizer):
         _, indicies = torch.sort(f_values)
         x_min = mesh_pts[indicies.squeeze().flipud()]
         return x_min[:n_candidates]
+
+
+def get_random_ic_generator(
+    nonlinear_constraints: list[Callable], max_resamples: int = 100
+):
+    """
+    Get a random initial condition generator for the given nonlinear constraints.
+
+    Parameters
+    ----------
+    nonlinear_constraints : list[Callable]
+        A list of callables representing the nonlinear constraints. Each callable should take a tensor input
+        and return a boolean mask indicating feasibility.
+    max_resamples : int, optional
+        Maximum number of resampling attempts to find valid initial conditions, default is 100. If no valid
+        initial conditions are found after this many attempts, an error is raised.
+
+    Returns
+    -------
+    random_ic_generator : Callable
+        A callable that generates random initial conditions for the given function for use in botorch `optimize_acqf`.
+
+    """
+
+    def random_ic_generator(
+        acq_function: AcquisitionFunction,
+        bounds: Tensor,
+        q: int,
+        num_restarts: int,
+        raw_samples: int,
+        fixed_features: dict[int, float] | None = None,
+        options: dict[str, bool | float | int] | None = None,
+        inequality_constraints: list[tuple[Tensor, Tensor, float]] | None = None,
+        equality_constraints: list[tuple[Tensor, Tensor, float]] | None = None,
+        generator: Callable[[int, int, int | None], Tensor] | None = None,
+        fixed_X_fantasies: Tensor | None = None,
+    ) -> Tensor:
+        if inequality_constraints is not None:
+            raise ValueError(
+                "Inequality constraints are not supported in random initial condition generator"
+            )
+        if equality_constraints is not None:
+            raise ValueError(
+                "Equality constraints are not supported in random initial condition generator"
+            )
+        if generator is not None:
+            raise ValueError(
+                "Custom generator is not supported in random initial condition generator"
+            )
+        if fixed_X_fantasies is not None:
+            raise ValueError(
+                "Fixed X fantasies are not supported in random initial condition generator"
+            )
+
+        # generate random points within the bounds
+        print("getting random initial conditions")
+        start = time.time()
+        lower, upper = bounds[0], bounds[1]
+        rand = torch.rand(
+            10 ** lower.shape[0],
+            q,
+            lower.shape[0],
+            dtype=lower.dtype,
+            device=lower.device,
+        )
+        X = lower + (upper - lower) * rand
+
+        # Apply fixed features if provided
+        if fixed_features is not None:
+            for idx, val in fixed_features.items():
+                X[..., idx] = val
+
+        # Apply nonlinear constraints
+        mask = torch.ones(X.shape[0], dtype=torch.bool, device=X.device)
+        for constraint in nonlinear_constraints:
+            mask &= nonlinear_constraint_is_feasible(constraint[0], constraint[1], X)
+        X = X[mask]
+
+        # If not enough points, resample until enough
+        n_resamples = 0
+        while X.shape[0] < num_restarts and n_resamples < max_resamples:
+            # print(f"Resampling: {X.shape[0]} < {num_restarts}")
+            needed = num_restarts - X.shape[0]
+            rand = torch.rand(
+                needed ** lower.shape[0],
+                q,
+                lower.shape[0],
+                dtype=lower.dtype,
+                device=lower.device,
+            )
+            new_X = lower + (upper - lower) * rand
+            if fixed_features is not None:
+                for idx, val in fixed_features.items():
+                    new_X[:, idx] = val
+
+            mask = torch.ones(new_X.shape[0], dtype=torch.bool, device=new_X.device)
+            for constraint in nonlinear_constraints:
+                mask &= nonlinear_constraint_is_feasible(
+                    constraint[0], constraint[1], new_X
+                )
+            new_X = new_X[mask]
+            X = torch.cat([X, new_X], dim=0)
+            n_resamples += 1
+
+        # If still not enough points, raise an error
+        if X.shape[0] < num_restarts:
+            raise ValueError("No valid initial conditions found")
+
+        print(
+            f"Generated {X.shape[0]} random valid initial conditions (using {num_restarts} of them), took {time.time() - start:.2f} seconds"
+        )
+        return X[:num_restarts]
+
+    return random_ic_generator
