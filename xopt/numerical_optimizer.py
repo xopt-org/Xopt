@@ -14,6 +14,10 @@ from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class NumericalOptimizer(XoptBaseModel, ABC):
     """
@@ -151,7 +155,7 @@ class LBFGSOptimizer(NumericalOptimizer):
             return candidates
 
         except CandidateGenerationError:
-            print(
+            warnings.warn(
                 "Candidate generation failed, returning random valid samples which may not be optimal.",
             )
             return ic_generator(
@@ -321,7 +325,7 @@ def get_random_ic_generator(
             )
 
         # generate random points within the bounds
-        print("getting random initial conditions")
+        logger.debug("getting random initial conditions")
         start = time.time()
         lower, upper = bounds[0], bounds[1]
         rand = torch.rand(
@@ -347,7 +351,7 @@ def get_random_ic_generator(
         # If not enough points, resample until enough
         n_resamples = 0
         while X.shape[0] < num_restarts and n_resamples < max_resamples:
-            # print(f"Resampling: {X.shape[0]} < {num_restarts}")
+            logger.debug(f"Resampling: {X.shape[0]} < {num_restarts}")
             rand = torch.rand(
                 10 ** lower.shape[0],
                 q,
@@ -373,7 +377,7 @@ def get_random_ic_generator(
         if X.shape[0] < num_restarts:
             raise ValueError("No valid initial conditions found")
 
-        print(
+        logger.debug(
             f"Generated {X.shape[0]} random valid initial conditions (using {num_restarts} of them) over {n_resamples} resamples, took {time.time() - start:.2f} seconds"
         )
         return X[:num_restarts]
