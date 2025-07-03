@@ -7,6 +7,7 @@ import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
 from botorch.optim.parameter_constraints import nonlinear_constraint_is_feasible
+from botorch.exceptions import CandidateGenerationError
 
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 from torch import Tensor
@@ -136,17 +137,30 @@ class LBFGSOptimizer(NumericalOptimizer):
                 full_nonlinear_inequality_constraints
             )
 
-        candidates, _ = optimize_acqf(
-            acq_function=function,
-            bounds=bounds,
-            q=n_candidates,
-            raw_samples=self.n_restarts,
-            num_restarts=self.n_restarts,
-            timeout_sec=max_time,
-            options={"maxiter": self.max_iter},
-            **kwargs,
-        )
-        return candidates
+        try:
+            candidates, _ = optimize_acqf(
+                acq_function=function,
+                bounds=bounds,
+                q=n_candidates,
+                raw_samples=self.n_restarts,
+                num_restarts=self.n_restarts,
+                timeout_sec=max_time,
+                options={"maxiter": self.max_iter},
+                **kwargs,
+            )
+            return candidates
+
+        except CandidateGenerationError:
+            print(
+                "Candidate generation failed, returning random valid samples which may not be optimal.",
+            )
+            return ic_generator(
+                function,
+                bounds,
+                q=n_candidates,
+                num_restarts=n_candidates,
+                raw_samples=self.n_restarts,
+            )[:n_candidates][0]
 
 
 class GridOptimizer(NumericalOptimizer):
@@ -242,10 +256,11 @@ class GridOptimizer(NumericalOptimizer):
                     constraint, True, mesh_pts.unsqueeze(1)
                 )
             f_values = f_values[mask]
+            mesh_pts = mesh_pts[mask]
 
-        # if no points are feasible, raise an error
-        if f_values.numel() == 0:
-            raise ValueError("No feasible points found")
+            # if no points are feasible, raise an error
+            if f_values.numel() == 0:
+                raise ValueError("No feasible points found")
 
         # get the best n_candidates
         _, indicies = torch.sort(f_values)
@@ -333,9 +348,8 @@ def get_random_ic_generator(
         n_resamples = 0
         while X.shape[0] < num_restarts and n_resamples < max_resamples:
             # print(f"Resampling: {X.shape[0]} < {num_restarts}")
-            needed = num_restarts - X.shape[0]
             rand = torch.rand(
-                needed ** lower.shape[0],
+                10 ** lower.shape[0],
                 q,
                 lower.shape[0],
                 dtype=lower.dtype,
@@ -360,7 +374,7 @@ def get_random_ic_generator(
             raise ValueError("No valid initial conditions found")
 
         print(
-            f"Generated {X.shape[0]} random valid initial conditions (using {num_restarts} of them), took {time.time() - start:.2f} seconds"
+            f"Generated {X.shape[0]} random valid initial conditions (using {num_restarts} of them) over {n_resamples} resamples, took {time.time() - start:.2f} seconds"
         )
         return X[:num_restarts]
 

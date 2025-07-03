@@ -123,7 +123,7 @@ class TestNumericalOptimizers:
 
         nonlinear_constraints = [constraint1, constraint2]
 
-        optimizer = GridOptimizer(n_grid_points=2)
+        optimizer = GridOptimizer(n_grid_points=5)
         bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
         candidates = optimizer.optimize(
             f,
@@ -131,7 +131,10 @@ class TestNumericalOptimizers:
             n_candidates=3,
             nonlinear_inequality_constraints=nonlinear_constraints,
         )
-        assert candidates.shape == torch.Size([2, 2])
+        assert torch.allclose(
+            candidates, torch.tensor([[1.0, 1.0], [1.0, 0.75], [1.0, 0.5]]),
+            atol=1e-4,
+        )
 
         # test case where no feasible points are found
         def infeasible_constraint(X):
