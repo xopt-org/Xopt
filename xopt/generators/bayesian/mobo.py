@@ -87,7 +87,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
         Returns:
         --------
-        FixedFeatureAcquisitionFunction
+        AcquisitionFunction
             The acquisition function.
         """
         if model is None:
@@ -96,29 +96,11 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         # get base acquisition function
         acq = self._get_acquisition(model)
 
-        if len(self.vocs.constraints):
-            try:
-                sampler = acq.sampler
-            except AttributeError:
-                sampler = self._get_sampler(model)
-
-            log_feasibility = qLogProbabilityOfFeasibility(
-                model,
-                self._get_constraint_callables(),
-                sampler=sampler,
-            )
-        else:
-            log_feasibility = None
-
         # apply fixed features if specified in the generator
         acq = self._apply_fixed_features(acq)
 
-        if log_feasibility is not None:
-            log_feasibility = self._apply_fixed_features(log_feasibility)
-            log_feasibility = log_feasibility.to(**self.tkwargs)
-
         acq = acq.to(**self.tkwargs)
-        return acq, log_feasibility
+        return acq
 
     def _get_acquisition(
         self, model: torch.nn.Module
