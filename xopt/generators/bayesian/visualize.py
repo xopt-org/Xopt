@@ -8,7 +8,6 @@ from typing import (
     TypeVar,
     TypedDict,
     Union,
-    cast,
 )
 
 import gpytorch
@@ -474,7 +473,11 @@ def plot_model_prediction(
                 x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean"
             )
         axis.plot(
-            x_axis, posterior_mean, color=color, linestyle="-", label="Posterior Mean"
+            x_axis,
+            posterior_mean,
+            color=color,
+            linestyle="-",
+            label="Posterior Mean",
         )
         c = axis.fill_between(
             x=x_axis,
