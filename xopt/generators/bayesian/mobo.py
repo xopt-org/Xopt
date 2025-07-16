@@ -87,7 +87,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
         Returns:
         --------
-        FixedFeatureAcquisitionFunction
+        AcquisitionFunction
             The acquisition function.
         """
         if model is None:
