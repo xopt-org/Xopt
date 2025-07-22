@@ -253,7 +253,26 @@ def cull_population(
 # Data processing
 ########################################################################################################################
 
-def nsga2_to_cnsga(input_dir: str, output_dir: str):
+def read_csv(filepath: str, last_n_lines: int | None = None) -> pd.DataFrame:
+    """
+    Wrapper for pandas.read_csv with addition of only reading last n lines.
+    """
+    if last_n_lines is not None:
+        # Count total lines (subtract 1 for header)
+        with open(filepath, 'r') as f:
+            total_lines = sum(1 for _ in f) - 1
+        
+        # Calculate how many lines to skip
+        skiprows = max(0, total_lines - last_n_lines)
+        skiprows = range(1, skiprows + 1)
+    else:
+        skiprows = None
+    
+    # Read with skiprows
+    return pd.read_csv(filepath, skiprows=skiprows)
+
+
+def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = None):
     """
     Convert the output of the NSGA2 generator to the same format used by the CNSGA generator. This
     function is useful for interfacing with existing analysis tools.
@@ -269,11 +288,12 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str):
         The output directory of the NSGA2 generator.
     output_dir : str
         Where the converted output will be saved. Directory will be created if necessary.
+    last_n_lines : int
+        Read only the last n lines of each CSV file (useful for pulling final generations in large files)
     """
     # Load the population and data files
-    pop = pd.read_csv(os.path.join(input_dir, "populations.csv"))
-    dat = pd.read_csv(os.path.join(input_dir, "data.csv"))
-
+    pop = read_csv(os.path.join(input_dir, "populations.csv"), last_n_lines=last_n_lines)
+    dat = read_csv(os.path.join(input_dir, "data.csv"), last_n_lines=last_n_lines)
     # Setup the output dir
     os.makedirs(output_dir, exist_ok=True)
 
