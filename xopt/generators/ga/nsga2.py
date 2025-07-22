@@ -3,7 +3,7 @@ from pydantic import Field, Discriminator
 from typing import Annotated
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import time
 
@@ -247,6 +247,64 @@ def cull_population(
         Indices of selected individuals, shape (population_size,).
     """
     return crowded_comparison_argsort(pop_f, pop_g)[-population_size:]
+
+
+########################################################################################################################
+# Data processing
+########################################################################################################################
+
+def nsga2_to_cnsga(input_dir: str, output_dir: str):
+    """
+    Convert the output of the NSGA2 generator to the same format used by the CNSGA generator. This
+    function is useful for interfacing with existing analysis tools.
+
+    The converted output is gauranteed to be reproducible for the same input data. To this end, the
+    converted filenames follow the format from the CNSGA generator `cnsga_population_<timestamp>.csv` 
+    and `cnsga_offspring_<timtestamp>.csv` where the timestamp is the generation index in seconds since
+    epoch.
+
+    Parameters:
+    -----------
+    input_dir : str
+        The output directory of the NSGA2 generator.
+    output_dir : str
+        Where the converted output will be saved. Directory will be created if necessary.
+    """
+    # Load the population and data files
+    pop = pd.read_csv(os.path.join(input_dir, "populations.csv"))
+    dat = pd.read_csv(os.path.join(input_dir, "data.csv"))
+
+    # Setup the output dir
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Write each population (separated by key `xopt_generation`)
+    for generation in pop['xopt_generation'].unique():
+        # Filter population data for this generation
+        gen_pop = pop[pop['xopt_generation'] == generation]
+        
+        # Build filename
+        timestamp = datetime.fromtimestamp(int(generation), tz=timezone.utc).isoformat().replace(":", "_")
+        filename = f"cnsga_population_{timestamp}.csv"
+        filename = os.path.join(output_dir, filename)
+        
+        # Write generation data to file
+        gen_pop.to_csv(filename, index=False)
+
+    # Write each set of the offspring (separated by key `xopt_parent_generation`)
+    for generation in dat['xopt_parent_generation'].unique():
+        # Filter population data for this generation
+        gen_pop = dat[dat['xopt_parent_generation'] == generation]
+        
+        # Build the filename
+        # Note: to match CNSGA generator behavior where the candidates just received by the generator 
+        # have the same timestamp as the completed generation, the `xopt_parent_generation` needs 
+        # additional factor of one.
+        timestamp = datetime.fromtimestamp(int(generation)+1, tz=timezone.utc).isoformat().replace(":", "_")
+        filename = f"cnsga_offspring_{timestamp}.csv"
+        filename = os.path.join(output_dir, filename)
+        
+        # Write generation data to file
+        gen_pop.to_csv(filename, index=False)
 
 
 ########################################################################################################################
