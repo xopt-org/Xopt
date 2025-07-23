@@ -145,6 +145,10 @@ class AsynchronousXopt(Xopt):
 
         self.add_data(new_data)
 
+        # Dump data to file if specified
+        if self.dump_file is not None:
+            self.dump()
+
         # Cleanup
         self._input_data.drop(index, inplace=True)
 
