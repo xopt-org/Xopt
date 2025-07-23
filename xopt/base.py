@@ -382,6 +382,7 @@ class Xopt(XoptBaseModel):
             new_data.index = np.arange(len(self.data), len(self.data) + len(new_data))
             self.data = pd.concat([self.data, new_data], axis=0)
         else:
+            new_data = pd.DataFrame(new_data, copy=True)
             new_data.index = np.arange(0, len(new_data))
             self.data = new_data
         self.generator.add_data(new_data)
