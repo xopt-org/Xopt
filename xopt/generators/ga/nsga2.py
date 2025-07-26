@@ -1,13 +1,15 @@
-import numpy as np
+from datetime import datetime
 from pydantic import Field, Discriminator
 from typing import Annotated
-import pandas as pd
-import os
-from datetime import datetime
+import json
 import logging
+import numpy as np
+import os
+import pandas as pd
 import time
 
 from ...generator import StateOwner
+from ...vocs import VOCS
 from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
 from .operators import (
@@ -367,6 +369,34 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
+
+    @classmethod
+    def from_checkpoint(cls, fname: str):
+        """
+        Load the generator object from a checkpoint.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the checkoint file. Must exist inside of directory structure with `vocs.txt` in parent directory.
+
+        Returns
+        -------
+        NSGA2Generator
+            The generator with full state as loaded from checkpoint.
+        """
+        # Load the VOCS object
+        vocs_fname = os.path.join(os.path.dirname(fname), "../vocs.txt")
+        if not os.path.exists(vocs_fname):
+            raise ValueError(
+                'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator output directory is required for loading from checkpoint.'
+            )
+        with open(vocs_fname) as f:
+            vocs = VOCS.from_dict(json.load(f))
+
+        # Load the checkpoint
+        with open(fname) as f:
+            return NSGA2Generator.from_dict({"vocs": vocs, **json.load(f)})
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
