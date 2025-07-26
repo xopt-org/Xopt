@@ -308,7 +308,7 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
         filename = os.path.join(output_dir, filename)
         
         # Write generation data to file
-        gen_pop.to_csv(filename, index=False)
+        gen_pop.to_csv(filename, index_label="xopt_index")
 
     # Write each set of the offspring (separated by key `xopt_parent_generation`)
     for generation in dat['xopt_parent_generation'].unique():
@@ -324,7 +324,7 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
         filename = os.path.join(output_dir, filename)
         
         # Write generation data to file
-        gen_pop.to_csv(filename, index=False)
+        gen_pop.to_csv(filename, index_label="xopt_index")
 
 
 ########################################################################################################################
