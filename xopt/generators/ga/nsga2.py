@@ -253,21 +253,22 @@ def cull_population(
 # Data processing
 ########################################################################################################################
 
+
 def read_csv(filepath: str, last_n_lines: int | None = None) -> pd.DataFrame:
     """
     Wrapper for pandas.read_csv with addition of only reading last n lines.
     """
     if last_n_lines is not None:
         # Count total lines (subtract 1 for header)
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             total_lines = sum(1 for _ in f) - 1
-        
+
         # Calculate how many lines to skip
         skiprows = max(0, total_lines - last_n_lines)
         skiprows = range(1, skiprows + 1)
     else:
         skiprows = None
-    
+
     # Read with skiprows
     return pd.read_csv(filepath, skiprows=skiprows)
 
@@ -278,7 +279,7 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
     function is useful for interfacing with existing analysis tools.
 
     The converted output is gauranteed to be reproducible for the same input data. To this end, the
-    converted filenames follow the format from the CNSGA generator `cnsga_population_<timestamp>.csv` 
+    converted filenames follow the format from the CNSGA generator `cnsga_population_<timestamp>.csv`
     and `cnsga_offspring_<timtestamp>.csv` where the timestamp is the generation index in seconds since
     epoch.
 
@@ -292,37 +293,47 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
         Read only the last n lines of each CSV file (useful for pulling final generations in large files)
     """
     # Load the population and data files
-    pop = read_csv(os.path.join(input_dir, "populations.csv"), last_n_lines=last_n_lines)
+    pop = read_csv(
+        os.path.join(input_dir, "populations.csv"), last_n_lines=last_n_lines
+    )
     dat = read_csv(os.path.join(input_dir, "data.csv"), last_n_lines=last_n_lines)
     # Setup the output dir
     os.makedirs(output_dir, exist_ok=True)
 
     # Write each population (separated by key `xopt_generation`)
-    for generation in pop['xopt_generation'].unique():
+    for generation in pop["xopt_generation"].unique():
         # Filter population data for this generation
-        gen_pop = pop[pop['xopt_generation'] == generation]
-        
+        gen_pop = pop[pop["xopt_generation"] == generation]
+
         # Build filename
-        timestamp = datetime.fromtimestamp(int(generation), tz=timezone.utc).isoformat().replace(":", "_")
+        timestamp = (
+            datetime.fromtimestamp(int(generation), tz=timezone.utc)
+            .isoformat()
+            .replace(":", "_")
+        )
         filename = f"cnsga_population_{timestamp}.csv"
         filename = os.path.join(output_dir, filename)
-        
+
         # Write generation data to file
         gen_pop.to_csv(filename, index_label="xopt_index")
 
     # Write each set of the offspring (separated by key `xopt_parent_generation`)
-    for generation in dat['xopt_parent_generation'].unique():
+    for generation in dat["xopt_parent_generation"].unique():
         # Filter population data for this generation
-        gen_pop = dat[dat['xopt_parent_generation'] == generation]
-        
+        gen_pop = dat[dat["xopt_parent_generation"] == generation]
+
         # Build the filename
-        # Note: to match CNSGA generator behavior where the candidates just received by the generator 
-        # have the same timestamp as the completed generation, the `xopt_parent_generation` needs 
+        # Note: to match CNSGA generator behavior where the candidates just received by the generator
+        # have the same timestamp as the completed generation, the `xopt_parent_generation` needs
         # additional factor of one.
-        timestamp = datetime.fromtimestamp(int(generation)+1, tz=timezone.utc).isoformat().replace(":", "_")
+        timestamp = (
+            datetime.fromtimestamp(int(generation) + 1, tz=timezone.utc)
+            .isoformat()
+            .replace(":", "_")
+        )
         filename = f"cnsga_offspring_{timestamp}.csv"
         filename = os.path.join(output_dir, filename)
-        
+
         # Write generation data to file
         gen_pop.to_csv(filename, index_label="xopt_index")
 

@@ -10,7 +10,7 @@ The following are currently implemented.
 To support Xopt's architecture, candidate solutions can continue to be generated after one population's worth has been produced.
 A single generation is considered finished once `population_size` evaluated individuals have been returned to the generator.
 At that point, selection will occur, output will be generated (if `output_dir` has been set), and further generated children will use the latest population.
-To strictly follow the NSGA-II algorithm, users should take care to only generate and evaluate exactly `population_size` individuals in a single batch to avoid the problem of 
+To strictly follow the NSGA-II algorithm, users should take care to only generate and evaluate exactly `population_size` individuals in a single batch to avoid the problem of
 
 ## Benchmarking
 
