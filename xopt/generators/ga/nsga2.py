@@ -297,10 +297,12 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
         os.path.join(input_dir, "populations.csv"), last_n_lines=last_n_lines
     )
     dat = read_csv(os.path.join(input_dir, "data.csv"), last_n_lines=last_n_lines)
+
     # Setup the output dir
     os.makedirs(output_dir, exist_ok=True)
 
     # Write each population (separated by key `xopt_generation`)
+    generations = 0
     for generation in pop["xopt_generation"].unique():
         # Filter population data for this generation
         gen_pop = pop[pop["xopt_generation"] == generation]
@@ -316,8 +318,13 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
 
         # Write generation data to file
         gen_pop.to_csv(filename, index_label="xopt_index")
+        logging.debug(
+            f'Saved population file for generation {generation} to "{filename}"'
+        )
+        generations += 1
 
     # Write each set of the offspring (separated by key `xopt_parent_generation`)
+    offsprings = 0
     for generation in dat["xopt_parent_generation"].unique():
         # Filter population data for this generation
         gen_pop = dat[dat["xopt_parent_generation"] == generation]
@@ -336,6 +343,15 @@ def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = N
 
         # Write generation data to file
         gen_pop.to_csv(filename, index_label="xopt_index")
+        logging.debug(
+            f'Saved offspring file for generation {generation} to "{filename}"'
+        )
+        offsprings += 1
+
+    # Some logging
+    logging.info(
+        f'Converted NSGA2Generator output "{input_dir}" to CNSGA2Generator format at "{output_dir}" ({generations} population files, {offsprings} offspring files, last_n_lines={last_n_lines})'
+    )
 
 
 ########################################################################################################################
