@@ -22,6 +22,7 @@ A writeup of the results may be found below.
 
 ## Examples
 The following examples are provided.
+
  - [Python Interface](nsga2_python.ipynb) - Basic usage of the generator from its python API.
  - [Output Conversion](nsga2_to_cnsga.ipynb) - Use this generator's output with analysis scripts written for `CNSGAGenerator`.
 
@@ -29,4 +30,4 @@ The following examples are provided.
 ## References
  - [1] Deb, K., Pratap, A., Agarwal, S., & Meyarivan, T. A. M. T. (2002). A fast and elitist multiobjective genetic algorithm: NSGA-II. IEEE transactions on evolutionary computation, 6(2), 182-197.
  - [2] Deb, K. (2001). Multi-objective optimization using evolutionary algorithms. John Wiley & Sons.
- - [3] Deb, K. (n.d.). Simulated Binary Crossover for Continuous Search Space. Complex Systems, 34.
+ - [3] Deb, K. (1995). Simulated Binary Crossover for Continuous Search Space. Complex Systems, 34.
