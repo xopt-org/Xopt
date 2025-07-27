@@ -289,7 +289,9 @@ def read_csv(filepath: str, last_n_lines: int | None = None, **kwargs) -> pd.Dat
     return pd.read_csv(filepath, skiprows=skiprows, **kwargs)
 
 
-def nsga2_to_cnsga(input_dir: str, output_dir: str, last_n_lines: int | None = None):
+def nsga2_to_cnsga_file_format(
+    input_dir: str, output_dir: str, last_n_lines: int | None = None
+):
     """
     Convert the output of the NSGA2 generator to the same format used by the CNSGA generator. This
     function is useful for interfacing with existing analysis tools.
