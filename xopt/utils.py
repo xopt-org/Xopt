@@ -19,6 +19,10 @@ from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
 
 
+# Grab the logger
+logger = logging.getLogger(__name__)
+
+
 def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
     """
     determine if constraints have been satisfied based on data and vocs
@@ -296,7 +300,7 @@ def nsga2_to_cnsga_file_format(
     Convert the output of the NSGA2 generator to the same format used by the CNSGA generator. This
     function is useful for interfacing with existing analysis tools.
 
-    The converted output is gauranteed to be reproducible for the same input data. To this end, the
+    The converted output is guaranteed to be reproducible for the same input data. To this end, the
     converted filenames follow the format from the CNSGA generator `cnsga_population_<timestamp>.csv`
     and `cnsga_offspring_<timtestamp>.csv` where the timestamp is the generation index in seconds since
     epoch.
@@ -336,7 +340,7 @@ def nsga2_to_cnsga_file_format(
 
         # Write generation data to file
         gen_pop.to_csv(filename, index_label="xopt_index")
-        logging.debug(
+        logger.debug(
             f'Saved population file for generation {generation} to "{filename}"'
         )
         generations += 1
