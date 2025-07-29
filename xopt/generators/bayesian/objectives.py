@@ -23,13 +23,13 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
     """
     Custom objective function wrapper for use in Bayesian generators.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Methods:
-    --------
+    Methods
+    -------
     forward(samples: Tensor, X: Optional[Tensor] = None) -> Tensor
         Evaluate the objective on the samples.
     """
@@ -48,7 +48,7 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
             X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if
                 the objective depends on the inputs explicitly.
 
-        Returns:
+        Returns
             Tensor: A `sample_shape x batch_shape x q`-dim Tensor of objective
             values (assuming maximization).
 
@@ -71,8 +71,8 @@ def feasibility(
     """
     Calculate the feasibility of the given points.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     X : Tensor
         The input tensor.
     model : torch.nn.Module
@@ -82,8 +82,8 @@ def feasibility(
     posterior_transform : Optional[Callable], optional
         The posterior transform, by default None.
 
-    Returns:
-    --------
+    Returns
+    -------
     Tensor
         The feasibility values.
     """
@@ -103,13 +103,13 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
     """
     Create a list of constraint callables.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Returns:
-    --------
+    Returns
+    -------
     Optional[List[Callable]]
         A list of constraint callables, or None if there are no constraints.
     """
@@ -139,13 +139,13 @@ def create_mc_objective(vocs: VOCS) -> LinearMCObjective:
     """
     Create a monte carlo objective object.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Returns:
-    --------
+    Returns
+    -------
     LinearMCObjective
         The objective object.
     """
@@ -161,13 +161,13 @@ def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
     BoTorch assumes maximization, so we need to negate any objectives that have
     the minimize keyword and zero out anything that is a constraint.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Returns:
-    --------
+    Returns
+    -------
     WeightedMCMultiOutputObjective
         The multi-objective Bayesian optimization objective.
     """
