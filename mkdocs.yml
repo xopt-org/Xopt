@@ -42,7 +42,10 @@ nav:
                 - Multi-generation gaussian process optimization: examples/multi_objective_bayes_opt/mggpo.ipynb
         - Evolutionary / Genetic:
             - CNSGA: examples/ga/cnsga_tnk.ipynb
-            - NSGA-II: examples/ga/nsga2.ipynb
+            - NSGA-II:
+              - examples/ga/nsga2/index.md
+              - "Python Interface": examples/ga/nsga2/nsga2_python.ipynb
+              - "Output Conversion": examples/ga/nsga2/nsga2_to_cnsga.ipynb
 
         - Sequential:
             - Nelder-Mead: examples/sequential/neldermead.ipynb
