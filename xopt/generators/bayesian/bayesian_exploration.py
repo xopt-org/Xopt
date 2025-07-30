@@ -5,29 +5,49 @@ from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
-from pydantic import field_validator
-from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
+from xopt.generators.bayesian.turbo import SafetyTurboController
 
 
 class BayesianExplorationGenerator(BayesianGenerator):
+    """
+    Bayesian exploration generator for autonomous characterization.
+    """
+
     name = "bayesian_exploration"
     supports_batch_generation: bool = True
+    supports_constraints: bool = True
 
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 
-    @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info: ValidationInfo):
-        if v.n_objectives != 0:
-            raise ValueError("this generator only supports observables")
-        return v
+    _compatible_turbo_controllers = [SafetyTurboController]
 
-    def _get_acquisition(self, model):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if self.vocs.n_observables == 0:
+            raise ValueError(
+                "BayesianExplorationGenerator requires at least one observable in the vocs (instead of specifying an objective)."
+            )
+
+    def _get_acquisition(self, model: Model) -> MCAcquisitionFunction:
+        """
+        Get the acquisition function for Bayesian Optimization.
+
+        Parameters
+        ----------
+        model : Model
+            The model used for Bayesian Optimization.
+
+        Returns
+        -------
+        MCAcquisitionFunction
+            The acquisition function for Bayesian Optimization.
+        """
         sampler = self._get_sampler(model)
         qPV = qPosteriorVariance(
             model,
@@ -39,6 +59,28 @@ class BayesianExplorationGenerator(BayesianGenerator):
 
 
 class qPosteriorVariance(MCAcquisitionFunction):
+    """
+    q-Posterior Variance acquisition function for Bayesian Optimization.
+
+    Parameters
+    ----------
+    model : Model
+        A fitted model.
+    sampler : Optional[MCSampler]
+        The sampler used to draw base samples. Defaults to `SobolQMCNormalSampler(num_samples=512, collapse_batch_dims=True)`.
+    objective : Optional[MCAcquisitionObjective]
+        The MCAcquisitionObjective under which the samples are evaluated. Defaults to `IdentityMCObjective()`.
+    posterior_transform : Optional[PosteriorTransform]
+        A PosteriorTransform (optional).
+    X_pending : Optional[Tensor]
+        A `batch_shape x m x d`-dim Tensor of `m` design points that have been submitted for function evaluation but have not yet been evaluated. Concatenated into X upon forward call. Copied and set to have no gradient.
+
+    Methods
+    -------
+    forward(self, X: Tensor) -> Tensor
+        Evaluate qPosteriorVariance on the candidate set `X`.
+    """
+
     def __init__(
         self,
         model: Model,
@@ -47,20 +89,6 @@ class qPosteriorVariance(MCAcquisitionFunction):
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
     ) -> None:
-        r"""q-Upper Confidence Bound.
-        Parameters
-        ----------
-            model: A fitted model.
-            sampler: The sampler used to draw base samples. Defaults to
-                `SobolQMCNormalSampler(num_samples=512, collapse_batch_dims=True)`
-            objective: The MCAcquisitionObjective under which the samples are
-                evaluated. Defaults to `IdentityMCObjective()`.
-            posterior_transform: A PosteriorTransform (optional).
-            X_pending: A `batch_shape x m x d`-dim Tensor of `m` design points that have
-                points that have been submitted for function evaluation but have not yet
-                been evaluated. Concatenated into X upon forward call. Copied and set to
-                have no gradient.
-        """
         super().__init__(
             model=model,
             sampler=sampler,
@@ -72,17 +100,18 @@ class qPosteriorVariance(MCAcquisitionFunction):
     @concatenate_pending_points
     @t_batch_mode_transform()
     def forward(self, X: Tensor) -> Tensor:
-        r"""Evaluate qUpperConfidenceBound on the candidate set `X`.
+        """
+        Evaluate qPosteriorVariance on the candidate set `X`.
+
         Parameters
         ----------
-            X: A `batch_sahpe x q x d`-dim Tensor of t-batches with `q` `d`-dim design
-                points each.
+        X : Tensor
+            A `batch_shape x q x d`-dim Tensor of t-batches with `q` `d`-dim design points each.
 
         Returns
         -------
-            A `batch_shape'`-dim Tensor of Upper Confidence Bound values at the given
-            design points `X`, where `batch_shape'` is the broadcasted batch shape of
-            model and input `X`.
+        Tensor
+            A `batch_shape'`-dim Tensor of Posterior Variance values at the given design points `X`, where `batch_shape'` is the broadcasted batch shape of model and input `X`.
         """
         posterior = self.model.posterior(
             X=X, posterior_transform=self.posterior_transform

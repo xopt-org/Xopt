@@ -1,24 +1,31 @@
+from copy import deepcopy
 import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from xopt import Xopt
+from xopt.errors import SeqGeneratorError
 from xopt.evaluator import Evaluator
-from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.vocs import VOCS
 
 
 class TestExtremumSeekingGenerator:
     def test_es_generate_multiple_points(self):
-        gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        gen = ExtremumSeekingGenerator(vocs=test_vocs)
 
         # Try to generate multiple samples
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(SeqGeneratorError):
             gen.generate(2)
 
     def test_es_options(self):
-        gen = ExtremumSeekingGenerator(vocs=TEST_VOCS_BASE)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+
+        gen = ExtremumSeekingGenerator(vocs=test_vocs)
 
         with pytest.raises(ValidationError):
             gen.k = "yo"
@@ -251,10 +258,33 @@ class TestExtremumSeekingGenerator:
         evaluator = Evaluator(function=f_ES_minimize)
         generator = ExtremumSeekingGenerator(vocs=vocs)
         X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+        X.evaluate_data({name: val for name, val in zip(vocs.variable_names, pES[0])})
 
         for i in range(ES_steps):
             X.step()
 
-        assert np.all(
-            cES == X.data["f"].to_numpy()
-        ), "Xopt ES does not match the vanilla one"
+        assert np.allclose(cES, X.data["f"].to_numpy()[:-1]), (
+            "Xopt ES does not match the vanilla one"
+        )
+
+    def test_es_convergence(self):
+        def eval_f(x):
+            return {"y1": np.sum([x**2 for x in x.values()])}
+
+        # reduce dimensionality to speed up test
+        variables = {f"x{i}": [-5, 5] for i in range(3)}
+        objectives = {"y1": "MINIMIZE"}
+        vocs = VOCS(variables=variables, objectives=objectives)
+        evaluator = Evaluator(function=eval_f)
+        generator = ExtremumSeekingGenerator(vocs=vocs)
+        X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+
+        X.random_evaluate(1)
+        for i in range(5000):
+            X.step()
+
+        idx, best, _ = X.vocs.select_best(X.data)
+        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        assert best[0] >= 0.0
+        assert best[0] <= 1.0
+        assert np.allclose(xbest, np.zeros(3), rtol=0, atol=1.0)

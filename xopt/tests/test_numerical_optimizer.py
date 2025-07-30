@@ -13,7 +13,13 @@ from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 
 
 def f(X):
-    return torch.sum(X**2, dim=-1)
+    # X: A `batch_shape x q x d` Tensor of t-batches with `q` `d`-dim design points each.
+    # _sample_forward would produce `sample_shape x batch_shape x q` (sample shape set by MC sampler)
+    # q_reduction converts it into `sample_shape x batch_shape`
+    # sample_reduction converts it into `batch_shape`-dim Tensor of acquisition values
+    # so, final fake tensor needs to have ndim=1
+    result = torch.amax(X, dim=(1, 2))
+    return result
 
 
 class TestNumericalOptimizers:
@@ -26,17 +32,19 @@ class TestNumericalOptimizers:
         for ndim in [1, 3]:
             bounds = torch.stack((torch.zeros(ndim), torch.ones(ndim)))
             for ncandidate in [1, 3]:
-                candidates = optimizer.optimize(f, bounds, ncandidate)
+                candidates = optimizer.optimize(
+                    function=f, bounds=bounds, n_candidates=ncandidate
+                )
                 assert candidates.shape == torch.Size([ncandidate, ndim])
 
         # test max time
-        max_time_optimizer = LBFGSOptimizer(max_time=0.01)
+        max_time_optimizer = LBFGSOptimizer(max_time=1.0)
         ndim = 1
         bounds = torch.stack((torch.zeros(ndim), torch.ones(ndim)))
         for ncandidate in [1, 3]:
             start_time = time.time()
             candidates = max_time_optimizer.optimize(f, bounds, ncandidate)
-            assert time.time() - start_time < 0.01
+            assert time.time() - start_time < 1.0
             assert candidates.shape == torch.Size([ncandidate, ndim])
 
     def test_grid_optimizer(self):

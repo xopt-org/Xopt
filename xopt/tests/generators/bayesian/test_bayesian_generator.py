@@ -10,23 +10,43 @@ from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
 
+from xopt import VOCS
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.bayesian_generator import (
+    BayesianGenerator,
+    MultiObjectiveBayesianGenerator,
+)
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 
+class PatchBayesianGenerator(BayesianGenerator):
+    """
+    Patch the Bayesian Generator class to allow for testing.
+    """
+
+    supports_batch_generation: bool = True
+    # supports_multi_objective: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
+
+
+class MultiObjectivePatchBayesianGenerator(MultiObjectiveBayesianGenerator):
+    supports_constraints: bool = True
+
+
 class TestBayesianGenerator(TestCase):
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_init(self):
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.model_dump()
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
 
         model = gen.train_model(test_data)
         assert isinstance(model, GPyTorchModel)
@@ -45,7 +65,7 @@ class TestBayesianGenerator(TestCase):
         constructor = deepcopy(gen.gp_constructor)
         constructor.covar_modules = {"y1": PeriodicKernel()}
 
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE, gp_constructor=constructor)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, gp_constructor=constructor)
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
 
@@ -53,17 +73,17 @@ class TestBayesianGenerator(TestCase):
         gen = deepcopy(gen)
         gen.gp_constructor.covar_modules = {"y1": PeriodicKernel()}
 
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model_w_conditions(self):
         # test with maximize and minimize
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives["y1"] = "MINIMIZE"
         test_data = deepcopy(TEST_VOCS_DATA)
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = PatchBayesianGenerator(vocs=test_vocs)
         model = gen.train_model(test_data)
         assert torch.allclose(
             model.models[0].outcome_transform(torch.tensor(test_data["y1"].to_numpy()))[
@@ -75,7 +95,7 @@ class TestBayesianGenerator(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives["y1"] = "MAXIMIZE"
         test_data = deepcopy(TEST_VOCS_DATA)
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = PatchBayesianGenerator(vocs=test_vocs)
         model = gen.train_model(test_data)
         assert torch.allclose(
             model.models[0].outcome_transform(torch.tensor(test_data["y1"].to_numpy()))[
@@ -87,20 +107,20 @@ class TestBayesianGenerator(TestCase):
         # try with input data that contains Nans due to xopt raising an error
         # currently we drop all rows containing Nans
         test_data = deepcopy(TEST_VOCS_DATA)
-        test_data["y1"].iloc[5] = np.nan
+        test_data.loc[test_data.index[5], "y1"] = np.nan
         model = gen.train_model(test_data)
         assert len(model.models[0].train_inputs[0]) == len(test_data) - 1
 
         # test with input data that is only Nans
         test_data = deepcopy(TEST_VOCS_DATA)
-        test_data["y1"].iloc[:] = np.nan
+        test_data.loc[:, "y1"] = np.nan
         with pytest.raises(ValueError):
             gen.train_model(test_data)
 
         # test with the same objective and constraint keys
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
-        gen2 = BayesianGenerator(vocs=test_vocs)
+        gen2 = PatchBayesianGenerator(vocs=test_vocs)
         test_data = deepcopy(TEST_VOCS_DATA)
         gen2.train_model(test_data)
 
@@ -108,15 +128,15 @@ class TestBayesianGenerator(TestCase):
         if torch.cuda.is_available():
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.constraints = {"y1": ["GREATER_THAN", 0]}
-            gen3 = BayesianGenerator(vocs=test_vocs)
+            gen3 = PatchBayesianGenerator(vocs=test_vocs)
             gen3.use_cuda = True
             test_data = deepcopy(TEST_VOCS_DATA)
             model = gen3.train_model(test_data)
             assert model.models[0].train_targets.is_cuda
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_transforms(self):
-        gen = BayesianGenerator(vocs=sinusoid_vocs)
+        gen = PatchBayesianGenerator(vocs=sinusoid_vocs)
         evaluator = Evaluator(function=evaluate_sinusoid)
         X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
 
@@ -135,7 +155,7 @@ class TestBayesianGenerator(TestCase):
             assert torch.allclose(
                 inputs[0].unsqueeze(-1).T,
                 input_transform(
-                    torch.from_numpy(X.data["x1"].to_numpy()).unsqueeze(-1)
+                    torch.from_numpy(X.data["x1"].to_numpy(copy=True)).unsqueeze(-1)
                 ).T,
             )
 
@@ -146,7 +166,7 @@ class TestBayesianGenerator(TestCase):
             model.train_targets[0],
             torch.flatten(
                 outcome_transform(
-                    torch.from_numpy(X.data["y1"].to_numpy()).unsqueeze(-1)
+                    torch.from_numpy(X.data["y1"].to_numpy(copy=True)).unsqueeze(-1)
                 )[0]
             ),
         )
@@ -159,20 +179,20 @@ class TestBayesianGenerator(TestCase):
 
     # TODO: test passing UCB options to bayesian exploration
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_bounds(self):
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         bounds = gen._get_optimization_bounds()
         assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds))
 
         # test with max_travel_distances specified but no data
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.max_travel_distances = [0.1, 0.2]
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
         # test with max_travel_distances specified and data
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.max_travel_distances = [0.1, 0.2]
         gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
         bounds = gen._get_optimization_bounds()
@@ -182,7 +202,7 @@ class TestBayesianGenerator(TestCase):
         high_d_vocs = deepcopy(TEST_VOCS_BASE)
         high_d_vocs.variables["x3"] = [0, 1]
 
-        gen = BayesianGenerator(vocs=high_d_vocs)
+        gen = PatchBayesianGenerator(vocs=high_d_vocs)
         gen.max_travel_distances = [0.1, 0.2, 0.1]
         gen.add_data(
             pd.DataFrame(
@@ -195,7 +215,7 @@ class TestBayesianGenerator(TestCase):
         )
 
         # test with bad max_distances
-        gen = BayesianGenerator(vocs=high_d_vocs)
+        gen = PatchBayesianGenerator(vocs=high_d_vocs)
         gen.max_travel_distances = [0.1, 0.2]
         gen.add_data(
             pd.DataFrame(
@@ -205,10 +225,10 @@ class TestBayesianGenerator(TestCase):
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_fixed_feature(self):
         # test with a fixed feature not contained in vocs
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"p": 3.0}
 
         assert gen.model_input_names == [*TEST_VOCS_BASE.variable_names, "p"]
@@ -224,7 +244,7 @@ class TestBayesianGenerator(TestCase):
         )
 
         # test fixed_feature in vocs
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"x1": 3.0}
 
         # test naming
@@ -244,10 +264,34 @@ class TestBayesianGenerator(TestCase):
         )
 
         # test bad fixed feature name
-        gen = BayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.fixed_features = {"bad_name": 3.0}
         data = deepcopy(TEST_VOCS_DATA)
         gen.add_data(data)
 
         with pytest.raises(KeyError):
             gen.train_model()
+
+    @patch.multiple(MultiObjectivePatchBayesianGenerator, __abstractmethods__=set())
+    def test_bad_mo_vocs(self):
+        vocs = VOCS(
+            **{
+                "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
+                "objectives": {"y1": "MINIMIZE"},
+                "constraints": {"c1": ["GREATER_THAN", 0.5]},
+                "constants": {"constant1": 1.0},
+            }
+        )
+        vocs2 = vocs.model_copy()
+        vocs2.objectives = {"y1": "MINIMIZE", "y2": "MAXIMIZE"}
+        with pytest.raises(VOCSError):
+            gen = MultiObjectivePatchBayesianGenerator(
+                vocs=vocs, reference_point={"y1": 0.5, "y2": 0.5}
+            )
+
+        gen = MultiObjectivePatchBayesianGenerator(
+            vocs=vocs2, reference_point={"y1": 0.5, "y2": 0.5}
+        )
+        assert not gen.supports_single_objective
+        with pytest.raises(VOCSError):
+            gen.vocs = vocs

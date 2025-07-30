@@ -22,9 +22,47 @@ logger = logging.getLogger()
 
 
 class MultiFidelityGenerator(MOBOGenerator):
+    """
+    Implements Multi-fidelity Bayesian optimization.
+
+    Attributes
+    ----------
+    name : str
+        The name of the generator.
+    fidelity_parameter : Literal["s"]
+        The fidelity parameter name.
+    cost_function : Callable
+        Callable function that describes the cost of evaluating the objective function.
+    reference_point : Optional[Dict[str, float]]
+        The reference point for multi-objective optimization.
+    supports_multi_objective : bool
+        Indicates if the generator supports multi-objective optimization.
+    supports_batch_generation : bool
+        Indicates if the generator supports batch candidate generation.
+
+    Methods
+    -------
+    validate_vocs(cls, v: VOCS) -> VOCS
+        Validate the VOCS for the generator.
+    calculate_total_cost(self, data: pd.DataFrame = None) -> float
+        Calculate the total cost of data samples using the fidelity parameter.
+    get_acquisition(self, model: torch.nn.Module) -> NMOMF
+        Get the acquisition function for Bayesian Optimization.
+    _get_acquisition(self, model: torch.nn.Module) -> NMOMF
+        Create the Multi-Fidelity Knowledge Gradient acquisition function.
+    add_data(self, new_data: pd.DataFrame)
+        Add new data to the generator.
+    fidelity_variable_index(self) -> int
+        Get the index of the fidelity variable.
+    fidelity_objective_index(self) -> int
+        Get the index of the fidelity objective.
+    get_optimum(self) -> pd.DataFrame
+        Select the best point at the maximum fidelity.
+    """
+
     name = "multi_fidelity"
     fidelity_parameter: Literal["s"] = Field(
-        "s", description="fidelity parameter " "name", exclude=True
+        "s", description="fidelity parameter name", exclude=True
     )
     cost_function: Callable = Field(
         lambda x: x + 1.0,
@@ -41,7 +79,25 @@ class MultiFidelityGenerator(MOBOGenerator):
         """
 
     @field_validator("vocs", mode="before")
-    def validate_vocs(cls, v: VOCS):
+    def validate_vocs(cls, v: VOCS) -> VOCS:
+        """
+        Validate the VOCS for the generator.
+
+        Parameters
+        ----------
+        v : VOCS
+            The VOCS to be validated.
+
+        Returns
+        -------
+        VOCS
+            The validated VOCS.
+
+        Raises
+        ------
+        ValueError
+            If constraints are present in the VOCS.
+        """
         v.variables["s"] = [0, 1]
         v.objectives["s"] = ObjectiveEnum("MAXIMIZE")
         if len(v.constraints):
@@ -71,7 +127,19 @@ class MultiFidelityGenerator(MOBOGenerator):
         )
 
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
-        """calculate total cost of data samples using the fidelity parameter"""
+        """
+        Calculate the total cost of data samples using the fidelity parameter.
+
+        Parameters
+        ----------
+        data : pd.DataFrame, optional
+            The data samples, by default None.
+
+        Returns
+        -------
+        float
+            The total cost of the data samples.
+        """
         if data is None:
             data = self.data
 
@@ -80,9 +148,19 @@ class MultiFidelityGenerator(MOBOGenerator):
         # apply callable function to get costs
         return self.cost_function(f_data[..., self.fidelity_variable_index]).sum()
 
-    def get_acquisition(self, model):
+    def get_acquisition(self, model: torch.nn.Module) -> NMOMF:
         """
-        Returns a function that can be used to evaluate the acquisition function
+        Get the acquisition function for Bayesian Optimization.
+
+        Parameters
+        ----------
+        model : torch.nn.Module
+            The model used for Bayesian Optimization.
+
+        Returns
+        -------
+        NMOMF
+            The acquisition function.
         """
         if model is None:
             raise ValueError("model cannot be None")
@@ -91,9 +169,9 @@ class MultiFidelityGenerator(MOBOGenerator):
         acq = self._get_acquisition(model)
         return acq
 
-    def _get_acquisition(self, model):
+    def _get_acquisition(self, model: torch.nn.Module) -> NMOMF:
         """
-        Creates the Multi-Fidelity Knowledge Gradient acquistion function
+        Create the Multi-Fidelity Knowledge Gradient acquisition function.
 
         In order for MFKG to evaluate the information gain, it uses the model to
         predict the function value at the highest fidelity after conditioning
@@ -108,12 +186,20 @@ class MultiFidelityGenerator(MOBOGenerator):
         posterior mean at the target fidelity). To accomplish this, we use a
         FixedFeatureAcquisitionFunction on top of a PosteriorMean.
 
-        """
+        Parameters
+        ----------
+        model : torch.nn.Module
+            The model used for Bayesian Optimization.
 
+        Returns
+        -------
+        NMOMF
+            The Multi-Fidelity Knowledge Gradient acquisition function.
+        """
         X_baseline = self.get_input_data(self.data)
 
         # wrap the cost function such that it only has to accept the fidelity parameter
-        def true_cost_function(X):
+        def true_cost_function(X: torch.Tensor) -> torch.Tensor:
             return self.cost_function(X[..., self.fidelity_variable_index])
 
         acq_func = NMOMF(
@@ -130,10 +216,23 @@ class MultiFidelityGenerator(MOBOGenerator):
         return acq_func
 
     def add_data(self, new_data: pd.DataFrame):
+        """
+        Add new data to the generator.
+
+        Parameters
+        ----------
+        new_data : pd.DataFrame
+            The new data to be added.
+
+        Raises
+        ------
+        ValueError
+            If the fidelity parameter is not in the new data or if the fidelity
+            values are outside the range [0,1].
+        """
         if self.fidelity_parameter not in new_data:
             raise ValueError(
-                f"fidelity parameter {self.fidelity_parameter} must be "
-                f"in added data"
+                f"fidelity parameter {self.fidelity_parameter} must be in added data"
             )
 
         # overwrite add data to check for valid fidelity values
@@ -144,16 +243,38 @@ class MultiFidelityGenerator(MOBOGenerator):
         super().add_data(new_data)
 
     @property
-    def fidelity_variable_index(self):
+    def fidelity_variable_index(self) -> int:
+        """
+        Get the index of the fidelity variable.
+
+        Returns
+        -------
+        int
+            The index of the fidelity variable.
+        """
         return self.vocs.variable_names.index(self.fidelity_parameter)
 
     @property
-    def fidelity_objective_index(self):
+    def fidelity_objective_index(self) -> int:
+        """
+        Get the index of the fidelity objective.
+
+        Returns
+        -------
+        int
+            The index of the fidelity objective.
+        """
         return self.vocs.objective_names.index(self.fidelity_parameter)
 
-    def get_optimum(self):
-        """select the best point at the maximum fidelity"""
+    def get_optimum(self) -> pd.DataFrame:
+        """
+        Select the best point at the maximum fidelity.
 
+        Returns
+        -------
+        pd.DataFrame
+            The best point at the maximum fidelity.
+        """
         # define single objective based on vocs
         weights = torch.zeros(self.vocs.n_outputs, **self.tkwargs)
         for idx, ele in enumerate(self.vocs.objective_names):
@@ -162,7 +283,9 @@ class MultiFidelityGenerator(MOBOGenerator):
             elif self.vocs.objectives[ele] == "MAXIMIZE":
                 weights[idx] = 1.0
 
-        def obj_callable(Z, X=None):
+        def obj_callable(
+            Z: torch.Tensor, X: Optional[torch.Tensor] = None
+        ) -> torch.Tensor:
             return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 
         c_posterior_mean = ConstrainedMCAcquisitionFunction(

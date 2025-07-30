@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import pandas as pd
+import pytest
 import torch
 from botorch.acquisition import ExpectedImprovement
 
@@ -8,8 +9,21 @@ from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.objectives import CustomXoptObjective
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
+from xopt.resources.testing import (
+    TEST_VOCS_BASE,
+    TEST_VOCS_DATA,
+    check_generator_tensor_locations,
+    create_set_options_helper,
+    generate_without_warnings,
+    xtest_callable,
+)
 from xopt.vocs import ObjectiveEnum, VOCS
+
+cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
+device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
+
+
+set_options = create_set_options_helper(data=TEST_VOCS_DATA)
 
 
 class TestExpectedImprovement:
@@ -17,19 +31,20 @@ class TestExpectedImprovement:
         ei_gen = ExpectedImprovementGenerator(vocs=TEST_VOCS_BASE)
         ei_gen.model_dump_json()
 
-    def test_generate(self):
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate(self, use_cuda):
         gen = ExpectedImprovementGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_restarts = 1
-        gen.n_monte_carlo_samples = 1
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, use_cuda, add_data=True)
 
-        candidate = gen.generate(1)
+        candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1
 
-        candidate = gen.generate(2)
+        candidate = generate_without_warnings(gen, 2)
         assert len(candidate) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
 
     def test_generate_w_overlapping_objectives_constraints(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -38,20 +53,20 @@ class TestExpectedImprovement:
         gen = ExpectedImprovementGenerator(
             vocs=test_vocs,
         )
-        gen.numerical_optimizer.n_restarts = 1
-        gen.n_monte_carlo_samples = 1
-        gen.data = TEST_VOCS_DATA
+        set_options(gen, add_data=True)
 
-        candidate = gen.generate(1)
+        candidate = generate_without_warnings(gen, 1)
         assert len(candidate) == 1
+
+        candidate = generate_without_warnings(gen, 2)
+        assert len(candidate) == 2
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)
         gen = ExpectedImprovementGenerator(
             vocs=TEST_VOCS_BASE,
         )
-        gen.numerical_optimizer.n_restarts = 1
-        gen.n_monte_carlo_samples = 1
+        set_options(gen)
 
         xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
@@ -59,10 +74,11 @@ class TestExpectedImprovement:
         xopt.random_evaluate(3)
 
         # now use bayes opt
-        for _ in range(1):
+        for _ in range(3):
             xopt.step()
 
-    def test_custom_objectives(self):
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_custom_objectives(self, use_cuda):
         train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
         train_y = torch.sin(2 * torch.pi * train_x)
         train_c = torch.cos(2 * torch.pi * train_x)
@@ -75,14 +91,17 @@ class TestExpectedImprovement:
             def forward(self, samples, X=None):
                 return samples[..., self.vocs.output_names.index("y1")] ** 2
 
-        generator = ExpectedImprovementGenerator(
+        gen = ExpectedImprovementGenerator(
             vocs=vocs, custom_objective=MyObjective(vocs)
         )
-        generator.add_data(train_data)
-        best_f = generator._get_best_f(generator.data, generator.custom_objective)
+        set_options(gen, use_cuda)
+        gen.add_data(train_data)
+        best_f = gen._get_best_f(gen.data, gen.custom_objective)
         assert float(best_f) == float(torch.max(train_y**2))
 
-        generator.generate(1)
+        gen.generate(1)
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
 
     def test_acquisition_accuracy(self):
         train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
@@ -94,12 +113,13 @@ class TestExpectedImprovement:
             vocs = VOCS(
                 **{"variables": {"x1": [0.0, 1.0]}, "objectives": {"y1": objective}}
             )
-            generator = ExpectedImprovementGenerator(vocs=vocs)
-            generator.add_data(train_data)
-            model = generator.train_model().models[0]
+            gen = ExpectedImprovementGenerator(vocs=vocs)
+            set_options(gen)
+            gen.add_data(train_data)
+            model = gen.train_model().models[0]
 
-            # xopt acquisition function
-            acq = generator.get_acquisition(model)
+            # xopt acquisition function - this is currently LogEI
+            acq = gen.get_acquisition(model)
 
             # analytical acquisition function
             if objective == "MAXIMIZE":
@@ -117,4 +137,4 @@ class TestExpectedImprovement:
                 an_candidate = test_x[torch.argmax(an_acq_v)]
 
             # difference should be small
-            assert torch.abs(an_candidate - candidate) < 0.01
+            assert torch.abs(an_candidate - candidate) < 1e-6

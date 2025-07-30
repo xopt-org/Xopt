@@ -6,6 +6,7 @@ import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
+from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
 
@@ -71,7 +72,28 @@ class StandardGenerator(ABC):
         """
 
 
-class Generator(XoptBaseModel, StandardGenerator, ABC):
+class Generator(XoptBaseModel, ABC):
+    """
+    Base class for Generators.
+
+    Generators are responsible for generating new points to evaluate.
+
+    Attributes
+    ----------
+    name : str
+        Name of the generator.
+    supports_batch_generation : bool
+        Flag that describes if this generator can generate batches of points.
+    supports_multi_objective : bool
+        Flag that describes if this generator can solve multi-objective problems.
+    vocs : VOCS
+        Generator VOCS.
+    data : pd.DataFrame, optional
+        Generator data.
+    model_config : ConfigDict
+        Model configuration.
+    """
+
     name: ClassVar[str] = Field(description="generator name")
 
     supports_batch_generation: bool = Field(
@@ -89,6 +111,20 @@ class Generator(XoptBaseModel, StandardGenerator, ABC):
         frozen=True,
         exclude=True,
     )
+    supports_single_objective: bool = Field(
+        default=False,
+        description="flag that describes if this generator can solve multi-objective "
+        "problems",
+        frozen=True,
+        exclude=True,
+    )
+    supports_constraints: bool = Field(
+        default=False,
+        description="flag that describes if this generator can solve "
+        "constrained optimization problems",
+        frozen=True,
+        exclude=True,
+    )
 
     vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: Optional[pd.DataFrame] = Field(
@@ -97,14 +133,20 @@ class Generator(XoptBaseModel, StandardGenerator, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    _is_done = False
-
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
-        if v.n_objectives > 1 and not info.data["supports_multi_objective"]:
-            raise ValueError(
-                "this generator only supports a single objective " "specified in vocs"
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+            raise VOCSError("this generator does not support constraints")
+        if v.n_objectives == 1:
+            if not info.data["supports_single_objective"]:
+                raise VOCSError(
+                    "this generator does not support single objective optimization"
+                )
+        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+            raise VOCSError(
+                "this generator does not support multi-objective optimization"
             )
+
         return v
 
     @field_validator("data", mode="before")
@@ -159,3 +201,21 @@ class Generator(XoptBaseModel, StandardGenerator, ABC):
         res.pop("supports_multi_objective", None)
 
         return res
+
+
+class StateOwner:
+    """
+    Mix-in class that represents a generator that owns its own state and needs special handling
+    of data loading on deserialization.
+    """
+
+    def set_data(self, data: pd.DataFrame):
+        """
+        Set the full dataset for the generator. Typically only used when loading from a save file.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data to set.
+        """
+        raise NotImplementedError

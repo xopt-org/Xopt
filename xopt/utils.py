@@ -1,21 +1,26 @@
+from copy import deepcopy
+from pydantic import BaseModel
+from typing import List, Tuple
 import datetime
 import importlib
 import inspect
+import logging
+import numpy as np
+import os
+import pandas as pd
 import sys
 import time
-import traceback
-from copy import deepcopy
-from typing import List, Tuple
-
-import numpy as np
-import pandas as pd
 import torch
+import traceback
 import yaml
-from pydantic import BaseModel
 
-from xopt.generator import Generator
+from .generator import Generator
 from .pydantic import get_descriptions_defaults
 from .vocs import VOCS
+
+
+# Grab the logger
+logger = logging.getLogger(__name__)
 
 
 def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
@@ -236,6 +241,143 @@ def has_device_field(module: torch.nn.Module, device: torch.device) -> bool:
     return False
 
 
+def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> dict:
+    """
+    calculates the bounds of a local region around a center point with side lengths
+    equal to a fixed fraction of the input space for each variable
+
+    """
+    if not center_point.keys() == set(vocs.variable_names):
+        raise KeyError("Center point keys must match vocs variable names")
+
+    bounds = {}
+    widths = {
+        ele: vocs.variables[ele][1] - vocs.variables[ele][0]
+        for ele in vocs.variable_names
+    }
+
+    for name in vocs.variable_names:
+        bounds[name] = [
+            np.max(
+                (center_point[name] - widths[name] * fraction, vocs.variables[name][0])
+            ),
+            np.min(
+                (center_point[name] + widths[name] * fraction, vocs.variables[name][1])
+            ),
+        ]
+
+    return bounds
+
+
+########################################################################################################################
+# Data processing
+########################################################################################################################
+
+
+def read_csv(filepath: str, last_n_lines: int | None = None, **kwargs) -> pd.DataFrame:
+    """
+    Wrapper for pandas.read_csv with addition of only reading last n lines.
+    """
+    if last_n_lines is not None:
+        # Count total lines (subtract 1 for header)
+        with open(filepath, "r") as f:
+            total_lines = sum(1 for _ in f) - 1
+
+        # Calculate how many lines to skip
+        skiprows = max(0, total_lines - last_n_lines)
+        skiprows = range(1, skiprows + 1)
+    else:
+        skiprows = None
+
+    # Read with skiprows
+    return pd.read_csv(filepath, skiprows=skiprows, **kwargs)
+
+
+def nsga2_to_cnsga_file_format(
+    input_dir: str, output_dir: str, last_n_lines: int | None = None
+):
+    """
+    Convert the output of the NSGA2 generator to the same format used by the CNSGA generator. This
+    function is useful for interfacing with existing analysis tools.
+
+    The converted output is guaranteed to be reproducible for the same input data. To this end, the
+    converted filenames follow the format from the CNSGA generator `cnsga_population_<timestamp>.csv`
+    and `cnsga_offspring_<timtestamp>.csv` where the timestamp is the generation index in seconds since
+    epoch.
+
+    Parameters:
+    -----------
+    input_dir : str
+        The output directory of the NSGA2 generator.
+    output_dir : str
+        Where the converted output will be saved. Directory will be created if necessary.
+    last_n_lines : int
+        Read only the last n lines of each CSV file (useful for pulling final generations in large files)
+    """
+    # Load the population and data files
+    pop = read_csv(
+        os.path.join(input_dir, "populations.csv"), last_n_lines=last_n_lines
+    )
+    dat = read_csv(os.path.join(input_dir, "data.csv"), last_n_lines=last_n_lines)
+
+    # Setup the output dir
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Write each population (separated by key `xopt_generation`)
+    generations = 0
+    for generation in pop["xopt_generation"].unique():
+        # Filter population data for this generation
+        gen_pop = pop[pop["xopt_generation"] == generation]
+
+        # Build filename
+        timestamp = (
+            datetime.datetime.fromtimestamp(int(generation), tz=datetime.timezone.utc)
+            .isoformat()
+            .replace(":", "_")
+        )
+        filename = f"cnsga_population_{timestamp}.csv"
+        filename = os.path.join(output_dir, filename)
+
+        # Write generation data to file
+        gen_pop.to_csv(filename, index_label="xopt_index")
+        logger.debug(
+            f'Saved population file for generation {generation} to "{filename}"'
+        )
+        generations += 1
+
+    # Write each set of the offspring (separated by key `xopt_parent_generation`)
+    offsprings = 0
+    for generation in dat["xopt_parent_generation"].unique():
+        # Filter population data for this generation
+        gen_pop = dat[dat["xopt_parent_generation"] == generation]
+
+        # Build the filename
+        # Note: to match CNSGA generator behavior where the candidates just received by the generator
+        # have the same timestamp as the completed generation, the `xopt_parent_generation` needs
+        # additional factor of one.
+        timestamp = (
+            datetime.datetime.fromtimestamp(
+                int(generation) + 1, tz=datetime.timezone.utc
+            )
+            .isoformat()
+            .replace(":", "_")
+        )
+        filename = f"cnsga_offspring_{timestamp}.csv"
+        filename = os.path.join(output_dir, filename)
+
+        # Write generation data to file
+        gen_pop.to_csv(filename, index_label="xopt_index")
+        logging.debug(
+            f'Saved offspring file for generation {generation} to "{filename}"'
+        )
+        offsprings += 1
+
+    # Some logging
+    logging.info(
+        f'Converted NSGA2Generator output "{input_dir}" to CNSGA2Generator format at "{output_dir}" ({generations} population files, {offsprings} offspring files, last_n_lines={last_n_lines})'
+    )
+
+
 def read_xopt_csv(*files):
     """
     Read several Xopt-style CSV files into data
@@ -255,30 +397,6 @@ def read_xopt_csv(*files):
         df = pd.read_csv(file, index_col="xopt_index")
         dfs.append(df)
     return pd.concat(dfs)
-
-
-def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> dict:
-    """
-    calculates the bounds of a local region around a center point with side lengths
-    equal to a fixed fraction of the input space for each variable
-
-    """
-    if not center_point.keys() == set(vocs.variable_names):
-        raise KeyError("Center point keys must match vocs variable names")
-
-    bounds = {}
-    widths = {
-        ele: vocs.variables[ele][1] - vocs.variables[ele][0]
-        for ele in vocs.variable_names
-    }
-
-    for name in vocs.variable_names:
-        bounds[name] = [
-            center_point[name] - widths[name] * fraction,
-            center_point[name] + widths[name] * fraction,
-        ]
-
-    return bounds
 
 
 def explode_all_columns(data: pd.DataFrame):

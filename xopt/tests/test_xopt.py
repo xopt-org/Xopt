@@ -25,6 +25,8 @@ from xopt.vocs import VOCS
 
 class DummyGenerator(Generator, ABC):
     name = "dummy"
+    supports_constraints: bool = True
+    supports_single_objective: bool = True
 
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
@@ -98,7 +100,7 @@ class TestXopt:
                 assert X.generator.data is None and X.data is None
             else:
                 assert len(X.generator.data) == len(X.data) == length
-                assert X.data.index.is_integer()
+                assert pd.api.types.is_integer_dtype(X.data.index)
                 assert X.data.index.dtype == np.int64
 
         def check_all(X, length):
@@ -201,14 +203,13 @@ class TestXopt:
 
         # test with vocs that uses "x1" as a constant
         test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables = {"x2": [0, 1]}
+        test_vocs.constants["x1"] = 2.0
 
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=test_vocs)
 
         xopt = Xopt(generator=generator, evaluator=evaluator, vocs=test_vocs)
-
-        test_vocs.variables = {"x2": [0, 1]}
-        test_vocs.constants["x1"] = 2.0
 
         out = xopt.evaluate({"x2": 0.2})
         assert isinstance(out, dict)
@@ -324,9 +325,9 @@ class TestXopt:
         assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
 
-        assert (
-            len(X.generator.data) == 2
-        ), f"len(X.generator.data) = {len(X.generator.data)}"
+        assert len(X.generator.data) == 2, (
+            f"len(X.generator.data) = {len(X.generator.data)}"
+        )
 
     def test_remove_data(self):
         generator = DummyGenerator(vocs=deepcopy(TEST_VOCS_BASE))
@@ -487,6 +488,19 @@ class TestXopt:
         xopt.random_evaluate(1)
         assert np.isclose(xopt.data["x1"].iloc[0], 0.488178)
         assert len(xopt.data) == 3
+
+    def test_copying_generators(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+        X2 = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+
+        assert X.generator is not X2.generator
 
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):

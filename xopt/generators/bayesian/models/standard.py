@@ -49,7 +49,7 @@ class StandardModelConstructor(ModelConstructor):
 
     Methods
     -------
-    likelihood
+    get_likelihood
         Get the likelihood for the model, considering the low noise prior.
 
     build_model(input_names, outcome_names, data, input_bounds, dtype, device)
@@ -62,7 +62,7 @@ class StandardModelConstructor(ModelConstructor):
 
     name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
-        True, description="specify if model should assume a low noise environment"
+        False, description="specify if model should assume a low noise environment"
     )
     covar_modules: Dict[str, Kernel] = Field(
         {}, description="covariance modules for GP models"
@@ -102,7 +102,7 @@ class StandardModelConstructor(ModelConstructor):
                     if val.startswith("base64:"):
                         v[key] = decode_torch_module(val)
                     elif os.path.exists(val):
-                        v[key] = torch.load(val)
+                        v[key] = torch.load(val, weights_only=False)
 
         return v
 
@@ -112,8 +112,11 @@ class StandardModelConstructor(ModelConstructor):
             assert name in info.data["mean_modules"]
         return v
 
-    @property
-    def likelihood(self) -> Likelihood:
+    def get_likelihood(
+        self,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
+    ) -> Likelihood:
         """
         Get the likelihood for the model, considering the low noise prior and or a
         custom noise prior.
@@ -124,13 +127,13 @@ class StandardModelConstructor(ModelConstructor):
             The likelihood for the model.
 
         """
+        tkwargs = {"dtype": dtype, "device": device}
         if self.custom_noise_prior is not None:
-            return GaussianLikelihood(
+            likelihood = GaussianLikelihood(
                 noise_prior=self.custom_noise_prior,
             )
-
-        if self.use_low_noise_prior:
-            return GaussianLikelihood(
+        elif self.use_low_noise_prior:
+            likelihood = GaussianLikelihood(
                 noise_prior=GammaPrior(1.0, 100.0),
             )
         else:
@@ -144,7 +147,8 @@ class StandardModelConstructor(ModelConstructor):
                     initial_value=noise_prior_mode,
                 ),
             )
-            return likelihood
+        likelihood = likelihood.to(**tkwargs)
+        return likelihood
 
     def build_model(
         self,
@@ -221,7 +225,7 @@ class StandardModelConstructor(ModelConstructor):
                     self.build_single_task_gp(
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
-                        likelihood=self.likelihood,
+                        likelihood=self.get_likelihood(**tkwargs),
                         train=not self.use_cached_hyperparameters,
                         **kwargs,
                     )
@@ -253,7 +257,7 @@ class StandardModelConstructor(ModelConstructor):
         full_model = ModelListGP(*models)
 
         # if specified, use cached model hyperparameters
-        if self.use_cached_hyperparameters:
+        if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
             store = {
                 name: ele.to(**tkwargs)
                 for name, ele in self._hyperparameter_store.items()
@@ -263,7 +267,7 @@ class StandardModelConstructor(ModelConstructor):
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
-        return full_model
+        return full_model.to(**tkwargs)
 
     def build_mean_module(
         self, name, mean_modules, input_transform, outcome_transform

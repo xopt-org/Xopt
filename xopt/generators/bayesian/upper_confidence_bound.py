@@ -1,25 +1,36 @@
 import warnings
 
 from botorch.acquisition import (
-    qUpperConfidenceBound,
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
+    qUpperConfidenceBound,
 )
-from pydantic import Field, field_validator
+from gpytorch import Module
+from pydantic import Field
 
+from xopt.errors import GeneratorWarning
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
 from xopt.generators.bayesian.utils import set_botorch_weights
 
 
+# TODO: is log necessary for numeric stability of constrained softplus case? need to benchmark
 class UpperConfidenceBoundGenerator(BayesianGenerator):
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     supports_batch_generation: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
+    _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
+
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound
 
 Attributes
@@ -30,22 +41,24 @@ beta : float, default 2.0
 
     """ + formatted_base_docstring()
 
-    @field_validator("vocs")
-    def validate_vocs_without_constraints(cls, v):
-        if v.constraints:
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.vocs.n_constraints > 0:
             warnings.warn(
-                f"Using {cls.__name__} with constraints may lead to numerical issues if the base acquisition "
-                f"function has negative values."
+                "Using upper confidence bound with constraints may lead to invalid values "
+                "if the base acquisition function has negative values. Use with "
+                "caution."
             )
-        return v
 
-    @field_validator("log_transform_acquisition_function")
-    def validate_log_transform_acquisition_function(cls, v):
-        if v:
-            raise ValueError(
-                "Log transform cannot be applied to potentially negative UCB "
-                "acquisition function."
+    def propose_candidates(self, model: Module, n_candidates: int = 1):
+        # TODO: convert to exception in the future
+        if self.vocs.n_constraints > 0 and n_candidates > 1:
+            warnings.warn(
+                "Using UCB for constrained generation of multiple candidates is numerically unstable and "
+                "will raise error in the future. Try expected improvement instead.",
+                category=GeneratorWarning,
             )
+        return super().propose_candidates(model, n_candidates)
 
     def _get_acquisition(self, model):
         objective = self._get_objective()
@@ -65,8 +78,7 @@ beta : float, default 2.0
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
             )
-
-        return acq
+        return acq.to(**self.tkwargs)
 
 
 class TDUpperConfidenceBoundGenerator(

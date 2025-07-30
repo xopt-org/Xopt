@@ -53,7 +53,7 @@ class TestPerformance:
         print(f"Pure generator time: {tpure}")
         print(f"Xopt time: {txopt}")
         print(
-            f"Xopt ratio: {txopt / tpure} ({(txopt-tpure)/NRUNS * 1e3:.3f}ms per "
+            f"Xopt ratio: {txopt / tpure} ({(txopt - tpure) / NRUNS * 1e3:.3f}ms per "
             f"call)"
         )
         print(f"Ratio every 100 steps: {ratio_array[::100]}")

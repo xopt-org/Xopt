@@ -1,5 +1,16 @@
-from typing import Any, Optional
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    List,
+    Dict,
+    Tuple,
+    TypeVar,
+    TypedDict,
+    Union,
+)
 
+import gpytorch
 import numpy as np
 import torch
 from botorch.acquisition import AcquisitionFunction
@@ -8,32 +19,72 @@ from pandas import DataFrame
 
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.ticker import FormatStrFormatter
 
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
+from .utils import torch_compile_gp_model, torch_trace_gp_model
+
+# Little helper class, which is only used as a type.
+DType = TypeVar("DType")
 
 
-def visualize_generator_model(generator, **kwargs) -> tuple:
-    """Displays GP model predictions for the selected output(s).
+class Array(np.ndarray, Generic[DType]):
+    def __getitem__(self, key) -> DType:
+        return super().__getitem__(key)
 
-    The GP models are displayed with respect to the named variables. If None are given, the list of variables in
-    generator.vocs is used. Feasible samples are indicated with a filled orange "o", infeasible samples with a
-    hollow red "o". Feasibility is calculated with respect to all constraints unless the selected output is a
-    constraint itself, in which case only that one is considered.
+
+def visualize_generator_model(
+    generator, **kwargs
+) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+    """Visualizes GP model predictions for the specified output(s).
+
+    This function generates a visualization of the Gaussian Process (GP) models associated with the provided generator.
+    It plots model predictions for selected outputs, showing feasible samples with filled orange circles ("o") and
+    infeasible samples with hollow red circles ("o"). Feasibility is calculated with respect to all constraints,
+    except when the selected output is a constraint itself, in which case only that constraint is considered.
 
     Parameters
     ----------
     generator : BayesianGenerator
-            Bayesian generator for which the GP model shall be visualized.
-    **kwargs : visualization parameters
-        See parameters of :func:`visualize_model`.
+        The Bayesian generator whose GP model is to be visualized. The generator must have a trained model.
+    **kwargs : dict, optional
+        Additional visualization parameters to customize the plots. Refer to the parameters of :func:`visualize_model`
+        for more details.
+
+    Raises
+    ------
+    ValueError
+        If the generator's model has not been trained (i.e., `generator.model` is None).
 
     Returns
     -------
     tuple
-        The matplotlib figure and axes objects.
+        A tuple containing the matplotlib figure and axes objects used for the visualization.
+
+    Examples
+    --------
+    >>> from xopt.generators.bayesian import ExpectedImprovementGenerator
+    >>> from xopt.generators.bayesian.visualize import visualize_generator_model
+    >>> generator = BayesianGenerator(...)
+    >>> generator.train_model()
+    >>> fig, ax = visualize_generator_model(generator, output_names=['output1'], show_acquisition=False)
+    >>> fig.show()
+
+    Notes
+    -----
+    - The visualization is limited to at most two variables at a time.
+    - The generator should be trained (via `generator.train_model()`) before calling this function.
+    - The function internally calls `visualize_model` to handle the actual plotting.
+
+    The following documentation is inherited from `visualize_model`:
+
     """
+
+    # append docstring dynamically
+    visualize_generator_model.__doc__ += visualize_model.__doc__
+
     if generator.model is None:
         raise ValueError(
             "The generator.model doesn't exist, try calling generator.train_model()."
@@ -43,6 +94,7 @@ def visualize_generator_model(generator, **kwargs) -> tuple:
         vocs=generator.vocs,
         data=generator.data,
         acquisition_function=generator.get_acquisition(generator.model),
+        tkwargs=generator.tkwargs,
         **kwargs,
     )
 
@@ -51,18 +103,21 @@ def visualize_model(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
-    acquisition_function: AcquisitionFunction = None,
-    output_names: list[str] = None,
-    variable_names: list[str] = None,
+    acquisition_function: Optional[AcquisitionFunction] = None,
+    output_names: Optional[List[str]] = None,
+    variable_names: Optional[List[str]] = None,
     idx: int = -1,
-    reference_point: dict[str, float] = None,
+    reference_point: Optional[Dict[str, float]] = None,
     show_samples: bool = True,
     show_prior_mean: bool = False,
     show_feasibility: bool = False,
     show_acquisition: bool = True,
     n_grid: int = 50,
     axes: Optional[Axes] = None,
-) -> tuple:
+    exponentiate: bool = True,
+    model_compile_mode: Optional[str] = None,
+    tkwargs: Optional[dict[str, Any]] = None,
+) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Displays GP model predictions for the selected output(s).
 
     The GP models are displayed with respect to the named variables. If None are given, the list of variables in
@@ -103,27 +158,41 @@ def visualize_model(
         Number of grid points per dimension used to display the model predictions.
     axes : Axes, optional
         Axes object used for plotting.
+    exponentiate : bool, optional
+        Flag to exponentiate acquisition function before plotting.
+    model_compile_mode : str, optional
+        Compilation mode for the model. If None (default), the model is not compiled.
+    tkwargs: dict, optional
+        kwargs for torch tensor creation
 
     Returns
     -------
     tuple
         The matplotlib figure and axes objects.
     """
+    tkwargs = tkwargs or {}
     output_names, variable_names = _validate_names(output_names, variable_names, vocs)
     reference_point_names = [
         name for name in vocs.variable_names if name not in variable_names
     ]
     if show_acquisition and acquisition_function is None:
         show_acquisition = False
-    kwargs = locals()
+
     dim_x, dim_y = len(variable_names), len(output_names)
     # plot configuration
-    figure_config = _get_figure_config(min_ncols=dim_x, min_nrows=dim_y, **kwargs)
-    plots: tuple[Figure, Axes | np.ndarray] = None
+    figure_config = _get_figure_config(
+        min_ncols=dim_x,
+        min_nrows=dim_y,
+        show_acquisition=show_acquisition,
+        show_prior_mean=show_prior_mean,
+        show_feasibility=show_feasibility,
+    )
+    plots: tuple[Figure, Array[Axes]]
     if axes is None:
         from matplotlib import pyplot as plt  # lazy import
 
         plots = plt.subplots(**figure_config, squeeze=False)
+
     else:
         plots = _get_figure_from_axes(axes), axes
     fig, ax = plots
@@ -145,16 +214,44 @@ def visualize_model(
                 output_name=output_name,
                 color=f"C{color_idx}",
                 axis=ax[i, 0],
-                **kwargs,
+                tkwargs=tkwargs,
+                model=model,
+                vocs=vocs,
+                data=data,
+                variable_names=variable_names,
+                reference_point=reference_point,
+                show_samples=show_samples,
+                show_prior_mean=show_prior_mean,
+                n_grid=n_grid,
+                idx=idx,
             )
             ax[i, 0].set_xlabel(None)
         if show_acquisition:
             plot_acquisition_function(
-                axis=ax[len(output_names), 0], **(kwargs | {"show_samples": False})
+                axis=ax[len(output_names), 0],
+                show_samples=False,
+                acquisition_function=acquisition_function,
+                vocs=vocs,
+                variable_names=variable_names,
+                data=data,
+                reference_point=reference_point,
+                idx=idx,
+                n_grid=n_grid,
+                tkwargs=tkwargs,
             )
             ax[len(output_names), 0].set_xlabel(None)
         if show_feasibility:
-            plot_feasibility(axis=ax[-1, 0], **kwargs)
+            plot_feasibility(
+                axis=ax[-1, 0],
+                data=data,
+                model=model,
+                vocs=vocs,
+                idx=idx,
+                n_grid=n_grid,
+                tkwargs=tkwargs,
+                reference_point=reference_point,
+                variable_names=variable_names,
+            )
         ax[-1, 0].set_xlabel(variable_names[0])
     else:
         # generate input mesh only once
@@ -163,7 +260,9 @@ def visualize_model(
             variable_names=variable_names,
             vocs=vocs,
             n_grid=n_grid,
+            tkwargs=tkwargs,
         )
+        input_mesh.to(**tkwargs)
         for i, output_name in enumerate(output_names):
             posterior_mean, posterior_std, prior_mean = _get_model_predictions(
                 input_mesh=input_mesh,
@@ -171,6 +270,7 @@ def visualize_model(
                 model=model,
                 vocs=vocs,
                 include_prior_mean=show_prior_mean,
+                model_compile_mode=model_compile_mode,
             )
             for j in range(ncols):
                 ax_ij: Axes = ax[i, j] if nrows > 1 else ax[0, j]
@@ -186,6 +286,7 @@ def visualize_model(
                     prediction = prior_mean
                     title = f"Prior Mean [{output_name}]"
                     cbar_label = output_name
+
                 _plot2d_prediction(
                     prediction=prediction,
                     output_name=output_name,
@@ -194,7 +295,11 @@ def visualize_model(
                     cbar_label=cbar_label,
                     axis=ax_ij,
                     show_legend=i == j == 0,
-                    **kwargs,
+                    data=data,
+                    vocs=vocs,
+                    n_grid=n_grid,
+                    variable_names=variable_names,
+                    show_samples=show_samples,
                 )
         if show_acquisition:
             ax_acq = ax[len(output_names), 0]
@@ -203,13 +308,33 @@ def visualize_model(
                     axis=ax[len(output_names), 0],
                     only_base_acq=True,
                     show_legend=False,
-                    **(kwargs | {"show_samples": False}),
+                    acquisition_function=acquisition_function,
+                    vocs=vocs,
+                    data=data,
+                    exponentiate=exponentiate,
+                    idx=idx,
+                    n_grid=n_grid,
+                    reference_point=reference_point,
+                    show_samples=False,
+                    variable_names=variable_names,
+                    tkwargs=tkwargs,
                 )
                 ax_acq = ax[len(output_names), 1]
             else:
                 ax[len(output_names), 1].axis("off")
             plot_acquisition_function(
-                axis=ax_acq, show_legend=False, **(kwargs | {"show_samples": False})
+                axis=ax_acq,
+                show_legend=False,
+                acquisition_function=acquisition_function,
+                vocs=vocs,
+                data=data,
+                exponentiate=exponentiate,
+                idx=idx,
+                n_grid=n_grid,
+                reference_point=reference_point,
+                show_samples=False,
+                variable_names=variable_names,
+                tkwargs=tkwargs,
             )
         if show_feasibility:
             if ncols == 3 and show_acquisition:
@@ -224,7 +349,15 @@ def visualize_model(
             plot_feasibility(
                 axis=ax_feasibility,
                 show_legend=False,
-                **(kwargs | {"show_samples": False}),
+                data=data,
+                model=model,
+                vocs=vocs,
+                variable_names=variable_names,
+                reference_point=reference_point,
+                idx=idx,
+                show_samples=False,
+                n_grid=n_grid,
+                tkwargs=tkwargs,
             )
         else:
             if ncols == 3 and show_acquisition:
@@ -247,19 +380,19 @@ def plot_model_prediction(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
-    output_name: str = None,
-    variable_names: list[str] = None,
-    prediction_type: str = None,
+    tkwargs: dict[str, Any],
+    output_name: Optional[str] = None,
+    variable_names: Optional[List[str]] = None,
+    prediction_type: Optional[str] = None,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: Optional[Dict[str, Any]] = None,
     show_samples: bool = True,
     show_prior_mean: bool = False,
     show_legend: bool = True,
     n_grid: int = 100,
     color: str = "C0",
-    axis=None,
-    **_,
-):
+    axis: Optional[Axes] = None,
+) -> Axes:
     """Displays the GP model prediction for the selected output.
 
     Parameters
@@ -305,8 +438,13 @@ def plot_model_prediction(
     _, variable_names = _validate_names([output_name], variable_names, vocs)
     axis = _get_axis(axis, dim=len(variable_names))
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
-    kwargs = locals()
-    input_mesh = _generate_input_mesh(**kwargs)
+    input_mesh = _generate_input_mesh(
+        vocs=vocs,
+        variable_names=variable_names,
+        n_grid=n_grid,
+        reference_point=reference_point,
+        tkwargs=tkwargs,
+    )
     requires_prior_mean = (
         prediction_type is not None and prediction_type.lower() == "prior mean"
     )
@@ -335,7 +473,11 @@ def plot_model_prediction(
                 x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean"
             )
         axis.plot(
-            x_axis, posterior_mean, color=color, linestyle="-", label="Posterior Mean"
+            x_axis,
+            posterior_mean,
+            color=color,
+            linestyle="-",
+            label="Posterior Mean",
         )
         c = axis.fill_between(
             x=x_axis,
@@ -346,7 +488,14 @@ def plot_model_prediction(
             label="",
         )
         if show_samples:
-            plot_samples(**kwargs)
+            plot_samples(
+                variable_names=variable_names,
+                output_name=output_name,
+                vocs=vocs,
+                data=data,
+                idx=idx,
+                axis=axis,
+            )
         # labels and legend
         axis.set_xlabel(variable_names[0])
         axis.set_ylabel(output_name)
@@ -380,7 +529,14 @@ def plot_model_prediction(
                 input_mesh=input_mesh,
                 title=f"Posterior Mean [{output_name}]",
                 cbar_label=output_name,
-                **kwargs,
+                output_name=output_name,
+                axis=axis,
+                show_legend=show_legend,
+                variable_names=variable_names,
+                data=data,
+                vocs=vocs,
+                show_samples=show_samples,
+                n_grid=n_grid,
             )
         elif prediction_type.lower() == "posterior std":
             axis = _plot2d_prediction(
@@ -388,7 +544,14 @@ def plot_model_prediction(
                 input_mesh=input_mesh,
                 title=f"Posterior SD [{output_name}]",
                 cbar_label=r"$\sigma\,$[{}]".format(output_name),
-                **kwargs,
+                output_name=output_name,
+                axis=axis,
+                show_legend=show_legend,
+                variable_names=variable_names,
+                data=data,
+                vocs=vocs,
+                show_samples=show_samples,
+                n_grid=n_grid,
             )
         else:
             axis = _plot2d_prediction(
@@ -396,25 +559,40 @@ def plot_model_prediction(
                 input_mesh=input_mesh,
                 title=f"Prior Mean [{output_name}]",
                 cbar_label=output_name,
-                **kwargs,
+                output_name=output_name,
+                axis=axis,
+                show_legend=show_legend,
+                variable_names=variable_names,
+                data=data,
+                vocs=vocs,
+                show_samples=show_samples,
+                n_grid=n_grid,
             )
     return axis
+
+
+def temp_kwargs_w_removed_keys(
+    kwargs: dict[str, Any], keys: List[str]
+) -> dict[str, Any]:
+    """Returns a copy of kwargs with the specified keys removed."""
+    return {k: v for k, v in kwargs.items() if k not in keys}
 
 
 def plot_acquisition_function(
     acquisition_function: AcquisitionFunction,
     vocs: VOCS,
     data: DataFrame,
-    variable_names: list[str] = None,
+    tkwargs: dict[str, Any],
+    variable_names: Optional[List[str]] = None,
     only_base_acq: bool = False,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: Optional[Dict[str, Any]] = None,
     show_samples: bool = False,
     show_legend: bool = True,
     n_grid: int = 100,
-    axis=None,
-    **_,
-):
+    axis: Optional[Axes] = None,
+    exponentiate: bool = True,
+) -> Axes:
     """Displays the given acquisition function.
 
     Parameters
@@ -441,6 +619,8 @@ def plot_acquisition_function(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
+    exponentiate : bool, optional
+        Flag to exponentiate acquisition function before plotting.
     _
 
     Returns
@@ -451,8 +631,19 @@ def plot_acquisition_function(
     _, variable_names = _validate_names(vocs.output_names, variable_names, vocs)
     axis = _get_axis(axis, dim=len(variable_names))
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
-    kwargs = locals()
-    input_mesh = _generate_input_mesh(**kwargs)
+    input_mesh = _generate_input_mesh(
+        n_grid=n_grid,
+        reference_point=reference_point,
+        variable_names=variable_names,
+        vocs=vocs,
+        tkwargs=tkwargs,
+    )
+
+    if exponentiate:
+        y_label = r"$\exp[ \alpha]$"
+    else:
+        y_label = r"$\alpha$"
+
     if len(variable_names) == 1:
         x_axis = (
             input_mesh[:, vocs.variable_names.index(variable_names[0])]
@@ -468,6 +659,10 @@ def plot_acquisition_function(
                 .numpy()
             )
         acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+
+        if exponentiate:
+            acq = np.exp(acq)
+
         if base_acq is None:
             axis.plot(x_axis, acq, "C0-")
         else:
@@ -475,11 +670,18 @@ def plot_acquisition_function(
             if not only_base_acq:
                 axis.plot(x_axis, acq, "C0-", label="Constrained Acq. Function")
             if show_samples:
-                axis = plot_samples(**kwargs)
+                axis = plot_samples(
+                    axis=axis,
+                    vocs=vocs,
+                    data=data,
+                    idx=idx,
+                    variable_names=variable_names,
+                )
             if show_legend:
                 axis.legend()
         axis.set_xlabel(variable_names[0])
-        axis.set_ylabel(r"$\alpha\,$[{}]".format(vocs.output_names[0]))
+
+        axis.set_ylabel(y_label)
     else:
         if only_base_acq:
             if not hasattr(acquisition_function, "base_acquisition"):
@@ -490,25 +692,41 @@ def plot_acquisition_function(
                 acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
                 .detach()
                 .squeeze()
+                .cpu()
                 .numpy()
             )
         else:
             acq = (
-                acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+                acquisition_function(input_mesh.unsqueeze(1))
+                .detach()
+                .squeeze()
+                .cpu()
+                .numpy()
             )
+
+        if exponentiate:
+            acq = np.exp(acq)
+
         if only_base_acq:
             title = "Base Acq. Function"
         elif hasattr(acquisition_function, "base_acquisition"):
             title = "Constrained Acq. Function"
         else:
             title = "Acq. Function"
+
         axis = _plot2d_prediction(
             prediction=acq,
             input_mesh=input_mesh,
             title=title,
-            cbar_label=r"$\alpha\,$[{}]".format(vocs.output_names[0]),
+            cbar_label=y_label,
             output_name=vocs.output_names[0],
-            **kwargs,
+            show_legend=show_legend,
+            variable_names=variable_names,
+            axis=axis,
+            data=data,
+            vocs=vocs,
+            show_samples=show_samples,
+            n_grid=n_grid,
         )
     return axis
 
@@ -517,15 +735,15 @@ def plot_feasibility(
     model: ModelListGP,
     vocs: VOCS,
     data: DataFrame,
-    variable_names: list[str] = None,
+    tkwargs: dict[str, Any],
+    variable_names: Optional[List[str]] = None,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: Optional[Dict[str, Any]] = None,
     show_samples: bool = False,
     show_legend: bool = True,
     n_grid: int = 100,
-    axis=None,
-    **_,
-):
+    axis: Optional[Axes] = None,
+) -> Axes:
     """Displays the feasibility region for the given model.
 
     Parameters
@@ -560,13 +778,25 @@ def plot_feasibility(
     _, variable_names = _validate_names(vocs.output_names, variable_names, vocs)
     axis = _get_axis(axis, dim=len(variable_names))
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
-    kwargs = locals()
-    input_mesh = _generate_input_mesh(**kwargs)
-    feas = feasibility(input_mesh.unsqueeze(1), model, vocs).detach().squeeze().numpy()
+    input_mesh = _generate_input_mesh(
+        n_grid=n_grid,
+        reference_point=reference_point,
+        variable_names=variable_names,
+        vocs=vocs,
+        tkwargs=tkwargs,
+    )
+    feas = (
+        feasibility(input_mesh.unsqueeze(1), model, vocs)
+        .detach()
+        .squeeze()
+        .cpu()
+        .numpy()
+    )
     if len(variable_names) == 1:
         x_axis = (
             input_mesh[:, vocs.variable_names.index(variable_names[0])]
             .squeeze()
+            .cpu()
             .numpy()
         )
         axis.plot(x_axis, feas, "C0-")
@@ -579,7 +809,13 @@ def plot_feasibility(
             input_mesh=input_mesh,
             title="Feasibility",
             cbar_label="Feasibility",
-            **kwargs,
+            show_legend=show_legend,
+            variable_names=variable_names,
+            axis=axis,
+            data=data,
+            vocs=vocs,
+            show_samples=show_samples,
+            n_grid=n_grid,
         )
     return axis
 
@@ -587,11 +823,10 @@ def plot_feasibility(
 def plot_samples(
     vocs: VOCS,
     data: DataFrame,
-    output_name: str = None,
-    variable_names: list[str] = None,
+    output_name: Optional[str] = None,
+    variable_names: Optional[list[str]] = None,
     idx: int = -1,
-    axis=None,
-    **_,
+    axis: Optional[Axes] = None,
 ):
     """Displays the data samples.
 
@@ -620,8 +855,14 @@ def plot_samples(
         output_name = vocs.output_names[0]
     _, variable_names = _validate_names([output_name], variable_names, vocs)
     axis = _get_axis(axis, dim=len(variable_names))
-    kwargs = locals()
-    x_feasible, y_feasible = _get_feasible_samples(**kwargs)
+    x_feasible, y_feasible = _get_feasible_samples(
+        vocs=vocs,
+        data=data,
+        output_name=output_name,
+        variable_names=variable_names,
+        idx=idx,
+        reverse=False,
+    )
     if not x_feasible.size == 0:
         axis.scatter(
             x_feasible[:, 0] if len(variable_names) == 2 else x_feasible,
@@ -632,7 +873,14 @@ def plot_samples(
             zorder=5,
             label="Feasible Samples",
         )
-    x_infeasible, y_infeasible = _get_feasible_samples(**kwargs, reverse=True)
+    x_infeasible, y_infeasible = _get_feasible_samples(
+        vocs=vocs,
+        data=data,
+        output_name=output_name,
+        variable_names=variable_names,
+        idx=idx,
+        reverse=True,
+    )
     if not x_infeasible.size == 0:
         axis.scatter(
             x_infeasible[:, 0] if len(variable_names) == 2 else x_infeasible,
@@ -664,7 +912,6 @@ def _plot2d_prediction(
     show_legend: bool = True,
     n_grid: int = 100,
     axis: Optional[Axes] = None,
-    **_,
 ):
     """
 
@@ -701,14 +948,15 @@ def _plot2d_prediction(
         The axis.
     """
     axis = _get_axis(axis, dim=len(variable_names))
-    kwargs = locals()
     axis.locator_params(axis="both", nbins=5)
     pcm = axis.pcolormesh(
         input_mesh[:, vocs.variable_names.index(variable_names[0])]
         .reshape(n_grid, n_grid)
+        .cpu()
         .numpy(),
         input_mesh[:, vocs.variable_names.index(variable_names[1])]
         .reshape(n_grid, n_grid)
+        .cpu()
         .numpy(),
         prediction.reshape(n_grid, n_grid),
         rasterized=True,
@@ -723,9 +971,20 @@ def _plot2d_prediction(
     axis.set_title(title)
     axis.set_xlabel(variable_names[0])
     axis.set_ylabel(variable_names[1])
+
+    cbar.ax.ticklabel_format(axis="both", style="sci", useOffset=False)
+    cbar.ax.yaxis.set_major_formatter(FormatStrFormatter("%.3f"))
+
     cbar.set_label(cbar_label)
     if show_samples:
-        axis = plot_samples(**kwargs)
+        axis = plot_samples(
+            vocs=vocs,
+            data=data,
+            output_name=output_name,
+            variable_names=variable_names,
+            idx=-1,
+            axis=axis,
+        )
     if show_legend:
         handles, labels = _combine_legend_entries_for_samples(
             *axis.get_legend_handles_labels()
@@ -746,7 +1005,7 @@ def _generate_input_mesh(
     variable_names: list[str],
     reference_point: dict[str, Any],
     n_grid: int,
-    **_,
+    tkwargs: dict[str, Any],
 ) -> torch.Tensor:
     """Generates an input mesh for visualization.
 
@@ -782,6 +1041,7 @@ def _generate_input_mesh(
         ],
         dim=-1,
     )
+    x = x.to(**tkwargs)
     return x
 
 
@@ -823,8 +1083,8 @@ def _get_model_predictions(
     output_name: str,
     input_mesh: torch.Tensor,
     include_prior_mean: bool = True,
-    **_,
-) -> tuple:
+    model_compile_mode: Optional[str] = None,
+) -> tuple[Any, Any, Any]:
     """Returns the model predictions for the given output name and input mesh.
 
     Parameters
@@ -839,6 +1099,8 @@ def _get_model_predictions(
         Input mesh for which model predictions are computed.
     include_prior_mean : bool, optional
         Whether to include the prior mean in the predictions.
+    model_compile_mode: str, optional
+        Compilation mode for the model. If None (default), the model is not compiled.
     _
 
     Returns
@@ -847,7 +1109,42 @@ def _get_model_predictions(
         The model predictions.
     """
     gp = model.models[vocs.output_names.index(output_name)]
-    with torch.no_grad():
+    # input_mesh = input_mesh.unsqueeze(-2)
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        if model_compile_mode == "trace":
+            if hasattr(model, "_jit"):
+                jitgp = model._jit
+            else:
+                jitgp = torch_trace_gp_model(
+                    gp,
+                    vocs,
+                    {"device": input_mesh.device},
+                    posterior=True,
+                    grad=False,
+                    batch_size=input_mesh.shape[-1],
+                )
+                model._jit = jitgp
+            mean, std = jitgp(input_mesh)
+            posterior_mean = mean.detach().squeeze().cpu().numpy()
+            posterior_std = torch.sqrt(std.detach()).squeeze().cpu().numpy()
+        elif model_compile_mode == "inductor":
+            jitgp = torch_compile_gp_model(
+                gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False
+            )
+            posterior = jitgp(input_mesh)
+            posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
+            posterior_std = (
+                torch.sqrt(posterior.variance).detach().squeeze().cpu().numpy()
+            )
+        elif model_compile_mode is None:
+            posterior = gp.posterior(input_mesh)
+            posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
+            posterior_std = (
+                torch.sqrt(posterior.mvn.variance.detach()).squeeze().cpu().numpy()
+            )
+        else:
+            raise ValueError(f"Unrecognized model_compile_mode: {model_compile_mode}.")
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
         prior_mean = None
         if include_prior_mean:
             _x = gp.input_transform.transform(input_mesh)
@@ -855,9 +1152,6 @@ def _get_model_predictions(
             prior_mean = (
                 gp.outcome_transform.untransform(_x)[0].detach().squeeze().numpy()
             )
-        posterior = gp.posterior(input_mesh)
-        posterior_mean = posterior.mean.detach().squeeze().numpy()
-        posterior_std = torch.sqrt(posterior.mvn.variance).detach().squeeze().numpy()
     return posterior_mean, posterior_std, prior_mean
 
 
@@ -868,7 +1162,6 @@ def _get_feasible_samples(
     variable_names: list[str],
     idx: int = -1,
     reverse: bool = False,
-    **_,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Returns the feasible samples for the given output.
 
@@ -904,8 +1197,8 @@ def _get_feasible_samples(
 
 
 def _validate_names(
-    output_names: list[str],
-    variable_names: list[str],
+    output_names: Optional[list[str]],
+    variable_names: Optional[list[str]],
     vocs: VOCS,
 ) -> tuple[list[str], list[str]]:
     """Verifies that all names are in vocs and that the number of variable_names is valid.
@@ -943,14 +1236,37 @@ def _validate_names(
     return output_names, variable_names
 
 
+class FigureConfig(TypedDict):
+    """Configuration for the figure used in model visualization.
+
+    Attributes
+    ----------
+    nrows : int
+        Number of rows in the figure.
+    ncols : int
+        Number of columns in the figure.
+    sharex : bool
+        Whether to share x-axis across subplots.
+    sharey : bool
+        Whether to share y-axis across subplots.
+    figsize : tuple[float, float]
+        Size of the figure in inches.
+    """
+
+    nrows: int
+    ncols: int
+    sharex: bool
+    sharey: bool
+    figsize: tuple[float, float]
+
+
 def _get_figure_config(
     min_ncols: int,
     min_nrows: int,
     show_acquisition: bool,
     show_prior_mean: bool,
     show_feasibility: bool,
-    **_,
-) -> dict[str, Any]:
+) -> FigureConfig:
     """Returns the matching plot configuration for model visualization.
 
     Parameters
@@ -990,13 +1306,15 @@ def _get_figure_config(
             figsize = (4 * ncols, 3.7 * nrows)
         else:
             figsize = (4 * ncols, 3.3 * nrows)
-    return {
+
+    figure_config: FigureConfig = {
         "nrows": nrows,
         "ncols": ncols,
         "sharex": sharex,
         "sharey": sharey,
         "figsize": figsize,
     }
+    return figure_config
 
 
 def _get_figure_from_axes(axes):

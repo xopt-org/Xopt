@@ -2,9 +2,8 @@ import json
 import warnings
 from typing import List
 
-from xopt.errors import XoptError
-
-from xopt.generators.random import RandomGenerator
+from ..errors import XoptError
+from .random import RandomGenerator
 
 # by default only load random generator
 registered_generators = [
@@ -26,7 +25,7 @@ all_generator_names = {
         "expected_improvement",
         "multi_fidelity",
     },
-    "ga": {"cnsga"},
+    "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
     "rcds": {"rcds"},
 }
@@ -61,7 +60,7 @@ def get_generator_dynamic(name: str):
     elif name in all_generator_names["scipy"]:
         try:
             from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
-            from xopt.generators.scipy.neldermead import NelderMeadGenerator
+            from xopt.generators.sequential.neldermead import NelderMeadGenerator
 
             registered_generators = [
                 NelderMeadGenerator,
@@ -103,19 +102,25 @@ def get_generator_dynamic(name: str):
 
     elif name in all_generator_names["ga"]:
         try:
-            from xopt.generators.ga import CNSGAGenerator
+            from xopt.generators.ga import CNSGAGenerator, NSGA2Generator
 
-            generators[name] = CNSGAGenerator
-            return CNSGAGenerator
+            registered_generators = [
+                CNSGAGenerator,
+                NSGA2Generator,
+            ]
+
+            for gen in registered_generators:
+                generators[gen.name] = gen
+            return generators[name]
         except ModuleNotFoundError:
             warnings.warn("WARNING: `deap` not found, CNSGAGenerator is not available")
     elif name in all_generator_names["es"]:
-        from xopt.generators.es.extremumseeking import ExtremumSeekingGenerator
+        from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 
         generators[name] = ExtremumSeekingGenerator
         return ExtremumSeekingGenerator
     elif name in all_generator_names["rcds"]:
-        from xopt.generators.rcds.rcds import RCDSGenerator
+        from xopt.generators.sequential.rcds import RCDSGenerator
 
         generators[name] = RCDSGenerator
         return RCDSGenerator
@@ -140,6 +145,8 @@ def get_generator_defaults(
             "data",
             "supports_batch_generation",
             "supports_multi_objective",
+            "supports_single_objective",
+            "supports_constraints",
         ]:
             continue
 

@@ -2,7 +2,6 @@ import math
 import os
 from copy import deepcopy
 from unittest import TestCase
-from unittest.mock import patch
 import json
 
 import numpy as np
@@ -11,10 +10,11 @@ import pytest
 import yaml
 
 from xopt import Evaluator, VOCS, Xopt
+from xopt.errors import FeasibilityError
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
-from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.generators.bayesian.turbo import (
     EntropyTurboController,
     OptimizeTurboController,
@@ -25,7 +25,10 @@ from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 def sin_function(input_dict):
     x = input_dict["x"]
-    return {"f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x)}
+    return {
+        "f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x),
+        "c": -1.0,
+    }
 
 
 class TestTurbo(TestCase):
@@ -46,49 +49,62 @@ class TestTurbo(TestCase):
         assert state.success_tolerance == 2
         assert not state.minimize
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_turbo_validation(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.variables = {"x1": [0, 1]}
 
-        turbo_controller = OptimizeTurboController(test_vocs)
-        BayesianGenerator(vocs=test_vocs, turbo_controller=turbo_controller)
-
-        turbo_controller = {"name": "optimize", "length": 0.5}
-        gen = BayesianGenerator(vocs=test_vocs, turbo_controller=turbo_controller)
+        turbo_controller = {"name": "OptimizeTurboController", "length": 0.5}
+        gen = UpperConfidenceBoundGenerator(
+            vocs=test_vocs, turbo_controller=turbo_controller
+        )
         assert gen.turbo_controller.length == 0.5
+        assert isinstance(gen.turbo_controller, OptimizeTurboController)
 
         # turbo controller dict needs to have a name attribute
         with pytest.raises(ValueError):
-            BayesianGenerator(
+            UpperConfidenceBoundGenerator(
                 vocs=test_vocs, turbo_controller={"bad_keyword": "result"}
             )
 
         # test specifying controller via string
-        BayesianGenerator(vocs=test_vocs, turbo_controller="optimize")
+        UpperConfidenceBoundGenerator(
+            vocs=test_vocs, turbo_controller="OptimizeTurboController"
+        )
 
         with pytest.raises(ValueError):
-            BayesianGenerator(vocs=test_vocs, turbo_controller="bad_controller")
+            UpperConfidenceBoundGenerator(
+                vocs=test_vocs, turbo_controller="bad_controller"
+            )
 
         # test not allowed generator type
         with pytest.raises(ValueError):
-            BayesianGenerator(
+            UpperConfidenceBoundGenerator(
                 vocs=test_vocs, turbo_controller=EntropyTurboController(test_vocs)
             )
 
         # test validation from serialized turbo controller
-        gen = BayesianGenerator(vocs=test_vocs, turbo_controller=turbo_controller)
+        gen = UpperConfidenceBoundGenerator(
+            vocs=test_vocs, turbo_controller=turbo_controller
+        )
         gen.add_data(TEST_VOCS_DATA)
         gen_dict = json.loads(gen.to_json())
         gen.from_dict(gen_dict | {"vocs": test_vocs})
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+        # test invalid turbo controller type
+        test_vocs_2 = test_vocs.model_copy()
+        test_vocs_2.objectives = {}
+        test_vocs_2.observables = ["o1"]
+        with pytest.raises(ValueError):
+            gen = BayesianExplorationGenerator(
+                vocs=test_vocs_2, turbo_controller="OptimizeTurboController"
+            )
+
     def test_get_trust_region(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.variables = {"x1": [0, 1]}
 
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
         gen.train_model()
 
@@ -100,7 +116,7 @@ class TestTurbo(TestCase):
 
         # test in 2D
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
         gen.train_model()
 
@@ -111,12 +127,93 @@ class TestTurbo(TestCase):
         assert np.all(tr[0].numpy() >= test_vocs.bounds[0])
         assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
+    def test_sign_conventions(self):
+        # 2D minimization
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+        # ensure first update will be a failure
+        data = TEST_VOCS_DATA.copy()
+        data.loc[data.index[-1], "y1"] = data["y1"].max()
+        gen.add_data(data)
+        gen.train_model()
+
+        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        # make next step to better (lower) value
+        test_data = {
+            "x1": [0.1234],
+            "x2": [0.1234],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].min() - 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 1
+        assert turbo_state.failure_counter == 0
+
+        # make next step to worse (higher) value
+        test_data = {
+            "x1": [0.2345],
+            "x2": [0.2345],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].max() + 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        # 2D maximization
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives["y1"] = "MAXIMIZE"
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+        # ensure first update will be a failure
+        data = TEST_VOCS_DATA.copy()
+        data.loc[data.index[-1], "y1"] = data["y1"].min()
+        gen.add_data(data)
+        gen.train_model()
+
+        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
+        # make next step to better (higher) value
+        test_data = {
+            "x1": [0.1234],
+            "x2": [0.1234],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].max() + 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 1
+        assert turbo_state.failure_counter == 0
+
+        # make next step to worse (lower) value
+        test_data = {
+            "x1": [0.2345],
+            "x2": [0.2345],
+            "c1": [1.0],
+            "y1": [TEST_VOCS_DATA["y1"].min() - 1.0],
+        }
+        gen.add_data(pd.DataFrame(test_data))
+        gen.train_model()
+        turbo_state.update_state(gen)
+        assert turbo_state.success_counter == 0
+        assert turbo_state.failure_counter == 1
+
     def test_restrict_data(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        gen = BayesianGenerator(
+        gen = UpperConfidenceBoundGenerator(
             vocs=test_vocs, turbo_controller=OptimizeTurboController(test_vocs)
         )
         gen.add_data(TEST_VOCS_DATA)
@@ -128,7 +225,6 @@ class TestTurbo(TestCase):
             restricted_data["x1"].to_numpy(), np.array([0.45, 0.56, 0.67])
         )
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_with_constraints(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -143,7 +239,7 @@ class TestTurbo(TestCase):
         data["y1"] = y_data
         best_x = data["x1"].iloc[5]
 
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
         gen.train_model()
 
@@ -159,7 +255,7 @@ class TestTurbo(TestCase):
 
         # test a case where the last point is invalid
         new_data = deepcopy(gen.data)
-        n_c = new_data["c1"].to_numpy()
+        n_c = new_data["c1"].to_numpy(copy=True)
         n_c[-1] = 1.0
         new_data["c1"] = n_c
         gen.add_data(new_data)
@@ -174,11 +270,11 @@ class TestTurbo(TestCase):
         y_data[5] = -1
         data["y1"] = y_data
 
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FeasibilityError):
             turbo_state.update_state(gen)
 
         # test best y value violates the constraint
@@ -192,7 +288,7 @@ class TestTurbo(TestCase):
         data["y1"] = y_data
         best_x = data["x1"].iloc[6]
 
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
@@ -210,19 +306,18 @@ class TestTurbo(TestCase):
         data["y1"] = y_data
         best_x = data["x1"].iloc[6]
 
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
         turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_set_best_point(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
         turbo_state = OptimizeTurboController(test_vocs)
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
 
         turbo_state.update_state(gen)
@@ -243,7 +338,7 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(test_vocs)
         assert not turbo_state.minimize
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
 
         turbo_state.update_state(gen)
@@ -252,7 +347,6 @@ class TestTurbo(TestCase):
         ].max()[test_vocs.objective_names[0]]
         assert turbo_state.best_value == best_value
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_batch_turbo(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -265,7 +359,7 @@ class TestTurbo(TestCase):
         data["c1"] = c_data
         y_data = np.ones(10)
         data["y1"] = y_data
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(test_vocs, failure_tolerance=5)
@@ -298,7 +392,6 @@ class TestTurbo(TestCase):
         for i in range(2):
             X.step()
 
-    @patch.multiple(BayesianGenerator, __abstractmethods__=set())
     def test_safety(self):
         test_vocs = VOCS(
             variables={"x": [0, 2 * math.pi]},
@@ -310,7 +403,7 @@ class TestTurbo(TestCase):
             {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, -1.0, 1.0]}
         )
         sturbo = SafetyTurboController(vocs=test_vocs)
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(test_data)
 
         sturbo.update_state(gen)
@@ -323,7 +416,7 @@ class TestTurbo(TestCase):
             {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, -1.0, -1.0]}
         )
 
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(test_data2)
 
         sturbo.update_state(gen, previous_batch_size=3)
@@ -335,21 +428,30 @@ class TestTurbo(TestCase):
         test_data3 = pd.DataFrame(
             {"x": [0.5, 1.0, 1.5], "f": [1.0, 1.0, 1.0], "c": [-1.0, 1.0, -1.0]}
         )
-        gen = BayesianGenerator(vocs=test_vocs)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(test_data3)
 
         sturbo.update_state(gen, previous_batch_size=3)
         assert sturbo.success_counter == 0
         assert sturbo.failure_counter == 1
 
+        # test vocs validation
+        test_vocs = VOCS(
+            variables={"x": [0, 2 * math.pi]},
+            objectives={"f": "MINIMIZE"},
+        )
+        with pytest.raises(ValueError):
+            SafetyTurboController(vocs=test_vocs)
+
     def test_serialization(self):
         vocs = VOCS(
             variables={"x": [0, 2 * math.pi]},
             objectives={"f": "MINIMIZE"},
+            constraints={"c": ["LESS_THAN", 0]},
         )
 
         evaluator = Evaluator(function=sin_function)
-        for name in ["optimize", "safety"]:
+        for name in ["OptimizeTurboController", "SafetyTurboController"]:
             generator = UpperConfidenceBoundGenerator(vocs=vocs, turbo_controller=name)
             X = Xopt(
                 evaluator=evaluator,
@@ -413,6 +515,26 @@ class TestTurbo(TestCase):
                 algorithm=algorithm,
                 turbo_controller=OptimizeTurboController(vocs),
             )
+
+    def test_turbo_restart(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables = {"x1": [0, 1]}
+
+        controllers = [
+            OptimizeTurboController(test_vocs),
+            SafetyTurboController(test_vocs),
+        ]
+        for controller in controllers:
+            controller.length = 5.0
+            controller.success_counter = 10
+            controller.failure_counter = 5
+            controller.center_x = {"x1": 0.5}
+
+            controller.reset()
+            assert controller.length == 0.25
+            assert controller.success_counter == 0
+            assert controller.failure_counter == 0
+            assert controller.center_x is None
 
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
