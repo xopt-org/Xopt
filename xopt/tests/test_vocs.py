@@ -7,10 +7,8 @@ import pytest
 from pydantic import ValidationError
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.vocs import VOCS, ContinuousVariable, DiscreteVariable, \
-    VirtualObjective, CharacterizeObjective, LessThanConstraint, \
-    BoundsConstraint, MinimizeObjective, MaximizeObjective
-
+from xopt.vocs import VOCS
+from generator_standard.vocs import ContinuousVariable, DiscreteVariable, ObjectiveTypeEnum, LessThanConstraint, BoundsConstraint
 
 class TestVOCS(object):
     def test_init(self):
@@ -18,15 +16,13 @@ class TestVOCS(object):
         vocs = VOCS(
             variables={
                 "x": [0, 1],
-                "y": [0, 1, 2]
+                "y": {0, 1, 2},
             },
             objectives={"f": "MINIMIZE"},
         )
         assert vocs.n_inputs == 2
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
-        assert isinstance(vocs.variables["x"], ContinuousVariable)
-        assert isinstance(vocs.variables["y"], DiscreteVariable)
 
     def test_variable_validation(self):
         with pytest.raises(ValidationError):
@@ -76,21 +72,9 @@ class TestVOCS(object):
             c:
               type: LessThanConstraint
               value: 0.0
-            cc:
-              type: BoundsConstraint
-              range:
-                - 0.0
-                - 5.0
         objectives:
-            z:
-              type: MinimizeObjective
-            zzz:
-              type: CharacterizeObjective
-            zz:
-              type: VirtualObjective
-              observables:
-                - y1
-                - a2
+            z: MINIMIZE
+            zzz: EXPLORE
         variables:
             x:
               type: ContinuousVariable
@@ -106,14 +90,12 @@ class TestVOCS(object):
 
         """
         vocs = VOCS.from_yaml(Y)
-        assert vocs.constraint_names == ["c", "cc"]
+        assert vocs.constraint_names == ["c"]
         assert isinstance(vocs.variables["x"], ContinuousVariable)
         assert isinstance(vocs.variables["y"], DiscreteVariable)
-        assert isinstance(vocs.objectives["z"], MinimizeObjective)
-        assert isinstance(vocs.objectives["zz"], VirtualObjective)
-        assert isinstance(vocs.objectives["zzz"], CharacterizeObjective)
+        assert vocs.objectives["z"] == ObjectiveTypeEnum.MINIMIZE
+        assert vocs.objectives["zzz"] == ObjectiveTypeEnum.EXPLORE
         assert isinstance(vocs.constraints["c"], LessThanConstraint)
-        assert isinstance(vocs.constraints["cc"], BoundsConstraint)
 
         assert vocs.n_inputs == 2
 
@@ -133,7 +115,7 @@ class TestVOCS(object):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.model_dump_json()
 
-        vocs.variables["a"] = np.array([1, 2])
+        vocs.variables["a"] = ContinuousVariable(domain=[0.0, 1.0])
         vocs.model_dump_json()
 
     def test_properties(self):

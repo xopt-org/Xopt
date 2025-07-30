@@ -84,6 +84,8 @@ def recursive_serialize(
             v[key] = str(v[key])
         elif isinstance(v[key], pd.DataFrame):
             v[key] = json.loads(v[key].to_json())
+        elif isinstance(v[key], set):
+            v[key] = list(v[key])
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(v[key], _type):
