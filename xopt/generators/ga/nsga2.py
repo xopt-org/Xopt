@@ -404,8 +404,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
 
-    @classmethod
-    def _load_checkpoint_data(cls, fname: str) -> dict:
+    @staticmethod
+    def _load_checkpoint_data(fname: str) -> dict:
         """
         Internal function to load generator data from checkpoint file as well as VOCS object.
 
