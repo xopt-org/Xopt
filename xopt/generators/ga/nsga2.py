@@ -407,7 +407,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     @classmethod
     def _load_checkpoint_data(cls, fname: str) -> dict:
         """
-        Load checkpoint data from file, reusing logic from existing from_checkpoint method.
+        Internal function to load generator data from checkpoint file as well as VOCS object.
 
         Parameters
         ----------

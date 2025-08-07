@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     # Create xopt
     with open(args.config) as f:
-        my_xopt = X_from_yaml = xopt.Xopt.from_yaml(f.read())
+        my_xopt = xopt.Xopt.from_yaml(f.read())
 
     # Run it
     my_xopt.run()
