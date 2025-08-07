@@ -1,6 +1,7 @@
 from datetime import datetime
-from pydantic import Field, Discriminator
+from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
+import json
 import logging
 import numpy as np
 import os
@@ -8,6 +9,7 @@ import pandas as pd
 import time
 
 from ...generator import StateOwner
+from ...vocs import VOCS
 from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
 from .operators import (
@@ -23,6 +25,31 @@ from .operators import (
 ########################################################################################################################
 # Helper functions
 ########################################################################################################################
+
+
+def _normalize_to_dict(obj):
+    """
+    Convert a potential pydantic object to dict, or pass through if already a dict.
+
+    Parameters
+    ----------
+    obj : VOCS, dict, or other
+        Object to normalize to dict
+
+    Returns
+    -------
+    dict
+        Dictionary representation of the object
+    """
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    elif hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    elif isinstance(obj, dict):
+        return obj
+    else:
+        # Fallback for other types
+        return obj
 
 
 def vocs_data_to_arr(data: list | np.ndarray) -> np.ndarray:
@@ -277,6 +304,10 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Directory to save algorithm state and population history.
     checkpoint_freq : int, default=1
         Frequency (in generations) at which to save checkpoints.
+    checkpoint_file : str, optional
+        Path to checkpoint file to load from. If provided, the generator will be initialized
+        from the checkpoint state. The user-provided VOCS must match the checkpoint VOCS exactly.
+        User-specified parameters will override checkpoint values.
     deduplicate_output : bool, default=True
         Whether to ensure all generated candidates are unique.
 
@@ -309,6 +340,11 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     name = "nsga2"
     supports_multi_objective: bool = True
     supports_constraints: bool = True
+
+    # Checkpoint loading
+    checkpoint_file: str | None = Field(
+        None, description="Path to checkpoint file to load from", exclude=True
+    )
 
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[
@@ -367,6 +403,66 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
+
+    @classmethod
+    def _load_checkpoint_data(cls, fname: str) -> dict:
+        """
+        Load checkpoint data from file, reusing logic from existing from_checkpoint method.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the checkpoint file
+
+        Returns
+        -------
+        dict
+            Dictionary containing VOCS and checkpoint data
+        """
+        # Load the VOCS object
+        vocs_fname = os.path.join(os.path.dirname(fname), "../vocs.txt")
+        if not os.path.exists(vocs_fname):
+            raise ValueError(
+                f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
+                "output directory is required for loading from checkpoint."
+            )
+        with open(vocs_fname) as f:
+            vocs = VOCS.from_dict(json.load(f))
+
+        # Load the checkpoint
+        with open(fname) as f:
+            checkpoint_data = json.load(f)
+
+        return {"vocs": vocs, **checkpoint_data}
+
+    @model_validator(mode="before")
+    @classmethod
+    def load_from_checkpoint(cls, values):
+        """
+        Load from checkpoint file if checkpoint_file is provided.
+        Validates that user VOCS matches checkpoint VOCS.
+        """
+        if isinstance(values, dict) and "checkpoint_file" in values:
+            checkpoint_file = values.pop("checkpoint_file")
+            if checkpoint_file is not None:
+                # Load checkpoint data
+                checkpoint_data = cls._load_checkpoint_data(checkpoint_file)
+
+                # VOCS validation - inline check
+                if "vocs" in values:
+                    if _normalize_to_dict(values["vocs"]) != _normalize_to_dict(
+                        checkpoint_data["vocs"]
+                    ):
+                        raise ValueError(
+                            "User-provided VOCS does not match checkpoint VOCS. "
+                            "The VOCS must be identical when loading from checkpoint to ensure "
+                            "consistency with the saved optimization state."
+                        )
+
+                # Merge with user data precedence
+                merged_data = {**checkpoint_data, **values}
+                return merged_data
+        return values
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
