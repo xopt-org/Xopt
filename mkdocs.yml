@@ -160,3 +160,6 @@ plugins:
           rendering:
             show_source: true
             show_root_heading: true
+
+hooks:
+  - docs/hooks/zip_generator.py

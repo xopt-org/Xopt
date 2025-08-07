@@ -1,6 +1,7 @@
-
+# Docs related output files
 docs/examples/ga/nsga2/assets/yaml_runner_example/nsga2_output
 docs/examples/ga/nsga2/assets/yaml_runner_example/nsga2_from_checkpoint_output
+docs/examples/ga/nsga2/yaml_interface/assets/yaml_runner_example.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
