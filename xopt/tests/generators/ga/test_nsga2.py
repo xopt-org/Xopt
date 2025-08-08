@@ -230,14 +230,8 @@ def test_nsga2_checkpoint_reload():
         sorted_checkpoints = sorted(checkpoint_files, key=get_checkpoint_datetime)
         latest_checkpoint = os.path.join(checkpoint_dir, sorted_checkpoints[-1])
 
-        # Load the generator from the checkpoint
-        with open(latest_checkpoint, "r") as f:
-            checkpoint_data = json.load(f)
-
         # Create a new generator from the checkpoint
-        restored_generator = NSGA2Generator.from_dict(
-            {"vocs": tnk_vocs, **checkpoint_data}
-        )
+        restored_generator = NSGA2Generator(checkpoint_file=latest_checkpoint)
 
         # Verify that the restored generator has the same state as the original
         assert restored_generator.n_generations == X.generator.n_generations
