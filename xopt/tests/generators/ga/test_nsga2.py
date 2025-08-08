@@ -192,6 +192,7 @@ def test_generate_child_binary_tournament():
 
 @pytest.fixture
 def nsga2_optimization_with_checkpoint():
+    """Test fixture that supplies a optimization with data and the final checkpoint path"""
     with TemporaryDirectory() as output_dir:
         # Set up the generator with output_dir and checkpoint_freq
         generator = NSGA2Generator(
@@ -231,8 +232,9 @@ def nsga2_optimization_with_checkpoint():
 
 def test_nsga2_checkpoint_reload(nsga2_optimization_with_checkpoint):
     """
-    Test that NSGA2Generator can be reloaded from a checkpoint.
+    Test that NSGA2Generator can be reloaded from a checkpoint and used.
     """
+    # Get the optimizer and checkpoint
     X, latest_checkpoint = nsga2_optimization_with_checkpoint
 
     # Create a new generator from the checkpoint
@@ -262,6 +264,26 @@ def test_nsga2_checkpoint_reload(nsga2_optimization_with_checkpoint):
     X.generator.close_log_file()
     if hasattr(X_restored.generator, "close_log_file"):
         X_restored.generator.close_log_file()
+
+
+def test_nsga2_checkpoint_reload_override(nsga2_optimization_with_checkpoint):
+    """
+    Confirm that overriding settings works as intended
+    """
+    # Get the optimizer and checkpoint
+    X, latest_checkpoint = nsga2_optimization_with_checkpoint
+
+    # Create a new generator from the checkpoint
+    new_pop_size = 20
+    restored_generator = NSGA2Generator(
+        checkpoint_file=latest_checkpoint, population_size=new_pop_size
+    )
+
+    # Check that the setting changed
+    assert restored_generator.population_size == new_pop_size
+    assert (
+        X.generator.population_size != new_pop_size
+    )  # Make sure we don't invalidate test in future by accident
 
 
 def test_nsga2_all_individuals_in_data():
