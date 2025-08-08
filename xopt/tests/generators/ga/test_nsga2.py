@@ -190,10 +190,8 @@ def test_generate_child_binary_tournament():
     )
 
 
-def test_nsga2_checkpoint_reload():
-    """
-    Test that NSGA2Generator can be reloaded from a checkpoint.
-    """
+@pytest.fixture
+def nsga2_optimization_with_checkpoint():
     with TemporaryDirectory() as output_dir:
         # Set up the generator with output_dir and checkpoint_freq
         generator = NSGA2Generator(
@@ -211,11 +209,9 @@ def test_nsga2_checkpoint_reload():
 
         # Verify that the checkpoint directory exists
         checkpoint_dir = os.path.join(output_dir, "checkpoints")
-        assert os.path.exists(checkpoint_dir)
 
         # Get the latest checkpoint file
         checkpoint_files = os.listdir(checkpoint_dir)
-        assert len(checkpoint_files) >= 1
 
         def get_checkpoint_datetime(filename):
             # Extract the date part and deduplication index
@@ -230,33 +226,42 @@ def test_nsga2_checkpoint_reload():
         sorted_checkpoints = sorted(checkpoint_files, key=get_checkpoint_datetime)
         latest_checkpoint = os.path.join(checkpoint_dir, sorted_checkpoints[-1])
 
-        # Create a new generator from the checkpoint
-        restored_generator = NSGA2Generator(checkpoint_file=latest_checkpoint)
+        yield X, latest_checkpoint
 
-        # Verify that the restored generator has the same state as the original
-        assert restored_generator.n_generations == X.generator.n_generations
-        assert restored_generator.n_candidates == X.generator.n_candidates
-        assert restored_generator.fevals == X.generator.fevals
-        assert len(restored_generator.pop) == len(X.generator.pop)
 
-        # Run a few more steps with the restored generator
-        X_restored = Xopt(
-            generator=restored_generator,
-            evaluator=Evaluator(function=evaluate_TNK),
-            vocs=tnk_vocs,
-            max_evaluations=10,  # Run for 1 more generation
-        )
-        X_restored.run()
+def test_nsga2_checkpoint_reload(nsga2_optimization_with_checkpoint):
+    """
+    Test that NSGA2Generator can be reloaded from a checkpoint.
+    """
+    X, latest_checkpoint = nsga2_optimization_with_checkpoint
 
-        # Verify that the restored generator continues from where it left off
-        assert X_restored.generator.n_generations > X.generator.n_generations
-        assert X_restored.generator.n_candidates > X.generator.n_candidates
-        assert X_restored.generator.fevals > X.generator.fevals
+    # Create a new generator from the checkpoint
+    restored_generator = NSGA2Generator(checkpoint_file=latest_checkpoint)
 
-        # Close log files before exiting context
-        X.generator.close_log_file()
-        if hasattr(X_restored.generator, "close_log_file"):
-            X_restored.generator.close_log_file()
+    # Verify that the restored generator has the same state as the original
+    assert restored_generator.n_generations == X.generator.n_generations
+    assert restored_generator.n_candidates == X.generator.n_candidates
+    assert restored_generator.fevals == X.generator.fevals
+    assert len(restored_generator.pop) == len(X.generator.pop)
+
+    # Run a few more steps with the restored generator
+    X_restored = Xopt(
+        generator=restored_generator,
+        evaluator=Evaluator(function=evaluate_TNK),
+        vocs=tnk_vocs,
+        max_evaluations=10,  # Run for 1 more generation
+    )
+    X_restored.run()
+
+    # Verify that the restored generator continues from where it left off
+    assert X_restored.generator.n_generations > X.generator.n_generations
+    assert X_restored.generator.n_candidates > X.generator.n_candidates
+    assert X_restored.generator.fevals > X.generator.fevals
+
+    # Close log files before exiting context
+    X.generator.close_log_file()
+    if hasattr(X_restored.generator, "close_log_file"):
+        X_restored.generator.close_log_file()
 
 
 def test_nsga2_all_individuals_in_data():
