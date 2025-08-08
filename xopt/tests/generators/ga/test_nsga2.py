@@ -230,9 +230,9 @@ def nsga2_optimization_with_checkpoint():
         yield X, latest_checkpoint
 
 
-def test_nsga2_checkpoint_reload(nsga2_optimization_with_checkpoint):
+def test_nsga2_checkpoint_reload_python(nsga2_optimization_with_checkpoint):
     """
-    Test that NSGA2Generator can be reloaded from a checkpoint and used.
+    Test that NSGA2Generator can be reloaded from a checkpoint and used (python interface).
     """
     # Get the optimizer and checkpoint
     X, latest_checkpoint = nsga2_optimization_with_checkpoint
@@ -253,6 +253,65 @@ def test_nsga2_checkpoint_reload(nsga2_optimization_with_checkpoint):
         vocs=tnk_vocs,
         max_evaluations=10,  # Run for 1 more generation
     )
+    X_restored.run()
+
+    # Verify that the restored generator continues from where it left off
+    assert X_restored.generator.n_generations > X.generator.n_generations
+    assert X_restored.generator.n_candidates > X.generator.n_candidates
+    assert X_restored.generator.fevals > X.generator.fevals
+
+    # Close log files before exiting context
+    X.generator.close_log_file()
+    if hasattr(X_restored.generator, "close_log_file"):
+        X_restored.generator.close_log_file()
+
+
+def test_nsga2_checkpoint_reload_yaml(nsga2_optimization_with_checkpoint):
+    """
+    Test that NSGA2Generator can be reloaded from a checkpoint and used (YAML interface).
+    """
+    # Get the optimizer and checkpoint
+    X, latest_checkpoint = nsga2_optimization_with_checkpoint
+
+    # Construct config file
+    yaml = f"""
+    max_evaluations: 100
+
+    generator:
+      name: nsga2
+      checkpoint_file: {latest_checkpoint}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+
+      constants:
+        a: dummy_constant
+    """.replace("\n    ", "\n")
+
+    # Reload from YAML, grab generator
+    X_restored = Xopt.from_yaml(yaml)
+    restored_generator = X_restored.generator
+
+    # Verify that the restored generator has the same state as the original
+    assert restored_generator.n_generations == X.generator.n_generations
+    assert restored_generator.n_candidates == X.generator.n_candidates
+    assert restored_generator.fevals == X.generator.fevals
+    assert len(restored_generator.pop) == len(X.generator.pop)
+
+    # Run a few more steps with the restored generator
     X_restored.run()
 
     # Verify that the restored generator continues from where it left off
