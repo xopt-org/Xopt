@@ -27,31 +27,6 @@ from .operators import (
 ########################################################################################################################
 
 
-def _normalize_to_dict(obj):
-    """
-    Convert a potential pydantic object to dict, or pass through if already a dict.
-
-    Parameters
-    ----------
-    obj : VOCS, dict, or other
-        Object to normalize to dict
-
-    Returns
-    -------
-    dict
-        Dictionary representation of the object
-    """
-    if hasattr(obj, "model_dump"):
-        return obj.model_dump()
-    elif hasattr(obj, "to_dict"):
-        return obj.to_dict()
-    elif isinstance(obj, dict):
-        return obj
-    else:
-        # Fallback for other types
-        return obj
-
-
 def vocs_data_to_arr(data: list | np.ndarray) -> np.ndarray:
     """Force data coming from VOCS object into 2D numpy array (or None) for compatibility with helper functions"""
     if isinstance(data, list):
@@ -442,6 +417,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Load from checkpoint file if checkpoint_file is provided.
         Validates that user VOCS matches checkpoint VOCS.
         """
+        # Case when a checkpoint file has been supplied
         if isinstance(values, dict) and "checkpoint_file" in values:
             checkpoint_file = values.pop("checkpoint_file")
             if checkpoint_file is not None:
@@ -450,9 +426,18 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
                 # VOCS validation - inline check
                 if "vocs" in values:
-                    if _normalize_to_dict(values["vocs"]) != _normalize_to_dict(
-                        checkpoint_data["vocs"]
-                    ):
+                    # Convert any user supplied vocs to VOCS object
+                    if isinstance(values["vocs"], dict):
+                        values["vocs"] = VOCS.from_dict(values["vocs"])
+                    elif isinstance(values["vocs"], VOCS):
+                        pass
+                    else:
+                        raise ValueError(
+                            f"vocs must be of type dict or VOCS, got {type(values['vocs'])}"
+                        )
+
+                    # Check if they match
+                    if values["vocs"] != checkpoint_data["vocs"]:
                         raise ValueError(
                             "User-provided VOCS does not match checkpoint VOCS. "
                             "The VOCS must be identical when loading from checkpoint to ensure "
@@ -462,6 +447,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # Merge with user data precedence
                 merged_data = {**checkpoint_data, **values}
                 return merged_data
+
+        # No checkpoint
         return values
 
     def _generate(self, n_candidates: int) -> list[dict]:

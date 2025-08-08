@@ -16,6 +16,7 @@ from xopt.generators.ga.nsga2 import (
 )
 from xopt.generators.ga.operators import PolynomialMutation, SimulatedBinaryCrossover
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
+
 from xopt.vocs import VOCS
 
 
@@ -275,7 +276,7 @@ def test_nsga2_checkpoint_reload_yaml(nsga2_optimization_with_checkpoint):
 
     # Construct config file
     yaml = f"""
-    max_evaluations: 100
+    max_evaluations: 20
 
     generator:
       name: nsga2
@@ -345,7 +346,7 @@ def test_nsga2_checkpoint_reload_override(nsga2_optimization_with_checkpoint):
     )  # Make sure we don't invalidate test in future by accident
 
 
-def test_nsga2_checkpoint_reload_vocs_mismatch(nsga2_optimization_with_checkpoint):
+def test_nsga2_checkpoint_reload_vocs_mismatch_yaml(nsga2_optimization_with_checkpoint):
     """
     Test that NSGA2Generator raises appropriate error when VOCS doesn't match checkpoint.
     """
@@ -372,7 +373,7 @@ def test_nsga2_checkpoint_reload_vocs_mismatch(nsga2_optimization_with_checkpoin
           objectives:
             f1: MINIMIZE
             f2: MINIMIZE
-        """.replace("        ", "")
+        """.replace("\n        ", "\n")
         Xopt.from_yaml(yaml)
 
 
