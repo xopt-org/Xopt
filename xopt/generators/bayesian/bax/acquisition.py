@@ -3,6 +3,7 @@ from botorch.acquisition.multi_objective.analytic import (
     MultiObjectiveAnalyticAcquisitionFunction,
 )
 from botorch.models.model import Model, ModelList
+from botorch.posteriors.ensemble import EnsemblePosterior
 from botorch.utils.transforms import t_batch_mode_transform
 from torch import Tensor
 
@@ -35,6 +36,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
             self.ys_exe,
             self.algorithm_results,
         ) = self.algorithm.get_execution_paths(self.model, bounds)
+
 
         # Need to call the model on some data before we can condition_on_observations
         self.model.posterior(*[self.xs_exe[:1, 0:1, 0:] for m in model.models])
@@ -83,17 +85,27 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
 
         # calculcate the variance of the posterior for each input x
         post = self.model.posterior(X)
-        var_post = post.variance
+        
+        # Some different shape handling with EnsemblePosterior -- maybe we can move this upstream?
+        if isinstance(post, EnsemblePosterior):
+            var_post = post.variance.unsqueeze(-1)
 
-        # calculcate the variance of the fantasy posteriors
-        fantasy_posts = self.fantasy_models.posterior(
-            (
-                X.reshape(*X.shape[:-2], 1, *X.shape[-2:]).expand(
-                    *X.shape[:-2], self.xs_exe.shape[0], *X.shape[-2:]
+            # calculcate the variance of the fantasy posteriors
+            fantasy_posts = self.fantasy_models.posterior(X)
+            var_fantasy_posts = fantasy_posts.variance.unsqueeze(-1).unsqueeze(-1)
+            
+        else:
+            var_post = post.variance
+
+            # calculcate the variance of the fantasy posteriors
+            fantasy_posts = self.fantasy_models.posterior(
+                (
+                    X.reshape(*X.shape[:-2], 1, *X.shape[-2:]).expand(
+                        *X.shape[:-2], self.xs_exe.shape[0], *X.shape[-2:]
+                    )
                 )
             )
-        )
-        var_fantasy_posts = fantasy_posts.variance
+            var_fantasy_posts = fantasy_posts.variance
 
         # calculate Shannon entropy for posterior given the current data
         h_current = 0.5 * torch.log(2 * torch.pi * var_post) + 0.5
