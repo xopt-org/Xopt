@@ -1,8 +1,17 @@
+import importlib
 import logging
 import time
 from typing import Any, Callable
 
+import numpy as np
 import pandas as pd
+import torch
+from botorch.utils.multi_objective import Hypervolume, is_non_dominated
+from botorch.utils.multi_objective.box_decompositions import (
+    DominatedPartitioning,
+    FastNondominatedPartitioning,
+)
+from deap.tools._hypervolume.pyhv import _HyperVolume
 
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import MOBOGenerator
@@ -120,6 +129,191 @@ class BenchMOBO:
         outputs["hvf"] = X.generator.get_pareto_front_and_hypervolume()[-1]
 
         return outputs
+
+
+have_pymoo = False
+try:
+    import importlib.util
+
+    if importlib.util.find_spec("pymoo") is not None:
+        have_pymoo = True
+except ImportError:
+    logger.warning("pymoo not installed, skipping pymoo benchmarks")
+    pass
+
+
+class BenchHV:
+    def __init__(self, n_obj_list, it=20, n_array=None):
+        # self.n_var_list = n_var_list or [10, 20]
+        self.n_obj_list = n_obj_list or [2, 3]
+        self.it = it
+        self.n_array = (
+            n_array
+            if n_array is not None
+            else np.linspace(10, 5000, 20).astype(np.int32)
+        )
+
+    def run(self):
+        results = []
+        for n_obj in self.n_obj_list:
+            for npoints in self.n_array:
+                print(f"Running {n_obj} objectives with {npoints} points")
+                r = self.test_hv_performance(n_obj=n_obj, it=self.it, n_points=npoints)
+                results.append(r)
+        return results
+
+    def test_hv_performance(self, n_obj=2, it=20, n_points=100):
+        objectives = {f"y{i}": "MAXIMIZE" for i in range(n_obj)}
+        # variables = {f'x{i}': [0.0, 1.0] for i in range(n_var)}
+
+        Y = np.random.randn(n_points, n_obj) - np.ones((n_points, n_obj)) / 3
+        Y_torch = torch.from_numpy(Y)
+        ref_point = {x: 0.0 for x in objectives.keys()}
+        ref_point_numpy = np.array(list(ref_point.values()))
+        ref_point_torch = torch.from_numpy(ref_point_numpy)
+
+        def compute_hv_pymoo(Y: np.ndarray, ref_point):
+            from pymoo.indicators.hv import HV
+
+            hv = HV(ref_point=ref_point)
+            volume = float(hv(Y))
+            return volume
+
+        def compute_hv_botorch(Y: torch.Tensor, ref_point):
+            hvo = Hypervolume(ref_point=ref_point)
+            pareto_mask = is_non_dominated(Y)
+            pareto_y = Y[pareto_mask]
+            volume = float(hvo.compute(pareto_y))
+            return volume
+
+        def compute_hv_botorch_partitioning(Y: torch.Tensor, ref_point):
+            bd = DominatedPartitioning(ref_point=ref_point, Y=Y)
+            volume = float(bd.compute_hypervolume().item())
+            return volume
+
+        def compute_hv_botorch_fndpartitioning(Y: torch.Tensor, ref_point):
+            bd = FastNondominatedPartitioning(ref_point=ref_point, Y=Y)
+            volume = float(bd.compute_hypervolume().item())
+            return volume
+
+        # this is not working
+        def compute_hv_deap(Y: np.ndarray, ref_point):
+            hv = _HyperVolume(ref_point)
+            volume = float(hv.compute(Y))
+            return volume
+
+        def compute_pf_botorch(Y: torch.Tensor):
+            pareto_mask = is_non_dominated(Y, deduplicate=False)
+            pareto_y = Y[pareto_mask]
+            return pareto_y
+
+        def compute_pf_botorch_partitioning(Y: torch.Tensor, ref_point):
+            bd = DominatedPartitioning(ref_point=ref_point, Y=Y)
+            return bd.pareto_Y
+
+        def compute_pf_botorch_fndpartitioning(Y: torch.Tensor, ref_point):
+            bd = FastNondominatedPartitioning(ref_point=ref_point, Y=Y)
+            return bd.pareto_Y
+
+        def accumulate(f, it, **kwargs):
+            vals = []
+            t1 = time.perf_counter()
+            for i in range(it):
+                vals.append(f(**kwargs))
+            t2 = time.perf_counter()
+            return vals, (t2 - t1) / it
+
+        if have_pymoo:
+            v_hv_pymoo, t_pymoo = accumulate(
+                compute_hv_pymoo, it, Y=Y, ref_point=ref_point_numpy
+            )
+        v_hv_botorch, t_botorch_hypervolume = accumulate(
+            compute_hv_botorch, it, Y=-Y_torch, ref_point=-ref_point_torch
+        )
+        v_hv_botorch_gpu, t_botorch_hypervolume_gpu = accumulate(
+            compute_hv_botorch,
+            it,
+            Y=-Y_torch.to("cuda:0"),
+            ref_point=-ref_point_torch.to("cuda:0"),
+        )
+        v_hv_botorch_partitioning, t_botorch_partitioning = accumulate(
+            compute_hv_botorch_partitioning, it, Y=-Y_torch, ref_point=-ref_point_torch
+        )
+        v_hv_botorch_partitioning_gpu, t_botorch_partitioning_gpu = accumulate(
+            compute_hv_botorch_partitioning,
+            it,
+            Y=-Y_torch.to("cuda:0"),
+            ref_point=-ref_point_torch.to("cuda:0"),
+        )
+        v_hv_botorch_fndpartitioning, t_botorch_partitioning_fnd = accumulate(
+            compute_hv_botorch_fndpartitioning,
+            it,
+            Y=-Y_torch,
+            ref_point=-ref_point_torch,
+        )
+        # v_hv_deap, t_deap = accumulate(compute_hv_deap, it, Y=Y, ref_point=ref_point_numpy)
+
+        v_pf_botorch, t_botorch_pf = accumulate(compute_pf_botorch, it, Y=-Y_torch)
+        v_pf_botorch_partitioning, t_botorch_partitioning_pf = accumulate(
+            compute_pf_botorch_partitioning, it, Y=-Y_torch, ref_point=-ref_point_torch
+        )
+        # v_pf_botorch_fndpartitioning, t_botorch_partitioning_fnd = accumulate(compute_pf_botorch_fndpartitioning, it,
+        #                                                                       Y=-Y_torch,
+        #                                                                       ref_point=-ref_point_torch)
+
+        if have_pymoo:
+            assert np.allclose(v_hv_pymoo, v_hv_botorch), (
+                f"{v_hv_pymoo} != {v_hv_botorch}"
+            )
+        assert np.allclose(v_hv_pymoo, v_hv_botorch_gpu), (
+            f"{v_hv_pymoo} != {v_hv_botorch_gpu}"
+        )
+        assert np.allclose(v_hv_pymoo, v_hv_botorch_partitioning), (
+            f"{v_hv_pymoo} != {v_hv_botorch_partitioning}"
+        )
+        assert np.allclose(v_hv_pymoo, v_hv_botorch_partitioning_gpu), (
+            f"{v_hv_pymoo} != {v_hv_botorch_partitioning_gpu}"
+        )
+        assert np.allclose(v_hv_pymoo, v_hv_botorch_fndpartitioning), (
+            f"{v_hv_pymoo} != {v_hv_botorch_fndpartitioning}"
+        )
+        # assert np.allclose(v_hv_pymoo, v_hv_deap), f'{v_hv_pymoo} != {v_hv_deap}'
+
+        # print(v_pf_botorch[0])
+        # print(v_pf_botorch_partitioning[0])
+        # print(v_pf_botorch_fndpartitioning[0])
+        pf1 = np.array(v_pf_botorch[0])
+        pf2 = np.array(v_pf_botorch_partitioning[0])
+        # non-dominated return more points vs partitioning
+        r = True
+        try:
+            # check if each row in pf2 is in pf1
+            for p in pf2:
+                if not np.any(np.all(pf1 == p, axis=1)):
+                    print(f"Not found {p} in {pf1}")
+                    r = False
+                    break
+        except Exception:
+            raise ValueError(f"Failed to compare {pf1} and {pf2}")
+
+        if not r:
+            raise ValueError(f"{pf1} != {pf2}")
+
+        r = {
+            "t_botorch_hypervolume": t_botorch_hypervolume,
+            "t_botorch_hypervolume_gpu": t_botorch_hypervolume_gpu,
+            "t_botorch_partitioning": t_botorch_partitioning,
+            "t_botorch_partitioning_gpu": t_botorch_partitioning_gpu,
+            "t_botorch_partitioning_fnd": t_botorch_partitioning_fnd,
+            "t_botorch_pf": t_botorch_pf,
+            "t_botorch_partitioning_pf": t_botorch_partitioning_pf,
+            #'t_deap': t_deap,
+            "n_obj": n_obj,
+            "n_points": n_points,
+        }
+        if have_pymoo:
+            r["t_pymoo"] = t_pymoo
+        return r
 
 
 def time_call(f: Callable, n: int = 1) -> tuple[list[float], list[Any]]:
