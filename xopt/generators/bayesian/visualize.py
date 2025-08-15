@@ -362,16 +362,6 @@ def visualize_model(
         else:
             if ncols == 3 and show_acquisition:
                 ax[len(output_names), 2].axis("off")
-        # set axis labels
-        for i in range(nrows):
-            for j in range(ncols):
-                ax_ij = ax[i, j] if nrows > 1 else ax[0, j]
-                ax_ij.set_xlabel(None)
-                ax_ij.set_ylabel(None)
-                if i == nrows - 1:
-                    ax_ij.set_xlabel(variable_names[0])
-                if j == 0:
-                    ax_ij.set_ylabel(variable_names[1])
     fig.tight_layout()
     return fig, ax
 
@@ -870,8 +860,9 @@ def plot_samples(
             marker="o",
             facecolors="C1",
             edgecolors="none",
-            zorder=5,
             label="Feasible Samples",
+            picker=True,
+            pickradius=5,
         )
     x_infeasible, y_infeasible = _get_feasible_samples(
         vocs=vocs,
@@ -888,8 +879,9 @@ def plot_samples(
             marker="o",
             facecolors="none",
             edgecolors="C3",
-            zorder=5,
             label="Infeasible Samples",
+            picker=True,
+            pickradius=5,
         )
     axis.set_xlabel(variable_names[0])
     if len(variable_names) == 2:
