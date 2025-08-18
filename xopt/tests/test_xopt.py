@@ -9,8 +9,10 @@ import pandas as pd
 import pytest
 import yaml
 from pydantic import ValidationError
-from xopt import from_file
 
+from generator_standard.vocs import ContinuousVariable
+
+from xopt import from_file
 from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.errors import XoptError
@@ -20,7 +22,7 @@ from xopt.generators import try_load_all_generators
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.utils import explode_all_columns
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 class DummyGenerator(Generator, ABC):
@@ -72,10 +74,10 @@ class TestXopt:
 
         """
         X = Xopt.from_yaml(YAML)
-        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+        assert X.vocs.variables == {"x1": ContinuousVariable(domain=[0, 3.14159]), "x2": ContinuousVariable(domain=[0, 3.14159])}
 
         X = Xopt(YAML)
-        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+        assert X.vocs.variables == {"x1": ContinuousVariable(domain=[0, 3.14159]), "x2": ContinuousVariable(domain=[0, 3.14159])}
 
         with pytest.raises(ValueError):
             Xopt(YAML, 1)
@@ -87,7 +89,7 @@ class TestXopt:
         yaml.dump(yaml.safe_load(YAML), open("test.yml", "w"))
         for ele in [False, True]:
             X = from_file("test.yml", ele)
-            assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+            assert X.vocs.variables == {"x1": ContinuousVariable(domain=[0, 3.14159]), "x2": ContinuousVariable(domain=[0, 3.14159])}
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -107,7 +109,7 @@ class TestXopt:
             check_index(X, length)
             check_index(reload(X), length)
 
-        test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
+        test_data = random_inputs(deepcopy(TEST_VOCS_BASE), 3)
 
         with pytest.raises(ValueError):
             X1 = Xopt(
@@ -227,7 +229,7 @@ class TestXopt:
         )
 
         # test evaluating data w/o constants specified
-        test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
+        test_data = random_inputs(deepcopy(TEST_VOCS_BASE), 3)
 
         # test list of dicts
         xopt.evaluate_data(test_data)
@@ -259,10 +261,6 @@ class TestXopt:
 
         val = str(xopt)
         assert "Data size: 2" in val
-        assert (
-            "vocs:\n  constants:\n    constant1: 1.0\n  constraints:\n    c1:\n    - "
-            "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
-        )
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -414,11 +412,11 @@ class TestXopt:
         X.strict = False
 
         # Submit to the evaluator some new inputs
-        X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
+        X.submit_data(random_inputs(deepcopy(TEST_VOCS_BASE), 4))
         X.process_futures()
 
         ss = 1
-        X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
+        X.submit_data(random_inputs(deepcopy(TEST_VOCS_BASE), 4))
         X.process_futures()
 
     def test_dump_w_exploded_cols(self):

@@ -14,10 +14,10 @@ import torch
 import traceback
 import yaml
 
+from generator_standard.vocs import VOCS, GreaterThanConstraint
+
 from .generator import Generator
 from .pydantic import get_descriptions_defaults
-from .vocs import VOCS
-
 
 # Grab the logger
 logger = logging.getLogger(__name__)
@@ -34,10 +34,10 @@ def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
     constraints = vocs.constraints
 
     for name, value in constraints.items():
-        if value[0] == "GREATER_THAN":
-            temp_data[name] = -(data[name] - value[1])
+        if isinstance(value, GreaterThanConstraint):
+            temp_data[name] = -(data[name] - value.value)
         else:
-            temp_data[name] = data[name] - value[1]
+            temp_data[name] = data[name] - value.value
 
         # add column to original dataframe
         data[f"{name}_feas"] = temp_data[name] < 0.0

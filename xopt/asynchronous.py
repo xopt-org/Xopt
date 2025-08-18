@@ -8,6 +8,7 @@ from pydantic import Field
 
 from xopt.base import logger, Xopt
 from xopt.evaluator import validate_outputs
+from xopt.vocs import validate_input_data
 
 
 class AsynchronousXopt(Xopt):

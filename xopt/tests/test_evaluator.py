@@ -3,6 +3,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import numpy as np
 import pandas as pd
 
+from xopt.vocs import random_inputs
+
 from xopt import Evaluator, Xopt
 from xopt.generators import RandomGenerator
 from xopt.vocs import VOCS
@@ -130,7 +132,7 @@ class TestEvaluator:
         MAX_WORKERS = 10
 
         vocs = VOCS(variables={"x": [0, 1], "y": [0, 1]}, objectives={"f1": "MINIMIZE"})
-        in10 = vocs.random_inputs(10)
+        in10 = random_inputs(vocs, 10)
 
         # Create Executor insance
         executor = ProcessPoolExecutor(max_workers=MAX_WORKERS)

@@ -323,7 +323,7 @@ class TestVOCS(object):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
         # test good data
-        validate_input_data(test_vocs,pd.DataFrame({"x1": 0.5, "x2": 1.0}, index=[0]))
+        validate_input_data(test_vocs, pd.DataFrame({"x1": 0.5, "x2": 1.0}, index=[0]))
 
         # test bad data
         with pytest.raises(ValueError):
@@ -399,12 +399,12 @@ class TestVOCS(object):
         )
         vocs.objectives = {}
         with pytest.raises(RuntimeError):
-            _ = cumulative_optimum(vocs,test_data)
+            _ = cumulative_optimum(vocs, test_data)
 
         vocs.objectives = {obj_name: "MINIMIZE"}
-        assert cumulative_optimum(vocs,pd.DataFrame()).empty
+        assert cumulative_optimum(vocs, pd.DataFrame()).empty
 
-        cumulative_minimum = cumulative_optimum(vocs,test_data)
+        cumulative_minimum = cumulative_optimum(vocs, test_data)
         assert np.array_equal(
             cumulative_minimum[f"best_{obj_name}"].values,
             np.array([np.nan, np.nan, -0.4, -0.4, -0.4, -0.7]),
@@ -412,7 +412,7 @@ class TestVOCS(object):
         )
 
         vocs.objectives[obj_name] = "MAXIMIZE"
-        cumulative_maximum = cumulative_optimum(vocs,test_data)
+        cumulative_maximum = cumulative_optimum(vocs, test_data)
         assert np.array_equal(
             cumulative_maximum[f"best_{obj_name}"].values,
             np.array([np.nan, np.nan, -0.4, 0.6, 0.6, 0.6]),
