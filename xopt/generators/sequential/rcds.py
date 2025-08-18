@@ -770,7 +770,7 @@ class RCDSGenerator(SequentialGenerator):
         x0, f0 = self._get_initial_point()
 
         # RCDS assume a normalized problem
-        lb, ub = self.vocs.bounds
+        lb, ub = np.array(self.vocs.bounds).T
         _x0 = (x0 - lb) / (ub - lb)
 
         self._powell = PowellMainStateMachine(
@@ -808,7 +808,7 @@ class RCDSGenerator(SequentialGenerator):
 
         # RCDS generator yields normalized x so denormalize it here
         _x_next = np.array(_x_next).flatten()  # convert 2D matrix to 1D array
-        lb, ub = self.vocs.bounds
+        lb, ub = np.array(self.vocs.bounds).T
         x_next = (ub - lb) * _x_next + lb
 
         x_next = [float(ele) for ele in x_next]

@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from xopt import Evaluator, VOCS, Xopt
+from xopt.vocs import select_best, get_variable_data
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.rcds import RCDSGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
@@ -108,8 +109,8 @@ class TestRCDSGenerator:
         for i in range(max_iter):
             X.step()
 
-        idx, best, _ = X.vocs.select_best(X.data)
-        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        idx, best, _ = select_best(X.vocs, X.data)
+        xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         if obj == "MINIMIZE":
             assert best[0] >= 0.0
             assert best[0] <= 0.001

@@ -7,6 +7,8 @@ import os
 import pandas as pd
 import time
 
+from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
+
 from ...generator import StateOwner
 from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
@@ -379,10 +381,13 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Generate candidates one by one
             candidates = []
-            pop_x = self.vocs.variable_data(self.pop).to_numpy()
-            pop_f = self.vocs.objective_data(self.pop).to_numpy()
-            pop_g = vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy())
+            pop_x = get_variable_data(self.vocs, self.pop).to_numpy()
+            pop_f = get_objective_data(self.vocs, self.pop).to_numpy()
+            pop_g = vocs_data_to_arr(
+                get_constraint_data(self.vocs, self.pop).to_numpy()
+            )
             fitness = get_fitness(pop_f, pop_g)
+            bounds = np.array(self.vocs.bounds).T
             for _ in range(n_candidates):
                 candidates.append(
                     {
@@ -393,7 +398,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                                 pop_x,
                                 pop_f,
                                 pop_g,
-                                self.vocs.bounds,
+                                bounds,
                                 mutate=self.mutation_operator,
                                 crossover=self.crossover_operator,
                                 fitness=fitness,
@@ -409,7 +414,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             vars = np.vstack(
                 [
                     np.random.uniform(x[0], x[1], n_candidates)
-                    for x in self.vocs.bounds.T
+                    for x in np.array(self.vocs.bounds).T
                 ]
             ).T
             candidates = [
@@ -451,9 +456,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Select using domination rank / crowding distance
             idx = cull_population(
-                self.vocs.variable_data(self.pop).to_numpy(),
-                self.vocs.objective_data(self.pop).to_numpy(),
-                vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy()),
+                get_variable_data(self.vocs, self.pop).to_numpy(),
+                get_objective_data(self.vocs, self.pop).to_numpy(),
+                vocs_data_to_arr(get_constraint_data(self.vocs, self.pop).to_numpy()),
                 self.population_size,
             )
             self.pop = [self.pop[i] for i in idx]
@@ -465,7 +470,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Generate logging message
             n_feasible = np.sum(
-                (self.vocs.constraint_data(self.pop).to_numpy() <= 0.0).all(axis=1)
+                (get_constraint_data(self.vocs, self.pop).to_numpy() <= 0.0).all(axis=1)
             )
             n_err = np.sum([x["xopt_error"] for x in self.pop])
             self._logger.info(

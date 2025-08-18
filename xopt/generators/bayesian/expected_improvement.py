@@ -137,7 +137,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         else:
             # analytic acquisition function for single candidate generation
             best_f = -torch.tensor(
-                self.vocs.objective_data(data).min().values, **self.tkwargs
+                get_objective_data(self.vocs, data).min().values, **self.tkwargs
             )
 
         return best_f

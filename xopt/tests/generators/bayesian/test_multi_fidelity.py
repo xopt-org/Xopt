@@ -19,7 +19,7 @@ class TestMultiFidelityGenerator:
         # test reference point
         pt = gen.reference_point
         assert pt == {"s": 0.0, "y1": 100.0}
-        assert gen.vocs.objective_names == ["s", "y1"]
+        assert gen.vocs.objective_names == ["y1", "s"]
 
     def test_add_data(self):
         vocs = deepcopy(TEST_VOCS_BASE)

@@ -100,8 +100,8 @@ class LatinHypercubeGenerator(Generator):
         names = self.vocs.variable_names
         rows = qmc.scale(
             self._sampler.random(n=self.batch_size),
-            [self.vocs.variables[k][0] for k in names],
-            [self.vocs.variables[k][1] for k in names],
+            [self.vocs.variables[k].domain[0] for k in names],
+            [self.vocs.variables[k].domain[1] for k in names],
         )
         rows = [{name: ele for name, ele in zip(names, row)} for row in rows]
         self._samples = [{**row, **self.vocs.constants} for row in rows]

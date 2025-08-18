@@ -9,7 +9,7 @@ from pydantic import ConfigDict, Field, field_validator
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
-from xopt.vocs import VOCS, validate_variable_bounds
+from xopt.vocs import VOCS, get_objective_data, get_variable_data, validate_variable_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -214,8 +214,8 @@ class NelderMeadGenerator(SequentialGenerator):
         if not self.is_active:
             assert self.future_state is None, "Not active, but future state exists?"
 
-            variable_data = self.vocs.variable_data(self.data).to_numpy()
-            objective_data = self.vocs.objective_data(self.data).to_numpy()[:, 0]
+            variable_data = get_variable_data(self.vocs, self.data).to_numpy()
+            objective_data = get_objective_data(self.vocs, self.data).to_numpy()[:, 0]
 
             _initial_simplex = variable_data.copy()
             N = self.vocs.n_variables
@@ -253,7 +253,7 @@ class NelderMeadGenerator(SequentialGenerator):
             self.future_state = None
 
             # Can have multiple points if resuming from file, grab last one
-            new_data_df = self.vocs.objective_data(new_data)
+            new_data_df = get_objective_data(self.vocs, new_data)
             res = new_data_df.iloc[-1:, :].to_numpy()
             assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
 
@@ -265,7 +265,7 @@ class NelderMeadGenerator(SequentialGenerator):
         # just store data
         self.data = data
 
-        new_data_df = self.vocs.objective_data(data)
+        new_data_df = get_objective_data(self.vocs, data)
         res = new_data_df.iloc[-1:, :].to_numpy()
         assert np.shape(res) == (1, 1), f"Bad last point [{res}]"
 
@@ -280,7 +280,7 @@ class NelderMeadGenerator(SequentialGenerator):
             self._initial_simplex = None
 
     def _call_algorithm(self):
-        mins, maxs = self.vocs.bounds
+        mins, maxs = np.array(self.vocs.bounds).T
         results = _neldermead_generator(
             x0=self.x0,
             state=self.current_state,

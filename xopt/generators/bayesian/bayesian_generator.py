@@ -27,6 +27,8 @@ from pydantic import (
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
+from generator_standard.vocs import ContinuousVariable
+
 from xopt.errors import XoptError, FeasibilityError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -55,6 +57,7 @@ from xopt.generators.bayesian.utils import (
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
+from xopt.vocs import convert_numpy_to_inputs, extract_data
 
 logger = logging.getLogger()
 
@@ -388,7 +391,7 @@ class BayesianGenerator(Generator, ABC):
             raise ValueError("no data available to build model")
 
         # get input bounds
-        variable_bounds = deepcopy(self.vocs.variables)
+        variable_bounds = {name: ele.domain for name, ele in self.vocs.variables.items()}
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -669,8 +672,8 @@ class BayesianGenerator(Generator, ABC):
                 results[name] = val
 
         else:
-            results = self.vocs.convert_numpy_to_inputs(
-                candidates.detach().cpu().numpy(), include_constants=False
+            results = convert_numpy_to_inputs(
+                self.vocs, candidates.detach().cpu().numpy(), include_constants=False
             )
 
         return results
@@ -774,7 +777,7 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds)
+        return torch.tensor(self.vocs.bounds).T
 
     def _get_optimization_bounds(self):
         """
@@ -872,7 +875,7 @@ class BayesianGenerator(Generator, ABC):
         last_point = self.data[self.vocs.variable_names].iloc[-1].to_numpy()
 
         # bound lengths based on vocs for normalization
-        vocs_bounds = self.vocs.bounds
+        vocs_bounds = np.array(self.vocs.bounds).T
         lengths = vocs_bounds[1, :] - vocs_bounds[0, :]
 
         # get maximum travel distances
@@ -1035,8 +1038,8 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         maximization for each objective"""
 
         # get raw data
-        var_df, obj_df, _, _ = self.vocs.extract_data(
-            data, return_raw=True, return_valid=True
+        var_df, obj_df, _, _ = extract_data(
+            self.vocs, data, return_raw=True, return_valid=True
         )
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())

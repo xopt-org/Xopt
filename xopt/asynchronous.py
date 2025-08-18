@@ -82,7 +82,7 @@ class AsynchronousXopt(Xopt):
         self._input_data = pd.concat([self._input_data, input_data])
 
         # validate data before submission
-        self.vocs.validate_input_data(self._input_data)
+        validate_input_data(self.vocs, self._input_data)
 
         return input_data
 

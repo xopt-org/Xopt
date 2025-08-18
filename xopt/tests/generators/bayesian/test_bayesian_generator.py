@@ -10,6 +10,8 @@ from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
 
+from generator_standard.vocs import ContinuousVariable
+
 from xopt import VOCS
 from xopt.base import Xopt
 from xopt.errors import VOCSError
@@ -20,6 +22,7 @@ from xopt.generators.bayesian.bayesian_generator import (
 )
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
+from xopt.vocs import random_inputs
 
 
 class PatchBayesianGenerator(BayesianGenerator):
@@ -54,7 +57,7 @@ class TestBayesianGenerator(TestCase):
         # test evaluating the model
         test_pts = torch.tensor(
             pd.DataFrame(
-                TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+                random_inputs(TEST_VOCS_BASE, 5, include_constants=False)
             ).to_numpy()
         )
 
@@ -150,7 +153,7 @@ class TestBayesianGenerator(TestCase):
         model = gen.train_model(X.data)
 
         # test input normalization
-        input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds))
+        input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds).T)
         for inputs in model.train_inputs:
             assert torch.allclose(
                 inputs[0].unsqueeze(-1).T,
@@ -183,7 +186,7 @@ class TestBayesianGenerator(TestCase):
     def test_get_bounds(self):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         bounds = gen._get_optimization_bounds()
-        assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds))
+        assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds).T.to(bounds))
 
         # test with max_travel_distances specified but no data
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
@@ -200,7 +203,7 @@ class TestBayesianGenerator(TestCase):
 
         # test with max_travel_distances specified and data
         high_d_vocs = deepcopy(TEST_VOCS_BASE)
-        high_d_vocs.variables["x3"] = [0, 1]
+        high_d_vocs.variables["x3"] = ContinuousVariable(domain=[0, 1.0])
 
         gen = PatchBayesianGenerator(vocs=high_d_vocs)
         gen.max_travel_distances = [0.1, 0.2, 0.1]

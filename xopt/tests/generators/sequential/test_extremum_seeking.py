@@ -8,7 +8,7 @@ from xopt.errors import SeqGeneratorError
 from xopt.evaluator import Evaluator
 from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, select_best, get_variable_data
 
 
 class TestExtremumSeekingGenerator:
@@ -283,8 +283,8 @@ class TestExtremumSeekingGenerator:
         for i in range(5000):
             X.step()
 
-        idx, best, _ = X.vocs.select_best(X.data)
-        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        idx, best, _ = select_best(X.vocs, X.data)
+        xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         assert best[0] >= 0.0
         assert best[0] <= 1.0
         assert np.allclose(xbest, np.zeros(3), rtol=0, atol=1.0)

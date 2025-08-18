@@ -21,7 +21,8 @@ from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
-from xopt.vocs import VOCS
+from xopt.vocs import validate_input_data, random_inputs, grid_inputs
+from generator_standard.vocs import VOCS
 
 logger = logging.getLogger(__name__)
 
@@ -297,7 +298,7 @@ class Xopt(XoptBaseModel):
         for name, value in self.vocs.constants.items():
             inputs[name] = value
 
-        self.vocs.validate_input_data(DataFrame(inputs, index=[0]))
+        validate_input_data(self.vocs, DataFrame(inputs, index=[0]))
         return self.evaluator.evaluate(input_dict)
 
     def evaluate_data(
@@ -336,7 +337,7 @@ class Xopt(XoptBaseModel):
                 input_data = DataFrame(deepcopy(input_data), index=[0])
 
         logger.debug(f"Evaluating {len(input_data)} inputs")
-        self.vocs.validate_input_data(input_data)
+        validate_input_data(self.vocs, input_data)
 
         # add constants to input data
         for name, value in self.vocs.constants.items():
@@ -453,10 +454,14 @@ class Xopt(XoptBaseModel):
             The results of the evaluations added to the internal DataFrame.
 
         """
-        random_inputs = self.vocs.random_inputs(
-            n_samples, seed=seed, custom_bounds=custom_bounds, include_constants=True
+        ri = random_inputs(
+            self.vocs,
+            n_samples,
+            seed=seed,
+            custom_bounds=custom_bounds,
+            include_constants=True,
         )
-        result = self.evaluate_data(random_inputs)
+        result = self.evaluate_data(ri)
         return result
 
     def grid_evaluate(
@@ -481,8 +486,8 @@ class Xopt(XoptBaseModel):
         pd.DataFrame
             The results of the evaluations added to the internal DataFrame.
         """
-        grid_inputs = self.vocs.grid_inputs(n_samples, custom_bounds=custom_bounds)
-        result = self.evaluate_data(grid_inputs)
+        gi = grid_inputs(self.vocs, n_samples, custom_bounds=custom_bounds)
+        result = self.evaluate_data(gi)
         return result
 
     def yaml(self, **kwargs):

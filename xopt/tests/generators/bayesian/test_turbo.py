@@ -9,8 +9,11 @@ import pandas as pd
 import pytest
 import yaml
 
-from xopt import Evaluator, VOCS, Xopt
+from generator_standard.vocs import VOCS
+
+from xopt import Evaluator, Xopt
 from xopt.errors import FeasibilityError
+from xopt.vocs import get_feasibility_data
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
@@ -111,8 +114,8 @@ class TestTurbo(TestCase):
         turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen)
         tr = turbo_state.get_trust_region(gen)
-        assert tr[0].numpy() >= test_vocs.bounds[0]
-        assert tr[1].numpy() <= test_vocs.bounds[1]
+        assert tr[0].numpy() >= np.array(test_vocs.bounds).T[0]
+        assert tr[1].numpy() <= np.array(test_vocs.bounds).T[1]
 
         # test in 2D
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -124,8 +127,8 @@ class TestTurbo(TestCase):
         turbo_state.update_state(gen)
         tr = turbo_state.get_trust_region(gen)
 
-        assert np.all(tr[0].numpy() >= test_vocs.bounds[0])
-        assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
+        assert np.all(tr[0].numpy() >= np.array(test_vocs.bounds).T[0])
+        assert np.all(tr[1].numpy() <= np.array(test_vocs.bounds).T[1])
 
     def test_sign_conventions(self):
         # 2D minimization
@@ -250,8 +253,8 @@ class TestTurbo(TestCase):
         assert turbo_state.failure_counter == 1
 
         tr = turbo_state.get_trust_region(gen)
-        assert tr[0].numpy() >= test_vocs.bounds[0]
-        assert tr[1].numpy() <= test_vocs.bounds[1]
+        assert tr[0].numpy() >= np.array(test_vocs.bounds).T[0]
+        assert tr[1].numpy() <= np.array(test_vocs.bounds).T[1]
 
         # test a case where the last point is invalid
         new_data = deepcopy(gen.data)
@@ -322,10 +325,10 @@ class TestTurbo(TestCase):
 
         turbo_state.update_state(gen)
         best_value = TEST_VOCS_DATA[
-            test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
+            get_feasibility_data(test_vocs, TEST_VOCS_DATA)["feasible"]
         ].min()[test_vocs.objective_names[0]]
         best_point = TEST_VOCS_DATA.iloc[
-            TEST_VOCS_DATA[test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]][
+            TEST_VOCS_DATA[get_feasibility_data(test_vocs, TEST_VOCS_DATA)["feasible"]][
                 test_vocs.objective_names[0]
             ].idxmin()
         ][test_vocs.variable_names].to_dict()
@@ -343,7 +346,7 @@ class TestTurbo(TestCase):
 
         turbo_state.update_state(gen)
         best_value = TEST_VOCS_DATA[
-            test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
+            get_feasibility_data(test_vocs, TEST_VOCS_DATA)["feasible"]
         ].max()[test_vocs.objective_names[0]]
         assert turbo_state.best_value == best_value
 

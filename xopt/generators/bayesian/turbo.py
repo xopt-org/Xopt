@@ -8,10 +8,12 @@ import torch
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
 from torch import Tensor
 
+from generator_standard.vocs import VOCS
+
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
-from xopt.vocs import VOCS
 from xopt.errors import FeasibilityError
+from xopt.vocs import get_feasibility_data, get_variable_data, get_objective_data
 
 logger = logging.getLogger()
 
@@ -159,7 +161,7 @@ class TurboController(XoptBaseModel, ABC):
             The trust region bounds.
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds)
+        bounds = torch.tensor(self.vocs.bounds).T
 
         if self.center_x is not None:
             # get bounds width
@@ -221,7 +223,7 @@ class TurboController(XoptBaseModel, ABC):
         pd.DataFrame
             The subset of data within the trust region.
         """
-        variable_data = torch.tensor(self.vocs.variable_data(data).to_numpy())
+        variable_data = torch.tensor(get_variable_data(self.vocs, data).to_numpy())
 
         bounds = self.get_trust_region(generator)
 
@@ -313,8 +315,8 @@ class OptimizeTurboController(TurboController):
         data : pd.DataFrame
             The data used to determine the best point value.
         """
-        variable_data = self.vocs.variable_data(data, "")
-        objective_data = self.vocs.objective_data(data, "", return_raw=True)
+        variable_data = get_variable_data(self.vocs, data, "")
+        objective_data = get_objective_data(self.vocs, data, "", return_raw=True)
 
         if self.minimize:
             best_idx = objective_data.idxmin()
@@ -351,7 +353,7 @@ class OptimizeTurboController(TurboController):
         data = generator.data
 
         # get locations of valid data samples
-        feas_data = self.vocs.feasibility_data(data)
+        feas_data = get_feasibility_data(self.vocs, data)
 
         if len(data[feas_data["feasible"]]) == 0:
             raise FeasibilityError(
@@ -363,9 +365,9 @@ class OptimizeTurboController(TurboController):
 
         # get feasibility of last `n_candidates`
         recent_data = data.iloc[-previous_batch_size:]
-        f_data = self.vocs.feasibility_data(recent_data)
+        f_data = get_feasibility_data(self.vocs, recent_data)
         recent_f_data = recent_data[f_data["feasible"]]
-        recent_f_data_minform = self.vocs.objective_data(recent_f_data, "")
+        recent_f_data_minform = get_objective_data(self.vocs, recent_f_data, "")
 
         # if none of the candidates are valid count this as a failure
         if len(recent_f_data) == 0:
@@ -452,11 +454,11 @@ class SafetyTurboController(TurboController):
         data = generator.data
 
         # set center point to be mean of valid data points
-        feas = data[self.vocs.feasibility_data(data)["feasible"]]
+        feas = data[get_feasibility_data(self.vocs, data)["feasible"]]
         self.center_x = feas[self.vocs.variable_names].mean().to_dict()
 
         # get the feasibility fractions of the last batch
-        last_batch = self.vocs.feasibility_data(data).iloc[-previous_batch_size:]
+        last_batch = get_feasibility_data(self.vocs, data).iloc[-previous_batch_size:]
         feas_fraction = last_batch["feasible"].sum() / len(last_batch)
 
         if feas_fraction > self.min_feasible_fraction:

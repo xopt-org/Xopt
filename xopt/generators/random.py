@@ -1,4 +1,5 @@
 from xopt.generator import Generator
+from xopt.vocs import random_inputs
 
 
 class RandomGenerator(Generator):
@@ -14,4 +15,4 @@ class RandomGenerator(Generator):
 
     def generate(self, n_candidates) -> list[dict]:
         """generate uniform random data points"""
-        return self.vocs.random_inputs(n_candidates, include_constants=False)
+        return random_inputs(self.vocs, n_candidates, include_constants=False)

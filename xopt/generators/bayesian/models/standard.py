@@ -326,7 +326,21 @@ class StandardModelConstructor(ModelConstructor):
             return None
 
     def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
-        """get input transform based on the supplied bounds and attributes"""
+        """
+        Get input transform based on the supplied bounds and attributes
+
+        Parameters
+        ----------
+        outcome_name : str
+            The name of the outcome variable.
+        input_names : list[str]
+            The names of the input variables.
+        input_bounds : dict[str, tuple[float, float]]
+            The bounds for the input variables.
+        tkwargs : dict
+            Additional keyword arguments for tensor creation.
+
+        """
         # get input bounds
         if input_bounds is None:
             bounds = None

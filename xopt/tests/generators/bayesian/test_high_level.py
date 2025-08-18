@@ -29,9 +29,9 @@ class TestHighLevel:
         acq = ucb_gen.get_acquisition(model)
 
         n = 10
-        bounds = ucb_gen.vocs.bounds
-        x = torch.linspace(*bounds.T[0], n)
-        y = torch.linspace(*bounds.T[1], n)
+        bounds = torch.tensor(ucb_gen.vocs.bounds)
+        x = torch.linspace(*bounds[0], n)
+        y = torch.linspace(*bounds[1], n)
         xx, yy = torch.meshgrid(x, y)
         pts = torch.hstack([ele.reshape(-1, 1) for ele in (xx, yy)]).double()
 

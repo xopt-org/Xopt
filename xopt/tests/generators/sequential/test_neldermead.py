@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from scipy.optimize import minimize
 
 from xopt import VOCS, Xopt
+from xopt.vocs import get_variable_data, select_best
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
@@ -215,8 +216,8 @@ class TestNelderMeadGenerator:
         for i in range(1000):
             X.step()
 
-        idx, best, _ = X.vocs.select_best(X.data)
-        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        idx, best, _ = select_best(X.vocs, X.data)
+        xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         assert np.allclose(xbest, np.zeros(10), rtol=0, atol=1e-4)
         if obj == "MINIMIZE":
             assert best[0] >= 0.0
@@ -259,15 +260,15 @@ class TestNelderMeadGenerator:
         X = Xopt.from_dict(config)
         for i in range(scipy_data.shape[0]):
             X.step()
-            data = X.vocs.variable_data(X.data).to_numpy()
+            data = get_variable_data(X.vocs, X.data).to_numpy()
             if not np.array_equal(data, scipy_data[: i + 1, :]):
                 raise Exception
 
-        data = X.vocs.variable_data(X.data).to_numpy()
+        data = get_variable_data(X.vocs, X.data).to_numpy()
         assert np.array_equal(data, scipy_data)
 
-        idx, best, _ = X.vocs.select_best(X.data)
-        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        idx, best, _ = select_best(X.vocs, X.data)
+        xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         assert np.array_equal(xbest, result.x), (
             "Xopt Simplex does not match the vanilla one"
         )
@@ -331,21 +332,21 @@ class TestNelderMeadGenerator:
                 samples = X.generator.generate(1)
                 X.evaluate_data(samples)
 
-        data = X.vocs.variable_data(X.data).to_numpy()
+        data = get_variable_data(X.vocs, X.data).to_numpy()
         assert data.shape == scipy_data.shape
         assert np.array_equal(data, scipy_data)
 
-        data = X2.vocs.variable_data(X2.data).to_numpy()
+        data = get_variable_data(X2.vocs, X2.data).to_numpy()
         assert data.shape == scipy_data.shape
         # Numerical precision issues with using strings for floats, need tolerance
         assert np.allclose(data, scipy_data, rtol=0, atol=1e-10)
 
-        data = X3.vocs.variable_data(X3.data).to_numpy()
+        data = get_variable_data(X3.vocs, X3.data).to_numpy()
         assert data.shape == scipy_data.shape
         assert np.allclose(data, scipy_data, rtol=0, atol=1e-10)
 
-        idx, best, _ = X.vocs.select_best(X.data)
-        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
+        idx, best, _ = select_best(X.vocs, X.data)
+        xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         assert np.array_equal(xbest, result.x), (
             "Xopt Simplex does not match the vanilla one"
         )

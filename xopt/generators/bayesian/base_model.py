@@ -118,8 +118,10 @@ class ModelConstructor(XoptBaseModel, ABC):
             The trained botorch model.
 
         """
+        variable_bounds = {name: ele.domain for name, ele in vocs.variables.items()}
+
         return self.build_model(
-            vocs.variable_names, vocs.output_names, data, vocs.variables, dtype, device
+            vocs.variable_names, vocs.output_names, data, variable_bounds, dtype, device
         )
 
     @staticmethod
