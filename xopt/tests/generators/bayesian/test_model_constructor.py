@@ -437,6 +437,28 @@ class TestModelConstructor:
             assert torch.allclose(generated_pred, benchmark_pred, rtol=1e-3)
             assert ~torch.allclose(generated_pred, old_prediction, rtol=1e-3)
 
+    def test_train_model(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = deepcopy(TEST_VOCS_DATA)
+
+        test_covar_modules = []
+
+        gp_constructor = StandardModelConstructor()
+        constructed_model = gp_constructor.build_model_from_vocs(
+                test_vocs, test_data
+        ).models[0]
+        init_mll = ExactMarginalLogLikelihood(
+                benchmark_model.likelihood, benchmark_model
+        )
+        fit_gpytorch_mll(init_mll)
+
+        for test_covar in test_covar_modules:
+            test_covar1 = deepcopy(test_covar)
+            test_covar2 = deepcopy(test_covar)
+
+            # train model with StandardModelConstructor
+
+
     def test_unused_modules_warning(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_data = deepcopy(TEST_VOCS_DATA)
