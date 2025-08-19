@@ -45,6 +45,7 @@ class LBFGSOptimizer(NumericalOptimizer):
         Maximum time allowed for optimization, default is None (no time limit).
     with_grad : bool
         Whether to use autograd (True, default) or finite difference (False) for gradient computation.
+    ftol: PositiveFloat = Field(
     sequential : bool
         Use sequential (True) or joint (False, default) optimization when multiple candidates are requested.
 
@@ -69,9 +70,21 @@ class LBFGSOptimizer(NumericalOptimizer):
     max_time: Optional[PositiveFloat] = Field(
         5.0, description="maximum time for optimization in seconds"
     )
+    max_ls: Optional[PositiveInt] = Field(
+        None,
+        description="maximum number of line search steps. If None, use scipy defaults.",
+    )
     with_grad: bool = Field(
         True,
         description="Use autograd (true) or finite difference (false) for gradient computation",
+    )
+    ftol: PositiveFloat = Field(
+        None,
+        description="Convergence tolerance on the acquisiton function value. If None, use scipy defaults.",
+    )
+    gtol: PositiveFloat = Field(
+        None,
+        description="Convergence tolerance on the projected gradient. If None, use scipy defaults.",
     )
     sequential: bool = Field(
         False,
