@@ -76,11 +76,12 @@ class LBFGSOptimizer(NumericalOptimizer):
     )
     with_grad: bool = Field(
         True,
-        description="Use autograd (true) or finite difference (false) for gradient computation",
+        description="Use autograd (true) or finite difference (false) for gradient computation. Use autograd "
+                    "wherenever possible (e.g. non-differentiable prior means).",
     )
     ftol: PositiveFloat = Field(
         None,
-        description="Convergence tolerance on the acquisiton function value. If None, use scipy defaults.",
+        description="Convergence tolerance on the acquisition function value. If None, use scipy defaults.",
     )
     gtol: PositiveFloat = Field(
         None,
