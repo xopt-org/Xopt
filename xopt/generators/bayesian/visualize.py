@@ -37,7 +37,7 @@ class Array(np.ndarray, Generic[DType]):
 
 
 def visualize_generator_model(
-    generator: Generator, interactive: bool, **kwargs
+    generator: Generator, interactive: bool = False, **kwargs
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Visualizes GP model predictions for the specified output(s).
 
@@ -50,6 +50,8 @@ def visualize_generator_model(
     ----------
     generator : BayesianGenerator
         The Bayesian generator whose GP model is to be visualized. The generator must have a trained model.
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
     **kwargs : dict, optional
         Additional visualization parameters to customize the plots. Refer to the parameters of :func:`visualize_model`
         for more details.
@@ -167,6 +169,8 @@ def visualize_model(
         Compilation mode for the model. If None (default), the model is not compiled.
     tkwargs: dict, optional
         kwargs for torch tensor creation
+    interactive: bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -426,7 +430,8 @@ def plot_model_prediction(
         Color used for line plots.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -626,7 +631,8 @@ def plot_acquisition_function(
         The axis to use for plotting. If None is given, a new one is generated.
     exponentiate : bool, optional
         Flag to exponentiate acquisition function before plotting.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -776,7 +782,8 @@ def plot_feasibility(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -854,7 +861,8 @@ def plot_samples(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -960,7 +968,8 @@ def _plot2d_prediction(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -1040,7 +1049,8 @@ def _generate_input_mesh(
         Reference point determining the value of variables in vocs, but not in variable_names.
     n_grid : int
         Number of grid points per dimension used to generate the input mesh.
-    _
+    tkwargs : dict[str, Any]
+        Additional keyword arguments for the tensor.
 
     Returns
     -------
