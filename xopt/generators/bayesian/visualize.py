@@ -21,6 +21,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
+from xopt.generator import Generator
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
@@ -36,7 +37,7 @@ class Array(np.ndarray, Generic[DType]):
 
 
 def visualize_generator_model(
-    generator, **kwargs
+    generator: Generator, interactive: bool, **kwargs
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Visualizes GP model predictions for the specified output(s).
 
@@ -95,6 +96,7 @@ def visualize_generator_model(
         data=generator.data,
         acquisition_function=generator.get_acquisition(generator.model),
         tkwargs=generator.tkwargs,
+        interactive=interactive,
         **kwargs,
     )
 
@@ -117,6 +119,7 @@ def visualize_model(
     exponentiate: bool = True,
     model_compile_mode: Optional[str] = None,
     tkwargs: Optional[dict[str, Any]] = None,
+    interactive: bool = False,
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Displays GP model predictions for the selected output(s).
 
@@ -171,6 +174,7 @@ def visualize_model(
         The matplotlib figure and axes objects.
     """
     tkwargs = tkwargs or {}
+
     output_names, variable_names = _validate_names(output_names, variable_names, vocs)
     reference_point_names = [
         name for name in vocs.variable_names if name not in variable_names
@@ -224,6 +228,7 @@ def visualize_model(
                 show_prior_mean=show_prior_mean,
                 n_grid=n_grid,
                 idx=idx,
+                interactive=interactive,
             )
             ax[i, 0].set_xlabel(None)
         if show_acquisition:
@@ -238,6 +243,7 @@ def visualize_model(
                 idx=idx,
                 n_grid=n_grid,
                 tkwargs=tkwargs,
+                interactive=interactive,
             )
             ax[len(output_names), 0].set_xlabel(None)
         if show_feasibility:
@@ -300,6 +306,7 @@ def visualize_model(
                     n_grid=n_grid,
                     variable_names=variable_names,
                     show_samples=show_samples,
+                    interactive=interactive,
                 )
         if show_acquisition:
             ax_acq = ax[len(output_names), 0]
@@ -318,6 +325,7 @@ def visualize_model(
                     show_samples=False,
                     variable_names=variable_names,
                     tkwargs=tkwargs,
+                    interactive=interactive,
                 )
                 ax_acq = ax[len(output_names), 1]
             else:
@@ -335,6 +343,7 @@ def visualize_model(
                 show_samples=False,
                 variable_names=variable_names,
                 tkwargs=tkwargs,
+                interactive=interactive,
             )
         if show_feasibility:
             if ncols == 3 and show_acquisition:
@@ -382,6 +391,7 @@ def plot_model_prediction(
     n_grid: int = 100,
     color: str = "C0",
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ) -> Axes:
     """Displays the GP model prediction for the selected output.
 
@@ -485,6 +495,7 @@ def plot_model_prediction(
                 data=data,
                 idx=idx,
                 axis=axis,
+                interactive=interactive,
             )
         # labels and legend
         axis.set_xlabel(variable_names[0])
@@ -527,6 +538,7 @@ def plot_model_prediction(
                 vocs=vocs,
                 show_samples=show_samples,
                 n_grid=n_grid,
+                interactive=interactive,
             )
         elif prediction_type.lower() == "posterior std":
             axis = _plot2d_prediction(
@@ -542,6 +554,7 @@ def plot_model_prediction(
                 vocs=vocs,
                 show_samples=show_samples,
                 n_grid=n_grid,
+                interactive=interactive,
             )
         else:
             axis = _plot2d_prediction(
@@ -557,6 +570,7 @@ def plot_model_prediction(
                 vocs=vocs,
                 show_samples=show_samples,
                 n_grid=n_grid,
+                interactive=interactive,
             )
     return axis
 
@@ -582,6 +596,7 @@ def plot_acquisition_function(
     n_grid: int = 100,
     axis: Optional[Axes] = None,
     exponentiate: bool = True,
+    interactive: bool = False,
 ) -> Axes:
     """Displays the given acquisition function.
 
@@ -666,6 +681,7 @@ def plot_acquisition_function(
                     data=data,
                     idx=idx,
                     variable_names=variable_names,
+                    interactive=interactive,
                 )
             if show_legend:
                 axis.legend()
@@ -717,6 +733,7 @@ def plot_acquisition_function(
             vocs=vocs,
             show_samples=show_samples,
             n_grid=n_grid,
+            interactive=interactive,
         )
     return axis
 
@@ -733,6 +750,7 @@ def plot_feasibility(
     show_legend: bool = True,
     n_grid: int = 100,
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ) -> Axes:
     """Displays the feasibility region for the given model.
 
@@ -806,6 +824,7 @@ def plot_feasibility(
             vocs=vocs,
             show_samples=show_samples,
             n_grid=n_grid,
+            interactive=interactive,
         )
     return axis
 
@@ -817,6 +836,7 @@ def plot_samples(
     variable_names: Optional[list[str]] = None,
     idx: int = -1,
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ):
     """Displays the data samples.
 
@@ -841,6 +861,13 @@ def plot_samples(
     Axes
         The axis.
     """
+    if interactive:
+        picker = True
+        pickradius = 5.0
+    else:
+        picker = None
+        pickradius = 0.0
+
     if output_name is None:
         output_name = vocs.output_names[0]
     _, variable_names = _validate_names([output_name], variable_names, vocs)
@@ -861,8 +888,8 @@ def plot_samples(
             facecolors="C1",
             edgecolors="none",
             label="Feasible Samples",
-            picker=True,
-            pickradius=5,
+            picker=picker,
+            pickradius=pickradius,
         )
     x_infeasible, y_infeasible = _get_feasible_samples(
         vocs=vocs,
@@ -880,8 +907,8 @@ def plot_samples(
             facecolors="none",
             edgecolors="C3",
             label="Infeasible Samples",
-            picker=True,
-            pickradius=5,
+            picker=picker,
+            pickradius=pickradius,
         )
     axis.set_xlabel(variable_names[0])
     if len(variable_names) == 2:
@@ -904,6 +931,7 @@ def _plot2d_prediction(
     show_legend: bool = True,
     n_grid: int = 100,
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ):
     """
 
@@ -976,6 +1004,7 @@ def _plot2d_prediction(
             variable_names=variable_names,
             idx=-1,
             axis=axis,
+            interactive=interactive,
         )
     if show_legend:
         handles, labels = _combine_legend_entries_for_samples(
