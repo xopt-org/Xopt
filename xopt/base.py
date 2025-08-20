@@ -250,7 +250,7 @@ class Xopt(XoptBaseModel):
 
         # generate samples and submit to evaluator
         logger.debug(f"Generating {n_generate} candidates")
-        new_samples = self.generator.ask(n_generate)
+        new_samples = self.generator.suggest(n_generate)
 
         if new_samples is not None:
             # Evaluate data
@@ -340,8 +340,8 @@ class Xopt(XoptBaseModel):
         validate_input_data(self.vocs, input_data)
 
         # add constants to input data
-        for name, value in self.vocs.constants.items():
-            input_data[name] = value
+        for name, const in self.vocs.constants.items():
+            input_data[name] = const.value
 
         # if we are using a sequential generator that is active, make sure that the evaluated data matches the last candidate
         if isinstance(self.generator, SequentialGenerator):
@@ -386,7 +386,7 @@ class Xopt(XoptBaseModel):
             if new_data.index.dtype != np.int64:
                 new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
-        self.generator.tell(new_data.to_dict(orient="records"))
+        self.generator.ingest(new_data.to_dict(orient="records"))
 
     def reset_data(self):
         """
@@ -486,7 +486,7 @@ class Xopt(XoptBaseModel):
         pd.DataFrame
             The results of the evaluations added to the internal DataFrame.
         """
-        gi = grid_inputs(self.vocs, n_samples, custom_bounds=custom_bounds)
+        gi = grid_inputs(self.vocs, n_samples, custom_bounds=custom_bounds, include_constants=True)
         result = self.evaluate_data(gi)
         return result
 

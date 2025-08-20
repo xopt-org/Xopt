@@ -16,7 +16,7 @@ from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.mobo import MOBOGenerator
-from generator_standard.vocs import ObjectiveTypeEnum, VOCS, ContinuousVariable
+from generator_standard.vocs import VOCS, ContinuousVariable, MaximizeObjective
 from xopt.vocs import convert_dataframe_to_inputs
 
 logger = logging.getLogger()
@@ -100,7 +100,7 @@ class MultiFidelityGenerator(MOBOGenerator):
             If constraints are present in the VOCS.
         """
         v.variables["s"] = ContinuousVariable(domain=[0, 1])
-        v.objectives["s"] = ObjectiveTypeEnum("MAXIMIZE")
+        v.objectives["s"] = MaximizeObjective()
         if len(v.constraints):
             raise ValueError(
                 "constraints are not currently supported in multi-fidelity BO"

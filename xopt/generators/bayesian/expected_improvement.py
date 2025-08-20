@@ -18,6 +18,7 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
+from xopt.vocs import get_objective_data
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):

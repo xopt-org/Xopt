@@ -58,7 +58,7 @@ def random_inputs(
 
     # Constants
     if include_constants and vocs.constants is not None:
-        inputs.update(vocs.constants)
+        inputs.update({name: ele.value for name, ele in vocs.constants.items()})
 
     if n is None:
         return [inputs]
@@ -128,8 +128,8 @@ def grid_inputs(
     inputs = {key: mesh[i].flatten() for i, key in enumerate(bounds.keys())}
 
     if include_constants and vocs.constants is not None:
-        for key, value in vocs.constants.items():
-            inputs[key] = np.full_like(next(iter(inputs.values())), value)
+        for key, const in vocs.constants.items():
+            inputs[key] = np.full_like(next(iter(inputs.values())), const.value)
 
     return pd.DataFrame(inputs)
 

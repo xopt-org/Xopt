@@ -8,7 +8,9 @@ from pydantic_core.core_schema import ValidationInfo
 
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
-from xopt.vocs import VOCS
+
+from generator_standard.vocs import VOCS
+from generator_standard.generator import Generator as BaseGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -16,63 +18,7 @@ from abc import ABC, abstractmethod
 from typing import Iterable, Optional, List
 
 
-class StandardGenerator(ABC):
-    """
-    v 0.1
-
-    Tentative ask/tell generator interface
-
-    .. code-block:: python
-
-        class MyGenerator(Generator):
-            def __init__(self, my_parameter, my_keyword=None):
-                self.model = init_model(my_parameter, my_keyword)
-
-            def ask(self, num_points):
-                return self.model.create_points(num_points)
-
-            def tell(self, results):
-                self.model.update_model(results)
-
-
-        my_generator = MyGenerator(my_parameter=100)
-    """
-
-    @abstractmethod
-    def __init__(self, *args, **kwargs):
-        """
-        Initialize the Generator object on the user-side. Constants, class-attributes,
-        and preparation goes here.
-
-        .. code-block:: python
-
-            >>> my_generator = MyGenerator(my_parameter, my_keyword=10)
-        """
-
-    @abstractmethod
-    def ask(self, num_points: Optional[int]) -> List[dict]:
-        """
-        Request the next set of points to evaluate.
-
-        .. code-block:: python
-
-            >>> points = my_generator.ask(3)
-            >>> print(points)
-            [{"x": 1, "y": 1}, {"x": 2, "y": 2}, {"x": 3, "y": 3}]
-        """
-
-    def tell(self, results: List[dict]) -> None:
-        """
-        Send the results of evaluations to the generator.
-
-        .. code-block:: python
-
-            >>> results = [{"x": 0.5, "y": 1.5, "f": 1}, {"x": 2, "y": 3, "f": 4}]
-            >>> my_generator.tell(results)
-        """
-
-
-class Generator(XoptBaseModel, ABC):
+class Generator(XoptBaseModel, BaseGenerator, ABC):
     """
     Base class for Generators.
 
@@ -158,6 +104,9 @@ class Generator(XoptBaseModel, ABC):
                 v = pd.DataFrame(v, index=[0])
         return v
 
+    def _validate_vocs(self, vocs: VOCS):
+        pass
+
     def __init__(self, **kwargs):
         """
         Initialize the generator.
@@ -166,10 +115,10 @@ class Generator(XoptBaseModel, ABC):
         super().__init__(**kwargs)
         logger.info(f"Initialized generator {self.name}")
 
-    def ask(self, num_points: Optional[int]) -> List[dict]:
+    def suggest(self, num_points: Optional[int]) -> List[dict]:
         return self.generate(num_points)
 
-    def tell(self, results: List[dict]) -> None:
+    def ingest(self, results: List[dict]) -> None:
         self.add_data(pd.DataFrame(results))
 
     @property
