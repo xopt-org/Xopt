@@ -50,6 +50,7 @@ nav:
                 - "Download Template": examples/ga/nsga2/yaml_interface/assets/yaml_runner_example.zip
               - examples/ga/nsga2/nsga2_python.ipynb
               - examples/ga/nsga2/nsga2_to_cnsga.ipynb
+              - examples/ga/nsga2/genetic_operators.ipynb
 
         - Sequential:
             - Nelder-Mead: examples/sequential/neldermead.ipynb

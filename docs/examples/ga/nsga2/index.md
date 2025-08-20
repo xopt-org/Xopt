@@ -22,6 +22,10 @@ The following are currently implemented.
  - `PolynomialMutation` - Mutation with polynomial probability distribution. Discussed in [2].
  - `SimulatedBinaryCrossover` - Crossover operator for real-coded genetic algorithms, described in [3].
 
+ A demonstration of each operator and further documentation on their use can be found in the following notebook.
+
+ [Genetic Operators Notebook](genetic_operators.ipynb)
+
 ## Benchmarking
 
 Statistical benchmark tests were performed on `NSGA2Generator`, `CNSGAGenerator`, and a reference implementation of NSGA-II to compare performance.
