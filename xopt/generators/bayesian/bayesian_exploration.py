@@ -38,13 +38,13 @@ class BayesianExplorationGenerator(BayesianGenerator):
         """
         Get the acquisition function for Bayesian Optimization.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model : Model
             The model used for Bayesian Optimization.
 
-        Returns:
-        --------
+        Returns
+        -------
         MCAcquisitionFunction
             The acquisition function for Bayesian Optimization.
         """
@@ -62,8 +62,8 @@ class qPosteriorVariance(MCAcquisitionFunction):
     """
     q-Posterior Variance acquisition function for Bayesian Optimization.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     model : Model
         A fitted model.
     sampler : Optional[MCSampler]
@@ -75,8 +75,8 @@ class qPosteriorVariance(MCAcquisitionFunction):
     X_pending : Optional[Tensor]
         A `batch_shape x m x d`-dim Tensor of `m` design points that have been submitted for function evaluation but have not yet been evaluated. Concatenated into X upon forward call. Copied and set to have no gradient.
 
-    Methods:
-    --------
+    Methods
+    -------
     forward(self, X: Tensor) -> Tensor
         Evaluate qPosteriorVariance on the candidate set `X`.
     """
@@ -103,13 +103,13 @@ class qPosteriorVariance(MCAcquisitionFunction):
         """
         Evaluate qPosteriorVariance on the candidate set `X`.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         X : Tensor
             A `batch_shape x q x d`-dim Tensor of t-batches with `q` `d`-dim design points each.
 
-        Returns:
-        --------
+        Returns
+        -------
         Tensor
             A `batch_shape'`-dim Tensor of Posterior Variance values at the given design points `X`, where `batch_shape'` is the broadcasted batch shape of model and input `X`.
         """

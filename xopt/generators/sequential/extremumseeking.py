@@ -19,8 +19,8 @@ class ExtremumSeekingGenerator(SequentialGenerator):
 
     This algorithm must be stepped serially.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the generator.
     k : PositiveFloat
@@ -50,8 +50,8 @@ class ExtremumSeekingGenerator(SequentialGenerator):
     _last_outcome : float
         Last outcome value.
 
-    Methods:
-    --------
+    Methods
+    -------
     add_data(self, new_data: pd.DataFrame)
         Add new data to the generator.
     p_normalize(self, p: np.ndarray) -> np.ndarray
@@ -119,13 +119,13 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         """
         Normalize parameters.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         p : np.ndarray
             The parameters to normalize.
 
-        Returns:
-        --------
+        Returns
+        -------
         np.ndarray
             The normalized parameters.
         """
@@ -136,13 +136,13 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         """
         Un-normalize parameters.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         p : np.ndarray
             The parameters to un-normalize.
 
-        Returns:
-        --------
+        Returns
+        -------
         np.ndarray
             The un-normalized parameters.
         """
@@ -153,8 +153,8 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         """
         Generate next candidate.
 
-        Returns:
-        --------
+        Returns
+        -------
         List[Dict[str, float]]
             A list of dictionaries containing the generated samples.
         """

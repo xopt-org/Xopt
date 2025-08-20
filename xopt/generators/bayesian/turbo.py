@@ -28,8 +28,8 @@ class TurboController(XoptBaseModel, ABC):
     """
     Base class for TuRBO (Trust Region Bayesian Optimization) controllers.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
     dim : PositiveInt
@@ -59,8 +59,8 @@ class TurboController(XoptBaseModel, ABC):
     model_config : ConfigDict
         Configuration dictionary for the model.
 
-    Methods:
-    --------
+    Methods
+    -------
     get_trust_region(self, generator) -> Tensor
         Return the trust region based on the generator.
     update_trust_region(self)
@@ -263,15 +263,15 @@ class OptimizeTurboController(TurboController):
     """
     Turbo controller for optimization tasks.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the controller.
     best_value : Optional[float]
         The best value found so far.
 
-    Methods:
-    --------
+    Methods
+    -------
     vocs_validation(cls, info)
         Validate the VOCS for the controller.
     minimize(self) -> bool
@@ -394,8 +394,8 @@ class SafetyTurboController(TurboController):
     """
     Turbo controller for safety-constrained optimization tasks.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the controller.
     scale_factor : PositiveFloat
@@ -403,16 +403,16 @@ class SafetyTurboController(TurboController):
     min_feasible_fraction : PositiveFloat
         Minimum feasible fraction to trigger trust region expansion.
 
-    Methods:
-    --------
+    Methods
+    -------
     vocs_validation(cls, info)
         Validate the VOCS for the controller.
     update_state(self, generator, previous_batch_size: int = 1)
         Update the state of the controller.
 
 
-    Notes:
-    ------
+    Notes
+    -----
     The trust region of the safety turbo controller is expanded or contracted based on the feasibility of the observed points.
     In cases where multiple samples are taken at once, the feasibility fraction is calculated based on the last
     `previous_batch_size` samples. If the feasibility fraction is above `min_feasible_fraction`,
@@ -473,15 +473,15 @@ class EntropyTurboController(TurboController):
     """
     Turbo controller for entropy-based optimization tasks.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the controller.
     _best_entropy : float
         The best entropy value found so far.
 
-    Methods:
-    --------
+    Methods
+    -------
     update_state(self, generator, previous_batch_size: int = 1) -> None
         Update the state of the controller.
     """

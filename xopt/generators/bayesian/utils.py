@@ -484,8 +484,8 @@ def compute_hypervolume_and_pf(
     Compute the hypervolume and pareto front
     given a set of points assuming maximization.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     X : torch.Tensor
         The input points.
     Y : torch.Tensor
@@ -493,8 +493,8 @@ def compute_hypervolume_and_pf(
     reference_point : torch.Tensor
         The reference point for hypervolume calculation.
 
-    Returns:
-    --------
+    Returns
+    -------
     pareto_front_X : torch.Tensor
         The points on the Pareto front. Returns None if no pareto front exists.
     pareto_front_Y : torch.Tensor
