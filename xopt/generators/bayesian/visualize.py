@@ -21,6 +21,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
+from xopt.generator import Generator
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
@@ -36,7 +37,7 @@ class Array(np.ndarray, Generic[DType]):
 
 
 def visualize_generator_model(
-    generator, **kwargs
+    generator: Generator, interactive: bool = False, **kwargs
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Visualizes GP model predictions for the specified output(s).
 
@@ -49,6 +50,8 @@ def visualize_generator_model(
     ----------
     generator : BayesianGenerator
         The Bayesian generator whose GP model is to be visualized. The generator must have a trained model.
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
     **kwargs : dict, optional
         Additional visualization parameters to customize the plots. Refer to the parameters of :func:`visualize_model`
         for more details.
@@ -95,6 +98,7 @@ def visualize_generator_model(
         data=generator.data,
         acquisition_function=generator.get_acquisition(generator.model),
         tkwargs=generator.tkwargs,
+        interactive=interactive,
         **kwargs,
     )
 
@@ -117,6 +121,7 @@ def visualize_model(
     exponentiate: bool = True,
     model_compile_mode: Optional[str] = None,
     tkwargs: Optional[dict[str, Any]] = None,
+    interactive: bool = False,
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """Displays GP model predictions for the selected output(s).
 
@@ -164,6 +169,8 @@ def visualize_model(
         Compilation mode for the model. If None (default), the model is not compiled.
     tkwargs: dict, optional
         kwargs for torch tensor creation
+    interactive: bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -171,6 +178,7 @@ def visualize_model(
         The matplotlib figure and axes objects.
     """
     tkwargs = tkwargs or {}
+
     output_names, variable_names = _validate_names(output_names, variable_names, vocs)
     reference_point_names = [
         name for name in vocs.variable_names if name not in variable_names
@@ -224,6 +232,7 @@ def visualize_model(
                 show_prior_mean=show_prior_mean,
                 n_grid=n_grid,
                 idx=idx,
+                interactive=interactive,
             )
             ax[i, 0].set_xlabel(None)
         if show_acquisition:
@@ -238,6 +247,7 @@ def visualize_model(
                 idx=idx,
                 n_grid=n_grid,
                 tkwargs=tkwargs,
+                interactive=interactive,
             )
             ax[len(output_names), 0].set_xlabel(None)
         if show_feasibility:
@@ -300,6 +310,7 @@ def visualize_model(
                     n_grid=n_grid,
                     variable_names=variable_names,
                     show_samples=show_samples,
+                    interactive=interactive,
                 )
         if show_acquisition:
             ax_acq = ax[len(output_names), 0]
@@ -318,6 +329,7 @@ def visualize_model(
                     show_samples=False,
                     variable_names=variable_names,
                     tkwargs=tkwargs,
+                    interactive=interactive,
                 )
                 ax_acq = ax[len(output_names), 1]
             else:
@@ -335,6 +347,7 @@ def visualize_model(
                 show_samples=False,
                 variable_names=variable_names,
                 tkwargs=tkwargs,
+                interactive=interactive,
             )
         if show_feasibility:
             if ncols == 3 and show_acquisition:
@@ -362,16 +375,6 @@ def visualize_model(
         else:
             if ncols == 3 and show_acquisition:
                 ax[len(output_names), 2].axis("off")
-        # set axis labels
-        for i in range(nrows):
-            for j in range(ncols):
-                ax_ij = ax[i, j] if nrows > 1 else ax[0, j]
-                ax_ij.set_xlabel(None)
-                ax_ij.set_ylabel(None)
-                if i == nrows - 1:
-                    ax_ij.set_xlabel(variable_names[0])
-                if j == 0:
-                    ax_ij.set_ylabel(variable_names[1])
     fig.tight_layout()
     return fig, ax
 
@@ -392,6 +395,7 @@ def plot_model_prediction(
     n_grid: int = 100,
     color: str = "C0",
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ) -> Axes:
     """Displays the GP model prediction for the selected output.
 
@@ -426,7 +430,8 @@ def plot_model_prediction(
         Color used for line plots.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -495,6 +500,7 @@ def plot_model_prediction(
                 data=data,
                 idx=idx,
                 axis=axis,
+                interactive=interactive,
             )
         # labels and legend
         axis.set_xlabel(variable_names[0])
@@ -537,6 +543,7 @@ def plot_model_prediction(
                 vocs=vocs,
                 show_samples=show_samples,
                 n_grid=n_grid,
+                interactive=interactive,
             )
         elif prediction_type.lower() == "posterior std":
             axis = _plot2d_prediction(
@@ -552,6 +559,7 @@ def plot_model_prediction(
                 vocs=vocs,
                 show_samples=show_samples,
                 n_grid=n_grid,
+                interactive=interactive,
             )
         else:
             axis = _plot2d_prediction(
@@ -567,6 +575,7 @@ def plot_model_prediction(
                 vocs=vocs,
                 show_samples=show_samples,
                 n_grid=n_grid,
+                interactive=interactive,
             )
     return axis
 
@@ -592,6 +601,7 @@ def plot_acquisition_function(
     n_grid: int = 100,
     axis: Optional[Axes] = None,
     exponentiate: bool = True,
+    interactive: bool = False,
 ) -> Axes:
     """Displays the given acquisition function.
 
@@ -621,7 +631,8 @@ def plot_acquisition_function(
         The axis to use for plotting. If None is given, a new one is generated.
     exponentiate : bool, optional
         Flag to exponentiate acquisition function before plotting.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -676,6 +687,7 @@ def plot_acquisition_function(
                     data=data,
                     idx=idx,
                     variable_names=variable_names,
+                    interactive=interactive,
                 )
             if show_legend:
                 axis.legend()
@@ -727,6 +739,7 @@ def plot_acquisition_function(
             vocs=vocs,
             show_samples=show_samples,
             n_grid=n_grid,
+            interactive=interactive,
         )
     return axis
 
@@ -743,6 +756,7 @@ def plot_feasibility(
     show_legend: bool = True,
     n_grid: int = 100,
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ) -> Axes:
     """Displays the feasibility region for the given model.
 
@@ -768,7 +782,8 @@ def plot_feasibility(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -816,6 +831,7 @@ def plot_feasibility(
             vocs=vocs,
             show_samples=show_samples,
             n_grid=n_grid,
+            interactive=interactive,
         )
     return axis
 
@@ -827,6 +843,7 @@ def plot_samples(
     variable_names: Optional[list[str]] = None,
     idx: int = -1,
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ):
     """Displays the data samples.
 
@@ -844,13 +861,21 @@ def plot_samples(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
     Axes
         The axis.
     """
+    if interactive:
+        picker = True
+        pickradius = 5.0
+    else:
+        picker = None
+        pickradius = 0.0
+
     if output_name is None:
         output_name = vocs.output_names[0]
     _, variable_names = _validate_names([output_name], variable_names, vocs)
@@ -870,8 +895,9 @@ def plot_samples(
             marker="o",
             facecolors="C1",
             edgecolors="none",
-            zorder=5,
             label="Feasible Samples",
+            picker=picker,
+            pickradius=pickradius,
         )
     x_infeasible, y_infeasible = _get_feasible_samples(
         vocs=vocs,
@@ -888,8 +914,9 @@ def plot_samples(
             marker="o",
             facecolors="none",
             edgecolors="C3",
-            zorder=5,
             label="Infeasible Samples",
+            picker=picker,
+            pickradius=pickradius,
         )
     axis.set_xlabel(variable_names[0])
     if len(variable_names) == 2:
@@ -912,6 +939,7 @@ def _plot2d_prediction(
     show_legend: bool = True,
     n_grid: int = 100,
     axis: Optional[Axes] = None,
+    interactive: bool = False,
 ):
     """
 
@@ -940,7 +968,8 @@ def _plot2d_prediction(
         See eponymous parameter of :func:`visualize_model`.
     axis : Axes, optional
         The axis to use for plotting. If None is given, a new one is generated.
-    _
+    interactive : bool, optional
+        Whether to enable picker functionality for samples in the subplots.
 
     Returns
     -------
@@ -984,6 +1013,7 @@ def _plot2d_prediction(
             variable_names=variable_names,
             idx=-1,
             axis=axis,
+            interactive=interactive,
         )
     if show_legend:
         handles, labels = _combine_legend_entries_for_samples(
@@ -1019,7 +1049,8 @@ def _generate_input_mesh(
         Reference point determining the value of variables in vocs, but not in variable_names.
     n_grid : int
         Number of grid points per dimension used to generate the input mesh.
-    _
+    tkwargs : dict[str, Any]
+        Additional keyword arguments for the tensor.
 
     Returns
     -------
