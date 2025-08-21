@@ -43,9 +43,14 @@ class LBFGSOptimizer(NumericalOptimizer):
         Maximum number of iterations for the optimizer, default is 2000.
     max_time : Optional[PositiveFloat]
         Maximum time allowed for optimization, default is None (no time limit).
+    max_ls : Optional[PositiveInt]
+        Maximum number of line search steps, default is None (use scipy defaults).
     with_grad : bool
         Whether to use autograd (True, default) or finite difference (False) for gradient computation.
-    ftol: PositiveFloat = Field(
+    ftol: Optional[PositiveFloat]
+        Convergence tolerance on the acquisition function value. If None, use scipy defaults.
+    pgtol: Optional[PositiveFloat]
+        Convergence tolerance on the projected gradient. If None, use scipy defaults.
     sequential : bool
         Use sequential (True) or joint (False, default) optimization when multiple candidates are requested.
 
@@ -76,20 +81,29 @@ class LBFGSOptimizer(NumericalOptimizer):
     )
     with_grad: bool = Field(
         True,
-        description="Use autograd (true) or finite difference (false) for gradient computation. Use autograd "
-                    "wherenever possible (e.g. non-differentiable prior means).",
+        description="Use autograd (true) or finite difference (false) for gradient computation."
+        " Use autograd unless it is impossible (e.g. non-differentiable elements).",
     )
-    ftol: PositiveFloat = Field(
+    eps: Optional[PositiveFloat] = Field(
         None,
-        description="Convergence tolerance on the acquisition function value. If None, use scipy defaults.",
+        description="Step size used for finite difference if with_grad is False."
+        " If None, use scipy default of 1e-08.",
     )
-    gtol: PositiveFloat = Field(
+    ftol: Optional[PositiveFloat] = Field(
         None,
-        description="Convergence tolerance on the projected gradient. If None, use scipy defaults.",
+        description="Convergence tolerance on the acquisition function value."
+        " If None, use scipy default of ftol = 1e7 * numpy.finfo(float).eps = 2.22e-09.",
+    )
+    pgtol: Optional[PositiveFloat] = Field(
+        None,
+        description="Convergence tolerance on the projected gradient."
+        " If None, use scipy default of 1e-05.",
     )
     sequential: bool = Field(
         False,
-        description="Use sequential (true) or joint (false) optimization when q > 1",
+        description="Use sequential (true) or joint (false) optimization when q > 1."
+        " In practice, joint optimization is faster but requires more GPU memory, "
+        " and sequential optimization is slightly more robust (especially with high q)",
     )
     model_config = ConfigDict(validate_assignment=True)
 
@@ -137,6 +151,17 @@ class LBFGSOptimizer(NumericalOptimizer):
         else:
             max_time = None
 
+        options = {
+            "maxiter": self.max_iter,
+            "with_grad": self.with_grad,
+        }
+        if self.ftol is not None:
+            options["ftol"] = self.ftol
+        if self.pgtol is not None:
+            options["pgtol"] = self.pgtol
+        if self.max_ls is not None:
+            options["max_ls"] = self.max_ls
+
         candidates, _ = optimize_acqf(
             acq_function=function,
             bounds=bounds,
@@ -144,7 +169,7 @@ class LBFGSOptimizer(NumericalOptimizer):
             raw_samples=self.n_raw_samples,
             num_restarts=self.n_restarts,
             timeout_sec=max_time,
-            options={"maxiter": self.max_iter, "with_grad": self.with_grad},
+            options=options,
             **kwargs,
         )
         return candidates
