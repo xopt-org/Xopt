@@ -198,7 +198,7 @@ class GridOptimizer(NumericalOptimizer):
         ]
 
         xx = torch.meshgrid(*linspace_list, indexing="ij")
-        mesh_pts = torch.stack(xx).flatten(start_dim=1).T
+        mesh_pts = torch.stack(xx).flatten(start_dim=1).T.double()
 
         # evaluate the function on grid points
         f_values = function(mesh_pts.unsqueeze(1))
