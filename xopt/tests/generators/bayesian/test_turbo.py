@@ -517,24 +517,41 @@ class TestTurbo(TestCase):
             )
 
     def test_turbo_restart(self):
-        test_vocs = deepcopy(TEST_VOCS_BASE)
-        test_vocs.variables = {"x1": [0, 1]}
+        vocs = TEST_VOCS_BASE
+        gen = UpperConfidenceBoundGenerator(vocs=vocs)
+        data = TEST_VOCS_DATA.copy()
+        gen.add_data(data)
+        gen.train_model()
 
-        controllers = [
-            OptimizeTurboController(test_vocs),
-            SafetyTurboController(test_vocs),
-        ]
-        for controller in controllers:
-            controller.length = 5.0
-            controller.success_counter = 10
-            controller.failure_counter = 5
-            controller.center_x = {"x1": 0.5}
+        controller = OptimizeTurboController(gen.vocs)
+        controller.update_state(gen)
+        assert controller.best_value is not None
+        controller.length = 5.0
+        controller.success_counter = 10
+        controller.failure_counter = 5
+        controller.center_x = {"x1": 0.5}
 
-            controller.reset()
-            assert controller.length == 0.25
-            assert controller.success_counter == 0
-            assert controller.failure_counter == 0
-            assert controller.center_x is None
+        controller.reset()
+        assert controller.length == 0.25
+        assert controller.success_counter == 0
+        assert controller.failure_counter == 0
+        assert controller.center_x is None
+        assert controller.best_value is None
+
+        controller = SafetyTurboController(gen.vocs)
+        controller.update_state(gen)
+        controller.length = 5.0
+        controller.success_counter = 10
+        controller.failure_counter = 5
+        controller.center_x = {"x1": 0.5}
+        controller.min_feasible_fraction = 0.7
+
+        controller.reset()
+        assert controller.length == 0.25
+        assert controller.success_counter == 0
+        assert controller.failure_counter == 0
+        assert controller.center_x is None
+        assert controller.min_feasible_fraction == 0.75
 
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
