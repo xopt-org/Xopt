@@ -261,6 +261,7 @@ def visualize_model(
                 tkwargs=tkwargs,
                 reference_point=reference_point,
                 variable_names=variable_names,
+                interactive=interactive,
             )
         ax[-1, 0].set_xlabel(variable_names[0])
     else:
@@ -371,6 +372,7 @@ def visualize_model(
                 show_samples=False,
                 n_grid=n_grid,
                 tkwargs=tkwargs,
+                interactive=interactive,
             )
         else:
             if ncols == 3 and show_acquisition:
