@@ -34,13 +34,13 @@ class TestNumericalOptimizers:
         for ndim in [1, 3]:
             bounds = torch.stack((torch.zeros(ndim), torch.ones(ndim)))
             for ncandidate in [1, 3]:
-                #np.random.seed(42)
-                #torch.manual_seed(42)
+                # np.random.seed(42)
+                # torch.manual_seed(42)
                 candidates = optimizer.optimize(
                     function=f, bounds=bounds, n_candidates=ncandidate
                 )
-                #np.random.seed(42)
-                #torch.manual_seed(42)
+                # np.random.seed(42)
+                # torch.manual_seed(42)
                 candidates2 = optimizer2.optimize(
                     function=f, bounds=bounds, n_candidates=ncandidate
                 )
