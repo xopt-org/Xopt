@@ -315,6 +315,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     name = "nsga2"
     supports_multi_objective: bool = True
     supports_constraints: bool = True
+    supports_single_objective: bool = True
 
     # Checkpoint loading
     checkpoint_file: str | None = Field(
