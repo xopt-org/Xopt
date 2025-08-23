@@ -35,7 +35,7 @@ class UncertaintyConstrainedAcquisitionFunction(SampleReducingMCAcquisitionFunct
         constraints: list[Callable[[Tensor], Tensor]] | None = None,
         eta: Tensor | float = 1e-3,
         fat: list[bool | None] | bool = False,
-        variance_limit: dict[int, float] = None,
+        variance_limits: dict[int, float] = None,
         variance_eta: float | dict[int, float] = None,
         variance_min_mult: float | dict[int, float] = 1e-3,
         variance_normalize: bool | dict[int, bool] = False,
@@ -52,31 +52,31 @@ class UncertaintyConstrainedAcquisitionFunction(SampleReducingMCAcquisitionFunct
             eta,
             fat,
         )
-        self.variance_limit = variance_limit
-        if variance_limit is None:
+        self.variance_limit = variance_limits
+        if variance_limits is None:
             assert variance_eta is None, (
                 "If no variance limit is provided, variance_eta must also be None."
             )
 
         if isinstance(variance_eta, float):
-            variance_eta = {k: variance_eta for k in variance_limit.keys()}
+            variance_eta = {k: variance_eta for k in variance_limits.keys()}
         else:
             assert isinstance(variance_eta, dict)
-            assert set(variance_eta.keys()) == set(variance_limit.keys())
+            assert set(variance_eta.keys()) == set(variance_limits.keys())
         self._variance_eta = variance_eta
 
         if isinstance(variance_min_mult, float):
-            variance_min_mult = {k: variance_min_mult for k in variance_limit.keys()}
+            variance_min_mult = {k: variance_min_mult for k in variance_limits.keys()}
         else:
             assert isinstance(variance_min_mult, dict)
-            assert set(variance_min_mult.keys()) == set(variance_limit.keys())
+            assert set(variance_min_mult.keys()) == set(variance_limits.keys())
         self._variance_min_mult = variance_min_mult
 
         if isinstance(variance_normalize, bool):
-            variance_normalize = {k: variance_normalize for k in variance_limit.keys()}
+            variance_normalize = {k: variance_normalize for k in variance_limits.keys()}
         else:
             assert isinstance(variance_normalize, dict)
-            assert set(variance_normalize.keys()) == set(variance_limit.keys())
+            assert set(variance_normalize.keys()) == set(variance_limits.keys())
         self.variance_normalize = variance_normalize
 
     def _non_reduced_forward(self, X: Tensor) -> Tensor:
@@ -214,7 +214,7 @@ class UCqExpectedImprovement(UncertaintyConstrainedAcquisitionFunction):
         X_pending: Tensor | None = None,
         constraints: list[Callable[[Tensor], Tensor]] | None = None,
         eta: Tensor | float = 1e-3,
-        variance_limit: dict[int, float] = None,
+        variance_limits: dict[int, float] = None,
         variance_eta: float | dict[int, float] = None,
         variance_min_mult: float | dict[int, float] = 1e-3,
         variance_normalize: bool | dict[int, bool] = False,
@@ -228,7 +228,7 @@ class UCqExpectedImprovement(UncertaintyConstrainedAcquisitionFunction):
             X_pending=X_pending,
             constraints=constraints,
             eta=eta,
-            variance_limit=variance_limit,
+            variance_limits=variance_limits,
             variance_eta=variance_eta,
             variance_min_mult=variance_min_mult,
             variance_normalize=variance_normalize,
@@ -249,7 +249,7 @@ class UCqPosteriorVariance(UncertaintyConstrainedAcquisitionFunction):
         X_pending: Tensor | None = None,
         constraints: list[Callable[[Tensor], Tensor]] | None = None,
         eta: Tensor | float = 1e-3,
-        variance_limit: dict[int, float] = None,
+        variance_limits: dict[int, float] = None,
         variance_eta: float | dict[int, float] = None,
         variance_min_mult: float | dict[int, float] = 1e-3,
         variance_normalize: bool | dict[int, bool] = False,
@@ -262,7 +262,7 @@ class UCqPosteriorVariance(UncertaintyConstrainedAcquisitionFunction):
             X_pending=X_pending,
             constraints=constraints,
             eta=eta,
-            variance_limit=variance_limit,
+            variance_limits=variance_limits,
             variance_eta=variance_eta,
             variance_min_mult=variance_min_mult,
             variance_normalize=variance_normalize,

@@ -1,6 +1,8 @@
+from botorch.models.model import Model
 from pandas import DataFrame
 import torch
 from botorch.acquisition import (
+    AcquisitionFunction,
     ScalarizedPosteriorTransform,
     LogExpectedImprovement,
     qLogExpectedImprovement,
@@ -10,6 +12,9 @@ from botorch.acquisition import (
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
+)
+from xopt.generators.bayesian.custom_botorch.noise_constrained_acq import (
+    UCqExpectedImprovement,
 )
 from xopt.generators.bayesian.objectives import CustomXoptObjective
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
@@ -29,6 +34,10 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     supports_batch_generation: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
+    variance_limits: dict[str, float] = None
+    variance_eta: float | dict[str, float] = None
+    variance_min_mult: float | dict[str, float] = 1e-3
+    variance_normalize: bool | dict[str, bool] = False
 
     __doc__ = (
         "Bayesian optimization generator using Expected improvement\n"
@@ -37,7 +46,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
 
     _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
-    def get_acquisition(self, model):
+    def get_acquisition(self, model: Model) -> AcquisitionFunction:
         """
         Returns a function that can be used to evaluate the acquisition function.
         Overwrites base `get_acquisition` method.
@@ -75,42 +84,64 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         acq = acq.to(**self.tkwargs)
         return acq
 
-    def _get_acquisition(self, model: torch.nn.Module):
-        """
-        Get the acquisition function for Bayesian Optimization.
-
-        Parameters
-        ----------
-        model : Model
-            The model used for Bayesian Optimization.
-
-        Returns
-        -------
-        acq : AcquisitionFunction
-            The acquisition function.
-        """
+    def _get_acquisition(self, model: Model) -> AcquisitionFunction:
+        """Get EI acquisition function"""
         objective = self._get_objective()
         best_f = self._get_best_f(self.data, objective)
 
-        if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
-            # MC sampling for generating multiple candidate points
+        if self.variance_limits is not None:
             sampler = self._get_sampler(model)
-            acq = qLogExpectedImprovement(
+            outputs = self.vocs.output_names
+            indexed_limits = {
+                outputs.index(o): v for o, v in self.variance_limits.items()
+            }
+            indexed_eta = {outputs.index(o): v for o, v in self.variance_eta.items()}
+
+            if isinstance(self.variance_min_mult, dict):
+                indexed_min_mult = {
+                    outputs.index(o): v for o, v in self.variance_min_mult.items()
+                }
+            else:
+                indexed_min_mult = self.variance_min_mult
+
+            if isinstance(self.variance_normalize, dict):
+                indexed_normalize = {
+                    outputs.index(o): v for o, v in self.variance_normalize.items()
+                }
+            else:
+                indexed_normalize = self.variance_normalize
+
+            acq = UCqExpectedImprovement(
                 model,
                 best_f=best_f,
                 sampler=sampler,
                 objective=objective,
                 constraints=self._get_constraint_callables(),
+                variance_limits=indexed_limits,
+                variance_eta=indexed_eta,
+                variance_min_mult=indexed_min_mult,
+                variance_normalize=indexed_normalize,
             )
         else:
-            # analytic acquisition function for single candidate generation with
-            # basic objective
-            # note that the analytic version cannot handle custom objectives
-            weights = set_botorch_weights(self.vocs).to(**self.tkwargs)
-            posterior_transform = ScalarizedPosteriorTransform(weights)
-            acq = LogExpectedImprovement(
-                model, best_f=best_f, posterior_transform=posterior_transform
-            )
+            if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
+                # MC sampling for generating multiple candidate points
+                sampler = self._get_sampler(model)
+                acq = qLogExpectedImprovement(
+                    model,
+                    best_f=best_f,
+                    sampler=sampler,
+                    objective=objective,
+                    constraints=self._get_constraint_callables(),
+                )
+            else:
+                # analytic acquisition function for single candidate generation with
+                # basic objective
+                # note that the analytic version cannot handle custom objectives
+                weights = set_botorch_weights(self.vocs).to(**self.tkwargs)
+                posterior_transform = ScalarizedPosteriorTransform(weights)
+                acq = LogExpectedImprovement(
+                    model, best_f=best_f, posterior_transform=posterior_transform
+                )
 
         return acq
 
