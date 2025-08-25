@@ -16,7 +16,10 @@ from xopt.generators.ga.nsga2 import (
 )
 from xopt.generators.ga.operators import PolynomialMutation, SimulatedBinaryCrossover
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-from xopt.resources.test_functions.modified_tnk import evaluate_modified_TNK, modified_tnk_vocs
+from xopt.resources.test_functions.modified_tnk import (
+    evaluate_modified_TNK,
+    modified_tnk_vocs,
+)
 
 from xopt.vocs import VOCS
 
@@ -33,6 +36,7 @@ def test_nsga2():
     )
     X.run()
 
+
 def test_nsga2_single_objective():
     """
     Test for NSGA2Generator single objective.
@@ -43,7 +47,7 @@ def test_nsga2_single_objective():
         vocs=modified_tnk_vocs,
         max_evaluations=5,
     )
-    
+
     X.run()
 
 

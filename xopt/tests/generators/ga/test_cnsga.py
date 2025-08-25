@@ -6,7 +6,10 @@ from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.cnsga import CNSGAGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-from xopt.resources.test_functions.modified_tnk import evaluate_modified_TNK, modified_tnk_vocs
+from xopt.resources.test_functions.modified_tnk import (
+    evaluate_modified_TNK,
+    modified_tnk_vocs,
+)
 
 
 def test_cnsga():
@@ -17,6 +20,7 @@ def test_cnsga():
         max_evaluations=5,
     )
     X.run()
+
 
 def test_cnsga_single_objective():
     """
