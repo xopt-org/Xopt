@@ -569,14 +569,26 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             if self.output_dir is not None:
                 save_start_t = time.perf_counter()
 
-                # Save all of the data
+                # Save all Xopt data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
                     f.write(self.vocs.to_json())
 
-                # Save this generation to the population file
+                # Construct the DataFrame for this population
                 pop_df = pd.DataFrame(self.pop)
                 pop_df["xopt_generation"] = self.n_generations
+
+                # Normalize the columns in the DataFrame
+                # Avoid schema changing part way through optimization so we can write CSV in append mode
+                columns = self.vocs.all_names + [
+                    "xopt_generation",
+                    "xopt_candidate_idx",
+                    "xopt_runtime",
+                    "xopt_error",
+                ]
+                pop_df = pop_df.reindex(columns=columns)
+
+                # Write population DataFrame to file
                 csv_path = os.path.join(self.output_dir, "populations.csv")
                 pop_df.to_csv(
                     csv_path, index=False, mode="a", header=not os.path.isfile(csv_path)
