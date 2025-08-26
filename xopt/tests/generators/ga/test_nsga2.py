@@ -217,11 +217,11 @@ def nsga2_optimization_with_checkpoint():
         generator = NSGA2Generator(
             vocs=tnk_vocs, output_dir=output_dir, population_size=10, checkpoint_freq=1
         )
-        
+
         # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
         generator.ensure_output_dir_setup()
         generator.close_log_file()
-        
+
         # Run a few optimization steps
         X = Xopt(
             generator=generator,
@@ -612,7 +612,6 @@ def test_crowded_comparison_argsort(pop_f, pop_g, expected_indices_options):
         assert False, message
 
 
-
 def test_nsga2_output_inhomogenous_data():
     """
     Confirm that valid CSV files are written by generator when evaluator function doesn't have
@@ -624,7 +623,7 @@ def test_nsga2_output_inhomogenous_data():
             output_dir=output_dir,
             population_size=10,
         )
-        
+
         # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
         generator.ensure_output_dir_setup()
         generator.close_log_file()
@@ -640,33 +639,43 @@ def test_nsga2_output_inhomogenous_data():
         # Fill up a few populations with data
         for _ in range(3):
             for idx in range(X.generator.population_size):
-                X.add_data(pd.DataFrame({
-                    "x1": np.random.random(),
-                    "x2": np.random.random(),
-                    "y1": np.random.random(),
-                    "y2": np.random.random(),
-                    "c1": np.random.random(),
-                    "c2": np.random.random(),
-                    "xopt_candidate_idx": idx,
-                    "xopt_runtime": 0.1,
-                    "xopt_error": False
-                }, index=[0]))
-        
+                X.add_data(
+                    pd.DataFrame(
+                        {
+                            "x1": np.random.random(),
+                            "x2": np.random.random(),
+                            "y1": np.random.random(),
+                            "y2": np.random.random(),
+                            "c1": np.random.random(),
+                            "c2": np.random.random(),
+                            "xopt_candidate_idx": idx,
+                            "xopt_runtime": 0.1,
+                            "xopt_error": False,
+                        },
+                        index=[0],
+                    )
+                )
+
         # Change the schema
         for _ in range(3):
             for _ in range(X.generator.population_size):
-                X.add_data(pd.DataFrame({
-                    "x1": np.random.random(),
-                    "x2": np.random.random(),
-                    "y1": np.random.random(),
-                    "y2": np.random.random(),
-                    "c1": np.random.random(),
-                    "c2": np.random.random(),
-                    "obs1": np.random.random(),
-                    "xopt_candidate_idx": idx,
-                    "xopt_runtime": 0.1,
-                    "xopt_error": False
-                }, index=[0]))
-            
+                X.add_data(
+                    pd.DataFrame(
+                        {
+                            "x1": np.random.random(),
+                            "x2": np.random.random(),
+                            "y1": np.random.random(),
+                            "y2": np.random.random(),
+                            "c1": np.random.random(),
+                            "c2": np.random.random(),
+                            "obs1": np.random.random(),
+                            "xopt_candidate_idx": idx,
+                            "xopt_runtime": 0.1,
+                            "xopt_error": False,
+                        },
+                        index=[0],
+                    )
+                )
+
         # Load the file (will fail on error)
-        df = pd.read_csv(os.path.join(output_dir, "populations.csv"))
+        pd.read_csv(os.path.join(output_dir, "populations.csv"))
