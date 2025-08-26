@@ -217,7 +217,11 @@ def nsga2_optimization_with_checkpoint():
         generator = NSGA2Generator(
             vocs=tnk_vocs, output_dir=output_dir, population_size=10, checkpoint_freq=1
         )
-
+        
+        # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
+        generator.ensure_output_dir_setup()
+        generator.close_log_file()
+        
         # Run a few optimization steps
         X = Xopt(
             generator=generator,
