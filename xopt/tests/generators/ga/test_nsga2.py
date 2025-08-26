@@ -677,5 +677,5 @@ def test_nsga2_output_inhomogenous_data():
                     )
                 )
 
-        # Load the file (will fail on error)
+        # Load the file (will fail if bad CSV file was written)
         pd.read_csv(os.path.join(output_dir, "populations.csv"))
