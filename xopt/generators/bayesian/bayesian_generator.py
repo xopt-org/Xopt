@@ -24,6 +24,7 @@ from pydantic import (
     SerializeAsAny,
     model_validator,
 )
+from pydantic.fields import PrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
@@ -170,7 +171,16 @@ class BayesianGenerator(Generator, ABC):
 
     n_candidates: int = 1
 
-    _compatible_turbo_controllers: Optional[List[TurboController]] = None
+    _compatible_turbo_controllers: Optional[list[type[TurboController]]] = PrivateAttr(
+        default=None
+    )
+    _compatible_numerical_optimizers: Optional[list[type[NumericalOptimizer]]] = (
+        PrivateAttr(default=None)
+    )
+
+    @classmethod
+    def get_compatible_turbo_controllers(cls) -> Optional[list[type[TurboController]]]:
+        return cls._compatible_turbo_controllers.get_default()
 
     @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
@@ -204,7 +214,10 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("numerical_optimizer", mode="before")
     def validate_numerical_optimizer(cls, value):
-        optimizer_dict = {"grid": GridOptimizer, "LBFGS": LBFGSOptimizer}
+        optimizer_dict: dict[str, type[NumericalOptimizer]] = {
+            "grid": GridOptimizer,
+            "LBFGS": LBFGSOptimizer,
+        }
         if value is None:
             value = LBFGSOptimizer()
         elif isinstance(value, NumericalOptimizer):
@@ -215,7 +228,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name = value.pop("name")
+            name: str = value.pop("name")
             if name in optimizer_dict:
                 value = optimizer_dict[name](**value)
             else:
@@ -223,12 +236,17 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(cls, value, info: ValidationInfo):
+    def validate_turbo_controller(
+        cls, value: Optional[list[type[TurboController]]], info: ValidationInfo
+    ):
         """note default behavior is no use of turbo"""
         if value is None:
             return value
 
-        if cls._compatible_turbo_controllers.default is None:
+        if (
+            cls._compatible_turbo_controllers is None
+            or len(cls._compatible_turbo_controllers) == 0
+        ):
             raise ValueError("cannot use any turbo controller with this generator")
         else:
             return validate_turbo_controller_base(

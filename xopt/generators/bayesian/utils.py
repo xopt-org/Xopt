@@ -11,6 +11,7 @@ from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
+from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -189,7 +190,9 @@ def interpolate_points(df, num_points=10):
     return interpolated_points
 
 
-def validate_turbo_controller_base(value, valid_controller_types, info):
+def validate_turbo_controller_base(
+    value: list[type[TurboController]], valid_controller_types, info
+):
     """Validate turbo controller input"""
 
     # get string names of available controller types
