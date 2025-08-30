@@ -4,7 +4,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -236,21 +236,24 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(
-        cls, value: Optional[list[type[TurboController]]], info: ValidationInfo
-    ):
+    def validate_turbo_controller(cls, value: Any, info: ValidationInfo):
         """note default behavior is no use of turbo"""
         if value is None:
             return value
 
-        if (
-            cls._compatible_turbo_controllers is None
-            or len(cls._compatible_turbo_controllers) == 0
-        ):
+        if cls._compatible_turbo_controllers is None:
+            raise ValueError("cannot use any turbo controller with this generator")
+
+        compatible_turbo_controllers = cast(
+            list[type[TurboController]],
+            cls._compatible_turbo_controllers.get_default(),  # type: ignore
+        )
+
+        if len(compatible_turbo_controllers) == 0:
             raise ValueError("cannot use any turbo controller with this generator")
         else:
             return validate_turbo_controller_base(
-                value, cls._compatible_turbo_controllers.default, info
+                value, compatible_turbo_controllers, info
             )
 
     @field_validator("computation_time", mode="before")

@@ -1,10 +1,11 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import List
+from typing import Any, List
 
 import gpytorch
 import numpy as np
 import pandas as pd
+from pydantic import ValidationInfo
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
@@ -191,7 +192,9 @@ def interpolate_points(df, num_points=10):
 
 
 def validate_turbo_controller_base(
-    value: list[type[TurboController]], valid_controller_types, info
+    value: Any,
+    valid_controller_types: list[type[TurboController]],
+    info: ValidationInfo,
 ):
     """Validate turbo controller input"""
 
@@ -232,17 +235,13 @@ def validate_turbo_controller_base(
             )
 
     # check if turbo controller is compatabile with the generator
-    valid_type = False
     for controller_type in valid_controller_types:
         if isinstance(value, controller_type):
-            valid_type = True
-
-    if not valid_type:
+            return value
+    else:
         raise ValueError(
             f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
         )
-
-    return value
 
 
 class MeanVarModelWrapper(torch.nn.Module):
