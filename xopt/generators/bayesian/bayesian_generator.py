@@ -175,12 +175,18 @@ class BayesianGenerator(Generator, ABC):
         default=None
     )
     _compatible_numerical_optimizers: Optional[list[type[NumericalOptimizer]]] = (
-        PrivateAttr(default=None)
+        PrivateAttr(default=[LBFGSOptimizer, GridOptimizer])
     )
 
     @classmethod
     def get_compatible_turbo_controllers(cls) -> Optional[list[type[TurboController]]]:
         return cls._compatible_turbo_controllers.get_default()
+
+    @classmethod
+    def get_compatible_numerical_optimizers(
+        cls,
+    ) -> Optional[list[type[NumericalOptimizer]]]:
+        return cls._compatible_numerical_optimizers.get_default()
 
     @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
