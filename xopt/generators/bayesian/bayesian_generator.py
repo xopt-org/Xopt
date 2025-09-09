@@ -24,7 +24,7 @@ from pydantic import (
     SerializeAsAny,
     model_validator,
 )
-from pydantic.fields import PrivateAttr
+from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
@@ -174,19 +174,24 @@ class BayesianGenerator(Generator, ABC):
     _compatible_turbo_controllers: Optional[list[type[TurboController]]] = PrivateAttr(
         default=None
     )
-    _compatible_numerical_optimizers: Optional[list[type[NumericalOptimizer]]] = (
-        PrivateAttr(default=[LBFGSOptimizer, GridOptimizer])
+    _compatible_numerical_optimizers: list[type[NumericalOptimizer]] = PrivateAttr(
+        default=[LBFGSOptimizer, GridOptimizer]
     )
 
     @classmethod
-    def get_compatible_turbo_controllers(cls) -> Optional[list[type[TurboController]]]:
-        return cls._compatible_turbo_controllers.get_default()
+    def get_compatible_turbo_controllers(cls) -> list[type[TurboController]]:
+        compatible = cls._compatible_turbo_controllers
+        if compatible is None:
+            return []
+        compatible = cast(ModelPrivateAttr, compatible)
+        return compatible.get_default()
 
     @classmethod
     def get_compatible_numerical_optimizers(
         cls,
-    ) -> Optional[list[type[NumericalOptimizer]]]:
-        return cls._compatible_numerical_optimizers.get_default()
+    ) -> list[type[NumericalOptimizer]]:
+        compatible = cast(ModelPrivateAttr, cls._compatible_numerical_optimizers)
+        return compatible.get_default()
 
     @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
