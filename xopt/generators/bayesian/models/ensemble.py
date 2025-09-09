@@ -166,6 +166,7 @@ class MCDropoutModel(Model):
             y_s = y
         
         optimizer = optim_type(self.model.parameters(), lr=lr)
+
         
         for epoch in range(n_epochs):
             pred = self.model(X_s)
@@ -226,8 +227,12 @@ class MCDropoutModel(Model):
 
     def posterior(self, X: Tensor, **kwargs):
         samples = self.forward(X)
+        if hasattr(self, "outcome_transform"):
+            samples = self.outcome_transform.untransform(samples)[0]
+            
+        posterior = FlattenedEnsemblePosterior(samples)
 
-        return FlattenedEnsemblePosterior(samples)
+        return posterior
     
     def set_train_data(self, X = None, y = None, strict=False):
         if X is None or y is None:
