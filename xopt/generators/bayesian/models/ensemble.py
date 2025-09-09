@@ -137,7 +137,7 @@ class MCDropoutModel(Model):
     def __init__(self, input_dim: int, output_dim: int, dropout_rate: float = 0.1, 
                  num_samples: int = 30, n_hidden_layers=3, hidden_dim=100, 
                  hidden_activation=nn.ReLU(), output_activation=None, observables=['y1'],
-                input_bounds=torch.tensor([[-np.pi], [np.pi]])):
+                 input_bounds=torch.tensor([[-np.pi], [np.pi]]), n_epochs=500, n_cond_epochs=40):
         
         super(MCDropoutModel, self).__init__()
         self.model = MCDropoutMLP(input_dim, output_dim, 
@@ -148,14 +148,19 @@ class MCDropoutModel(Model):
                                     output_activation=output_activation)
         
         self.num_samples = num_samples
+        self.n_epochs = n_epochs
+        self.n_cond_epochs = n_cond_epochs
         
         self.outcome_transform = Standardize(output_dim)
         self.input_transform = Normalize(input_dim, bounds = input_bounds)
         self.output_indices = None
 
     def fit(self, X: Tensor, y: Tensor, loss_fn=torch.nn.MSELoss(),
-            n_epochs = 500, optim_type = torch.optim.Adam, lr = 1e-3, is_fantasy=False) -> None:
+            n_epochs=None, optim_type = torch.optim.Adam, lr = 1e-3, is_fantasy=False) -> None:
         
+        if n_epochs is None:
+            n_epochs = self.n_epochs
+            
         self.model.train()
         # Seems like this is normalized already in InfoBAX calc?
         if not is_fantasy:
@@ -181,14 +186,14 @@ class MCDropoutModel(Model):
             self.train_targets = y
             
   
-    def condition_on_observations(self, X, y, n_cond_epochs=40):
+    def condition_on_observations(self, X, y):
         fantasies = []
         for i_batch in range(X.shape[0]):
             new_model = deepcopy(self)
             train_X = torch.cat([new_model.train_inputs[0], X[i_batch]], dim=0)
             train_y = torch.cat([new_model.train_targets, y[i_batch]], dim=0)
             
-            new_model.fit(train_X, train_y, n_epochs=n_cond_epochs, is_fantasy=True)
+            new_model.fit(train_X, train_y, n_epochs=self.n_cond_epochs, is_fantasy=True)
             
             fantasies.append(new_model)
             
