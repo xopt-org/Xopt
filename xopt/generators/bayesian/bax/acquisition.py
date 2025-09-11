@@ -125,5 +125,8 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         # eq (4) of https://arxiv.org/pdf/2104.09460.pdf
         # (avg_h_fantasy is a Monte-Carlo estimate of the second term on the right)
         eig = h_current_scalar - avg_h_fantasy
+        
+        # mean over properties
+        eig = eig.mean(dim=-1, keepdim=True)
 
         return eig.reshape(X.shape[:-2])

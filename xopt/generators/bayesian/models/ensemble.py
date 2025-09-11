@@ -37,7 +37,7 @@ class EnsembleModelConstructor(ModelConstructor):
     ):
         # get training data -- need to update utils for multivariate case
         train_X, train_Y, train_Yvar = get_training_data(
-            input_names, outcome_names[0], data
+            input_names, outcome_names, data
         )
         self.model = self.model.to(dtype)
         
@@ -213,9 +213,8 @@ class MCDropoutModel(Model):
         preds = []
         for i in range(self.num_samples):
             out = self.model(x, seed=i)
-            # Some of this shape logic to be checked -- probably need to modify for n-d
-            if out.ndim == 2:
-                out = out.unsqueeze(-1)
+            if out.ndim == 2: # add q dimension
+                out = out.unsqueeze(-2)
             elif out.ndim == 1:
                 out = out.unsqueeze(-1).unsqueeze(-1)
                 
