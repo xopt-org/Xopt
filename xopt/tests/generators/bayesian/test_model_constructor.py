@@ -445,10 +445,10 @@ class TestModelConstructor:
 
         gp_constructor = StandardModelConstructor()
         constructed_model = gp_constructor.build_model_from_vocs(
-                test_vocs, test_data
+            test_vocs, test_data
         ).models[0]
         init_mll = ExactMarginalLogLikelihood(
-                benchmark_model.likelihood, benchmark_model
+            benchmark_model.likelihood, benchmark_model
         )
         fit_gpytorch_mll(init_mll)
 
@@ -457,7 +457,6 @@ class TestModelConstructor:
             test_covar2 = deepcopy(test_covar)
 
             # train model with StandardModelConstructor
-
 
     def test_unused_modules_warning(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)

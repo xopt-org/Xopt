@@ -1,13 +1,13 @@
 import os.path
 import warnings
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import botorch.settings
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_mll
-from botorch.models import ModelListGP
+from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
@@ -64,42 +64,45 @@ class StandardModelConstructor(ModelConstructor):
 
     name: str = Field("standard", frozen=True)
     use_low_noise_prior: bool = Field(
-            False, description="specify if model should assume a low noise environment"
+        False, description="specify if model should assume a low noise environment"
     )
     covar_modules: Dict[str, Kernel] = Field(
-            {}, description="covariance modules for GP models"
+        {}, description="covariance modules for GP models"
     )
     mean_modules: Dict[str, Module] = Field(
-            {}, description="prior mean modules for GP models"
+        {}, description="prior mean modules for GP models"
     )
     trainable_mean_keys: List[str] = Field(
-            [], description="list of prior mean modules that can be trained"
+        [], description="list of prior mean modules that can be trained"
     )
     transform_inputs: Union[Dict[str, bool], bool] = Field(
-            True,
-            description="specify if inputs should be transformed inside the gp "
-                        "model, can optionally specify a dict of specifications",
+        True,
+        description="specify if inputs should be transformed inside the gp "
+        "model, can optionally specify a dict of specifications",
     )
     custom_noise_prior: Optional[Prior] = Field(
-            None,
-            description="specify custom noise prior for the GP likelihood, "
-                        "overwrites value specified by use_low_noise_prior",
+        None,
+        description="specify custom noise prior for the GP likelihood, "
+        "overwrites value specified by use_low_noise_prior",
     )
     use_cached_hyperparameters: Optional[bool] = Field(
-            False,
-            description="flag to specify if cached hyperparameters should be used in "
-                        "model creation instead of training",
+        False,
+        description="flag to specify if cached hyperparameters should be used in "
+        "model creation instead of training",
     )
     _hyperparameter_store: Optional[Dict] = None
+    method: Literal["lbfgs", "adam"] = Field(
+        "lbfgs", description="training method to use"
+    )
     train_model: bool = Field(
-            True,
-            description="specify if the model should be trained",
+        True,
+        description="specify if the model should be trained",
     )
     train_kwargs: Dict[str, Any] | None = Field(
-            default_factory=lambda: {
-                "maxiter": 1000,
-            },
-            description="kwargs for training the model - passed to botorch.fit_gpytorch_mll_scipy",
+        default_factory=lambda: {
+            "maxiter": 1000,
+        },
+        description="kwargs for training the model - passed to botorch.fit_gpytorch_mll_scipy",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
@@ -108,9 +111,14 @@ class StandardModelConstructor(ModelConstructor):
     def validate_train_kwargs(cls, train_kwargs):
         if train_kwargs is None:
             return train_kwargs
-        allowed_keys = ['optimizer_kwargs', 'pick_best_of_all_attempts', 'max_attempts',
-                        'optimizer', 'warning_handler']
-        allowed_subkeys = {'optimizer_kwargs': ['timeout_sec', 'options']}
+        allowed_keys = [
+            "optimizer_kwargs",
+            "pick_best_of_all_attempts",
+            "max_attempts",
+            "optimizer",
+            "warning_handler",
+        ]
+        allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "options"]}
         if not isinstance(train_kwargs, dict):
             raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
         if set(train_kwargs.keys()) - set(allowed_keys):
@@ -119,7 +127,9 @@ class StandardModelConstructor(ModelConstructor):
             if isinstance(v, dict):
                 allowed = allowed_subkeys.get(k, [])
                 if set(v.keys()) - set(allowed):
-                    raise ValueError(f"train_kwargs['{k}'] can only contain the keys {allowed}")
+                    raise ValueError(
+                        f"train_kwargs['{k}'] can only contain the keys {allowed}"
+                    )
         return train_kwargs
 
     @field_validator("covar_modules", "mean_modules", mode="before")
@@ -143,9 +153,9 @@ class StandardModelConstructor(ModelConstructor):
         return v
 
     def get_likelihood(
-            self,
-            dtype: torch.dtype = torch.double,
-            device: Union[torch.device, str] = "cpu",
+        self,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ) -> Likelihood:
         """
         Get the likelihood for the model, considering the low noise prior and or a
@@ -160,34 +170,34 @@ class StandardModelConstructor(ModelConstructor):
         tkwargs = {"dtype": dtype, "device": device}
         if self.custom_noise_prior is not None:
             likelihood = GaussianLikelihood(
-                    noise_prior=self.custom_noise_prior,
+                noise_prior=self.custom_noise_prior,
             )
         elif self.use_low_noise_prior:
             likelihood = GaussianLikelihood(
-                    noise_prior=GammaPrior(1.0, 100.0),
+                noise_prior=GammaPrior(1.0, 100.0),
             )
         else:
             noise_prior = GammaPrior(1.1, 0.05)
             noise_prior_mode = (noise_prior.concentration - 1) / noise_prior.rate
             likelihood = GaussianLikelihood(
-                    noise_prior=noise_prior,
-                    noise_constraint=GreaterThan(
-                            MIN_INFERRED_NOISE_LEVEL,
-                            transform=None,
-                            initial_value=noise_prior_mode,
-                    ),
+                noise_prior=noise_prior,
+                noise_constraint=GreaterThan(
+                    MIN_INFERRED_NOISE_LEVEL,
+                    transform=None,
+                    initial_value=noise_prior_mode,
+                ),
             )
         likelihood = likelihood.to(**tkwargs)
         return likelihood
 
     def build_model(
-            self,
-            input_names: List[str],
-            outcome_names: List[str],
-            data: pd.DataFrame,
-            input_bounds: Dict[str, List] = None,
-            dtype: torch.dtype = torch.double,
-            device: Union[torch.device, str] = "cpu",
+        self,
+        input_names: List[str],
+        outcome_names: List[str],
+        data: pd.DataFrame,
+        input_bounds: Dict[str, List] = None,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
         """
         Construct independent models for each objective and constraint.
@@ -221,25 +231,25 @@ class StandardModelConstructor(ModelConstructor):
         if self.use_cached_hyperparameters:
             if self._hyperparameter_store is None:
                 raise RuntimeWarning(
-                        "cannot use cached hyperparameters, hyperparameter store empty, "
-                        "training GP model hyperparameters instead"
+                    "cannot use cached hyperparameters, hyperparameter store empty, "
+                    "training GP model hyperparameters instead"
                 )
 
         covar_modules = deepcopy(self.covar_modules)
         mean_modules = deepcopy(self.mean_modules)
         for outcome_name in outcome_names:
             input_transform = self._get_input_transform(
-                    outcome_name, input_names, input_bounds, tkwargs
+                outcome_name, input_names, input_bounds, tkwargs
             )
             outcome_transform = Standardize(1)
             covar_module = self._get_module(covar_modules, outcome_name)
             mean_module = self.build_mean_module(
-                    outcome_name, mean_modules, input_transform, outcome_transform
+                outcome_name, mean_modules, input_transform, outcome_transform
             )
 
             # get training data
             train_X, train_Y, train_Yvar = get_training_data(
-                    input_names, outcome_name, data
+                input_names, outcome_name, data
             )
             # collect arguments into a single dict
             kwargs = {
@@ -252,36 +262,36 @@ class StandardModelConstructor(ModelConstructor):
             if train_Yvar is None:
                 # train basic single-task-gp model
                 models.append(
-                        self.build_single_task_gp(
-                                train_X.to(**tkwargs),
-                                train_Y.to(**tkwargs),
-                                likelihood=self.get_likelihood(**tkwargs),
-                                train=False,
-                                **kwargs,
-                        )
+                    self.build_single_task_gp(
+                        train_X.to(**tkwargs),
+                        train_Y.to(**tkwargs),
+                        likelihood=self.get_likelihood(**tkwargs),
+                        train=False,
+                        **kwargs,
+                    )
                 )
             else:
                 # train heteroskedastic single-task-gp model
                 # turn off warnings
                 models.append(
-                        self.build_heteroskedastic_gp(
-                                train_X.to(**tkwargs),
-                                train_Y.to(**tkwargs),
-                                train_Yvar.to(**tkwargs),
-                                train=False,
-                                **kwargs,
-                        )
+                    self.build_heteroskedastic_gp(
+                        train_X.to(**tkwargs),
+                        train_Y.to(**tkwargs),
+                        train_Yvar.to(**tkwargs),
+                        train=False,
+                        **kwargs,
+                    )
                 )
         # check all specified modules were added to the model
         if covar_modules:
             warnings.warn(
-                    f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
-                    f"could not be added to the model."
+                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"could not be added to the model."
             )
         if mean_modules:
             warnings.warn(
-                    f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
-                    f"could not be added to the model."
+                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"could not be added to the model."
             )
 
         full_model = ModelListGP(*models)
@@ -306,7 +316,7 @@ class StandardModelConstructor(ModelConstructor):
         return full_model.to(**tkwargs)
 
     def build_mean_module(
-            self, name, mean_modules, input_transform, outcome_transform
+        self, name, mean_modules, input_transform, outcome_transform
     ) -> Optional[CustomMean]:
         """
         Build the mean module for the output specified by name.
@@ -332,7 +342,7 @@ class StandardModelConstructor(ModelConstructor):
         if mean_module is not None:
             fixed_model = False if name in self.trainable_mean_keys else True
             mean_module = CustomMean(
-                    mean_module, input_transform, outcome_transform, fixed_model=fixed_model
+                mean_module, input_transform, outcome_transform, fixed_model=fixed_model
             )
         return mean_module
 
@@ -368,7 +378,7 @@ class StandardModelConstructor(ModelConstructor):
             bounds = None
         else:
             bounds = torch.vstack(
-                    [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
+                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
             ).T
 
         # create transform
@@ -379,8 +389,8 @@ class StandardModelConstructor(ModelConstructor):
             if not self.transform_inputs:
                 input_transform = None
         if (
-                isinstance(self.transform_inputs, dict)
-                and outcome_name in self.transform_inputs
+            isinstance(self.transform_inputs, dict)
+            and outcome_name in self.transform_inputs
         ):
             if not self.transform_inputs[outcome_name]:
                 input_transform = None
@@ -390,3 +400,164 @@ class StandardModelConstructor(ModelConstructor):
             botorch.settings.validate_input_scaling(False)
 
         return input_transform
+
+
+class BatchedModelConstructor(StandardModelConstructor):
+    def _get_input_transform(self, outcome_names, input_names, input_bounds, tkwargs):
+        # get input bounds
+        if input_bounds is None:
+            bounds = None
+        else:
+            bounds = torch.vstack(
+                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
+            ).T
+
+        # create transform
+        input_transform = Normalize(
+            len(input_names),
+            bounds=bounds,
+            batch_shape=torch.Size([len(outcome_names)]),
+        )
+
+        # remove input transform if the bool is False or the dict entry is false
+        if isinstance(self.transform_inputs, bool):
+            if not self.transform_inputs:
+                input_transform = None
+
+        if isinstance(self.transform_inputs, dict):
+            raise AttributeError(
+                f"Cannot specify dict for transform_inputs when using BatchedModelConstructor"
+            )
+
+        # remove warnings if input transform is None
+        if input_transform is None:
+            botorch.settings.validate_input_scaling(False)
+
+        return input_transform
+
+    def get_training_data_batched(
+        self, input_names: List[str], outcome_names: str, data: pd.DataFrame
+    ) -> (torch.Tensor, torch.Tensor):
+        """
+        Creates training data from input data frame.
+
+        Parameters
+        ----------
+        input_names : List[str]
+            List of input feature names.
+
+        outcome_name : str
+            Name of the outcome variable.
+
+        data : pd.DataFrame
+            DataFrame containing input and outcome data.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            Tuple containing training input tensor (train_X), training outcome tensor (
+            train_Y), and training outcome variance tensor (train_Yvar).
+
+
+        """
+        input_data = data[input_names]
+        outcome_data = data[outcome_names]
+
+        non_nans = ~input_data.isnull().T.any()
+        non_nans_output = ~outcome_data.isnull().T.any()
+        non_nans_all = non_nans & non_nans_output
+        input_data = input_data[non_nans_all]
+        outcome_data = outcome_data[non_nans_all]
+
+        train_X = torch.tensor(input_data.to_numpy(dtype="double")).unsqueeze(0)
+        train_Y = (
+            torch.tensor(outcome_data.to_numpy(dtype="double"))
+            .unsqueeze(-1)
+            .unsqueeze(0)
+        )
+
+        return train_X, train_Y, None
+
+    def build_model(
+        self,
+        input_names: List[str],
+        outcome_names: List[str],
+        data: pd.DataFrame,
+        input_bounds: Dict[str, List] = None,
+        dtype: torch.dtype = torch.double,
+        device: Union[torch.device, str] = "cpu",
+    ) -> ModelListGP:
+        """
+        Construct a single batched model for objectives and constraints.
+        """
+        tkwargs = {"dtype": dtype, "device": device}
+        models = []
+
+        if self.use_cached_hyperparameters:
+            if self._hyperparameter_store is None:
+                raise RuntimeWarning(
+                    "cannot use cached hyperparameters, hyperparameter store empty, "
+                    "training GP model hyperparameters instead"
+                )
+
+        train_X, train_Y, train_Yvar = get_training_data(
+            input_names, outcome_names, data
+        )
+
+        covar_modules = deepcopy(self.covar_modules)
+        mean_modules = deepcopy(self.mean_modules)
+
+        likelihood = (self.get_likelihood(**tkwargs),)
+        input_transform = self._get_input_transform(
+            outcome_names, input_names, input_bounds, tkwargs
+        )
+        outcome_transform = Standardize(
+            m=train_Y.shape[-1], batch_shape=torch.Size([len(outcome_names)])
+        )
+        covar_module = self._get_module(covar_modules, outcome_name)
+        mean_module = self.build_mean_module(
+            outcome_name, mean_modules, input_transform, outcome_transform
+        )
+        kwargs = {
+            "input_transform": input_transform,
+            "outcome_transform": outcome_transform,
+            "covar_module": covar_module,
+            "mean_module": mean_module,
+        }
+
+        if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
+            raise ValueError("no data found to train model!")
+        model = SingleTaskGP(train_X, train_Y, likelihood=likelihood, **kwargs)
+
+        # check all specified modules were added to the model
+        if covar_modules:
+            warnings.warn(
+                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"could not be added to the model."
+            )
+        if mean_modules:
+            warnings.warn(
+                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"could not be added to the model."
+            )
+
+        full_model = ModelListGP(*models)
+
+        # if specified, use cached model hyperparameters
+        if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
+            store = {
+                name: ele.to(**tkwargs)
+                for name, ele in self._hyperparameter_store.items()
+            }
+            full_model.load_state_dict(store)
+
+        if self.train_model:
+            for m in full_model.models:
+                mll = ExactMarginalLogLikelihood(m.likelihood, m)
+                tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
+                fit_gpytorch_mll(mll, **tr_kwargs)
+
+        # cache model hyperparameters
+        self._hyperparameter_store = full_model.state_dict()
+
+        return full_model.to(**tkwargs)
