@@ -4,7 +4,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ from pydantic import (
     SerializeAsAny,
     model_validator,
 )
+from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
@@ -170,7 +171,27 @@ class BayesianGenerator(Generator, ABC):
 
     n_candidates: int = 1
 
-    _compatible_turbo_controllers: Optional[List[TurboController]] = None
+    _compatible_turbo_controllers: Optional[list[type[TurboController]]] = PrivateAttr(
+        default=None
+    )
+    _compatible_numerical_optimizers: list[type[NumericalOptimizer]] = PrivateAttr(
+        default=[LBFGSOptimizer, GridOptimizer]
+    )
+
+    @classmethod
+    def get_compatible_turbo_controllers(cls) -> list[type[TurboController]]:
+        compatible = cls._compatible_turbo_controllers
+        if compatible is None:
+            return []
+        compatible = cast(ModelPrivateAttr, compatible)
+        return compatible.get_default()
+
+    @classmethod
+    def get_compatible_numerical_optimizers(
+        cls,
+    ) -> list[type[NumericalOptimizer]]:
+        compatible = cast(ModelPrivateAttr, cls._compatible_numerical_optimizers)
+        return compatible.get_default()
 
     @field_validator("model", mode="before")
     def validate_torch_modules(cls, v):
@@ -204,7 +225,10 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("numerical_optimizer", mode="before")
     def validate_numerical_optimizer(cls, value):
-        optimizer_dict = {"grid": GridOptimizer, "LBFGS": LBFGSOptimizer}
+        optimizer_dict: dict[str, type[NumericalOptimizer]] = {
+            "grid": GridOptimizer,
+            "LBFGS": LBFGSOptimizer,
+        }
         if value is None:
             value = LBFGSOptimizer()
         elif isinstance(value, NumericalOptimizer):
@@ -215,7 +239,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name = value.pop("name")
+            name: str = value.pop("name")
             if name in optimizer_dict:
                 value = optimizer_dict[name](**value)
             else:
@@ -223,16 +247,21 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("turbo_controller", mode="before")
-    def validate_turbo_controller(cls, value, info: ValidationInfo):
+    def validate_turbo_controller(cls, value: Any, info: ValidationInfo):
         """note default behavior is no use of turbo"""
         if value is None:
             return value
 
-        if cls._compatible_turbo_controllers.default is None:
-            raise ValueError("cannot use any turbo controller with this generator")
+        if cls._compatible_turbo_controllers is None:
+            raise ValueError("no turbo controllers are compatible with this generator")
+
+        compatible_turbo_controllers = cls.get_compatible_turbo_controllers()
+
+        if len(compatible_turbo_controllers) == 0:
+            raise ValueError("no turbo controllers are compatible with this generator")
         else:
             return validate_turbo_controller_base(
-                value, cls._compatible_turbo_controllers.default, info
+                value, compatible_turbo_controllers, info
             )
 
     @field_validator("computation_time", mode="before")
