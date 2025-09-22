@@ -21,7 +21,10 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
-from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.models.standard import (
+    BatchedModelConstructor,
+    StandardModelConstructor,
+)
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import VOCS
 
@@ -335,6 +338,30 @@ class TestModelConstructor:
             # assert torch.allclose(
             #    constructed_prediction, benchmark_prediction, rtol=1e-3
             # )
+
+    def test_train_model_batch(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = deepcopy(TEST_VOCS_DATA)
+
+        gp_constructor = BatchedModelConstructor()
+
+        train_X, train_Y, train_Yvar = gp_constructor.get_training_data_batched(
+            input_names=test_vocs.variable_names,
+            outcome_names=test_vocs.output_names,
+            data=test_data,
+        )
+        assert train_X.shape == torch.Size([2, 10, 2])
+        assert train_X[0, 0, 0] == train_X[1, 0, 0] == test_data.loc[0, "x1"]
+        assert train_Y.shape == torch.Size([2, 10, 1])
+        assert train_Y[0, 0, 0] == test_data.loc[0, "y1"]
+        assert train_Y[1, 0, 0] == test_data.loc[0, "c1"]
+
+        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+
+        assert isinstance(model, SingleTaskGP)
+        assert model._aug_batch_shape == torch.Size([2])
+        assert model.covar_module.raw_lengthscale.shape == torch.Size([2, 1, 2])
+        print(model.state_dict())
 
     def test_train_from_scratch(self):
         # test to verify that GP modules are trained from scratch everytime
