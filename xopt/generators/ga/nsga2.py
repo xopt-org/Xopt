@@ -550,14 +550,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 "New data must contain at least all variables, objectives, and constraints as columns"
             )
 
-        # Force all names in VOCS to be present, creating those which are not required by generator
-        new_data = new_data.assign(
-            **{
-                col: None
-                for col in set(self.vocs.all_names).difference(new_data.columns)
-            }
-        )
-
         # Pass to parent class for inclusion in self.data
         super().add_data(new_data)
 
