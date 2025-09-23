@@ -551,7 +551,12 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             )
 
         # Force all names in VOCS to be present, creating those which are not required by generator
-        new_data = new_data.reindex(columns=self.vocs.all_names)
+        new_data = new_data.assign(
+            **{
+                col: None
+                for col in set(self.vocs.all_names).difference(new_data.columns)
+            }
+        )
 
         # Pass to parent class for inclusion in self.data
         super().add_data(new_data)
