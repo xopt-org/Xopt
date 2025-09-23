@@ -441,11 +441,11 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                     # Check that the VOCS object is compatible with our checkpoint
                     # For selection and the genetic operators to work correctly, all incoming variables,
                     # objectives, and constraints must exist as keys in pop/child
-                    all_individuals = chain(
-                        checkpoint_data["pop"], checkpoint_data["child"]
-                    )
                     if checkpoint_data["pop"] or checkpoint_data["child"]:
                         # The keys present in all individuals
+                        all_individuals = chain(
+                            checkpoint_data["pop"], checkpoint_data["child"]
+                        )
                         all_keys = set.intersection(
                             *(set(x.keys()) for x in all_individuals)
                         )
