@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import time
 
+from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
 from ..deduplicated import DeduplicatedGeneratorBase
@@ -547,7 +548,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         )
         if not set(vocs_names).issubset(set(new_data.columns)):
             missing_cols = set(vocs_names).difference(set(new_data.columns))
-            raise ValueError(
+            raise DataError(
                 "New data must contain at least all variables, objectives, and constraints as columns"
                 f" (missing columns: {missing_cols})"
             )

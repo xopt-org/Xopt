@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from xopt.base import Xopt
+from xopt.errors import DataError
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.nsga2 import (
     NSGA2Generator,
@@ -915,19 +916,23 @@ def test_nsga2_vocs_not_present_in_add_data():
     )
 
     # Missing var
-    with pytest.raises(ValueError, match="New data must contain at least all.*"):
+    with pytest.raises(DataError, match="New data must contain at least all.*"):
         X.add_data(
             pd.DataFrame({"x1": [0], "y1": [0], "y2": [0], "c1": [0], "c2": [0]})
         )
 
     # Missing obj
-    with pytest.raises(ValueError, match="New data must contain at least all.*"):
+    with pytest.raises(DataError, match="New data must contain at least all.*"):
         X.add_data(
             pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "c1": [0], "c2": [0]})
         )
 
     # Missing constraint
-    with pytest.raises(ValueError, match="New data must contain at least all.*"):
+    with pytest.raises(DataError, match="New data must contain at least all.*"):
         X.add_data(
             pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "y2": [0], "c1": [0]})
         )
+
+    # Try with strict=False
+    X.strict = False
+    X.add_data(pd.DataFrame({"x1": [0], "y2": [0], "c1": [0]}))
