@@ -1,28 +1,8 @@
 from .base import Xopt
+from .evaluator import DummyExecutor
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import contextmanager
 import argparse
-
-
-class MapExecutor:
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, *args):
-        pass
-    
-    def map(self, func, iterable):
-        return map(func, iterable)
-    
-    def submit(self, func, *args):
-        from concurrent.futures import Future
-        future = Future()
-        try:
-            result = func(*args)
-            future.set_result(result)
-        except Exception as e:
-            future.set_exception(e)
-        return future
 
 
 @contextmanager
@@ -42,9 +22,11 @@ def get_executor(name, max_workers=1):
     Executor
         The executor selected by name
     """
-    if name == "map":
+    if name is None:
+        yield None
+    elif name == "map":
         # Built-in map doesn't need a context manager, but we'll create a dummy one
-        yield MapExecutor()
+        yield DummyExecutor()
     elif name == "ThreadPoolExecutor":
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             yield executor
@@ -63,13 +45,16 @@ def main():
     )
     parser.add_argument(
         "--executor", 
-        help="The executor to use", 
+        help="Override the executor", 
         type=str, 
         choices=["map", "ThreadPoolExecutor", "ProcessPoolExecutor"],
-        default="ThreadPoolExecutor",
+        default=None,
     )
     parser.add_argument(
-        "--n_cpu", help="Number of threads to launch.", type=int, default=1
+        "--max_workers",
+        help="Override number of workers (processes/threads/vectorized tasks)",
+        type=int,
+        default=None
     )
     args = parser.parse_args()
 
@@ -78,9 +63,11 @@ def main():
         my_xopt = Xopt.from_yaml(f.read())
 
     # Run it
-    with get_executor(args.executor, max_workers=args.n_cpu) as executor:
-        my_xopt.evaluator.executor = executor
-        my_xopt.evaluator.max_workers = args.n_cpu
+    with get_executor(args.executor, max_workers=args.max_workers) as executor:
+        if args.executor is not None:
+            my_xopt.evaluator.executor = executor
+        if args.max_workers is not None:
+            my_xopt.evaluator.max_workers = args.n_cpu
         my_xopt.run()
 
 
