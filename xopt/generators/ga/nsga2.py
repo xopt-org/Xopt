@@ -427,51 +427,35 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # Load checkpoint data
                 checkpoint_data = cls._load_checkpoint_data(checkpoint_file)
 
-                # VOCS validation - inline check
-                if "vocs" in values:
-                    # Convert any user supplied vocs to VOCS object
-                    if isinstance(values["vocs"], dict):
-                        vocs = VOCS.from_dict(values.pop("vocs"))
-                    elif isinstance(values["vocs"], VOCS):
-                        vocs = values.pop("vocs")
-                    else:
-                        raise ValueError(
-                            f"vocs must be of type dict or VOCS, got {type(values['vocs'])}"
-                        )
-
-                    # Check that the VOCS object is compatible with our checkpoint
-                    # For selection and the genetic operators to work correctly, all incoming variables,
-                    # objectives, and constraints must exist as keys in pop/child
-                    if checkpoint_data["pop"] or checkpoint_data["child"]:
-                        # The keys present in all individuals
-                        all_individuals = chain(
-                            checkpoint_data["pop"], checkpoint_data["child"]
-                        )
-                        all_keys = set.intersection(
-                            *(set(x.keys()) for x in all_individuals)
-                        )
-
-                        # Check that all required VOCS keys exist in the checkpoint populations
-                        if not all_keys.issuperset(
-                            vocs.variable_names
-                            + vocs.objective_names
-                            + vocs.constraint_names
-                        ):
-                            raise ValueError(
-                                "User-provided VOCS is not compatible with existing population "
-                                "or child data from checkpoint."
-                            )
-
-                    # Use the user-provided VOCS to allow overrides of settings
-                    checkpoint_data.pop("vocs")
-                    values["vocs"] = vocs
-
                 # Merge with user data precedence
                 merged_data = {**checkpoint_data, **values}
                 return merged_data
 
         # No checkpoint
         return values
+
+    @model_validator(mode="after")
+    def vocs_compatible(self):
+        # Check that the VOCS object is compatible with our checkpoint
+        # For selection and the genetic operators to work correctly, all incoming variables,
+        # objectives, and constraints must exist as keys in pop/child
+        if self.pop or self.child:
+            # The keys present in all individuals
+            all_individuals = chain(self.pop, self.child)
+            all_keys = set.intersection(*(set(x.keys()) for x in all_individuals))
+
+            # Check that all required VOCS keys exist in the checkpoint populations
+            if not all_keys.issuperset(
+                self.vocs.variable_names
+                + self.vocs.objective_names
+                + self.vocs.constraint_names
+            ):
+                raise ValueError(
+                    "User-provided VOCS is not compatible with existing population "
+                    "or child data from checkpoint."
+                )
+
+        return self
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
