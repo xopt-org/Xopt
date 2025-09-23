@@ -418,7 +418,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     def load_from_checkpoint(cls, values):
         """
         Load from checkpoint file if checkpoint_file is provided.
-        Validates that user VOCS matches checkpoint VOCS.
         """
         # Case when a checkpoint file has been supplied
         if isinstance(values, dict) and "checkpoint_file" in values:
@@ -436,9 +435,12 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     @model_validator(mode="after")
     def vocs_compatible(self):
-        # Check that the VOCS object is compatible with our checkpoint
-        # For selection and the genetic operators to work correctly, all incoming variables,
-        # objectives, and constraints must exist as keys in pop/child
+        """
+        Check that the VOCS object is compatible with our checkpoint
+        For selection and the genetic operators to work correctly, all
+        incoming variables, objectives, and constraints must exist as
+        keys in pop/child
+        """
         if self.pop or self.child:
             # The keys present in all individuals
             all_individuals = chain(self.pop, self.child)
