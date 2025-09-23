@@ -25,7 +25,6 @@ def get_executor(name, max_workers=1):
     if name is None:
         yield None
     elif name == "map":
-        # Built-in map doesn't need a context manager, but we'll create a dummy one
         yield DummyExecutor()
     elif name == "ThreadPoolExecutor":
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
