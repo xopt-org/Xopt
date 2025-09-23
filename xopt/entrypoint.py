@@ -44,7 +44,7 @@ def main():
     )
     parser.add_argument(
         "--executor", 
-        help="Override the executor", 
+        help="Override the executor (and forcing vectorized=False)", 
         type=str, 
         choices=["map", "ThreadPoolExecutor", "ProcessPoolExecutor"],
         default=None,
@@ -65,8 +65,9 @@ def main():
     with get_executor(args.executor, max_workers=args.max_workers) as executor:
         if args.executor is not None:
             my_xopt.evaluator.executor = executor
+            my_xopt.evaluator.vectorized = False
         if args.max_workers is not None:
-            my_xopt.evaluator.max_workers = args.n_cpu
+            my_xopt.evaluator.max_workers = args.max_workers
         my_xopt.run()
 
 
