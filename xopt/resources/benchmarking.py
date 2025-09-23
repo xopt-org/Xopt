@@ -158,7 +158,7 @@ class BenchFunction:
                 t2 = time.perf_counter()
                 total_time += t2 - t1
                 n += 1
-                if total_time > max_time:
+                if total_time > max_time and n >= min_rounds:
                     break
                 if n >= min_rounds and total_time > min_time:
                     break

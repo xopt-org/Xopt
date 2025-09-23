@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 
 import torch
 
@@ -9,7 +8,6 @@ from xopt.generators.bayesian.models.standard import (
     StandardModelConstructor,
 )
 from xopt.resources.benchmarking import BenchFunction
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -38,16 +36,21 @@ def generate_data(vocs, n=100):
 def test_model_batched():
     torch.set_num_threads(1)
     test_vocs = generate_vocs(n_vars=10, n_obj=5, n_constr=3)
-    test_data = generate_data(vocs=test_vocs)
+    test_data = generate_data(vocs=test_vocs, n=300)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def build_batched():
         gp_constructor = BatchedModelConstructor()
-        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+        model = gp_constructor.build_model_from_vocs(
+            test_vocs, test_data, device=device
+        )
         return model
 
     def build_standard():
         gp_constructor = StandardModelConstructor()
-        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+        model = gp_constructor.build_model_from_vocs(
+            test_vocs, test_data, device=device
+        )
         return model
 
     bench = BenchFunction()
