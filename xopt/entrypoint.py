@@ -26,10 +26,10 @@ def get_executor(name, max_workers=1):
         yield None
     elif name == "map":
         yield DummyExecutor()
-    elif name == "ThreadPoolExecutor":
+    elif name == "thread_pool":
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             yield executor
-    elif name == "ProcessPoolExecutor":
+    elif name == "process_pool":
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             yield executor
     else:
@@ -46,12 +46,12 @@ def main():
         "--executor", 
         help="Override the executor (and forcing vectorized=False)", 
         type=str, 
-        choices=["map", "ThreadPoolExecutor", "ProcessPoolExecutor"],
+        choices=["map", "thread_pool", "process_pool"],
         default=None,
     )
     parser.add_argument(
         "--max_workers",
-        help="Override number of workers (processes/threads/vectorized tasks)",
+        help="Override number of workers (number of evaluations each time Xopt.step() is called)",
         type=int,
         default=None
     )
@@ -61,13 +61,18 @@ def main():
     with open(args.config) as f:
         my_xopt = Xopt.from_yaml(f.read())
 
-    # Run it
+    # Get our executor
     with get_executor(args.executor, max_workers=args.max_workers) as executor:
+        # Handle executor override
         if args.executor is not None:
             my_xopt.evaluator.executor = executor
             my_xopt.evaluator.vectorized = False
+
+        # Handle max_worker override
         if args.max_workers is not None:
             my_xopt.evaluator.max_workers = args.max_workers
+
+        # Run Xopt
         my_xopt.run()
 
 
