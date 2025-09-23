@@ -75,7 +75,7 @@ def main():
 
     # Create xopt
     with open(args.config) as f:
-        my_xopt = X_from_yaml = Xopt.from_yaml(f.read())
+        my_xopt = Xopt.from_yaml(f.read())
 
     # Run it
     with get_executor(args.executor, max_workers=args.n_cpu) as executor:
