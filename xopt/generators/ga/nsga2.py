@@ -4,11 +4,11 @@ from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
 import json
 import logging
+from logging.handlers import MemoryHandler
 import numpy as np
 import os
 import pandas as pd
 import time
-import warnings
 
 from ...errors import DataError
 from ...generator import StateOwner
@@ -24,6 +24,8 @@ from .operators import (
     CrossoverOperator,
 )
 
+# Format for log file messages
+log_file_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 ########################################################################################################################
 # Helper functions
@@ -351,7 +353,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     _output_dir_setup: bool = (
         False  # Used in initializing the directory. PLEASE DO NOT CHANGE
     )
-    _logger: logging.Logger | None = None
+    _logger: logging.Logger
 
     # Metadata
     fevals: int = Field(
@@ -377,16 +379,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     # The population and returned children
     pop: list[dict] = Field(default=[])
     child: list[dict] = Field(default=[])
-
-    def get_logger(self):
-        """
-        Get the object's logger, creating it if necessary.
-        """
-        if self._logger is None:
-            # Get a unique logger per object
-            self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
-            self._logger.setLevel(self.log_level)
-        return self._logger
 
     @staticmethod
     def _load_checkpoint_data(fname: str) -> dict:
@@ -440,13 +432,36 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         return values
 
     @model_validator(mode="after")
-    def vocs_compatible(self):
+    def after_initializer(self):
         """
+        Run all after initialization here so logger can be created
+        and messages sent to it during post-validation.
+
+        Create the logging object and setup MemoryHandler to store
+        messages until file creation.
+
         Check that the VOCS object is compatible with our checkpoint
         For selection and the genetic operators to work correctly, all
         incoming variables, objectives, and constraints must exist as
         keys in pop/child
         """
+        # Create the logger
+        logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
+        logger.setLevel(self.log_level)
+        self._logger = logger
+
+        # Attach a memory handler to store messages until log file is set up
+        memory_handler = MemoryHandler(
+            capacity=500,
+            flushLevel=logging.CRITICAL,  # Only auto-flush on CRITICAL
+            target=None,
+        )
+        memory_handler.setFormatter(logging.Formatter(log_file_fmt))
+        memory_handler.setLevel(self.log_level)
+
+        # Add to logger
+        logger.addHandler(memory_handler)
+
         if self.pop or self.child:
             # The keys present in all individuals
             all_individuals = chain(self.pop, self.child)
@@ -480,8 +495,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                     f"Filtered {n_filtered} individuals from population/children "
                     "that lay outside of variable bounds."
                 )
-                self.get_logger().warning(msg)
-                warnings.warn(msg)
+                self._logger.warning(msg)
 
         return self
 
@@ -526,7 +540,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                         )
                     }
                 )
-            self.get_logger().debug(
+            self._logger.debug(
                 f"generated {n_candidates} candidates from generation {self.n_generations} "
                 f"in {1000 * (time.perf_counter() - start_t):.2f}ms"
             )
@@ -541,7 +555,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 {k: v for k, v in zip(self.vocs.variable_names, individual)}
                 for individual in vars
             ]
-            self.get_logger().debug(
+            self._logger.debug(
                 f"generated {n_candidates} random candidates in {1000 * (time.perf_counter() - start_t):.2f}ms "
                 f"(no population exists yet)"
             )
@@ -579,7 +593,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Record the function evaluations
         self.fevals += len(new_data)
         self.child.extend(new_data.to_dict(orient="records"))
-        self.get_logger().info(
+        self._logger.info(
             f"adding {len(new_data)} new evaluated individuals to generator"
         )
 
@@ -606,7 +620,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 (self.vocs.constraint_data(self.pop).to_numpy() <= 0.0).all(axis=1)
             )
             n_err = np.sum([x["xopt_error"] for x in self.pop])
-            self.get_logger().info(
+            self._logger.info(
                 f"completed generation {self.n_generations + 1} in "
                 f"{time.perf_counter() - self.generation_start_t:.3f}s"
                 f" (n_feasible={n_feasible}, n_err={n_err}, children_performance={perf_message}, "
@@ -649,7 +663,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 )
 
                 # Log some things
-                self.get_logger().info(
+                self._logger.info(
                     f'saved optimization data to "{self.output_dir}" '
                     f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
                 )
@@ -687,7 +701,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Now we have a unique filename
         with open(checkpoint_path, "w") as f:
             f.write(self.to_json())
-        self.get_logger().info(f'saved checkpoint file "{checkpoint_path}"')
+        self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
         self.data = data
@@ -705,6 +719,18 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         return self.__repr__()
 
     def ensure_output_dir_setup(self):
+        """
+        Create output directory, initializes log file, removes MemoryHandler from
+        logger which is used to hold log messages until log file initialization.
+        """
+        # Check if we have the original MemoryHandler and remove
+        mem_handler = None
+        for handler in list(self._logger.handlers):
+            if isinstance(handler, MemoryHandler):
+                self._logger.removeHandler(handler)
+                mem_handler = handler
+
+        # Quit if we dont need to setup the directory and log file
         if (self.output_dir is None) or self._output_dir_setup:
             return
 
@@ -714,7 +740,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
             output_dir_dedup = f"{self.output_dir}_{counter}"
             counter += 1
-        self.get_logger().info(
+        self._logger.info(
             f'detected existing output_dir "{self.output_dir}" and corrected '
             f'to "{output_dir_dedup}" to avoid overwriting'
         )
@@ -732,14 +758,17 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         file_handler.setLevel(self.log_level)
 
         # Use the same format as the default logger
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter(log_file_fmt)
         file_handler.setFormatter(formatter)
 
         # Add the file handler to the logger
-        self.get_logger().addHandler(file_handler)
-        self.get_logger().info(f"routing log output to file: {log_file_path}")
+        self._logger.addHandler(file_handler)
+        self._logger.info(f"routing log output to file: {log_file_path}")
+
+        # Dump any log messages from before log file initialization
+        if mem_handler is not None:
+            mem_handler.setTarget(file_handler)
+            mem_handler.flush()
 
     def close_log_file(self):
         """
@@ -747,7 +776,18 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         """
         if self.output_dir is not None and self._output_dir_setup:
             # Remove all handlers from the logger
-            for handler in list(self.get_logger().handlers):
+            for handler in list(self._logger.handlers):
                 if isinstance(handler, logging.FileHandler):
                     handler.close()
-                self.get_logger().removeHandler(handler)
+                self._logger.removeHandler(handler)
+
+    def _safe_log(self, level, msg):
+        """
+        Transparently deal with log messages that may happen during model initialization.
+        Ie, the logfile / logger may not be open during initialization. Use this method to
+        log a message and store it until self.model_post_init (or log if logger exists).
+        """
+        if self._logger is not None:
+            self._logger.log(level, msg)
+        else:
+            self._init_log_msgs.append((level, msg))
