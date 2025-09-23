@@ -11,12 +11,12 @@ import sys
 def get_executor(name, max_workers=1):
     """
     Context manager that returns the appropriate executor based on name.
-    
+
     Parameters
     ----------
     name : str
         The executor type ('map', 'ThreadPoolExecutor', 'ProcessPoolExecutor')
-    max_workers: int 
+    max_workers: int
         Number of workers/threads/processes
 
     Yields
@@ -41,13 +41,11 @@ def get_executor(name, max_workers=1):
 def main():
     # Handle the CLI arguments
     parser = argparse.ArgumentParser()
+    parser.add_argument("config", help="The Xopt YAML config file")
     parser.add_argument(
-        "config", help="The Xopt YAML config file"
-    )
-    parser.add_argument(
-        "--executor", 
-        help="Override the executor (and forcing vectorized=False)", 
-        type=str, 
+        "--executor",
+        help="Override the executor (and forcing vectorized=False)",
+        type=str,
         choices=["map", "thread_pool", "process_pool"],
         default=None,
     )
@@ -55,12 +53,12 @@ def main():
         "--max_workers",
         help="Override number of workers (number of evaluations each time Xopt.step() is called)",
         type=int,
-        default=None
+        default=None,
     )
     parser.add_argument(
-        "--python_path", 
-        help="Additional path to add to Python import path for evaluation function module search", 
-        default=None
+        "--python_path",
+        help="Additional path to add to Python import path for evaluation function module search",
+        default=None,
     )
     args = parser.parse_args()
 
