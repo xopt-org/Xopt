@@ -222,11 +222,15 @@ def nsga2_optimization_with_checkpoint():
         generator.ensure_output_dir_setup()
         generator.close_log_file()
 
+        # Add a constant for testing VOCS reload with new parameters
+        vocs = tnk_vocs.model_copy(deep=True)
+        vocs.constants["my_const1"] = 0.0
+
         # Run a few optimization steps
         X = Xopt(
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
-            vocs=tnk_vocs,
+            vocs=vocs,
             max_evaluations=20,  # Run for 2 generations
         )
         X.run()
@@ -368,35 +372,249 @@ def test_nsga2_checkpoint_reload_override(nsga2_optimization_with_checkpoint):
     )  # Make sure we don't invalidate test in future by accident
 
 
-def test_nsga2_checkpoint_reload_vocs_mismatch_yaml(nsga2_optimization_with_checkpoint):
-    """
-    Test that NSGA2Generator raises appropriate error when VOCS doesn't match checkpoint.
-    """
-    # Get the optimizer and checkpoint (created with tnk_vocs)
-    _, latest_checkpoint = nsga2_optimization_with_checkpoint
+def test_nsga2_checkpoint_reload_vocs_var_bounds(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
 
-    # Attempt to create generator with mismatched VOCS - should fail during model validation
-    with pytest.raises(
-        ValueError, match="User-provided VOCS does not match checkpoint VOCS"
-    ):
-        yaml = f"""
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [-10.0, 10.0]
+        x2: [-10.0, 10.0]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_obj_dir(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MAXIMIZE
+        y2: MAXIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_constraint_conf(
+    nsga2_optimization_with_checkpoint,
+):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [LESS_THAN, 0.123]
+        c2: [GREATER_THAN, 0.321]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_new_var(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+        my_const1: [0.0, 1.0]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_new_obj(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+        my_const1: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_new_const(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+        my_const1: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_bad_var(nsga2_optimization_with_checkpoint):
+    with pytest.raises(ValueError, match="User-provided VOCS is not compatible.*"):
+        Xopt.from_yaml(
+            f"""
         generator:
           name: nsga2
-          checkpoint_file: {latest_checkpoint}
+          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
 
         evaluator:
           function: xopt.resources.test_functions.tnk.evaluate_TNK
 
         vocs:
           variables:
-            x1: [0, 1]
-            x2: [0, 1]
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+            does_not_exist: [0.0, 1.0]
 
           objectives:
-            f1: MINIMIZE
-            f2: MINIMIZE
+            y1: MINIMIZE
+            y2: MINIMIZE
+
+          constraints:
+            c1: [GREATER_THAN, 0]
+            c2: [LESS_THAN, 0.5]
         """.replace("\n        ", "\n")
-        Xopt.from_yaml(yaml)
+        )
+
+
+def test_nsga2_checkpoint_reload_vocs_bad_obj(nsga2_optimization_with_checkpoint):
+    with pytest.raises(ValueError, match="User-provided VOCS is not compatible.*"):
+        Xopt.from_yaml(
+            f"""
+        generator:
+          name: nsga2
+          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+        evaluator:
+          function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+        vocs:
+          variables:
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+
+          objectives:
+            y1: MINIMIZE
+            y2: MINIMIZE
+            does_not_exist: MINIMIZE
+
+          constraints:
+            c1: [GREATER_THAN, 0]
+            c2: [LESS_THAN, 0.5]
+        """.replace("\n        ", "\n")
+        )
+
+
+def test_nsga2_checkpoint_reload_vocs_bad_const(nsga2_optimization_with_checkpoint):
+    with pytest.raises(ValueError, match="User-provided VOCS is not compatible.*"):
+        Xopt.from_yaml(
+            f"""
+        generator:
+          name: nsga2
+          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+        evaluator:
+          function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+        vocs:
+          variables:
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+
+          objectives:
+            y1: MINIMIZE
+            y2: MINIMIZE
+
+          constraints:
+            c1: [GREATER_THAN, 0]
+            c2: [LESS_THAN, 0.5]
+            does_not_exist: [LESS_THAN, 0.5]
+        """.replace("\n        ", "\n")
+        )
 
 
 def test_nsga2_all_individuals_in_data():
