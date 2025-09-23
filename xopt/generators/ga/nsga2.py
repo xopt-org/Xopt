@@ -539,6 +539,20 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     def add_data(self, new_data: pd.DataFrame):
         self.ensure_output_dir_setup()
 
+        # Validate data is at least compatible with selection / genetic operators
+        vocs_names = (
+            self.vocs.variable_names
+            + self.vocs.objective_names
+            + self.vocs.constraint_names
+        )
+        if not set(vocs_names).issubset(set(new_data.columns)):
+            raise ValueError(
+                "New data must contain at least all variables, objectives, and constraints as columns"
+            )
+
+        # Force all names in VOCS to be present, creating those which are not required by generator
+        new_data = new_data.reindex(columns=self.vocs.all_names)
+
         # Pass to parent class for inclusion in self.data
         super().add_data(new_data)
 
