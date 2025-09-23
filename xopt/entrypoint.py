@@ -3,6 +3,8 @@ from .evaluator import DummyExecutor
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import contextmanager
 import argparse
+import os
+import sys
 
 
 @contextmanager
@@ -55,7 +57,17 @@ def main():
         type=int,
         default=None
     )
+    parser.add_argument(
+        "--python_path", 
+        help="Additional path to add to Python import path for evaluation function module search", 
+        default=None
+    )
     args = parser.parse_args()
+
+    # Add specified path or CWD to sys.path
+    import_path = args.python_path or os.getcwd()
+    if import_path not in sys.path:
+        sys.path.insert(0, import_path)
 
     # Create xopt
     with open(args.config) as f:
