@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import chain
 from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
 import json
@@ -428,22 +429,41 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # VOCS validation - inline check
                 if "vocs" in values:
                     # Convert any user supplied vocs to VOCS object
-                    if isinstance(values["vocs"], dict):
-                        values["vocs"] = VOCS.from_dict(values["vocs"])
+                    if isinstance(values["vocs"].pop(), dict):
+                        vocs = VOCS.from_dict(values["vocs"])
                     elif isinstance(values["vocs"], VOCS):
-                        pass
+                        vocs = values["vocs"].pop()
                     else:
                         raise ValueError(
                             f"vocs must be of type dict or VOCS, got {type(values['vocs'])}"
                         )
 
-                    # Check if they match
-                    if values["vocs"] != checkpoint_data["vocs"]:
-                        raise ValueError(
-                            "User-provided VOCS does not match checkpoint VOCS. "
-                            "The VOCS must be identical when loading from checkpoint to ensure "
-                            "consistency with the saved optimization state."
+                    # Check that the VOCS object is compatible with our checkpoint
+                    # For selection and the genetic operators to work correctly, all incoming variables,
+                    # objectives, and constraints must exist as keys in pop/child
+                    all_individuals = chain(
+                        checkpoint_data["pop"], checkpoint_data["child"]
+                    )
+                    if checkpoint_data["pop"] or checkpoint_data["child"]:
+                        # The keys present in all individuals
+                        all_keys = set.intersection(
+                            *(x.keys() for x in all_individuals)
                         )
+
+                        # Check that all required VOCS keys exist in the checkpoint populations
+                        if not all_keys.issuperset(
+                            vocs.variable_names
+                            + vocs.objective_names
+                            + vocs.constraint_names
+                        ):
+                            raise ValueError(
+                                "User-provided VOCS is not compatible with existing population "
+                                "or child data from checkpoint."
+                            )
+
+                    # Use the user-provided VOCS to allow overrides of settings
+                    checkpoint_data.pop("vocs")
+                    values["vocs"] = vocs
 
                 # Merge with user data precedence
                 merged_data = {**checkpoint_data, **values}
