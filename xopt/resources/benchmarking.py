@@ -122,6 +122,64 @@ class BenchMOBO:
         return outputs
 
 
+class BenchFunction:
+    def __init__(self):
+        self.configs = []
+
+    def add(self, f, args=None, kwargs=None):
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
+        self.configs.append((f, args, kwargs))
+
+    def run_config(
+        self,
+        min_time: float = 1.0,
+        max_time: float = 5.0,
+        min_rounds: int = 2,
+        disable_gc: bool = False,
+        warmup: bool = False,
+        row: int = 0,
+    ):
+        f, args, kwargs = self.configs[row]
+        import gc
+
+        try:
+            if warmup:
+                f(*args, **kwargs)
+            if disable_gc:
+                gc.disable()
+            n = 0
+            total_time = 0.0
+            while True:
+                t1 = time.perf_counter()
+                f(*args, **kwargs)
+                t2 = time.perf_counter()
+                total_time += t2 - t1
+                n += 1
+                if total_time > max_time:
+                    break
+                if n >= min_rounds and total_time > min_time:
+                    break
+            return {
+                "n": n,
+                "t_avg": total_time / n,
+                "f": f.__name__,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        finally:
+            if disable_gc:
+                gc.enable()
+
+    def run(self, **kwargs):
+        results = []
+        for i in range(len(self.configs)):
+            results.append(self.run_config(row=i, **kwargs))
+        return pd.DataFrame(results)
+
+
 def time_call(f: Callable, n: int = 1) -> tuple[list[float], list[Any]]:
     """
     Time a function call
