@@ -97,13 +97,11 @@ class StandardModelConstructor(ModelConstructor):
     )
     train_model: bool = Field(
         True,
-        description="specify if the model should be trained",
+        description="flag to specify if the model should be trained",
     )
     train_kwargs: Dict[str, Any] | None = Field(
-        default_factory=lambda: {
-            "maxiter": 1000,
-        },
-        description="kwargs for training the model - passed to botorch.fit_gpytorch_mll_scipy",
+        default_factory=lambda: {"optimizer_kwargs": {"options": {"maxiter": 1000}}},
+        description="kwargs for model optimizer - see fit_gpytorch_mll_scipy",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
@@ -112,9 +110,10 @@ class StandardModelConstructor(ModelConstructor):
         super().__init__(**kwargs)
     
     @field_validator("train_kwargs")
-    def validate_train_kwargs(cls, train_kwargs):
+    def validate_train_kwargs(cls, train_kwargs, info: ValidationInfo):
         if train_kwargs is None:
             return train_kwargs
+        # keys are from _fit_fallback in botorch/fit.py - we don't use other dispatchers
         allowed_keys = [
             "optimizer_kwargs",
             "pick_best_of_all_attempts",
@@ -122,11 +121,19 @@ class StandardModelConstructor(ModelConstructor):
             "optimizer",
             "warning_handler",
         ]
-        allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "options"]}
+        # subkeys for optimizer_kwargs based on fit_gpytorch_mll_scipy/fit_gpytorch_mll_torch
+        if info.data["method"] == "adam":
+            # TODO: add scheduler/stopping criterion pydantic models?
+            allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "step_limit"]}
+        else:
+            allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "options"]}
         if not isinstance(train_kwargs, dict):
             raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
-        if set(train_kwargs.keys()) - set(allowed_keys):
-            raise ValueError(f"train_kwargs can only contain the keys {allowed_keys}")
+        invalid_keys = set(train_kwargs.keys()) - set(allowed_keys)
+        if invalid_keys:
+            raise ValueError(
+                f"train_kwargs can only contain the keys {allowed_keys}, have {invalid_keys}"
+            )
         for k, v in train_kwargs.items():
             if isinstance(v, dict):
                 allowed = allowed_subkeys.get(k, [])
@@ -413,14 +420,13 @@ class BatchedModelConstructor(StandardModelConstructor):
         outcome_names: list[str],
         input_names: list[str],
         input_bounds,
-        tkwargs,
         _aug_batch_shape: torch.Size = torch.Size([]),
     ) -> Optional[Normalize]:
         if input_bounds is None:
             bounds = None
         else:
             bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
+                [torch.tensor(input_bounds[name]) for name in input_names]
             ).T
 
         input_transform = Normalize(
@@ -541,49 +547,45 @@ class BatchedModelConstructor(StandardModelConstructor):
             )
         )
 
-        covar_modules = deepcopy(self.covar_modules)
-        mean_modules = deepcopy(self.mean_modules)
-        # mean_module = ConstantMean(batch_shape=self._aug_batch_shape)
+        covar_module = None
+        if len(self.covar_modules) > 1:
+            raise ValueError(
+                "Covariance modules cannot be specified individually when using BatchedModelConstructor"
+            )
+        elif len(self.covar_modules) == 1:
+            covar_module = list(self.covar_modules.values())[0]
 
-        likelihood = self.get_likelihood(**tkwargs, _aug_batch_shape=_aug_batch_shape)
+        mean_module = None
+        if len(self.mean_modules) > 1:
+            raise ValueError(
+                "Mean modules cannot be specified individually when using BatchedModelConstructor"
+            )
+        # assume that if have 1 module, it is to be used for all outputs
+        elif len(self.mean_modules) == 1:
+            mean_module = list(self.mean_modules.values())[0]
+
+        likelihood = self.get_likelihood(_aug_batch_shape=_aug_batch_shape)
         input_transform = self._get_input_transform(
             outcome_names,
             input_names,
-            input_bounds,
-            tkwargs,
+            input_bounds=input_bounds,
             _aug_batch_shape=_aug_batch_shape,
         )
         outcome_transform = Standardize(
             m=train_Y.shape[-1], batch_shape=_aug_batch_shape
         )
-        # covar_module = self._get_module(covar_modules, outcome_name)
-        # mean_module = self.build_mean_module(
-        #     outcome_name, mean_modules, input_transform, outcome_transform
-        # )
         kwargs = {
             "input_transform": input_transform,
             "outcome_transform": outcome_transform,
-            # "covar_module": covar_module,
-            # "mean_module": mean_module,
+            "covar_module": covar_module,
+            "mean_module": mean_module,
         }
 
         if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
             raise ValueError("no data found to train model!")
         full_model = SingleTaskGP(train_X, train_Y, likelihood=likelihood, **kwargs)
+        full_model.to(**tkwargs)
 
-        # check all specified modules were added to the model
-        if covar_modules:
-            warnings.warn(
-                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
-                f"could not be added to the model."
-            )
-        if mean_modules:
-            warnings.warn(
-                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
-                f"could not be added to the model."
-            )
-
-        # if specified, use cached model hyperparameters
         if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
             store = {
                 name: ele.to(**tkwargs)
