@@ -377,10 +377,15 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     pop: list[dict] = Field(default=[])
     child: list[dict] = Field(default=[])
 
-    def model_post_init(self, context):
-        # Get a unique logger per object
-        self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
-        self._logger.setLevel(self.log_level)
+    def get_logger(self):
+        """
+        Get the object's logger, creating it if necessary.
+        """
+        if self._logger is None:
+            # Get a unique logger per object
+            self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
+            self._logger.setLevel(self.log_level)
+        return self._logger
 
     @staticmethod
     def _load_checkpoint_data(fname: str) -> dict:
@@ -457,7 +462,33 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                     "or child data from checkpoint."
                 )
 
+            # Filter individuals outside of variable bounds
+            # Use __setattr__ to not recursively apply validation
+            n_ind = len(self.pop) + len(self.child)
+            object.__setattr__(
+                self, "pop", [x for x in self.pop if self.data_in_bounds(x)]
+            )
+            object.__setattr__(
+                self, "child", [x for x in self.child if self.data_in_bounds(x)]
+            )
+
+            # Check how many individuals we filtered and report
+            n_filtered = len(self.pop) + len(self.child) - n_ind
+            if n_filtered > 0:
+                self.get_logger().warning(
+                    f"Filtered {n_filtered} individuals from population/children "
+                    "that lay outside of variable bounds."
+                )
+
         return self
+
+    def data_in_bounds(self, data: dict) -> bool:
+        """
+        Returns true if every variable in the data dictionary is within bounds.
+        """
+        return all(
+            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+        )
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
@@ -492,7 +523,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                         )
                     }
                 )
-            self._logger.debug(
+            self.get_logger().debug(
                 f"generated {n_candidates} candidates from generation {self.n_generations} "
                 f"in {1000 * (time.perf_counter() - start_t):.2f}ms"
             )
@@ -507,7 +538,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 {k: v for k, v in zip(self.vocs.variable_names, individual)}
                 for individual in vars
             ]
-            self._logger.debug(
+            self.get_logger().debug(
                 f"generated {n_candidates} random candidates in {1000 * (time.perf_counter() - start_t):.2f}ms "
                 f"(no population exists yet)"
             )
@@ -545,7 +576,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Record the function evaluations
         self.fevals += len(new_data)
         self.child.extend(new_data.to_dict(orient="records"))
-        self._logger.info(
+        self.get_logger().info(
             f"adding {len(new_data)} new evaluated individuals to generator"
         )
 
@@ -572,7 +603,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 (self.vocs.constraint_data(self.pop).to_numpy() <= 0.0).all(axis=1)
             )
             n_err = np.sum([x["xopt_error"] for x in self.pop])
-            self._logger.info(
+            self.get_logger().info(
                 f"completed generation {self.n_generations + 1} in "
                 f"{time.perf_counter() - self.generation_start_t:.3f}s"
                 f" (n_feasible={n_feasible}, n_err={n_err}, children_performance={perf_message}, "
@@ -615,7 +646,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 )
 
                 # Log some things
-                self._logger.info(
+                self.get_logger().info(
                     f'saved optimization data to "{self.output_dir}" '
                     f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
                 )
@@ -653,7 +684,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Now we have a unique filename
         with open(checkpoint_path, "w") as f:
             f.write(self.to_json())
-        self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
+        self.get_logger().info(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
         self.data = data
@@ -680,7 +711,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
             output_dir_dedup = f"{self.output_dir}_{counter}"
             counter += 1
-        self._logger.info(
+        self.get_logger().info(
             f'detected existing output_dir "{self.output_dir}" and corrected '
             f'to "{output_dir_dedup}" to avoid overwriting'
         )
@@ -704,8 +735,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         file_handler.setFormatter(formatter)
 
         # Add the file handler to the logger
-        self._logger.addHandler(file_handler)
-        self._logger.info(f"routing log output to file: {log_file_path}")
+        self.get_logger().addHandler(file_handler)
+        self.get_logger().info(f"routing log output to file: {log_file_path}")
 
     def close_log_file(self):
         """
@@ -713,7 +744,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         """
         if self.output_dir is not None and self._output_dir_setup:
             # Remove all handlers from the logger
-            for handler in list(self._logger.handlers):
+            for handler in list(self.get_logger().handlers):
                 if isinstance(handler, logging.FileHandler):
                     handler.close()
-                self._logger.removeHandler(handler)
+                self.get_logger().removeHandler(handler)
