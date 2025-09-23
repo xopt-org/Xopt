@@ -340,6 +340,8 @@ class TestModelConstructor:
             # )
 
     def test_train_model_batch(self):
+        # tests to make sure that models created by BatchedModelConstructor class
+        # generate correct shapes
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_data = deepcopy(TEST_VOCS_DATA)
 
@@ -361,7 +363,57 @@ class TestModelConstructor:
         assert isinstance(model, SingleTaskGP)
         assert model._aug_batch_shape == torch.Size([2])
         assert model.covar_module.raw_lengthscale.shape == torch.Size([2, 1, 2])
-        print(model.state_dict())
+
+    def test_train_model_batch_compare(self):
+        # test to verify that BatchedModelConstructor produces same results as
+        # StandardModelConstructor with multiple SingleTaskGP models
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = deepcopy(TEST_VOCS_DATA)
+
+        gp_constructor = BatchedModelConstructor()
+        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+
+        constructor = StandardModelConstructor()
+        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
+
+        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
+            [1, 2]
+        )
+        ls1 = model_list.models[0].covar_module.raw_lengthscale
+        ls2 = model_list.models[1].covar_module.raw_lengthscale
+        ls3 = model_single.covar_module.raw_lengthscale
+        print(ls1)
+        print(ls2)
+        print(ls3)
+        assert torch.allclose(ls3[0, ...], ls1, rtol=0, atol=1e-3)
+        assert torch.allclose(ls3[1, ...], ls2, rtol=0, atol=1e-3)
+
+    def test_train_model_batch_bench(self):
+        # test to verify that BatchedModelConstructor produces same results as
+        # StandardModelConstructor with multiple SingleTaskGP models
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_data = deepcopy(TEST_VOCS_DATA)
+
+        gp_constructor = BatchedModelConstructor()
+        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+
+        constructor = StandardModelConstructor()
+        constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
+
+        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
+            [1, 2]
+        )
+        ls1 = model_list.models[0].covar_module.raw_lengthscale
+        ls2 = model_list.models[1].covar_module.raw_lengthscale
+        ls3 = model_single.covar_module.raw_lengthscale
+        print(ls1)
+        print(ls2)
+        print(ls3)
+        assert torch.allclose(ls3[0, ...], ls1, rtol=0, atol=1e-3)
+        assert torch.allclose(ls3[1, ...], ls2, rtol=0, atol=1e-3)
 
     def test_train_from_scratch(self):
         # test to verify that GP modules are trained from scratch everytime
@@ -463,27 +515,6 @@ class TestModelConstructor:
 
             assert torch.allclose(generated_pred, benchmark_pred, rtol=1e-3)
             assert ~torch.allclose(generated_pred, old_prediction, rtol=1e-3)
-
-    def test_train_model(self):
-        test_vocs = deepcopy(TEST_VOCS_BASE)
-        test_data = deepcopy(TEST_VOCS_DATA)
-
-        test_covar_modules = []
-
-        gp_constructor = StandardModelConstructor()
-        constructed_model = gp_constructor.build_model_from_vocs(
-            test_vocs, test_data
-        ).models[0]
-        init_mll = ExactMarginalLogLikelihood(
-            benchmark_model.likelihood, benchmark_model
-        )
-        fit_gpytorch_mll(init_mll)
-
-        for test_covar in test_covar_modules:
-            test_covar1 = deepcopy(test_covar)
-            test_covar2 = deepcopy(test_covar)
-
-            # train model with StandardModelConstructor
 
     def test_unused_modules_warning(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
