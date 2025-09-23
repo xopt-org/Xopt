@@ -213,18 +213,18 @@ def test_generate_child_binary_tournament():
 def nsga2_optimization_with_checkpoint():
     """Test fixture that supplies a optimization with data and the final checkpoint path"""
     with TemporaryDirectory() as output_dir:
+        # Add a constant for testing VOCS reload with new parameters
+        vocs = tnk_vocs.model_copy(deep=True)
+        vocs.constants["my_const1"] = 0.0
+
         # Set up the generator with output_dir and checkpoint_freq
         generator = NSGA2Generator(
-            vocs=tnk_vocs, output_dir=output_dir, population_size=10, checkpoint_freq=1
+            vocs=vocs, output_dir=output_dir, population_size=10, checkpoint_freq=1
         )
 
         # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
         generator.ensure_output_dir_setup()
         generator.close_log_file()
-
-        # Add a constant for testing VOCS reload with new parameters
-        vocs = tnk_vocs.model_copy(deep=True)
-        vocs.constants["my_const1"] = 0.0
 
         # Run a few optimization steps
         X = Xopt(
@@ -897,3 +897,37 @@ def test_nsga2_output_inhomogenous_data():
 
         # Load the file (will fail if bad CSV file was written)
         pd.read_csv(os.path.join(output_dir, "populations.csv"))
+
+
+def test_nsga2_vocs_not_present_in_add_data():
+    # Run a few optimization steps
+    X = Xopt(
+        generator=NSGA2Generator(vocs=tnk_vocs),
+        evaluator=Evaluator(function=evaluate_TNK),
+        vocs=tnk_vocs,
+        max_evaluations=10,
+    )
+    X.run()
+
+    # Attempt to submit data with required vocs columns
+    X.add_data(
+        pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "y2": [0], "c1": [0], "c2": [0]})
+    )
+
+    # Missing var
+    with pytest.raises(ValueError, match="New data must contain at least all.*"):
+        X.add_data(
+            pd.DataFrame({"x1": [0], "y1": [0], "y2": [0], "c1": [0], "c2": [0]})
+        )
+
+    # Missing obj
+    with pytest.raises(ValueError, match="New data must contain at least all.*"):
+        X.add_data(
+            pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "c1": [0], "c2": [0]})
+        )
+
+    # Missing constraint
+    with pytest.raises(ValueError, match="New data must contain at least all.*"):
+        X.add_data(
+            pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "y2": [0], "c1": [0]})
+        )

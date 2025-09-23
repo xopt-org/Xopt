@@ -546,8 +546,10 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             + self.vocs.constraint_names
         )
         if not set(vocs_names).issubset(set(new_data.columns)):
+            missing_cols = set(vocs_names).difference(set(new_data.columns))
             raise ValueError(
                 "New data must contain at least all variables, objectives, and constraints as columns"
+                f" (missing columns: {missing_cols})"
             )
 
         # Pass to parent class for inclusion in self.data
