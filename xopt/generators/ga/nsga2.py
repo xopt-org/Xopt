@@ -8,6 +8,7 @@ import numpy as np
 import os
 import pandas as pd
 import time
+import warnings
 
 from ...errors import DataError
 from ...generator import StateOwner
@@ -475,10 +476,12 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             # Check how many individuals we filtered and report
             n_filtered = len(self.pop) + len(self.child) - n_ind
             if n_filtered > 0:
-                self.get_logger().warning(
+                msg = (
                     f"Filtered {n_filtered} individuals from population/children "
                     "that lay outside of variable bounds."
                 )
+                self.get_logger().warning(msg)
+                warnings.warn(msg)
 
         return self
 
