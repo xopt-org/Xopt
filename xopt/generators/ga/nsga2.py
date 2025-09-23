@@ -429,10 +429,10 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # VOCS validation - inline check
                 if "vocs" in values:
                     # Convert any user supplied vocs to VOCS object
-                    if isinstance(values["vocs"].pop(), dict):
-                        vocs = VOCS.from_dict(values["vocs"])
+                    if isinstance(values["vocs"], dict):
+                        vocs = VOCS.from_dict(values.pop("vocs"))
                     elif isinstance(values["vocs"], VOCS):
-                        vocs = values["vocs"].pop()
+                        vocs = values.pop("vocs")
                     else:
                         raise ValueError(
                             f"vocs must be of type dict or VOCS, got {type(values['vocs'])}"
@@ -447,7 +447,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                     if checkpoint_data["pop"] or checkpoint_data["child"]:
                         # The keys present in all individuals
                         all_keys = set.intersection(
-                            *(x.keys() for x in all_individuals)
+                            *(set(x.keys()) for x in all_individuals)
                         )
 
                         # Check that all required VOCS keys exist in the checkpoint populations
