@@ -4,7 +4,6 @@ from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
 import json
 import logging
-from logging.handlers import MemoryHandler
 import numpy as np
 import os
 import pandas as pd
@@ -24,8 +23,6 @@ from .operators import (
     CrossoverOperator,
 )
 
-# Format for log file messages
-log_file_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 ########################################################################################################################
 # Helper functions
@@ -353,7 +350,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     _output_dir_setup: bool = (
         False  # Used in initializing the directory. PLEASE DO NOT CHANGE
     )
-    _logger: logging.Logger
+    _logger: logging.Logger | None = None
 
     # Metadata
     fevals: int = Field(
@@ -379,6 +376,11 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     # The population and returned children
     pop: list[dict] = Field(default=[])
     child: list[dict] = Field(default=[])
+
+    def model_post_init(self, context):
+        # Get a unique logger per object
+        self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
+        self._logger.setLevel(self.log_level)
 
     @staticmethod
     def _load_checkpoint_data(fname: str) -> dict:
@@ -432,36 +434,13 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         return values
 
     @model_validator(mode="after")
-    def after_initializer(self):
+    def vocs_compatible(self):
         """
-        Run all after initialization here so logger can be created
-        and messages sent to it during post-validation.
-
-        Create the logging object and setup MemoryHandler to store
-        messages until file creation.
-
         Check that the VOCS object is compatible with our checkpoint
         For selection and the genetic operators to work correctly, all
         incoming variables, objectives, and constraints must exist as
         keys in pop/child
         """
-        # Create the logger
-        logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
-        logger.setLevel(self.log_level)
-        self._logger = logger
-
-        # Attach a memory handler to store messages until log file is set up
-        memory_handler = MemoryHandler(
-            capacity=500,
-            flushLevel=logging.CRITICAL,  # Only auto-flush on CRITICAL
-            target=None,
-        )
-        memory_handler.setFormatter(logging.Formatter(log_file_fmt))
-        memory_handler.setLevel(self.log_level)
-
-        # Add to logger
-        logger.addHandler(memory_handler)
-
         if self.pop or self.child:
             # The keys present in all individuals
             all_individuals = chain(self.pop, self.child)
@@ -478,34 +457,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                     "or child data from checkpoint."
                 )
 
-            # Filter individuals outside of variable bounds
-            # Use __setattr__ to not recursively apply validation
-            n_ind = len(self.pop) + len(self.child)
-            object.__setattr__(
-                self, "pop", [x for x in self.pop if self.data_in_bounds(x)]
-            )
-            object.__setattr__(
-                self, "child", [x for x in self.child if self.data_in_bounds(x)]
-            )
-
-            # Check how many individuals we filtered and report
-            n_filtered = len(self.pop) + len(self.child) - n_ind
-            if n_filtered > 0:
-                msg = (
-                    f"Filtered {n_filtered} individuals from population/children "
-                    "that lay outside of variable bounds."
-                )
-                self._logger.warning(msg)
-
         return self
-
-    def data_in_bounds(self, data: dict) -> bool:
-        """
-        Returns true if every variable in the data dictionary is within bounds.
-        """
-        return all(
-            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
-        )
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
@@ -719,18 +671,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         return self.__repr__()
 
     def ensure_output_dir_setup(self):
-        """
-        Create output directory, initializes log file, removes MemoryHandler from
-        logger which is used to hold log messages until log file initialization.
-        """
-        # Check if we have the original MemoryHandler and remove
-        mem_handler = None
-        for handler in list(self._logger.handlers):
-            if isinstance(handler, MemoryHandler):
-                self._logger.removeHandler(handler)
-                mem_handler = handler
-
-        # Quit if we dont need to setup the directory and log file
         if (self.output_dir is None) or self._output_dir_setup:
             return
 
@@ -758,17 +698,14 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         file_handler.setLevel(self.log_level)
 
         # Use the same format as the default logger
-        formatter = logging.Formatter(log_file_fmt)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         file_handler.setFormatter(formatter)
 
         # Add the file handler to the logger
         self._logger.addHandler(file_handler)
         self._logger.info(f"routing log output to file: {log_file_path}")
-
-        # Dump any log messages from before log file initialization
-        if mem_handler is not None:
-            mem_handler.setTarget(file_handler)
-            mem_handler.flush()
 
     def close_log_file(self):
         """
@@ -780,14 +717,3 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 if isinstance(handler, logging.FileHandler):
                     handler.close()
                 self._logger.removeHandler(handler)
-
-    def _safe_log(self, level, msg):
-        """
-        Transparently deal with log messages that may happen during model initialization.
-        Ie, the logfile / logger may not be open during initialization. Use this method to
-        log a message and store it until self.model_post_init (or log if logger exists).
-        """
-        if self._logger is not None:
-            self._logger.log(level, msg)
-        else:
-            self._init_log_msgs.append((level, msg))
