@@ -374,7 +374,7 @@ def test_nsga2_checkpoint_reload_override(nsga2_optimization_with_checkpoint):
 
 
 def test_nsga2_checkpoint_reload_vocs_var_bounds(nsga2_optimization_with_checkpoint):
-    Xopt.from_yaml(
+    my_xopt = Xopt.from_yaml(
         f"""
     generator:
       name: nsga2
@@ -397,6 +397,11 @@ def test_nsga2_checkpoint_reload_vocs_var_bounds(nsga2_optimization_with_checkpo
         c2: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
+
+    # Check that all individuals are loaded (no filtering)
+    orig_xopt = nsga2_optimization_with_checkpoint[0]
+    assert len(my_xopt.generator.pop) == len(orig_xopt.generator.pop)
+    assert len(my_xopt.generator.child) == len(orig_xopt.generator.child)
 
 
 def test_nsga2_checkpoint_reload_vocs_obj_dir(nsga2_optimization_with_checkpoint):
