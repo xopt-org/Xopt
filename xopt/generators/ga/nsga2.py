@@ -8,6 +8,7 @@ import numpy as np
 import os
 import pandas as pd
 import time
+import warnings
 
 from ...errors import DataError
 from ...generator import StateOwner
@@ -457,7 +458,33 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                     "or child data from checkpoint."
                 )
 
+            # Filter individuals outside of variable bounds
+            # Use __setattr__ to not recursively apply validation
+            n_ind = len(self.pop) + len(self.child)
+            object.__setattr__(
+                self, "pop", [x for x in self.pop if self.data_in_bounds(x)]
+            )
+            object.__setattr__(
+                self, "child", [x for x in self.child if self.data_in_bounds(x)]
+            )
+
+            # Check how many individuals we filtered and report
+            n_filtered = n_ind - (len(self.pop) + len(self.child))
+            if n_filtered > 0:
+                warnings.warn(
+                    f"Filtered {n_filtered} individuals from population/children "
+                    "that lay outside of variable bounds."
+                )
+
         return self
+
+    def data_in_bounds(self, data: dict) -> bool:
+        """
+        Returns true if every variable in the data dictionary is within bounds.
+        """
+        return all(
+            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+        )
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
