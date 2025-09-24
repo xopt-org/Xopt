@@ -373,7 +373,12 @@ def test_nsga2_checkpoint_reload_override(nsga2_optimization_with_checkpoint):
     )  # Make sure we don't invalidate test in future by accident
 
 
-def test_nsga2_checkpoint_reload_vocs_var_bounds(nsga2_optimization_with_checkpoint):
+def test_nsga2_checkpoint_reload_vocs_var_bounds_expand(
+    nsga2_optimization_with_checkpoint,
+):
+    """
+    Confirm we can expand bounds and individuals are not filtered.
+    """
     my_xopt = Xopt.from_yaml(
         f"""
     generator:
@@ -402,6 +407,41 @@ def test_nsga2_checkpoint_reload_vocs_var_bounds(nsga2_optimization_with_checkpo
     orig_xopt = nsga2_optimization_with_checkpoint[0]
     assert len(my_xopt.generator.pop) == len(orig_xopt.generator.pop)
     assert len(my_xopt.generator.child) == len(orig_xopt.generator.child)
+
+
+def test_nsga2_checkpoint_reload_vocs_var_bounds_shrink(
+    nsga2_optimization_with_checkpoint,
+):
+    """
+    Confirm we can change variable bounds and individuals outside are filtered.
+    """
+    my_xopt = Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [-10.0, -5.0]
+        x2: [-10.0, -5.0]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+    # Check that all individuals are filtered (all out of bounds)
+    assert len(my_xopt.generator.pop) == 0
+    assert len(my_xopt.generator.child) == 0
 
 
 def test_nsga2_checkpoint_reload_vocs_obj_dir(nsga2_optimization_with_checkpoint):
