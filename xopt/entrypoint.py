@@ -1,10 +1,12 @@
 from .base import Xopt
 from .evaluator import DummyExecutor
+from .pydantic import remove_none_values
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import contextmanager
 import argparse
 import os
 import sys
+import yaml
 
 
 @contextmanager
@@ -69,7 +71,14 @@ def main():
 
     # Create xopt
     with open(args.config) as f:
-        my_xopt = Xopt.from_yaml(f.read())
+        # Open file
+        dat = yaml.safe_load(f)
+
+        # Clean up (replicate behavior of Xopt.from_file)
+        dat = remove_none_values(dat)
+
+        # Construct Xopt object
+        my_xopt = Xopt.model_validate(dat)
 
     # Get our executor
     with get_executor(args.executor, max_workers=args.max_workers) as executor:
