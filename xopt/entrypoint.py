@@ -40,6 +40,59 @@ def get_executor(name, max_workers=1):
         raise ValueError(f"Unknown executor: {name}")
 
 
+def override_to_dict(override: str) -> dict:
+    """
+    Convert strings of form "class_a.class_b.class_c.param=1" to
+    {'class_a': {'class_b': {'class_c': {'param': 1}}}}.
+
+    Uses yaml library for consistent type conversion of values following
+    same convention as in config files.
+
+    Parameters
+    ----------
+    override : str
+        The override string
+
+    Returns
+    -------
+    dict
+        The nested dictionary containing the value.
+    """
+    path, value = override.split("=", 1)
+    yaml_str = (
+        "\n".join([" " * idx + x + ":" for idx, x in enumerate(path.split("."))])
+        + " "
+        + value.strip()
+    )
+    return yaml.safe_load(yaml_str)
+
+
+def merge_dicts(dict1: dict, dict2: dict) -> dict:
+    """
+    Nested merging of dicts. Will combine nested dicts keeping keys in both with
+    the values in dict2 overriding those in dict1.
+
+    Parameters
+    ----------
+    dict1 : dict
+        Parameters to override
+    dict2 : dict
+        Parameters used to override those in dict1
+
+    Returns
+    -------
+    dict
+        Values from dict1 with overrides from dict2
+    """
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 def main():
     # Handle the CLI arguments
     parser = argparse.ArgumentParser()
@@ -62,6 +115,12 @@ def main():
         help="Additional path to add to Python import path for evaluation function module search",
         default=None,
     )
+    parser.add_argument(
+        "--override",
+        help="Override config values using dot notation (e.g., generator.mutation_operator.eta_m=20)",
+        action="append",
+        default=[],
+    )
     args = parser.parse_args()
 
     # Add specified path or CWD to sys.path
@@ -72,13 +131,24 @@ def main():
     # Create xopt
     with open(args.config) as f:
         # Open file
-        dat = yaml.safe_load(f)
+        config = yaml.safe_load(f)
 
         # Clean up (replicate behavior of Xopt.from_file)
-        dat = remove_none_values(dat)
+        config = remove_none_values(config)
+
+        # Apply the overrides to the config dict
+        for override in args.override:
+            # Sanity check
+            if "=" not in override:
+                raise ValueError(
+                    f'Invalid override format: "{override}". Expected key=value'
+                )
+
+            # Merge in the config override
+            config = merge_dicts(config, override_to_dict(override))
 
         # Construct Xopt object
-        my_xopt = Xopt.model_validate(dat)
+        my_xopt = Xopt.model_validate(config)
 
     # Get our executor
     with get_executor(args.executor, max_workers=args.max_workers) as executor:
