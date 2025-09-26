@@ -21,7 +21,7 @@ from torch.nn import Module
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.generators.bayesian.utils import get_training_data
+from xopt.generators.bayesian.utils import get_training_data, get_training_data_batched
 from xopt.pydantic import decode_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
@@ -100,7 +100,7 @@ class StandardModelConstructor(ModelConstructor):
         description="flag to specify if the model should be trained",
     )
     train_kwargs: Dict[str, Any] | None = Field(
-        default_factory=lambda: {"optimizer_kwargs": {"options": {"maxiter": 1000}}},
+        default_factory=lambda: {"optimizer_kwargs": {"options": {"maxiter": 10000}}},
         description="kwargs for model optimizer - see fit_gpytorch_mll_scipy",
     )
 
@@ -166,8 +166,7 @@ class StandardModelConstructor(ModelConstructor):
 
     def get_likelihood(
         self,
-        dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
+        batch_shape: torch.Size = torch.Size(),
     ) -> Likelihood:
         """
         Get the likelihood for the model, considering the low noise prior and or a
@@ -179,14 +178,13 @@ class StandardModelConstructor(ModelConstructor):
             The likelihood for the model.
 
         """
-        tkwargs = {"dtype": dtype, "device": device}
         if self.custom_noise_prior is not None:
             likelihood = GaussianLikelihood(
-                noise_prior=self.custom_noise_prior,
+                noise_prior=self.custom_noise_prior, batch_shape=batch_shape
             )
         elif self.use_low_noise_prior:
             likelihood = GaussianLikelihood(
-                noise_prior=GammaPrior(1.0, 100.0),
+                noise_prior=GammaPrior(1.0, 100.0), batch_shape=batch_shape
             )
         else:
             noise_prior = GammaPrior(1.1, 0.05)
@@ -198,8 +196,8 @@ class StandardModelConstructor(ModelConstructor):
                     transform=None,
                     initial_value=noise_prior_mode,
                 ),
+                batch_shape=batch_shape,
             )
-        likelihood = likelihood.to(**tkwargs)
         return likelihood
 
     def build_model(
@@ -251,7 +249,7 @@ class StandardModelConstructor(ModelConstructor):
         mean_modules = deepcopy(self.mean_modules)
         for outcome_name in outcome_names:
             input_transform = self._get_input_transform(
-                outcome_name, input_names, input_bounds, tkwargs
+                outcome_name, input_names, input_bounds
             )
             outcome_transform = Standardize(1)
             covar_module = self._get_module(covar_modules, outcome_name)
@@ -277,7 +275,7 @@ class StandardModelConstructor(ModelConstructor):
                     self.build_single_task_gp(
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
-                        likelihood=self.get_likelihood(**tkwargs),
+                        likelihood=self.get_likelihood(),
                         train=False,
                         **kwargs,
                     )
@@ -383,14 +381,14 @@ class StandardModelConstructor(ModelConstructor):
         else:
             return None
 
-    def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
+    def _get_input_transform(self, outcome_name, input_names, input_bounds):
         """get input transform based on the supplied bounds and attributes"""
         # get input bounds
         if input_bounds is None:
             bounds = None
         else:
             bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
+                [torch.tensor(input_bounds[name]) for name in input_names]
             ).T
 
         # create transform
@@ -420,7 +418,7 @@ class BatchedModelConstructor(StandardModelConstructor):
         outcome_names: list[str],
         input_names: list[str],
         input_bounds,
-        _aug_batch_shape: torch.Size = torch.Size([]),
+        batch_shape: torch.Size = torch.Size(),
     ) -> Optional[Normalize]:
         if input_bounds is None:
             bounds = None
@@ -432,7 +430,7 @@ class BatchedModelConstructor(StandardModelConstructor):
         input_transform = Normalize(
             len(input_names),
             bounds=bounds,
-            batch_shape=_aug_batch_shape,
+            batch_shape=batch_shape,
         )
 
         # remove input transform if the bool is False or the dict entry is false
@@ -449,71 +447,6 @@ class BatchedModelConstructor(StandardModelConstructor):
             botorch.settings.validate_input_scaling(False)
 
         return input_transform
-
-    def get_likelihood(
-        self,
-        dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
-        _aug_batch_shape: torch.Size = torch.Size([]),
-    ) -> Likelihood:
-        tkwargs = {"dtype": dtype, "device": device}
-        if self.custom_noise_prior is not None:
-            likelihood = GaussianLikelihood(
-                noise_prior=self.custom_noise_prior, batch_shape=_aug_batch_shape
-            )
-        elif self.use_low_noise_prior:
-            likelihood = GaussianLikelihood(
-                noise_prior=GammaPrior(1.0, 100.0), batch_shape=_aug_batch_shape
-            )
-        else:
-            noise_prior = GammaPrior(1.1, 0.05)
-            noise_prior_mode = (noise_prior.concentration - 1) / noise_prior.rate
-            likelihood = GaussianLikelihood(
-                noise_prior=noise_prior,
-                noise_constraint=GreaterThan(
-                    MIN_INFERRED_NOISE_LEVEL,
-                    transform=None,
-                    initial_value=noise_prior_mode,
-                ),
-                batch_shape=_aug_batch_shape,
-            )
-        likelihood = likelihood.to(**tkwargs)
-        return likelihood
-
-    def get_training_data_batched(
-        self, input_names: List[str], outcome_names: List[str], data: pd.DataFrame
-    ) -> (torch.Tensor, torch.Tensor):
-        """
-        Returns
-        -------
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            train_X (number of outcomes) x n x d
-            train_Y (number of outcomes) x n x m
-            train_Yvar (number of outcomes) x n x m
-
-        """
-        input_data = data[input_names]
-        outcome_data = data[outcome_names]
-
-        non_nans = ~input_data.isnull().T.any()
-        non_nans_output = ~outcome_data.isnull().T.any()
-        non_nans_all = non_nans & non_nans_output
-        input_data = input_data[non_nans_all]
-        outcome_data = outcome_data[non_nans_all]
-
-        train_X = torch.tensor(input_data.to_numpy(dtype="double")).unsqueeze(0)
-        # TODO: check expand vs repeat performance
-        train_X = train_X.expand(len(outcome_names), -1, -1)
-
-        train_Y_batches = []
-        for outcome in outcome_names:
-            train_Y = torch.tensor(
-                outcome_data[outcome].to_numpy(dtype="double")
-            ).unsqueeze(-1)
-            train_Y_batches.append(train_Y)
-        train_Y = torch.stack(train_Y_batches)
-
-        return train_X, train_Y, None
 
     def build_model(
         self,
@@ -536,9 +469,16 @@ class BatchedModelConstructor(StandardModelConstructor):
                     "training GP model hyperparameters instead"
                 )
 
-        train_X, train_Y, train_Yvar = self.get_training_data_batched(
+        train_X, train_Y, train_Yvar = get_training_data_batched(
             input_names, outcome_names, data
         )
+        if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
+            raise ValueError("no data found to train model!")
+
+        # train_Y is n x m, will get transformed to (m) x n x 1 by
+        # SingleTaskGP to run as m independent batches
+        # _input_batch_shape = empty
+        # _aug_batch_shape = (m,) = (_num_outputs,)
 
         _num_outputs = train_Y.shape[-1]
         _input_batch_shape, _aug_batch_shape = (
@@ -564,15 +504,17 @@ class BatchedModelConstructor(StandardModelConstructor):
         elif len(self.mean_modules) == 1:
             mean_module = list(self.mean_modules.values())[0]
 
-        likelihood = self.get_likelihood(_aug_batch_shape=_aug_batch_shape)
+        likelihood = self.get_likelihood(batch_shape=_aug_batch_shape)
+        # breakpoint()
+        # input and output transforms are applied BEFORE tensors are unrolled
         input_transform = self._get_input_transform(
             outcome_names,
             input_names,
             input_bounds=input_bounds,
-            _aug_batch_shape=_aug_batch_shape,
+            batch_shape=_input_batch_shape,
         )
         outcome_transform = Standardize(
-            m=train_Y.shape[-1], batch_shape=_aug_batch_shape
+            m=train_Y.shape[-1], batch_shape=_input_batch_shape
         )
         kwargs = {
             "input_transform": input_transform,
@@ -581,8 +523,6 @@ class BatchedModelConstructor(StandardModelConstructor):
             "mean_module": mean_module,
         }
 
-        if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
-            raise ValueError("no data found to train model!")
         full_model = SingleTaskGP(train_X, train_Y, likelihood=likelihood, **kwargs)
         full_model.to(**tkwargs)
 
@@ -601,4 +541,4 @@ class BatchedModelConstructor(StandardModelConstructor):
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
-        return full_model.to(**tkwargs)
+        return full_model
