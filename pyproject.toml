@@ -42,9 +42,18 @@ dev = [
   "pytest-cov",
   "pytest-xdist",
   "dask[distributed]",
-  "mpi4py",
   "jupyter",
   "nbconvert"
+  "pytest-benchmark",
+  "ruff",
+  "py-spy",
+  "ffmpeg",
+  "jupyterlab>=3",
+  "jupyterlab-lsp",
+  "python-lsp-server",
+  "pygments",
+  "dask",
+  "mpi4py"
 ]
 doc = [
   "mkdocs",
