@@ -124,7 +124,10 @@ def main():
     args = parser.parse_args()
 
     # Add specified path or CWD to sys.path
-    import_path = args.python_path or os.getcwd()
+    if args.python_path is None:
+        import_path = os.getcwd()
+    else:
+        import_path = os.path.expanduser(os.path.expandvars(args.python_path))
     if import_path not in sys.path:
         sys.path.insert(0, import_path)
 
