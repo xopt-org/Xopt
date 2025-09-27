@@ -122,7 +122,7 @@ plugins:
 
   - mkdocs-jupyter:
       include_source: True
-      execute: False
+      execute: True
 
   - mkdocstrings:
       default_handler: python
