@@ -49,6 +49,7 @@ specified in `VOCS`
 
 Evolutionary Generators
 =====
+- [`NSGA2Generator`](../examples/ga/nsga2/index.md): implementation of the NSGA-II non-dominated sorting multi-objective genetic algorithm.
 - [`CNSGAGenerator`](../examples/ga/cnsga_tnk.ipynb): implements Continuous Non-dominated Sorted Genetic Algorithm
   which as a good general purpose evolutionary algorithm used for solving
   multi-objective optimization problems where evaluating the objective is relatively
