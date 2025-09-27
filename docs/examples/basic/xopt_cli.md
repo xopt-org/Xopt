@@ -2,6 +2,7 @@
 
 The tool `xopt-run` allows users without advanced needs to run optimizations using only a YAML config file and an evaluation function available from python's path.
 You may use `xopt-run` if your optimization satisfies the following requirements.
+
 - You are using one of Xopt's built in `Generator` classes.
 - You plan to run the evaluation function in serial (vectorized or non-vectorized), or use `ProcessPoolExecutor` or `ThreadPoolExecutor` for parallelism.
 - The parameter `Xopt.max_evaluations` is sufficient to define your stopping condition.
@@ -16,6 +17,7 @@ xopt-run [-h] [--executor {map,thread_pool,process_pool}] [--max_workers MAX_WOR
 ```
 
 The available arguments are the following.
+
 - `config`: (required) Path to the YAML config file
 - `-h`: Display help text for the tool.
 - `--executor`: Override the executor defined in the config file. Available options are "map" (run serially, ie using the function `map`), "thread_pool" (use `ThreadPoolExecutor`), and "process_pool" (use `ProcessPoolExecutor`).
@@ -42,7 +44,7 @@ The argument `--python_path <path>` is used to add the directory containing your
 By default, the current working directory is included in your python path.
 
 ## Example Usage
-### Calling Evaluation Function from Python File
+### Calling an Evaluation Function from a Python File
 As an example, if you would like to use a custom evaluation function called `eval_fun` and have defined it in the file `my_optimization.py`, your YAML config file would contain the following entry.
 ```yaml
 evaluator:
