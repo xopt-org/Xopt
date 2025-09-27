@@ -239,11 +239,12 @@ Your directory should include the following files.
 - `eval_fun.py`
 - `nsga2_zdt3.yml`
 
-To run the optimization, execute the following command from the project directory using a python environment with Xopt installed.
-The CLI tool `xopt-run` is a general tool to run Xopt from a YAML configuration file for users with basic parallelization needs.
+To run the optimization, execute the following command from the same directory as `eval_fun.py` using a python environment with Xopt installed.
 ```bash
 xopt-run nsga2_zdt3.yml
 ```
+The CLI tool `xopt-run` is a general tool to run Xopt from a YAML configuration file for users with basic parallelization needs.
+Read more about it on the [Xopt CLI documentation page](../../../basic/xopt_cli.md).
 It should complete in roughly 30s and produce a directory called `nsga2_output` in the current location.
 
 Navigate to the output directory and observe the files there.
