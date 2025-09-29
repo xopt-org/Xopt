@@ -18,14 +18,15 @@ def run_benchmark():
     assert device == "cpu" or device == "cuda" or device.startswith("cuda:"), (
         "Device must be 'cpu', 'cuda', or 'cuda:<index>'"
     )
-    if device != "cpu":
+    if device == "cpu":
+        dev_kwargs["device"] = "cpu"
+    else:
         import torch
 
         if not torch.cuda.is_available():
             raise ValueError("CUDA is not available on this machine")
         if device == "cuda":
             device = "cuda:0"
-        torch.cuda.set_device(device)
         dev_kwargs["device"] = device
 
     runner = BenchFunction()
@@ -33,6 +34,7 @@ def run_benchmark():
         try:
             pre, func = BenchDispatcher.get(benchmark)
             kwargs = BenchDispatcher.get_kwargs(benchmark)
+            kwargs.update(dev_kwargs)
             print(f"Adding benchmark {benchmark} for {args.n} iterations")
         except KeyError:
             raise ValueError(f"Benchmark function {benchmark} not found")
