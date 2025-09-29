@@ -35,16 +35,18 @@ class EnsembleModelConstructor(ModelConstructor):
         dtype: torch.dtype = torch.float64,
         device: Union[torch.device, str] = "cpu",
     ):
-        # get training data -- need to update utils for multivariate case
+        # Get training data
         train_X, train_Y, train_Yvar = get_training_data(
             input_names, outcome_names, data
         )
         self.model = self.model.to(dtype)
         
+        # Fit model on training data
         self.model.fit(train_X, train_Y)
         self.model = self.model.to(device)
         self.model.eval()
         
+        # Expected model list
         self.model.models = [self.model]
         
         return self.model
@@ -57,8 +59,10 @@ class MCDropoutMLP(nn.Module):
                  hidden_activation=nn.ReLU(), output_activation=None):
         super().__init__()
 
+        # Build up model layers
         self.layers = nn.ModuleList()
         for i in range(n_hidden_layers):
+            # Input layer or hidden layers
             if i == 0:
                 self.layers.append(nn.Linear(input_dim, hidden_dim))
             else:
@@ -67,7 +71,7 @@ class MCDropoutMLP(nn.Module):
             self.layers.append(nn.Dropout(p=dropout_rate))
             self.layers.append(hidden_activation)
 
-        
+        # Output layer
         if n_hidden_layers == 0:
             self.layers.append(nn.Linear(input_dim, output_dim))
         else:
@@ -79,11 +83,12 @@ class MCDropoutMLP(nn.Module):
     def forward(self, input_data, seed=None):
         # Needed so that dropout works
         self.train()
+        # Seeding makes dropout self-consistent
         if seed is not None:
             torch.random.manual_seed(seed)
         for layer in self.layers:
             input_data = layer(input_data)
-            
+
         self.eval()
         return input_data
 
@@ -114,7 +119,7 @@ class FlattenedEnsemblePosterior(EnsemblePosterior):
         mean = self.mean
         variance = self.variance
         
-        # Assumes diagonal gaussian for simplicity
+        # Assumes diagonal gaussian for simplicity -- not necessarily true, but probably good enough
         covar = torch.diag_embed(variance.squeeze(-1).squeeze(-1))
         mvn = MultivariateNormal(mean.squeeze(-1).squeeze(-1), covariance_matrix=covar)
         
@@ -140,6 +145,7 @@ class MCDropoutModel(Model):
                  input_bounds=torch.tensor([[-np.pi], [np.pi]]), n_epochs=500, n_cond_epochs=40):
         
         super(MCDropoutModel, self).__init__()
+        # Construct model
         self.model = MCDropoutMLP(input_dim, output_dim, 
                                     dropout_rate=dropout_rate,
                                     n_hidden_layers=n_hidden_layers, 
@@ -170,9 +176,9 @@ class MCDropoutModel(Model):
             X_s = X
             y_s = y
         
+        # Generic training loop -- may be worth exposing more/adding more hooks?
         optimizer = optim_type(self.model.parameters(), lr=lr)
 
-        
         for epoch in range(n_epochs):
             pred = self.model(X_s)
             loss = loss_fn(pred, y_s)
@@ -202,10 +208,10 @@ class MCDropoutModel(Model):
     def subset_output(self, output_indices):
         # Create a deep copy of the model to avoid modifying the original
         new_model = deepcopy(self)
+        # Update output indices attribute (see forward)
         new_model.output_indices = output_indices
 
         return new_model
-        
 
     def forward(self, X: Tensor) -> Tensor:
         x = self.input_transform(X)

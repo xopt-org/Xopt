@@ -39,7 +39,8 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
 
 
         # Need to call the model on some data before we can condition_on_observations
-       # self.model.posterior(*[self.xs_exe[:1, 0:1, 0:] for m in model.models])
+        # SG: removed this -- I don't think it's needed?
+        # self.model.posterior(*[self.xs_exe[:1, 0:1, 0:] for m in model.models])
 
         # construct a batch of size n_samples fantasy models,
         # where each fantasy model is produced by taking the model
