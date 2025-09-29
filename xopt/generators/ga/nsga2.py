@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import chain
 from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
 import json
@@ -7,7 +8,9 @@ import numpy as np
 import os
 import pandas as pd
 import time
+import warnings
 
+from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
 from ..deduplicated import DeduplicatedGeneratorBase
@@ -416,7 +419,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     def load_from_checkpoint(cls, values):
         """
         Load from checkpoint file if checkpoint_file is provided.
-        Validates that user VOCS matches checkpoint VOCS.
         """
         # Case when a checkpoint file has been supplied
         if isinstance(values, dict) and "checkpoint_file" in values:
@@ -425,32 +427,64 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # Load checkpoint data
                 checkpoint_data = cls._load_checkpoint_data(checkpoint_file)
 
-                # VOCS validation - inline check
-                if "vocs" in values:
-                    # Convert any user supplied vocs to VOCS object
-                    if isinstance(values["vocs"], dict):
-                        values["vocs"] = VOCS.from_dict(values["vocs"])
-                    elif isinstance(values["vocs"], VOCS):
-                        pass
-                    else:
-                        raise ValueError(
-                            f"vocs must be of type dict or VOCS, got {type(values['vocs'])}"
-                        )
-
-                    # Check if they match
-                    if values["vocs"] != checkpoint_data["vocs"]:
-                        raise ValueError(
-                            "User-provided VOCS does not match checkpoint VOCS. "
-                            "The VOCS must be identical when loading from checkpoint to ensure "
-                            "consistency with the saved optimization state."
-                        )
-
                 # Merge with user data precedence
                 merged_data = {**checkpoint_data, **values}
                 return merged_data
 
         # No checkpoint
         return values
+
+    @model_validator(mode="after")
+    def vocs_compatible(self):
+        """
+        Check that the VOCS object is compatible with our checkpoint
+        For selection and the genetic operators to work correctly, all
+        incoming variables, objectives, and constraints must exist as
+        keys in pop/child
+        """
+        if self.pop or self.child:
+            # The keys present in all individuals
+            all_individuals = chain(self.pop, self.child)
+            all_keys = set.intersection(*(set(x.keys()) for x in all_individuals))
+
+            # Check that all required VOCS keys exist in the checkpoint populations
+            if not all_keys.issuperset(
+                self.vocs.variable_names
+                + self.vocs.objective_names
+                + self.vocs.constraint_names
+            ):
+                raise ValueError(
+                    "User-provided VOCS is not compatible with existing population "
+                    "or child data from checkpoint."
+                )
+
+            # Filter individuals outside of variable bounds
+            # Use __setattr__ to not recursively apply validation
+            n_ind = len(self.pop) + len(self.child)
+            object.__setattr__(
+                self, "pop", [x for x in self.pop if self.data_in_bounds(x)]
+            )
+            object.__setattr__(
+                self, "child", [x for x in self.child if self.data_in_bounds(x)]
+            )
+
+            # Check how many individuals we filtered and report
+            n_filtered = n_ind - (len(self.pop) + len(self.child))
+            if n_filtered > 0:
+                warnings.warn(
+                    f"Filtered {n_filtered} individuals from population/children "
+                    "that lay outside of variable bounds."
+                )
+
+        return self
+
+    def data_in_bounds(self, data: dict) -> bool:
+        """
+        Returns true if every variable in the data dictionary is within bounds.
+        """
+        return all(
+            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+        )
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
@@ -518,6 +552,19 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     def add_data(self, new_data: pd.DataFrame):
         self.ensure_output_dir_setup()
+
+        # Validate data is at least compatible with selection / genetic operators
+        vocs_names = (
+            self.vocs.variable_names
+            + self.vocs.objective_names
+            + self.vocs.constraint_names
+        )
+        if not set(vocs_names).issubset(set(new_data.columns)):
+            missing_cols = set(vocs_names).difference(set(new_data.columns))
+            raise DataError(
+                "New data must contain at least all variables, objectives, and constraints as columns"
+                f" (missing columns: {missing_cols})"
+            )
 
         # Pass to parent class for inclusion in self.data
         super().add_data(new_data)

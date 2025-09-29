@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from xopt.base import Xopt
+from xopt.errors import DataError
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.nsga2 import (
     NSGA2Generator,
@@ -213,9 +214,13 @@ def test_generate_child_binary_tournament():
 def nsga2_optimization_with_checkpoint():
     """Test fixture that supplies a optimization with data and the final checkpoint path"""
     with TemporaryDirectory() as output_dir:
+        # Add a constant for testing VOCS reload with new parameters
+        vocs = tnk_vocs.model_copy(deep=True)
+        vocs.constants["my_const1"] = 0.0
+
         # Set up the generator with output_dir and checkpoint_freq
         generator = NSGA2Generator(
-            vocs=tnk_vocs, output_dir=output_dir, population_size=10, checkpoint_freq=1
+            vocs=vocs, output_dir=output_dir, population_size=10, checkpoint_freq=1
         )
 
         # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
@@ -226,7 +231,7 @@ def nsga2_optimization_with_checkpoint():
         X = Xopt(
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
-            vocs=tnk_vocs,
+            vocs=vocs,
             max_evaluations=20,  # Run for 2 generations
         )
         X.run()
@@ -368,35 +373,294 @@ def test_nsga2_checkpoint_reload_override(nsga2_optimization_with_checkpoint):
     )  # Make sure we don't invalidate test in future by accident
 
 
-def test_nsga2_checkpoint_reload_vocs_mismatch_yaml(nsga2_optimization_with_checkpoint):
+def test_nsga2_checkpoint_reload_vocs_var_bounds_expand(
+    nsga2_optimization_with_checkpoint,
+):
     """
-    Test that NSGA2Generator raises appropriate error when VOCS doesn't match checkpoint.
+    Confirm we can expand bounds and individuals are not filtered.
     """
-    # Get the optimizer and checkpoint (created with tnk_vocs)
-    _, latest_checkpoint = nsga2_optimization_with_checkpoint
+    my_xopt = Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
 
-    # Attempt to create generator with mismatched VOCS - should fail during model validation
-    with pytest.raises(
-        ValueError, match="User-provided VOCS does not match checkpoint VOCS"
-    ):
-        yaml = f"""
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [-10.0, 10.0]
+        x2: [-10.0, 10.0]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+    # Check that all individuals are loaded (no filtering)
+    orig_xopt = nsga2_optimization_with_checkpoint[0]
+    assert len(my_xopt.generator.pop) == len(orig_xopt.generator.pop)
+    assert len(my_xopt.generator.child) == len(orig_xopt.generator.child)
+
+
+def test_nsga2_checkpoint_reload_vocs_var_bounds_shrink(
+    nsga2_optimization_with_checkpoint,
+):
+    """
+    Confirm we can change variable bounds and individuals outside are filtered.
+    """
+    my_xopt = Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [-10.0, -5.0]
+        x2: [-10.0, -5.0]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+    # Check that all individuals are filtered (all out of bounds)
+    assert len(my_xopt.generator.pop) == 0
+    assert len(my_xopt.generator.child) == 0
+
+
+def test_nsga2_checkpoint_reload_vocs_obj_dir(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MAXIMIZE
+        y2: MAXIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_constraint_conf(
+    nsga2_optimization_with_checkpoint,
+):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [LESS_THAN, 0.123]
+        c2: [GREATER_THAN, 0.321]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_new_var(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+        my_const1: [0.0, 1.0]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_new_obj(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+        my_const1: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_new_const(nsga2_optimization_with_checkpoint):
+    Xopt.from_yaml(
+        f"""
+    generator:
+      name: nsga2
+      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+    evaluator:
+      function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+    vocs:
+      variables:
+        x1: [0, 3.14159]
+        x2: [0, 3.14159]
+
+      objectives:
+        y1: MINIMIZE
+        y2: MINIMIZE
+
+      constraints:
+        c1: [GREATER_THAN, 0]
+        c2: [LESS_THAN, 0.5]
+        my_const1: [LESS_THAN, 0.5]
+    """.replace("\n    ", "\n")
+    )
+
+
+def test_nsga2_checkpoint_reload_vocs_bad_var(nsga2_optimization_with_checkpoint):
+    with pytest.raises(ValueError, match="User-provided VOCS is not compatible.*"):
+        Xopt.from_yaml(
+            f"""
         generator:
           name: nsga2
-          checkpoint_file: {latest_checkpoint}
+          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
 
         evaluator:
           function: xopt.resources.test_functions.tnk.evaluate_TNK
 
         vocs:
           variables:
-            x1: [0, 1]
-            x2: [0, 1]
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+            does_not_exist: [0.0, 1.0]
 
           objectives:
-            f1: MINIMIZE
-            f2: MINIMIZE
+            y1: MINIMIZE
+            y2: MINIMIZE
+
+          constraints:
+            c1: [GREATER_THAN, 0]
+            c2: [LESS_THAN, 0.5]
         """.replace("\n        ", "\n")
-        Xopt.from_yaml(yaml)
+        )
+
+
+def test_nsga2_checkpoint_reload_vocs_bad_obj(nsga2_optimization_with_checkpoint):
+    with pytest.raises(ValueError, match="User-provided VOCS is not compatible.*"):
+        Xopt.from_yaml(
+            f"""
+        generator:
+          name: nsga2
+          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+        evaluator:
+          function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+        vocs:
+          variables:
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+
+          objectives:
+            y1: MINIMIZE
+            y2: MINIMIZE
+            does_not_exist: MINIMIZE
+
+          constraints:
+            c1: [GREATER_THAN, 0]
+            c2: [LESS_THAN, 0.5]
+        """.replace("\n        ", "\n")
+        )
+
+
+def test_nsga2_checkpoint_reload_vocs_bad_const(nsga2_optimization_with_checkpoint):
+    with pytest.raises(ValueError, match="User-provided VOCS is not compatible.*"):
+        Xopt.from_yaml(
+            f"""
+        generator:
+          name: nsga2
+          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+
+        evaluator:
+          function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+        vocs:
+          variables:
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+
+          objectives:
+            y1: MINIMIZE
+            y2: MINIMIZE
+
+          constraints:
+            c1: [GREATER_THAN, 0]
+            c2: [LESS_THAN, 0.5]
+            does_not_exist: [LESS_THAN, 0.5]
+        """.replace("\n        ", "\n")
+        )
 
 
 def test_nsga2_all_individuals_in_data():
@@ -679,3 +943,41 @@ def test_nsga2_output_inhomogenous_data():
 
         # Load the file (will fail if bad CSV file was written)
         pd.read_csv(os.path.join(output_dir, "populations.csv"))
+
+
+def test_nsga2_vocs_not_present_in_add_data():
+    # Run a few optimization steps
+    X = Xopt(
+        generator=NSGA2Generator(vocs=tnk_vocs),
+        evaluator=Evaluator(function=evaluate_TNK),
+        vocs=tnk_vocs,
+        max_evaluations=10,
+    )
+    X.run()
+
+    # Attempt to submit data with required vocs columns
+    X.add_data(
+        pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "y2": [0], "c1": [0], "c2": [0]})
+    )
+
+    # Missing var
+    with pytest.raises(DataError, match="New data must contain at least all.*"):
+        X.add_data(
+            pd.DataFrame({"x1": [0], "y1": [0], "y2": [0], "c1": [0], "c2": [0]})
+        )
+
+    # Missing obj
+    with pytest.raises(DataError, match="New data must contain at least all.*"):
+        X.add_data(
+            pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "c1": [0], "c2": [0]})
+        )
+
+    # Missing constraint
+    with pytest.raises(DataError, match="New data must contain at least all.*"):
+        X.add_data(
+            pd.DataFrame({"x1": [0], "x2": [0], "y1": [0], "y2": [0], "c1": [0]})
+        )
+
+    # Try with strict=False
+    X.strict = False
+    X.add_data(pd.DataFrame({"x1": [0], "y2": [0], "c1": [0]}))
