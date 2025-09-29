@@ -28,8 +28,18 @@ def xtest_callable(input_dict: dict, a=0) -> dict:
 
     assert "constant1" in input_dict
 
-    y1 = x1**2
-    c1 = x2
+    y1 = x2
+    c1 = x1
+    return {"y1": y1, "c1": c1}
+
+
+def xtest_callable_3d(input_dict: dict, a=0) -> dict:
+    """Single-objective callable test function"""
+    assert isinstance(input_dict, dict)
+    assert "constant1" in input_dict
+
+    y1 = input_dict["x2"]
+    c1 = input_dict["x1"] ** 1.5 - input_dict["x3"] ** 2
     return {"y1": y1, "c1": c1}
 
 
@@ -270,6 +280,14 @@ def create_set_options_helper(
 # Single-objective VOCS with constraints
 TEST_VOCS_BASE = VOCS(
     **{
+        "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
+        "objectives": {"y1": "MINIMIZE"},
+        "constraints": {"c1": ["GREATER_THAN", 0.5]},
+        "constants": {"constant1": 1.0},
+    }
+)
+TEST_VOCS_BASE_3D = VOCS(
+    **{
         "variables": {"x1": [0, 1.0], "x2": [0, 10.0], "x3": [-1.0, 1.0]},
         "objectives": {"y1": "MINIMIZE"},
         "constraints": {"c1": ["GREATER_THAN", 0.5]},
@@ -300,11 +318,19 @@ cnames = (
 test_init_data = {
     "x1": np.linspace(0.01, 1.0, 10),
     "x2": np.linspace(0.01, 1.0, 10) * 10.0,
+    "constant1": 1.0,
+}
+test_init_data_3d = {
+    "x1": np.linspace(0.01, 1.0, 10),
+    "x2": np.linspace(0.01, 1.0, 10) * 10.0,
     "x3": np.linspace(-0.9, 0.9, 10),
     "constant1": 1.0,
 }
 
 TEST_VOCS_DATA = pd.DataFrame({**test_init_data, **xtest_callable(test_init_data)})
+TEST_VOCS_DATA_3D = pd.DataFrame(
+    {**test_init_data_3d, **xtest_callable_3d(test_init_data_3d)}
+)
 TEST_VOCS_DATA_MO = pd.DataFrame(
     {**test_init_data, **xtest_callable_mo(test_init_data)}
 )

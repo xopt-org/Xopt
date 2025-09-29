@@ -174,13 +174,13 @@ class BenchFunction:
                 time.sleep(0.01)
             return {
                 "f": f.__name__,
-                "n_runs": n,
-                "t_mean": total_time / n,
-                "t_median": float(np.median(times)),
+                "n": n,
+                "t_avg": total_time / n,
+                "t_med": float(np.median(times)),
                 "t_max": float(np.max(times)),
                 "t_min": float(np.min(times)),
-                "t_total": total_time,
-                "stdev": float(np.std(times)),
+                "t_tot": total_time,
+                "std": float(np.std(times)) if n > 1 else 0.0,
                 "args": args,
                 "kwargs": kwargs,
             }
@@ -199,7 +199,7 @@ class BenchFunction:
         #     print(rdisp.iloc[i])
 
         print("---Results---")
-        print(rdisp.to_markdown())
+        print(rdisp.to_markdown(floatfmt=".3f"))
 
 
 class BenchDispatcher:

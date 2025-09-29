@@ -162,16 +162,10 @@ class StandardModelConstructor(ModelConstructor):
             # "optimizer_kwargs",
             "pick_best_of_all_attempts",
             "max_attempts",
-            "optimizer",
+            # "optimizer",
             "warning_handler",
         ]
-        # subkeys for optimizer_kwargs based on fit_gpytorch_mll_scipy/fit_gpytorch_mll_torch
         allowed_subkeys = {}
-        # if info.data["method"] == "adam":
-        #     # TODO: add scheduler/stopping criterion pydantic models?
-        #     allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "step_limit"]}
-        # else:
-        #     allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "options"]}
         if not isinstance(train_kwargs, dict):
             raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
         invalid_keys = set(train_kwargs.keys()) - set(allowed_keys)
@@ -485,7 +479,10 @@ class StandardModelConstructor(ModelConstructor):
             bounds = None
         else:
             bounds = torch.vstack(
-                [torch.tensor(input_bounds[name]) for name in input_names]
+                [
+                    torch.tensor(input_bounds[name], dtype=torch.double)
+                    for name in input_names
+                ]
             ).T
 
         # create transform
