@@ -9,6 +9,10 @@ from xopt.generators.bayesian.upper_confidence_bound import (
     TDUpperConfidenceBoundGenerator,
     UpperConfidenceBoundGenerator,
 )
+import torch
+
+# set default precision
+torch.set_default_dtype(torch.double)
 
 
 __all__ = [
