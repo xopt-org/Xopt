@@ -6,29 +6,38 @@ import xopt.resources.bench_functions  # noqa: F401
 
 def run_benchmark():
     parser = argparse.ArgumentParser(description="Run benchmark function")
-    parser.add_argument(
-        "benchmark", type=str, help="Name of the benchmark function to run"
-    )
     parser.add_argument("-n", type=int, help="number of repeats", nargs="?", default=1)
     parser.add_argument("-device", type=str, help="device to use", default="cpu")
+    parser.add_argument(
+        "benchmarks", type=str, nargs="+", help="Name of the benchmark function to run"
+    )
     args = parser.parse_args()
 
-    try:
-        pre, func = BenchDispatcher.get(args.benchmark)
-        kwargs = BenchDispatcher.get_kwargs(args.benchmark)
-        print(f"Running benchmark {args.benchmark} for {args.n} iterations")
-    except KeyError:
-        raise ValueError(f"Benchmark function {args.benchmark} not found")
-
+    dev_kwargs = {}
     device = args.device
     assert device == "cpu" or device == "cuda" or device.startswith("cuda:"), (
         "Device must be 'cpu', 'cuda', or 'cuda:<index>'"
     )
+    if device != "cpu":
+        import torch
 
-    pre()
-    bench = BenchFunction()
-    bench.add(func, kwargs=kwargs)
-    bench.run(min_rounds=args.n, min_time=0.0)
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA is not available on this machine")
+        if device == "cuda":
+            device = "cuda:0"
+        torch.cuda.set_device(device)
+        dev_kwargs["device"] = device
+
+    runner = BenchFunction()
+    for benchmark in args.benchmarks:
+        try:
+            pre, func = BenchDispatcher.get(benchmark)
+            kwargs = BenchDispatcher.get_kwargs(benchmark)
+            print(f"Adding benchmark {benchmark} for {args.n} iterations")
+        except KeyError:
+            raise ValueError(f"Benchmark function {benchmark} not found")
+        runner.add(func, kwargs=kwargs, preamble=pre)
+    runner.run(min_rounds=args.n, min_time=0.0)
 
 
 if __name__ == "__main__":

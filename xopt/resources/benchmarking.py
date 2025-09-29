@@ -130,12 +130,12 @@ class BenchFunction:
     def __init__(self):
         self.configs = []
 
-    def add(self, f, args=None, kwargs=None):
+    def add(self, f, args=None, kwargs=None, preamble=None):
         if args is None:
             args = []
         if kwargs is None:
             kwargs = {}
-        self.configs.append((f, args, kwargs))
+        self.configs.append((f, args, kwargs, preamble))
 
     def run_config(
         self,
@@ -146,10 +146,12 @@ class BenchFunction:
         warmup: bool = False,
         row: int = 0,
     ):
-        f, args, kwargs = self.configs[row]
+        f, args, kwargs, pre = self.configs[row]
         import gc
 
         try:
+            if pre is not None:
+                pre()
             if warmup:
                 f(*args, **kwargs)
             if disable_gc:
@@ -171,14 +173,14 @@ class BenchFunction:
                     break
                 time.sleep(0.01)
             return {
-                "n": n,
+                "f": f.__name__,
+                "n_runs": n,
                 "t_mean": total_time / n,
                 "t_median": float(np.median(times)),
                 "t_max": float(np.max(times)),
                 "t_min": float(np.min(times)),
                 "t_total": total_time,
                 "stdev": float(np.std(times)),
-                "f": f.__name__,
                 "args": args,
                 "kwargs": kwargs,
             }
@@ -191,19 +193,24 @@ class BenchFunction:
         for i in range(len(self.configs)):
             results.append(self.run_config(row=i, **kwargs))
         r = pd.DataFrame(results)
-        rdisp = r.drop(columns=["args", "kwargs", "f"])
-        for i in range(len(self.configs)):
-            print("Results for function:", self.configs[0][0].__name__)
-            print(rdisp.iloc[i])
+        rdisp = r.drop(columns=["args", "kwargs"])
+        # for i in range(len(self.configs)):
+        #     print("Results for function:", self.configs[i][0].__name__)
+        #     print(rdisp.iloc[i])
+
+        print("---Results---")
+        print(rdisp.to_markdown())
 
 
 class BenchDispatcher:
     benchmarks = {}
     arguments = {}
+    verbose = False
 
     @staticmethod
     def register(func, name=None, preamble=None):
-        print(f"Registering benchmark function {name or func.__name__}")
+        if BenchDispatcher.verbose:
+            print(f"Registering benchmark function {name or func.__name__}")
         if name is None:
             name = func.__name__
         BenchDispatcher.benchmarks[name] = [preamble, func]
