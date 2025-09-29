@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import List
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ from xopt.vocs import VOCS
 
 
 def get_training_data(
-    input_names: List[str], outcome_names: str, data: pd.DataFrame
+    input_names: List[str], outcome_names: Union[str, List[str]], data: pd.DataFrame
 ) -> (torch.Tensor, torch.Tensor):
     """
     Creates training data from input data frame.
@@ -43,6 +43,9 @@ def get_training_data(
 
     """
 
+    if type(outcome_names) != list:
+        outcome_names = [outcome_names]
+        
     input_data = data[input_names]
     outcome_data = data[outcome_names]
 
