@@ -16,11 +16,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 def bench_build_standard_kwargs():
     test_vocs = generate_vocs(n_vars=12, n_obj=5, n_constr=2)
-    test_data = generate_data(vocs=test_vocs, n=100)
+    test_data = generate_data(vocs=test_vocs, n=500)
     return test_vocs, test_data
 
 
-def preamble_build_model():
+def preamble_build_model(verbose=False):
     # import numpy as np
     # np.show_runtime()
     torch.set_num_threads(1)
@@ -30,7 +30,8 @@ def preamble_build_model():
 
     threadpoolctl.threadpool_limits(limits=1, user_api="blas")
     threadpoolctl.threadpool_limits(limits=1, user_api="openmp")
-    pprint(threadpoolctl.threadpool_info())
+    if verbose:
+        pprint(threadpoolctl.threadpool_info())
 
     torch.cuda.synchronize()
 
@@ -92,7 +93,7 @@ def bench_build_batched_botorch_patch(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_batched_gpytorch(vocs, data, device="cpu"):
+def bench_build_batched_gpytorch_mt(vocs, data, device="cpu"):
     class BatchIndependentMultitaskGPModel(gpytorch.models.ExactGP):
         def __init__(self, train_x, train_y, likelihood):
             super().__init__(train_x, train_y, likelihood)
@@ -118,6 +119,8 @@ def bench_build_batched_gpytorch(vocs, data, device="cpu"):
         batch_mode=False,
     )
     device = torch.device(device)
+    train_X = train_X.to(device=device)
+    train_Y = train_Y.to(device=device)
     # disabling global noise is critical to match list implementation
     likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
         num_tasks=vocs.n_outputs, has_global_noise=False
@@ -131,7 +134,7 @@ def bench_build_batched_gpytorch(vocs, data, device="cpu"):
     mll.to(device=device)
     training_iterations = 200
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-    #print([(p, p.shape) for p in model.parameters()])
+    # print([(p, p.shape) for p in model.parameters()])
     for i in range(training_iterations):
         optimizer.zero_grad()
         output = model(train_X)
@@ -140,7 +143,66 @@ def bench_build_batched_gpytorch(vocs, data, device="cpu"):
         if i % 10 == 0:
             print("Iter %d/%d - Loss: %.3f" % (i + 1, training_iterations, loss.item()))
         optimizer.step()
-    # [10.246825   8.605122   6.923973   5.161834   4.2145376  4.3885226  4.4575253]
+    print(
+        "Lengthscale: ",
+        model.covar_module.base_kernel.raw_lengthscale.numpy(force=True).flatten(),
+    )
+
+
+@BenchDispatcher.register_decorator(preamble=preamble_build_model)
+@BenchDispatcher.register_defaults(
+    ["vocs", "data"], lambda: bench_build_standard_kwargs()
+)
+def bench_build_batched_gpytorch(vocs, data, device="cpu"):
+    class BatchIndependentGPModel(gpytorch.models.ExactGP):
+        def __init__(self, train_x, train_y, likelihood):
+            super().__init__(train_x, train_y, likelihood)
+            self.mean_module = gpytorch.means.ConstantMean(
+                batch_shape=torch.Size([vocs.n_outputs])
+            )
+            self.covar_module = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.RBFKernel(batch_shape=torch.Size([vocs.n_outputs])),
+                batch_shape=torch.Size([vocs.n_outputs]),
+            )
+
+        def forward(self, x):
+            mean_x = self.mean_module(x)
+            covar_x = self.covar_module(x)
+            return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+    train_X, train_Y, train_Yvar = get_training_data_batched(
+        input_names=vocs.variable_names,
+        outcome_names=vocs.output_names,
+        data=data,
+        batch_mode=True,
+    )
+    assert train_X.shape == (vocs.n_outputs, len(data), vocs.n_variables)
+    assert train_Y.shape == (vocs.n_outputs, len(data), 1)
+    train_Y = train_Y.squeeze(-1)
+    device = torch.device(device)
+    train_X = train_X.to(device=device)
+    train_Y = train_Y.to(device=device)
+    likelihood = gpytorch.likelihoods.GaussianLikelihood(
+        batch_shape=torch.Size([vocs.n_outputs])
+    )
+    model = BatchIndependentGPModel(train_X, train_Y, likelihood)
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+    model.train()
+    likelihood.train()
+    model.to(device=device)
+    mll.to(device=device)
+    training_iterations = 200
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    # print([(p, p.shape) for p in model.parameters()])
+    for i in range(training_iterations):
+        optimizer.zero_grad()
+        output = model(train_X)
+        loss = -mll(output, train_Y).sum()
+        loss.backward()
+        if i % 10 == 0:
+            print("Iter %d/%d - Loss: %.3f" % (i + 1, training_iterations, loss.item()))
+        optimizer.step()
     print(
         "Lengthscale: ",
         model.covar_module.base_kernel.raw_lengthscale.numpy(force=True).flatten(),
@@ -173,7 +235,8 @@ def bench_build_standard_gpytorch(vocs, data, device="cpu"):
     )
 
     device = torch.device(device)
-    torch.use_deterministic_algorithms(True)
+    train_X = train_X.to(device=device)
+    train_Y = train_Y.to(device=device)
     models = []
     for i in range(vocs.n_outputs):
         models.append(
@@ -192,7 +255,7 @@ def bench_build_standard_gpytorch(vocs, data, device="cpu"):
     model.to(device=device)
     mll.to(device=device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-    #print([(p, p.shape) for p in model.parameters()])
+    # print([(p, p.shape) for p in model.parameters()])
     training_iterations = 200
     for i in range(training_iterations):
         optimizer.zero_grad()
@@ -208,5 +271,4 @@ def bench_build_standard_gpytorch(vocs, data, device="cpu"):
             for m in models
         ]
     )
-    # [10.246825   8.605122   6.9239607  5.161834   4.214438   4.3885236   4.4575253]
     print("Lengthscale: ", ls)

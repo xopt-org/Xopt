@@ -426,7 +426,7 @@ class TestModelConstructor:
         for i in range(test_vocs.n_outputs):
             assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
         print([(p, p.shape) for p in model_list.parameters()])
-        print('------------------------------')
+        print("------------------------------")
         print([(p, p.shape) for p in model_single.parameters()])
 
         mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
