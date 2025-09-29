@@ -28,8 +28,8 @@ def xtest_callable(input_dict: dict, a=0) -> dict:
 
     assert "constant1" in input_dict
 
-    y1 = x2**2
-    c1 = x2**2 + 5  # x1
+    y1 = x1**2
+    c1 = x2
     return {"y1": y1, "c1": c1}
 
 

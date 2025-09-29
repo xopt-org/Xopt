@@ -1,13 +1,16 @@
 import argparse
 
-from xopt.resources.benchmarking import BenchDispatcher
+from xopt.resources.benchmarking import BenchDispatcher, BenchFunction
+import xopt.resources.bench_functions  # noqa: F401
 
 
 def run_benchmark():
     parser = argparse.ArgumentParser(description="Run benchmark function")
-    parser.add_argument("benchmark", type=str, help="Name of the benchmark function to run")
-    parser.add_argument("-n", type=int, help="number of repeats", nargs='?', default=1)
-    parser.add_argument('-device', type=str, help="device to use", default='cpu')
+    parser.add_argument(
+        "benchmark", type=str, help="Name of the benchmark function to run"
+    )
+    parser.add_argument("-n", type=int, help="number of repeats", nargs="?", default=1)
+    parser.add_argument("-device", type=str, help="device to use", default="cpu")
     args = parser.parse_args()
 
     try:
@@ -18,11 +21,14 @@ def run_benchmark():
         raise ValueError(f"Benchmark function {args.benchmark} not found")
 
     device = args.device
-    assert device == 'cpu' or device == 'cuda' or device.startswith('cuda:'), "Device must be 'cpu', 'cuda', or 'cuda:<index>'"
+    assert device == "cpu" or device == "cuda" or device.startswith("cuda:"), (
+        "Device must be 'cpu', 'cuda', or 'cuda:<index>'"
+    )
 
     pre()
-    for _ in range(args.n):
-        func(**kwargs, device=args.device)
+    bench = BenchFunction()
+    bench.add(func, kwargs=kwargs)
+    bench.run(min_rounds=args.n, min_time=0.0)
 
 
 if __name__ == "__main__":
