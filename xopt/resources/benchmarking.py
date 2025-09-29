@@ -140,7 +140,7 @@ class BenchFunction:
     def run_config(
         self,
         min_time: float = 1.0,
-        max_time: float = 5.0,
+        max_time: float = 600.0,
         min_rounds: int = 2,
         disable_gc: bool = False,
         warmup: bool = False,
@@ -169,10 +169,15 @@ class BenchFunction:
                     break
                 if n >= min_rounds and total_time > min_time:
                     break
+                time.sleep(0.01)
             return {
                 "n": n,
-                "t_avg": total_time / n,
-                "stdev": np.std(times),
+                "t_mean": total_time / n,
+                "t_median": float(np.median(times)),
+                "t_max": float(np.max(times)),
+                "t_min": float(np.min(times)),
+                "t_total": total_time,
+                "stdev": float(np.std(times)),
                 "f": f.__name__,
                 "args": args,
                 "kwargs": kwargs,
@@ -185,7 +190,11 @@ class BenchFunction:
         results = []
         for i in range(len(self.configs)):
             results.append(self.run_config(row=i, **kwargs))
-        return pd.DataFrame(results)
+        r = pd.DataFrame(results)
+        rdisp = r.drop(columns=["args", "kwargs", "f"])
+        for i in range(len(self.configs)):
+            print("Results for function:", self.configs[0][0].__name__)
+            print(rdisp.iloc[i])
 
 
 class BenchDispatcher:
@@ -293,18 +302,11 @@ def generate_vocs(n_vars=5, n_obj=2, n_constr=2):
 
 
 def generate_data(vocs, n=100):
-    import numpy as np
-    import pandas as pd
-
     data = {}
     for var in vocs.variables:
-        data[var] = np.random.rand(n)
+        data[var] = np.linspace(0.0, 1.0, num=n)
     for i, obj in enumerate(vocs.objectives):
-        data[obj] = np.linspace(0.0, 1.0, n) * (i + 1)
+        data[obj] = (np.linspace(0.0, 1.0, n) - 0.5) * (i + 1)
     for i, constr in enumerate(vocs.constraints):
-        data[constr] = np.random.rand(n)
+        data[constr] = np.sin(np.linspace(0.0, 1.0, num=n) / (2 * np.pi) + (i + 1))
     return pd.DataFrame(data)
-
-    torch.set_num_threads(1)
-    test_vocs = generate_vocs(n_vars=10, n_obj=3, n_constr=2)
-    test_data = generate_data(vocs=test_vocs, n=500)

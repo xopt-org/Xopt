@@ -505,7 +505,6 @@ class BatchedModelConstructor(StandardModelConstructor):
             mean_module = list(self.mean_modules.values())[0]
 
         likelihood = self.get_likelihood(batch_shape=_aug_batch_shape)
-        # breakpoint()
         # input and output transforms are applied BEFORE tensors are unrolled
         input_transform = self._get_input_transform(
             outcome_names,
