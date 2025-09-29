@@ -1,6 +1,7 @@
 import os.path
 import warnings
 from copy import deepcopy
+from functools import partial
 from typing import Any, Dict, List, Literal, Optional, Union
 
 import botorch.settings
@@ -10,6 +11,8 @@ from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
+from botorch.optim import ExpMAStoppingCriterion
+from botorch.optim.fit import fit_gpytorch_mll_scipy, fit_gpytorch_mll_torch
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
@@ -18,14 +21,49 @@ from gpytorch.priors import GammaPrior, Prior
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 from torch.nn import Module
+from torch.optim import Adam
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_training_data, get_training_data_batched
-from xopt.pydantic import decode_torch_module
+from xopt.pydantic import XoptBaseModel, decode_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
+
+# TODO: make custom stopping criterion that checks lengthscales
+
+
+class ExpMAStoppingCriterionModel(XoptBaseModel):
+    maxiter: int = Field(500, description="maximum number of iterations")
+    n_window: int = Field(
+        5, description="size of the exponential moving average window"
+    )
+    eta: float = Field(1.0, description="exponential decay factor in the weights")
+    rel_tol: float = Field(5e-4, description="relative tolerance for termination")
+
+
+class NumericalOptimizerConfig(XoptBaseModel):
+    timeout: Optional[float] = Field(None, description="timeout in seconds")
+
+
+class LBFGSNumericalOptimizerConfig(NumericalOptimizerConfig):
+    gtol: float = Field(
+        1e-4, description="projected gradient tolerance, scipy default is 1e-5"
+    )
+    ftol: float = Field(
+        2e-8,
+        description="function tolerance, scipy default is 1e7 * np.finfo(float).eps = "
+        "2.2204460492503131e-09",
+    )
+    maxiter: int = Field(500, description="maximum number of iterations")
+
+
+class AdamNumericalOptimizerConfig(NumericalOptimizerConfig):
+    stopping_criterion: ExpMAStoppingCriterionModel = Field(
+        default_factory=ExpMAStoppingCriterionModel
+    )
+    lr: float = Field(0.1, description="learning rate for the Adam optimizer")
 
 
 class StandardModelConstructor(ModelConstructor):
@@ -99,9 +137,15 @@ class StandardModelConstructor(ModelConstructor):
         True,
         description="flag to specify if the model should be trained",
     )
-    train_kwargs: Dict[str, Any] | None = Field(
-        default_factory=lambda: {"optimizer_kwargs": {"options": {"maxiter": 10000}}},
-        description="kwargs for model optimizer - see fit_gpytorch_mll_scipy",
+    train_config: (
+        AdamNumericalOptimizerConfig | LBFGSNumericalOptimizerConfig | None
+    ) = Field(
+        None,
+        description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy",
+    )
+    train_kwargs: Optional[Dict[str, Any]] = Field(
+        None,
+        description="additional keyword arguments passed to the training method",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
@@ -115,18 +159,19 @@ class StandardModelConstructor(ModelConstructor):
             return train_kwargs
         # keys are from _fit_fallback in botorch/fit.py - we don't use other dispatchers
         allowed_keys = [
-            "optimizer_kwargs",
+            # "optimizer_kwargs",
             "pick_best_of_all_attempts",
             "max_attempts",
             "optimizer",
             "warning_handler",
         ]
         # subkeys for optimizer_kwargs based on fit_gpytorch_mll_scipy/fit_gpytorch_mll_torch
-        if info.data["method"] == "adam":
-            # TODO: add scheduler/stopping criterion pydantic models?
-            allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "step_limit"]}
-        else:
-            allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "options"]}
+        allowed_subkeys = {}
+        # if info.data["method"] == "adam":
+        #     # TODO: add scheduler/stopping criterion pydantic models?
+        #     allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "step_limit"]}
+        # else:
+        #     allowed_subkeys = {"optimizer_kwargs": ["timeout_sec", "options"]}
         if not isinstance(train_kwargs, dict):
             raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
         invalid_keys = set(train_kwargs.keys()) - set(allowed_keys)
@@ -142,6 +187,24 @@ class StandardModelConstructor(ModelConstructor):
                         f"train_kwargs['{k}'] can only contain the keys {allowed}"
                     )
         return train_kwargs
+
+    @field_validator("train_config")
+    def validate_train_config(cls, v, info: ValidationInfo):
+        if v is None:
+            return v
+        if info.data["method"] == "adam":
+            if not isinstance(v, AdamNumericalOptimizerConfig):
+                raise ValueError(
+                    "train_config must be of type AdamOptimizerConfig when method is 'adam'"
+                )
+        elif info.data["method"] == "lbfgs":
+            if not isinstance(v, LBFGSNumericalOptimizerConfig):
+                raise ValueError(
+                    "train_config must be of type LBFGSOptimizerConfig when method is 'lbfgs'"
+                )
+        else:
+            raise ValueError("method must be either 'adam' or 'lbfgs'")
+        return v
 
     @field_validator("covar_modules", "mean_modules", mode="before")
     def validate_torch_modules(cls, value: Any):
@@ -315,15 +378,49 @@ class StandardModelConstructor(ModelConstructor):
             full_model.load_state_dict(store)
 
         if self.train_model:
-            for m in full_model.models:
-                mll = ExactMarginalLogLikelihood(m.likelihood, m)
-                tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
-                fit_gpytorch_mll(mll, **tr_kwargs)
+            full_model = self._train_model(full_model)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
         return full_model.to(**tkwargs)
+
+    def _train_model(self, model):
+        models = model.models if isinstance(model, ModelListGP) else [model]
+        for m in models:
+            mll = ExactMarginalLogLikelihood(m.likelihood, m)
+            tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
+            if "optimizer_kwargs" not in tr_kwargs:
+                tr_kwargs["optimizer_kwargs"] = {}
+            if self.train_config is not None and self.train_config.timeout is not None:
+                tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
+            if self.method == "adam":
+                cfg: AdamNumericalOptimizerConfig = (
+                    self.train_config or AdamNumericalOptimizerConfig()
+                )
+                sc = ExpMAStoppingCriterion(
+                    maxiter=cfg.stopping_criterion.maxiter,
+                    n_window=cfg.stopping_criterion.n_window,
+                    eta=cfg.stopping_criterion.eta,
+                    rel_tol=cfg.stopping_criterion.rel_tol,
+                )
+                opt = partial(Adam, lr=cfg.lr)
+                tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
+                tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
+                optimizer = fit_gpytorch_mll_torch
+            else:
+                cfg: LBFGSNumericalOptimizerConfig = (
+                    self.train_config or LBFGSNumericalOptimizerConfig()
+                )
+                if "options" not in tr_kwargs["optimizer_kwargs"]:
+                    tr_kwargs["optimizer_kwargs"]["options"] = {}
+                tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg.maxiter
+                tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg.gtol
+                tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg.ftol
+                optimizer = fit_gpytorch_mll_scipy
+
+            fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+        return model
 
     def build_mean_module(
         self, name, mean_modules, input_transform, outcome_transform
@@ -533,9 +630,7 @@ class BatchedModelConstructor(StandardModelConstructor):
             full_model.load_state_dict(store)
 
         if self.train_model:
-            mll = ExactMarginalLogLikelihood(full_model.likelihood, full_model)
-            tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
-            fit_gpytorch_mll(mll, **tr_kwargs)
+            full_model = self._train_model(full_model)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()

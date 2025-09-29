@@ -40,7 +40,7 @@ def preamble_build_model(verbose=False):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_standard(vocs, data, device="cpu"):
+def bench_build_standard(vocs, data, device):
     device = torch.device(device)
     gp_constructor = StandardModelConstructor()
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
@@ -51,7 +51,7 @@ def bench_build_standard(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_standard_adam(vocs, data, device="cpu"):
+def bench_build_standard_adam(vocs, data, device):
     device = torch.device(device)
     gp_constructor = StandardModelConstructor(method="adam")
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
@@ -62,7 +62,7 @@ def bench_build_standard_adam(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_batched(vocs, data, device="cpu"):
+def bench_build_batched(vocs, data, device):
     device = torch.device(device)
     gp_constructor = BatchedModelConstructor()
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
@@ -73,7 +73,18 @@ def bench_build_batched(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_batched_botorch_patch(vocs, data, device="cpu"):
+def bench_build_batched_adam(vocs, data, device):
+    device = torch.device(device)
+    gp_constructor = BatchedModelConstructor(method="adam")
+    model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
+    return model
+
+
+@BenchDispatcher.register_decorator(preamble=preamble_build_model)
+@BenchDispatcher.register_defaults(
+    ["vocs", "data"], lambda: bench_build_standard_kwargs()
+)
+def bench_build_batched_botorch_patch(vocs, data, device):
     def as_ndarray(values, dtype=None, inplace=True):
         if inplace:
             return values.numpy(force=True).astype(dtype, copy=False)
@@ -93,7 +104,7 @@ def bench_build_batched_botorch_patch(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_batched_gpytorch_mt(vocs, data, device="cpu"):
+def bench_build_batched_gpytorch_mt(vocs, data, device):
     class BatchIndependentMultitaskGPModel(gpytorch.models.ExactGP):
         def __init__(self, train_x, train_y, likelihood):
             super().__init__(train_x, train_y, likelihood)
@@ -132,7 +143,7 @@ def bench_build_batched_gpytorch_mt(vocs, data, device="cpu"):
     likelihood.train()
     model.to(device=device)
     mll.to(device=device)
-    training_iterations = 200
+    training_iterations = 150
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     # print([(p, p.shape) for p in model.parameters()])
     for i in range(training_iterations):
@@ -153,7 +164,7 @@ def bench_build_batched_gpytorch_mt(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_batched_gpytorch(vocs, data, device="cpu"):
+def bench_build_batched_gpytorch(vocs, data, device):
     class BatchIndependentGPModel(gpytorch.models.ExactGP):
         def __init__(self, train_x, train_y, likelihood):
             super().__init__(train_x, train_y, likelihood)
@@ -192,7 +203,7 @@ def bench_build_batched_gpytorch(vocs, data, device="cpu"):
     likelihood.train()
     model.to(device=device)
     mll.to(device=device)
-    training_iterations = 200
+    training_iterations = 150
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     # print([(p, p.shape) for p in model.parameters()])
     for i in range(training_iterations):
@@ -213,7 +224,7 @@ def bench_build_batched_gpytorch(vocs, data, device="cpu"):
 @BenchDispatcher.register_defaults(
     ["vocs", "data"], lambda: bench_build_standard_kwargs()
 )
-def bench_build_standard_gpytorch(vocs, data, device="cpu"):
+def bench_build_standard_gpytorch(vocs, data, device):
     class ExactGPModel(gpytorch.models.ExactGP):
         def __init__(self, train_x, train_y, likelihood):
             super().__init__(train_x, train_y, likelihood)
@@ -256,7 +267,7 @@ def bench_build_standard_gpytorch(vocs, data, device="cpu"):
     mll.to(device=device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     # print([(p, p.shape) for p in model.parameters()])
-    training_iterations = 200
+    training_iterations = 150
     for i in range(training_iterations):
         optimizer.zero_grad()
         output = model(*model.train_inputs)

@@ -10,6 +10,7 @@ import yaml
 from botorch import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
+from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
@@ -54,10 +55,22 @@ class TestModelConstructor:
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)
         constructor = StandardModelConstructor(method="adam")
+        # monkeypatch to check if adam was called
+        import xopt.generators.bayesian.models.standard as st
+
+        called = False
+
+        def torch_monkeypatch(*args, **kwargs):
+            nonlocal called
+            called = True
+            return fit_gpytorch_mll_torch(*args, **kwargs)
+
+        st.fit_gpytorch_mll_torch = torch_monkeypatch
         model = constructor.build_model_from_vocs(
             test_vocs, test_data, device=device_map[use_cuda]
         )
         verify_state_device(model, device=device_map[use_cuda])
+        assert called
 
     def test_transform_inputs(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -301,10 +314,10 @@ class TestModelConstructor:
 
             # build initial model explicitly for comparison
             train_X = torch.cat(
-                (
-                    torch.tensor(test_data["x1"]).reshape(-1, 1),
-                    torch.tensor(test_data["x2"]).reshape(-1, 1),
-                ),
+                [
+                    torch.tensor(test_data[v]).reshape(-1, 1)
+                    for v in test_vocs.variable_names
+                ],
                 dim=1,
             )
             train_Y = torch.tensor(test_data["y1"]).reshape(-1, 1)
