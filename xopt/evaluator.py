@@ -352,12 +352,6 @@ class DummyExecutor(Executor):
         self._shutdown = False
         self._shutdownLock = Lock()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        pass
-
     def map(self, fn: Callable, *iterables, timeout: float = None, chunksize: int = 1):
         """
         Map the function to the iterables.
