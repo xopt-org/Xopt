@@ -13,7 +13,7 @@ Once Xopt is installed from conda/pip, the tool will be available in your system
 
 ```
 xopt-run [-h] [--executor {map,thread_pool,process_pool}] [--max_workers MAX_WORKERS]
-         [--python_path PYTHON_PATH] [--override OVERRIDE] config
+         [--python_path PYTHON_PATH] [--override OVERRIDE] [-v] config
 ```
 
 The available arguments are the following.
@@ -24,6 +24,7 @@ The available arguments are the following.
 - `--max_workers`: Override the number of workers in Xopt and launch this number of threads/processes if using a parallel executor.
 - `--python_path`: Add this directory to your python path. By default, the current working directory. May include environment variables and the character `~` to represent the user's home directory. Note: you can pass these values into the tool without shell expansion by surrounding them by single quotes. May have more than one of this flag.
 - `--override`: Override a value from the YAML config file. May have more than one of this flag. More details below.
+- `-v`, `--verbose`: Display verbose output (`logging.DEBUG` level messages) from Xopt
 
 ## Overriding Settings in Config File
 The flag `--override` may be used to override values in the configuration file.
