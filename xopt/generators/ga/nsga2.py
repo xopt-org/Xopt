@@ -525,7 +525,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Record the function evaluations
         self.fevals += len(new_data)
         self.child.extend(new_data.to_dict(orient="records"))
-        self._logger.info(
+        self._logger.debug(
             f"adding {len(new_data)} new evaluated individuals to generator"
         )
 
@@ -595,7 +595,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 )
 
                 # Log some things
-                self._logger.info(
+                self._logger.debug(
                     f'saved optimization data to "{self.output_dir}" '
                     f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
                 )
@@ -633,7 +633,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Now we have a unique filename
         with open(checkpoint_path, "w") as f:
             f.write(self.to_json())
-        self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
+        self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
         self.data = data

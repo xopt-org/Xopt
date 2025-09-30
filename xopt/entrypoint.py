@@ -4,9 +4,13 @@ from .pydantic import remove_none_values
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import contextmanager
 import argparse
+import logging
 import os
 import sys
 import yaml
+
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -124,10 +128,22 @@ def main():
     )
     args = parser.parse_args()
 
+    # Start logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
+
     # Add specified paths and CWD to sys.path
-    import_paths = [os.path.expanduser(os.path.expandvars(x)) for x in args.python_path]
-    import_paths.append(os.getcwd())
-    for import_path in import_paths:
+    import_paths = [os.getcwd()]
+    import_paths.extend(
+        [os.path.expanduser(os.path.expandvars(x)) for x in args.python_path]
+    )
+    if len(import_paths) > 1:
+        logger.info("Python path additions:")
+    for idx, import_path in enumerate(import_paths):
+        if idx:
+            logger.info(f"  {import_path}")
         if import_path not in sys.path:
             sys.path.insert(0, import_path)
 
@@ -140,7 +156,10 @@ def main():
         config = remove_none_values(config)
 
         # Apply the overrides to the config dict
+        if args.override:
+            logger.info("Applying config file overrides:")
         for override in args.override:
+            logger.info(f"  {override}")
             # Sanity check
             if "=" not in override:
                 raise ValueError(
@@ -153,7 +172,12 @@ def main():
         # Construct Xopt object
         my_xopt = Xopt.model_validate(config)
 
-    # Get our executor
+    # Get our executor and start xopt
+    if args.executor is not None:
+        msg = f"Starting Xopt with executor {args.executor}"
+        if args.max_workers is not None:
+            msg = msg + f" (max_workers={args.max_workers})"
+        logger.info(msg)
     with get_executor(args.executor, max_workers=args.max_workers) as executor:
         # Handle executor override
         if args.executor is not None:
