@@ -234,46 +234,17 @@ vocs:
 
 ## Running Xopt
 
-The final file we must write before running the optimizer is a script which will load the Xopt object from the YAMl file and run it.
-An example that may be broadly used for optimization problems with NSGAII is included below.
-Write it to a file named `run_xopt.py` in your project directory.
-
-```python
-"""
-run_xopt.py - Simple Xopt runner script
-This script reads the Xopt object from a YAML file and runs it.
-"""
-
-import xopt
-import argparse
-
-
-if __name__ == "__main__":
-    # Handle the CLI arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "config", help="The Xopt YAML config file"
-    )
-    args = parser.parse_args()
-
-    # Create xopt
-    with open(args.config) as f:
-        my_xopt = X_from_yaml = xopt.Xopt.from_yaml(f.read())
-
-    # Run it
-    my_xopt.run()
-```
-
 We are now ready to run the optimization!
 Your directory should include the following files.
 - `eval_fun.py`
 - `nsga2_zdt3.yml`
-- `run_xopt.py`
 
-To run the optimization, execute the following command from the project directory using a python environment with Xopt installed.
+To run the optimization, execute the following command from the same directory as `eval_fun.py` using a python environment with Xopt installed.
 ```bash
-python run_xopt.py nsga2_zdt3.yml
+xopt-run nsga2_zdt3.yml
 ```
+The CLI tool `xopt-run` is a general tool to run Xopt from a YAML configuration file for users with basic parallelization needs.
+Read more about it on the [Xopt CLI documentation page](../../../basic/xopt_cli.md).
 It should complete in roughly 30s and produce a directory called `nsga2_output` in the current location.
 
 Navigate to the output directory and observe the files there.

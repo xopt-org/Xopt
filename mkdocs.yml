@@ -9,6 +9,7 @@ nav:
     - Examples:
         - Basics:
             - examples/basic/xopt_basic.ipynb
+            - examples/basic/xopt_cli.md
             - examples/basic/xopt_parallel.ipynb
             - examples/basic/xopt_vocs.ipynb
             - examples/basic/xopt_evaluator.ipynb
