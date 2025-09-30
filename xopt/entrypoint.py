@@ -113,7 +113,8 @@ def main():
     parser.add_argument(
         "--python_path",
         help="Additional path to add to Python import path for evaluation function module search",
-        default=None,
+        action="append",
+        default=[],
     )
     parser.add_argument(
         "--override",
@@ -123,13 +124,12 @@ def main():
     )
     args = parser.parse_args()
 
-    # Add specified path or CWD to sys.path
-    if args.python_path is None:
-        import_path = os.getcwd()
-    else:
-        import_path = os.path.expanduser(os.path.expandvars(args.python_path))
-    if import_path not in sys.path:
-        sys.path.insert(0, import_path)
+    # Add specified paths and CWD to sys.path
+    import_paths = [os.path.expanduser(os.path.expandvars(x)) for x in args.python_path]
+    import_paths.append(os.getcwd())
+    for import_path in import_paths:
+        if import_path not in sys.path:
+            sys.path.insert(0, import_path)
 
     # Create xopt
     with open(args.config) as f:
