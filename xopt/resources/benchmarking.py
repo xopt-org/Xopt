@@ -161,9 +161,9 @@ class BenchFunction:
             total_time = 0.0
             while True:
                 t1 = time.perf_counter()
-                f(*args, **kwargs)
+                tfun = f(*args, **kwargs)
                 t2 = time.perf_counter()
-                t = t2 - t1
+                t, results = t2 - t1 if tfun is None else tfun
                 times.append(t)
                 total_time += t
                 n += 1
@@ -200,6 +200,9 @@ class BenchFunction:
 
         print("---Results---")
         print(rdisp.to_markdown(floatfmt=".3f"))
+
+
+TRACE = False
 
 
 class BenchDispatcher:
@@ -248,7 +251,8 @@ class BenchDispatcher:
             return {}
         kwargs = {}
         for arg_names, v in BenchDispatcher.arguments[name]:
-            print(f"Generating args {arg_names} for function {name} from {v}")
+            if TRACE:
+                print(f"Generating args {arg_names} for function {name} from {v}")
             if callable(v):
                 v = v()
             for k2, v2 in zip(arg_names, v):

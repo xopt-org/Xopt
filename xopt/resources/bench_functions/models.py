@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 def bench_build_standard_kwargs():
-    test_vocs = generate_vocs(n_vars=12, n_obj=5, n_constr=2)
+    test_vocs = generate_vocs(n_vars=10, n_obj=2, n_constr=1)
     test_data = generate_data(vocs=test_vocs, n=500)
     return test_vocs, test_data
 
@@ -44,7 +44,7 @@ def bench_build_standard(vocs, data, device):
     device = torch.device(device)
     gp_constructor = StandardModelConstructor()
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
-    return model
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -53,9 +53,9 @@ def bench_build_standard(vocs, data, device):
 )
 def bench_build_standard_adam(vocs, data, device):
     device = torch.device(device)
-    gp_constructor = StandardModelConstructor(method="adam")
+    gp_constructor = StandardModelConstructor(train_method="adam")
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
-    return model
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -66,7 +66,7 @@ def bench_build_batched(vocs, data, device):
     device = torch.device(device)
     gp_constructor = BatchedModelConstructor()
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
-    return model
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -75,9 +75,9 @@ def bench_build_batched(vocs, data, device):
 )
 def bench_build_batched_adam(vocs, data, device):
     device = torch.device(device)
-    gp_constructor = BatchedModelConstructor(method="adam")
+    gp_constructor = BatchedModelConstructor(train_method="adam")
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
-    return model
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -97,7 +97,7 @@ def bench_build_batched_botorch_patch(vocs, data, device):
     device = torch.device(device)
     gp_constructor = BatchedModelConstructor()
     model = gp_constructor.build_model_from_vocs(vocs, data, device=device)
-    return model
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -158,6 +158,7 @@ def bench_build_batched_gpytorch_mt(vocs, data, device):
         "Lengthscale: ",
         model.covar_module.base_kernel.raw_lengthscale.numpy(force=True).flatten(),
     )
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -218,6 +219,7 @@ def bench_build_batched_gpytorch(vocs, data, device):
         "Lengthscale: ",
         model.covar_module.base_kernel.raw_lengthscale.numpy(force=True).flatten(),
     )
+    return None, model
 
 
 @BenchDispatcher.register_decorator(preamble=preamble_build_model)
@@ -283,3 +285,4 @@ def bench_build_standard_gpytorch(vocs, data, device):
         ]
     )
     print("Lengthscale: ", ls)
+    return None, model
