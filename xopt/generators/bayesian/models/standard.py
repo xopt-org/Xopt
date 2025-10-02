@@ -87,18 +87,23 @@ class StandardModelConstructor(ModelConstructor):
     trainable_mean_keys : List[str]
         List of prior mean modules that can be trained.
 
+    transform_inputs : Union[Dict[str, bool], bool]
+        Specify if inputs should be transformed inside the GP model. Can optionally
+        specify a dict of specifications.
 
-    Methods
-    -------
-    get_likelihood
-        Get the likelihood for the model, considering the low noise prior.
+    custom_noise_prior : Optional[Prior]
+        Specify a custom noise prior for the GP likelihood. Overwrites value specified
+        by use_low_noise_prior.
 
-    build_model(input_names, outcome_names, data, input_bounds, dtype, device)
-        Construct independent models for each objective and constraint.
+    use_cached_hyperparameters : Optional[bool]
+        Flag to specify if cached hyperparameters should be used in model creation.
+        Training will still occur unless train_model is False.
 
-    build_mean_module(name, input_transform, outcome_transform)
-        Build the mean module for the output specified by name.
+    train_method : Literal["lbfgs", "adam"]
+        Numerical optimization algorithm to use.
 
+    train_model : bool
+        Flag to specify if the model should be trained (fitted to data).
     """
 
     name: str = Field("standard", frozen=True)
@@ -127,26 +132,27 @@ class StandardModelConstructor(ModelConstructor):
     use_cached_hyperparameters: Optional[bool] = Field(
         False,
         description="flag to specify if cached hyperparameters should be used in "
-        "model creation instead of training",
+        "model creation. Training will still occur unless train_model is False.",
     )
-    _hyperparameter_store: Optional[Dict] = None
-    method: Literal["lbfgs", "adam"] = Field(
-        "lbfgs", description="training method to use"
+    train_method: Literal["lbfgs", "adam"] = Field(
+        "lbfgs", description="numerical optimization algorithm to use"
     )
     train_model: bool = Field(
         True,
-        description="flag to specify if the model should be trained",
+        description="flag to specify if the model should be trained (fitted to data)",
     )
     train_config: (
         AdamNumericalOptimizerConfig | LBFGSNumericalOptimizerConfig | None
     ) = Field(
         None,
-        description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy",
+        description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy"
+        " and fit_gpytorch_mll_torch",
     )
     train_kwargs: Optional[Dict[str, Any]] = Field(
         None,
-        description="additional keyword arguments passed to the training method",
+        description="additional keyword arguments passed to the training optimizer",
     )
+    _hyperparameter_store: Optional[Dict] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
@@ -159,11 +165,10 @@ class StandardModelConstructor(ModelConstructor):
             return train_kwargs
         # keys are from _fit_fallback in botorch/fit.py - we don't use other dispatchers
         allowed_keys = [
-            # "optimizer_kwargs",
             "pick_best_of_all_attempts",
             "max_attempts",
-            # "optimizer",
             "warning_handler",
+            "optimizer_kwargs",
         ]
         allowed_subkeys = {}
         if not isinstance(train_kwargs, dict):
@@ -174,7 +179,7 @@ class StandardModelConstructor(ModelConstructor):
                 f"train_kwargs can only contain the keys {allowed_keys}, have {invalid_keys}"
             )
         for k, v in train_kwargs.items():
-            if isinstance(v, dict):
+            if k in allowed_subkeys and isinstance(v, dict):
                 allowed = allowed_subkeys.get(k, [])
                 if set(v.keys()) - set(allowed):
                     raise ValueError(
@@ -388,7 +393,7 @@ class StandardModelConstructor(ModelConstructor):
                 tr_kwargs["optimizer_kwargs"] = {}
             if self.train_config is not None and self.train_config.timeout is not None:
                 tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
-            if self.method == "adam":
+            if self.train_method == "adam":
                 cfg: AdamNumericalOptimizerConfig = (
                     self.train_config or AdamNumericalOptimizerConfig()
                 )
