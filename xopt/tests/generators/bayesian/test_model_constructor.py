@@ -57,7 +57,7 @@ class TestModelConstructor:
     def test_standard_adam(self, use_cuda):
         test_data = deepcopy(TEST_DATA)
         test_vocs = deepcopy(TEST_VOCS)
-        constructor = StandardModelConstructor(method="adam")
+        constructor = StandardModelConstructor(train_method="adam")
         # monkeypatch to check if adam was called
         import xopt.generators.bayesian.models.standard as st
 
@@ -417,6 +417,7 @@ class TestModelConstructor:
         # StandardModelConstructor with multiple SingleTaskGP models
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
+        verbose = False
 
         torch.manual_seed(42)
         gp_constructor = BatchedModelConstructor(train_model=False)
@@ -427,7 +428,86 @@ class TestModelConstructor:
         else:
             assert ls == torch.Size([1, test_vocs.n_variables])
 
-        torch.manual_seed(42)
+        constructor = StandardModelConstructor(train_model=False)
+        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
+            [1, test_vocs.n_variables]
+        )
+
+        list_ls = [
+            model_list.models[i].covar_module.raw_lengthscale
+            for i in range(test_vocs.n_outputs)
+        ]
+        batch_ls = model_single.covar_module.raw_lengthscale
+        for i in range(test_vocs.n_outputs):
+            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+        if verbose:
+            print([(p, p.shape) for p in model_list.parameters()])
+            print("------------------------------")
+            print([(p, p.shape) for p in model_single.parameters()])
+
+        mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
+        # breakpoint()
+
+        isingle = 0
+        single_losses = np.zeros(1)
+
+        def cb_single(parameters, result):
+            nonlocal isingle
+            if verbose:
+                print(f"SINGLE{isingle} {result} ")
+                for k, v in parameters.items():
+                    print(f"  {k}: {super(type(v), v).__repr__()}")
+            isingle += 1
+            single_losses[0] = result.fval
+
+        fit_gpytorch_mll(mll, optimizer_kwargs={"callback": cb_single})
+
+        list_losses = np.zeros(len(model_list.models))
+        for i, ml in enumerate(model_list.models):
+            ilist = 0
+
+            def cb_list(parameters, result):
+                nonlocal ilist
+                if verbose:
+                    print(f"LIST{ilist} {result} ")
+                    for k, v in parameters.items():
+                        print(f"  {k}: {super(type(v), v).__repr__()}")
+                ilist += 1
+                list_losses[i] = result.fval
+
+            mll = ExactMarginalLogLikelihood(ml.likelihood, ml)
+            fit_gpytorch_mll(mll, optimizer_kwargs={"callback": cb_list})
+
+        if verbose:
+            print(f"Single losses: {single_losses}")
+            print(f"List losses: {list_losses}, sum {list_losses.sum()}")
+        assert np.isclose(list_losses.sum(), single_losses.sum(), rtol=0.0, atol=1e-4)
+
+        list_ls = [
+            model_list.models[i].covar_module.raw_lengthscale
+            for i in range(test_vocs.n_outputs)
+        ]
+        batch_ls = model_single.covar_module.raw_lengthscale
+        with pytest.raises(AssertionError):
+            # Hyperparameters do not match after training (they are close-ish)
+            # This is because L-BFGS-B terminates at different places for individual models,
+            # but the loss is summed for single model so we run until shared stopping criterion
+            for i in range(test_vocs.n_outputs):
+                assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+
+    def test_train_model_batch_compare_adam(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        gp_constructor = BatchedModelConstructor(train_model=False)
+        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+        ls = model_single.covar_module.raw_lengthscale.shape
+        if test_vocs.n_outputs > 1:
+            assert ls == torch.Size([test_vocs.n_outputs, 1, test_vocs.n_variables])
+        else:
+            assert ls == torch.Size([1, test_vocs.n_variables])
+
         constructor = StandardModelConstructor(train_model=False)
         model_list = constructor.build_model_from_vocs(test_vocs, test_data)
         assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
@@ -445,23 +525,40 @@ class TestModelConstructor:
         print("------------------------------")
         print([(p, p.shape) for p in model_single.parameters()])
 
+        optimizer_single = torch.optim.Adam(model_single.parameters(), lr=0.1)
         mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
-        fit_gpytorch_mll(mll)
-
+        optimizer_list = []
+        mll_list = []
         for ml in model_list.models:
-            mll = ExactMarginalLogLikelihood(ml.likelihood, ml)
-            fit_gpytorch_mll(mll)
+            optimizer_list.append(torch.optim.Adam(ml.parameters(), lr=0.1))
+            mll_list.append(ExactMarginalLogLikelihood(ml.likelihood, ml))
 
+        for i in range(10):
+            optimizer_single.zero_grad()
+            output = model_single(model_single.train_inputs[0])
+            loss = -mll(output, model_single.train_targets).sum()
+            loss.backward()
+            optimizer_single.step()
+            single_loss = float(loss.item())
+            print(f"Single: {loss.item()}")
+            total_list_loss = 0.0
+            for j, ml in enumerate(model_list.models):
+                optimizer_list[j].zero_grad()
+                output = ml(ml.train_inputs[0])
+                loss = -mll_list[j](output, ml.train_targets)
+                loss.backward()
+                optimizer_list[j].step()
+                print(f"List {j}: {loss.item()}")
+                total_list_loss += loss.item()
+            print(f"List total: {total_list_loss}")
+            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-8)
         list_ls = [
             model_list.models[i].covar_module.raw_lengthscale
             for i in range(test_vocs.n_outputs)
         ]
         batch_ls = model_single.covar_module.raw_lengthscale
-        with pytest.raises(AssertionError):
-            # Something is wrong - hyperparameters do not match after training (they are close)
-            # This works in gpytorch, need to investigate
-            for i in range(test_vocs.n_outputs):
-                assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+        for i in range(test_vocs.n_outputs):
+            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
 
     def test_train_from_scratch(self):
         # test to verify that GP modules are trained from scratch everytime
