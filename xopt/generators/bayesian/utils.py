@@ -51,9 +51,9 @@ def get_training_data(
 
     """
 
-    if type(outcome_names) != list:
+    if type(outcome_names) is not list:
         outcome_names = [outcome_names]
-        
+
     input_data = data[input_names]
     outcome_data = data[outcome_names]
 
@@ -62,7 +62,9 @@ def get_training_data(
     input_data = input_data[non_nans]
     outcome_data = outcome_data[non_nans]
 
-    train_X = torch.tensor(input_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double"))
+    train_X = torch.tensor(
+        input_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double")
+    )
     train_Y = torch.tensor(
         outcome_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double")
     )

@@ -37,7 +37,6 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
             self.algorithm_results,
         ) = self.algorithm.get_execution_paths(self.model, bounds)
 
-
         # Need to call the model on some data before we can condition_on_observations
         self.model.posterior(self.xs_exe[:1, 0:1, 0:])
 
@@ -85,7 +84,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
 
         # calculcate the variance of the posterior for each input x
         post = self.model.posterior(X)
-        
+
         # Some different shape handling with EnsemblePosterior -- maybe we can move this upstream?
         if isinstance(post, EnsemblePosterior):
             var_post = post.variance.unsqueeze(-1)
@@ -93,7 +92,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
             # calculcate the variance of the fantasy posteriors
             fantasy_posts = self.fantasy_models.posterior(X)
             var_fantasy_posts = fantasy_posts.variance.unsqueeze(-1).unsqueeze(-1)
-            
+
         else:
             var_post = post.variance
 
@@ -125,7 +124,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         # eq (4) of https://arxiv.org/pdf/2104.09460.pdf
         # (avg_h_fantasy is a Monte-Carlo estimate of the second term on the right)
         eig = h_current_scalar - avg_h_fantasy
-        
+
         # mean over properties
         eig = eig.mean(dim=-1, keepdim=True)
 
