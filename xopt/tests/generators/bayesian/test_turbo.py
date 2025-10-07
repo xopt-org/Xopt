@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from xopt import Evaluator, VOCS, Xopt
+from xopt.errors import FeasibilityError
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
@@ -90,7 +91,7 @@ class TestTurbo(TestCase):
         gen.from_dict(gen_dict | {"vocs": test_vocs})
 
         # test invalid turbo controller type
-        test_vocs_2 = test_vocs.copy()
+        test_vocs_2 = test_vocs.model_copy()
         test_vocs_2.objectives = {}
         test_vocs_2.observables = ["o1"]
         with pytest.raises(ValueError):
@@ -132,7 +133,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data["y1"].max()
+        data.loc[data.index[-1], "y1"] = data["y1"].max()
         gen.add_data(data)
         gen.train_model()
 
@@ -173,7 +174,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         # ensure first update will be a failure
         data = TEST_VOCS_DATA.copy()
-        data.loc[:, "y1"].iloc[-1] = data["y1"].min()
+        data.loc[data.index[-1], "y1"] = data["y1"].min()
         gen.add_data(data)
         gen.train_model()
 
@@ -254,7 +255,7 @@ class TestTurbo(TestCase):
 
         # test a case where the last point is invalid
         new_data = deepcopy(gen.data)
-        n_c = new_data["c1"].to_numpy()
+        n_c = new_data["c1"].to_numpy(copy=True)
         n_c[-1] = 1.0
         new_data["c1"] = n_c
         gen.add_data(new_data)
@@ -273,7 +274,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
 
         turbo_state = OptimizeTurboController(gen.vocs)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(FeasibilityError):
             turbo_state.update_state(gen)
 
         # test best y value violates the constraint
@@ -516,24 +517,41 @@ class TestTurbo(TestCase):
             )
 
     def test_turbo_restart(self):
-        test_vocs = deepcopy(TEST_VOCS_BASE)
-        test_vocs.variables = {"x1": [0, 1]}
+        vocs = TEST_VOCS_BASE
+        gen = UpperConfidenceBoundGenerator(vocs=vocs)
+        data = TEST_VOCS_DATA.copy()
+        gen.add_data(data)
+        gen.train_model()
 
-        controllers = [
-            OptimizeTurboController(test_vocs),
-            SafetyTurboController(test_vocs),
-        ]
-        for controller in controllers:
-            controller.length = 5.0
-            controller.success_counter = 10
-            controller.failure_counter = 5
-            controller.center_x = {"x1": 0.5}
+        controller = OptimizeTurboController(gen.vocs)
+        controller.update_state(gen)
+        assert controller.best_value is not None
+        controller.length = 5.0
+        controller.success_counter = 10
+        controller.failure_counter = 5
+        controller.center_x = {"x1": 0.5}
 
-            controller.reset()
-            assert controller.length == 0.25
-            assert controller.success_counter == 0
-            assert controller.failure_counter == 0
-            assert controller.center_x is None
+        controller.reset()
+        assert controller.length == 0.25
+        assert controller.success_counter == 0
+        assert controller.failure_counter == 0
+        assert controller.center_x is None
+        assert controller.best_value is None
+
+        controller = SafetyTurboController(gen.vocs)
+        controller.update_state(gen)
+        controller.length = 5.0
+        controller.success_counter = 10
+        controller.failure_counter = 5
+        controller.center_x = {"x1": 0.5}
+        controller.min_feasible_fraction = 0.7
+
+        controller.reset()
+        assert controller.length == 0.25
+        assert controller.success_counter == 0
+        assert controller.failure_counter == 0
+        assert controller.center_x is None
+        assert controller.min_feasible_fraction == 0.75
 
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):

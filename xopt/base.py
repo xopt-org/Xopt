@@ -15,6 +15,7 @@ from pydantic import (
     ValidationInfo,
 )
 
+from .errors import DataError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
@@ -170,7 +171,7 @@ class Xopt(XoptBaseModel):
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
         elif isinstance(v, DataFrame):
-            if not v.index.is_integer():
+            if not pd.api.types.is_integer_dtype(v.index):
                 raise ValueError("dataframe index must be integer")
         # also add data to generator
         # TODO: find a more robust way of doing this
@@ -385,7 +386,13 @@ class Xopt(XoptBaseModel):
             if new_data.index.dtype != np.int64:
                 new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
-        self.generator.add_data(new_data)
+
+        # Pass data to generator, continue in case of invalid data when strict=False
+        try:
+            self.generator.add_data(new_data)
+        except DataError as exc:
+            if self.strict:
+                raise exc
 
     def reset_data(self):
         """

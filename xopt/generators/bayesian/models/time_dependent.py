@@ -21,8 +21,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
     """
     Time-dependent model constructor for Bayesian optimization.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the model constructor.
     use_spectral_mixture_kernel : bool
@@ -30,8 +30,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
     initialize_spectral_kernel_from_data : bool
         Whether to initialize the Spectral Mixture Kernel from data.
 
-    Methods:
-    --------
+    Methods
+    -------
     build_model(self, input_names: List[str], outcome_names: List[str], data: pd.DataFrame, input_bounds: Dict[str, List] = None, dtype: torch.dtype = torch.double, device: Union[torch.device, str] = "cpu") -> ModelListGP
         Build the model.
     build_model_from_vocs(self, vocs: VOCS, data: pd.DataFrame, dtype: torch.dtype = torch.double, device: Union[torch.device, str] = "cpu") -> ModelListGP
@@ -54,8 +54,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         """
         Build the model.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         input_names : List[str]
             The names of the input variables.
         outcome_names : List[str]
@@ -69,8 +69,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         device : Union[torch.device, str], optional
             The device to use. Defaults to "cpu".
 
-        Returns:
-        --------
+        Returns
+        -------
         ModelListGP
             The built model.
         """
@@ -138,8 +138,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         """
         Build the model from VOCS.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         vocs : VOCS
             The VOCS object containing the variables, objectives, and constraints.
         data : pd.DataFrame
@@ -149,8 +149,8 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         device : Union[torch.device, str], optional
             The device to use. Defaults to "cpu".
 
-        Returns:
-        --------
+        Returns
+        -------
         ModelListGP
             The built model.
         """

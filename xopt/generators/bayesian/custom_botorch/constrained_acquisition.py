@@ -10,6 +10,8 @@ from botorch.utils import apply_constraints
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
 from torch import Tensor
 
+from xopt.resources.testing import XOPT_VERIFY_CONSTRAINED_ACQF_POSITIVE
+
 
 class FeasibilityObjective(GenericMCObjective):
     def __init__(
@@ -23,7 +25,9 @@ class FeasibilityObjective(GenericMCObjective):
 
         super().__init__(objective=ones_callable)
         self.constraints = constraints
-        self.eta = eta
+        if type(eta) is not Tensor:
+            eta = torch.full((len(constraints),), eta)
+        self.register_buffer("eta", eta)
         self.register_buffer("infeasible_cost", torch.as_tensor(infeasible_cost))
 
     def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
@@ -36,7 +40,7 @@ class FeasibilityObjective(GenericMCObjective):
             X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if
                 the objective depends on the inputs explicitly.
 
-        Returns:
+        Returns
             A `sample_shape x batch_shape x q`-dim Tensor of objective values
             weighted by feasibility (assuming maximization).
         """
@@ -83,17 +87,17 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
             samples = self.get_posterior_samples(posterior)
             obj = self.objective(samples, X=X)
 
-            # check base acquisition function for negative values
             base_acq_val = self.base_acquisition(X)
-            min_value = torch.min(base_acq_val)
-            if min_value < 0.0:
-                warnings.warn(
-                    "The base acquisition function has negative values and a softplus transformation will be "
-                    "applied. This may cause numerical issues for large negative values."
-                )
-                base_val = torch.nn.functional.softplus(base_acq_val, beta=1)
-            else:
-                base_val = base_acq_val
+            base_val = base_acq_val
+            if XOPT_VERIFY_CONSTRAINED_ACQF_POSITIVE:
+                # check base acquisition function for negative values
+                min_value = torch.min(base_acq_val)
+                if min_value < 0.0:
+                    warnings.warn(
+                        "The base acquisition function has negative values and a softplus transformation will be "
+                        "applied. This may cause numerical issues for large negative values."
+                    )
+                    base_val = torch.nn.functional.softplus(base_acq_val, beta=1)
 
             # multiply the output of the base acquisition function by the feasibility
             return base_val * obj.max(dim=-1)[0].mean(dim=0)

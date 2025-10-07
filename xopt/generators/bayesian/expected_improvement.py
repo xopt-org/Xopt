@@ -42,13 +42,13 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         Returns a function that can be used to evaluate the acquisition function.
         Overwrites base `get_acquisition` method.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model : Model
             The model used for Bayesian Optimization.
 
-        Returns:
-        --------
+        Returns
+        -------
         acq : AcquisitionFunction
             The acquisition function.
         """
@@ -72,19 +72,20 @@ class ExpectedImprovementGenerator(BayesianGenerator):
                 acq_function=acq, d=dim, columns=columns, values=values
             )
 
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def _get_acquisition(self, model: torch.nn.Module):
         """
         Get the acquisition function for Bayesian Optimization.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model : Model
             The model used for Bayesian Optimization.
 
-        Returns:
-        --------
+        Returns
+        -------
         acq : AcquisitionFunction
             The acquisition function.
         """
@@ -117,15 +118,15 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         """
         Get the best function value for Expected Improvement based on the objective.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         data : pd.DataFrame
             The data used for optimization.
         objective : Objective
             The objective function.
 
-        Returns:
-        --------
+        Returns
+        -------
         best_f : Tensor
             The best function value.
         """

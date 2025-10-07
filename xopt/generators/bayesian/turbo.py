@@ -9,7 +9,9 @@ from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_valida
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
+from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
 from xopt.vocs import VOCS
+from xopt.errors import FeasibilityError
 
 logger = logging.getLogger()
 
@@ -26,8 +28,8 @@ class TurboController(XoptBaseModel, ABC):
     """
     Base class for TuRBO (Trust Region Bayesian Optimization) controllers.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
     dim : PositiveInt
@@ -57,8 +59,8 @@ class TurboController(XoptBaseModel, ABC):
     model_config : ConfigDict
         Configuration dictionary for the model.
 
-    Methods:
-    --------
+    Methods
+    -------
     get_trust_region(self, generator) -> Tensor
         Return the trust region based on the generator.
     update_trust_region(self)
@@ -103,7 +105,7 @@ class TurboController(XoptBaseModel, ABC):
     scale_factor: float = Field(
         2.0, description="multiplier to increase or decrease trust region", ge=1.0
     )
-    restrict_model_data: Optional[bool] = Field(
+    restrict_model_data: bool = Field(
         True, description="flag to restrict model data to within the trust region"
     )
 
@@ -143,6 +145,8 @@ class TurboController(XoptBaseModel, ABC):
         given by the `length` parameter and are scaled according to the generator
         model lengthscales (if available).
 
+        Lives on CPU always.
+
         Parameters
         ----------
         generator : BayesianGenerator
@@ -155,7 +159,7 @@ class TurboController(XoptBaseModel, ABC):
             The trust region bounds.
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds, **generator.tkwargs)
+        bounds = torch.tensor(self.vocs.bounds)
 
         if self.center_x is not None:
             # get bounds width
@@ -164,7 +168,6 @@ class TurboController(XoptBaseModel, ABC):
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
                 [self.center_x[ele] for ele in self.vocs.variable_names],
-                **generator.tkwargs,
             ).unsqueeze(dim=0)
 
             # default weights are 1 (if there is no model or a model without
@@ -173,7 +176,9 @@ class TurboController(XoptBaseModel, ABC):
 
             if model is not None:
                 if model.models[0].covar_module.lengthscale is not None:
-                    lengthscales = model.models[0].covar_module.lengthscale.detach()
+                    lengthscales = (
+                        model.models[0].covar_module.lengthscale.detach().cpu()
+                    )
 
                     # calculate the ratios of lengthscales for each axis
                     weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
@@ -220,6 +225,9 @@ class TurboController(XoptBaseModel, ABC):
 
         bounds = self.get_trust_region(generator)
 
+        if XOPT_VERIFY_TORCH_DEVICE:
+            assert bounds.device == torch.device("cpu")
+
         mask = torch.ones(len(variable_data), dtype=torch.bool)
         for dim in range(variable_data.shape[1]):
             mask &= (variable_data[:, dim] >= bounds[0][dim]) & (
@@ -255,15 +263,15 @@ class OptimizeTurboController(TurboController):
     """
     Turbo controller for optimization tasks.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the controller.
     best_value : Optional[float]
         The best value found so far.
 
-    Methods:
-    --------
+    Methods
+    -------
     vocs_validation(cls, info)
         Validate the VOCS for the controller.
     minimize(self) -> bool
@@ -346,8 +354,9 @@ class OptimizeTurboController(TurboController):
         feas_data = self.vocs.feasibility_data(data)
 
         if len(data[feas_data["feasible"]]) == 0:
-            raise RuntimeError(
-                "turbo requires at least one valid point in the training dataset"
+            raise FeasibilityError(
+                "No points in the dataset satisfy the given constraints. "
+                "TuRBO requires at least one valid point in the training dataset. "
             )
         else:
             self._set_best_point_value(data[feas_data["feasible"]])
@@ -385,8 +394,8 @@ class SafetyTurboController(TurboController):
     """
     Turbo controller for safety-constrained optimization tasks.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the controller.
     scale_factor : PositiveFloat
@@ -394,16 +403,16 @@ class SafetyTurboController(TurboController):
     min_feasible_fraction : PositiveFloat
         Minimum feasible fraction to trigger trust region expansion.
 
-    Methods:
-    --------
+    Methods
+    -------
     vocs_validation(cls, info)
         Validate the VOCS for the controller.
     update_state(self, generator, previous_batch_size: int = 1)
         Update the state of the controller.
 
 
-    Notes:
-    ------
+    Notes
+    -----
     The trust region of the safety turbo controller is expanded or contracted based on the feasibility of the observed points.
     In cases where multiple samples are taken at once, the feasibility fraction is calculated based on the last
     `previous_batch_size` samples. If the feasibility fraction is above `min_feasible_fraction`,
@@ -464,21 +473,21 @@ class EntropyTurboController(TurboController):
     """
     Turbo controller for entropy-based optimization tasks.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the controller.
     _best_entropy : float
         The best entropy value found so far.
 
-    Methods:
-    --------
+    Methods
+    -------
     update_state(self, generator, previous_batch_size: int = 1) -> None
         Update the state of the controller.
     """
 
     name: str = Field("EntropyTurboController", frozen=True)
-    _best_entropy: float = None
+    _best_entropy: Optional[float] = None
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         """
@@ -521,3 +530,7 @@ class EntropyTurboController(TurboController):
                 self.update_trust_region()
             else:
                 self._best_entropy = entropy
+
+    def reset(self):
+        super().reset()
+        self._best_entropy = None

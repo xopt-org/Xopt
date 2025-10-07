@@ -1,7 +1,7 @@
-from typing import Optional, Callable
+from typing import Optional
 
 import torch
-from botorch.acquisition import FixedFeatureAcquisitionFunction
+from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
@@ -11,6 +11,7 @@ from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
+from xopt.generators.bayesian.turbo import SafetyTurboController
 from xopt.numerical_optimizer import LBFGSOptimizer
 
 
@@ -19,8 +20,8 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     Implements Multi-Objective Bayesian Optimization using the Log Expected
     Hypervolume Improvement acquisition function.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the generator.
     supports_batch_generation : bool
@@ -29,8 +30,8 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         Flag to specify if Pareto front points are to be used during optimization
         of the acquisition function.
 
-    Methods:
-    --------
+    Methods
+    -------
     _get_objective(self) -> Callable
         Create the multi-objective Bayesian optimization objective.
     get_acquisition(self, model: torch.nn.Module) -> FixedFeatureAcquisitionFunction
@@ -53,30 +54,39 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     __doc__ = """Implements Multi-Objective Bayesian Optimization using the Log Expected
             Hypervolume Improvement acquisition function"""
 
-    def _get_objective(self) -> Callable:
+    _compatible_turbo_controllers = [SafetyTurboController]
+
+    def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
-
-        Returns:
-        --------
-        Callable
-            The multi-objective Bayesian optimization objective.
         """
-        return create_mobo_objective(self.vocs)
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
+                raise RuntimeError(
+                    "cannot specify objectives in VOCS "
+                    "and a custom objective for the generator at the "
+                    "same time"
+                )
 
-    def get_acquisition(
-        self, model: torch.nn.Module
-    ) -> FixedFeatureAcquisitionFunction:
+            objective = self.custom_objective
+        else:
+            objective = create_mobo_objective(self.vocs)
+
+        return objective.to(**self.tkwargs)
+
+    def get_acquisition(self, model: torch.nn.Module):
         """
         Get the acquisition function for Bayesian Optimization.
+        Note that this needs to overwrite the base method due to
+        how qLogExpectedHypervolumeImprovement handles constraints.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
-        Returns:
-        --------
+        Returns
+        -------
         FixedFeatureAcquisitionFunction
             The acquisition function.
         """
@@ -87,19 +97,9 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         acq = self._get_acquisition(model)
 
         # apply fixed features if specified in the generator
-        if self.fixed_features is not None:
-            # get input dim
-            dim = len(self.model_input_names)
-            columns = []
-            values = []
-            for name, value in self.fixed_features.items():
-                columns += [self.model_input_names.index(name)]
-                values += [value]
+        acq = self._apply_fixed_features(acq)
 
-            acq = FixedFeatureAcquisitionFunction(
-                acq_function=acq, d=dim, columns=columns, values=values
-            )
-
+        acq = acq.to(**self.tkwargs)
         return acq
 
     def _get_acquisition(
@@ -108,13 +108,13 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         """
         Create the Log Expected Hypervolume Improvement acquisition function.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         model : torch.nn.Module
             The model used for Bayesian Optimization.
 
-        Returns:
-        --------
+        Returns
+        -------
         qLogNoisyExpectedHypervolumeImprovement
             The Log Expected Hypervolume Improvement acquisition function.
         """
@@ -131,7 +131,6 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
             cache_root=False,
             prune_baseline=True,
         )
-
         return acq
 
     def _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]:
@@ -144,13 +143,13 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         function instead of randomly selected points (random points fill in the set
         if `num_restarts` is greater than the number of points in the Pareto set).
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         n_candidates : int, optional
             The number of candidates to generate, by default 1.
 
-        Returns:
-        --------
+        Returns
+        -------
         Optional[Tensor]
             A `num_restarts x q x d` tensor of initial conditions, or None if the
             Pareto front is not used.
@@ -160,7 +159,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
                 bounds = self._get_optimization_bounds()
                 num_restarts = self.numerical_optimizer.n_restarts
 
-                pf_locations, _ = self.get_pareto_front()
+                pf_locations, _, _, _ = self.get_pareto_front_and_hypervolume()
 
                 # if there is no pareto front just return None to revert back to
                 # default behavior

@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
-from functools import partial
 from typing import Optional, Callable, List
 
 import torch
-from botorch.acquisition import GenericMCObjective, MCAcquisitionObjective
+from botorch.acquisition import (
+    LinearMCObjective,
+    MCAcquisitionObjective,
+)
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
 from torch import Tensor
+from functools import partial
 
 from xopt import VOCS
 
@@ -20,13 +23,13 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
     """
     Custom objective function wrapper for use in Bayesian generators.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Methods:
-    --------
+    Methods
+    -------
     forward(samples: Tensor, X: Optional[Tensor] = None) -> Tensor
         Evaluate the objective on the samples.
     """
@@ -45,7 +48,7 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
             X: A `batch_shape x q x d`-dim tensor of inputs. Relevant only if
                 the objective depends on the inputs explicitly.
 
-        Returns:
+        Returns
             Tensor: A `sample_shape x batch_shape x q`-dim Tensor of objective
             values (assuming maximization).
 
@@ -68,8 +71,8 @@ def feasibility(
     """
     Calculate the feasibility of the given points.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     X : Tensor
         The input tensor.
     model : torch.nn.Module
@@ -79,8 +82,8 @@ def feasibility(
     posterior_transform : Optional[Callable], optional
         The posterior transform, by default None.
 
-    Returns:
-    --------
+    Returns
+    -------
     Tensor
         The feasibility values.
     """
@@ -96,89 +99,59 @@ def feasibility(
     return torch.mean(objective(samples, X), dim=0)
 
 
-def constraint_function(Z: Tensor, vocs: VOCS, name: str) -> Tensor:
-    """
-    Create constraint function.
-
-    Constraint functions should return negative values for feasible values and
-    positive values for infeasible values.
-
-    Parameters:
-    -----------
-    Z : Tensor
-        The input tensor.
-    vocs : VOCS
-        The VOCS (Variables, Objectives, Constraints, Statics) object.
-    name : str
-        The name of the constraint.
-
-    Returns:
-    --------
-    Tensor
-        The constraint values.
-    """
-    output_names = vocs.output_names
-    constraint = vocs.constraints[name]
-
-    if constraint[0] == "LESS_THAN":
-        return Z[..., output_names.index(name)] - constraint[1]
-    elif constraint[0] == "GREATER_THAN":
-        return -(Z[..., output_names.index(name)] - constraint[1])
-
-
 def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
     """
     Create a list of constraint callables.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Returns:
-    --------
+    Returns
+    -------
     Optional[List[Callable]]
         A list of constraint callables, or None if there are no constraints.
     """
     if vocs.constraints is not None:
         constraint_names = vocs.constraint_names
         constraint_callables = []
+        output_names = vocs.output_names
         for name in constraint_names:
-            constraint_callables += [
-                partial(
-                    constraint_function,
-                    vocs=vocs,
-                    name=name,
-                )
-            ]
+            constraint = vocs.constraints[name]
+            index = output_names.index(name)
+            value = constraint[1]
+            sign = 1 if constraint[0] == "LESS_THAN" else -1
+
+            def cbf(Z: Tensor, index: int, value: float, sign: float) -> Tensor:
+                return sign * (Z[..., index] - value)
+
+            constraint_callables.append(
+                partial(cbf, index=index, value=value, sign=sign)
+            )
         return constraint_callables
 
     else:
         return None
 
 
-def create_mc_objective(vocs: VOCS, tkwargs: dict) -> GenericMCObjective:
+def create_mc_objective(vocs: VOCS) -> LinearMCObjective:
     """
     Create a monte carlo objective object.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
-    tkwargs : dict
-        Tensor keyword arguments.
 
-    Returns:
-    --------
-    GenericMCObjective
+    Returns
+    -------
+    LinearMCObjective
         The objective object.
     """
     weights = set_botorch_weights(vocs)
-
-    def obj_callable(Z: Tensor, X: Optional[Tensor] = None) -> Tensor:
-        return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
-
-    return GenericMCObjective(obj_callable)
+    objective = LinearMCObjective(weights=weights)
+    return objective
 
 
 def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
@@ -188,20 +161,29 @@ def create_mobo_objective(vocs: VOCS) -> WeightedMCMultiOutputObjective:
     BoTorch assumes maximization, so we need to negate any objectives that have
     the minimize keyword and zero out anything that is a constraint.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS (Variables, Objectives, Constraints, Statics) object.
 
-    Returns:
-    --------
+    Returns
+    -------
     WeightedMCMultiOutputObjective
         The multi-objective Bayesian optimization objective.
     """
     output_names = vocs.output_names
-    objective_indices = [output_names.index(name) for name in vocs.objectives]
-    weights = set_botorch_weights(vocs)[objective_indices]
+    if vocs.n_outputs == vocs.n_objectives:
+        objective_indices = None
+        weights = set_botorch_weights(vocs)
+    else:
+        objective_indices = [output_names.index(name) for name in vocs.objectives]
+        weights = set_botorch_weights(vocs)[objective_indices]
 
-    return WeightedMCMultiOutputObjective(
-        weights, outcomes=objective_indices, num_outcomes=vocs.n_objectives
+    # Note that objective_indices gets registered as buffer with no device specified by botorch
+    # If it is None, a lot of checks are skipped so we do this for performance
+    objective = WeightedMCMultiOutputObjective(
+        weights=weights,
+        outcomes=objective_indices,
+        num_outcomes=vocs.n_objectives,
     )
+    return objective

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from pydantic import ConfigDict, conlist, Field, field_validator
+from xopt.errors import FeasibilityError
 
 from xopt.pydantic import XoptBaseModel
 
@@ -41,8 +42,8 @@ class VOCS(XoptBaseModel):
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
     to describe optimization problems.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     variables : Dict[str, conlist(float, min_length=2, max_length=2)]
         Input variable names with a list of minimum and maximum values.
     constraints : Dict[str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)]
@@ -54,8 +55,8 @@ class VOCS(XoptBaseModel):
     observables : List[str]
         Observation names tracked alongside objectives and constraints.
 
-    Methods:
-    --------
+    Methods
+    -------
     from_yaml(cls, yaml_text: str) -> 'VOCS'
         Create a VOCS object from a YAML string.
     as_yaml(self) -> str
@@ -698,6 +699,8 @@ class VOCS(XoptBaseModel):
                 Dataframe containing objective data
             constraint_data : DataFrame
                 Dataframe containing constraint data
+            observable_data : DataFrame
+                Dataframe containing observable data
         """
         variable_data = self.variable_data(data, "")
         objective_data = self.objective_data(data, "", return_raw)
@@ -707,10 +710,10 @@ class VOCS(XoptBaseModel):
         if return_valid:
             feasible_status = self.feasibility_data(data)["feasible"]
             return (
-                variable_data[feasible_status],
-                objective_data[feasible_status],
-                constraint_data[feasible_status],
-                observable_data[feasible_status],
+                variable_data.loc[feasible_status, :],
+                objective_data.loc[feasible_status, :],
+                constraint_data.loc[feasible_status, :],
+                observable_data.loc[feasible_status, :],
             )
 
         return variable_data, objective_data, constraint_data, observable_data
@@ -743,24 +746,29 @@ class VOCS(XoptBaseModel):
             raise RuntimeError("cannot select best point if dataframe is empty")
 
         feasible_data = self.feasibility_data(data)
-        if feasible_data.empty:
-            raise RuntimeError(
-                "cannot select best point if no points satisfy the given constraints"
+        if feasible_data.empty or (~feasible_data["feasible"]).all():
+            raise FeasibilityError(
+                "Cannot select best point if no points satisfy the given constraints. "
             )
 
         ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
         obj = self.objectives[self.objective_names[0]]
         obj_name = self.objective_names[0]
 
-        res = data[feasible_data["feasible"]].sort_values(
-            obj_name, ascending=ascending_flag[obj]
-        )[obj_name][:n]
+        res = (
+            data.loc[feasible_data["feasible"], :]
+            .sort_values(obj_name, ascending=ascending_flag[obj])
+            .loc[:, obj_name]
+            .iloc[:n]
+        )
 
-        params = data.iloc[res.index.to_numpy(int)][self.variable_names].to_dict(
-            orient="records"
-        )[0]
+        params = data.loc[res.index, self.variable_names].to_dict(orient="records")[0]
 
-        return res.index.to_numpy(int), res.to_numpy(float), params
+        return (
+            res.index.to_numpy(copy=True, dtype=int),
+            res.to_numpy(copy=True, dtype=float),
+            params,
+        )
 
     def cumulative_optimum(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -853,7 +861,7 @@ def form_objective_data(
 
             weights[i] = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
 
-        oarr = data.loc[:, objectives_names].to_numpy(dtype=float) * weights
+        oarr = data.loc[:, objectives_names].to_numpy(copy=True, dtype=float) * weights
         oarr[np.isnan(oarr)] = np.inf
         odata = pd.DataFrame(
             oarr, columns=[prefix + k for k in objectives_names], index=data.index
@@ -872,7 +880,7 @@ def form_objective_data(
                 raise ValueError(f"Unknown objective operator: {operator}")
 
             weight = 1.0 if return_raw else OBJECTIVE_WEIGHT[operator]
-            arr = data.loc[:, [k]].to_numpy(float) * weight
+            arr = data.loc[:, [k]].to_numpy(copy=True, dtype=float) * weight
             arr[np.isnan(arr)] = np.inf
             array_list.append(arr)
 

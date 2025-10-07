@@ -100,7 +100,7 @@ class TestXopt:
                 assert X.generator.data is None and X.data is None
             else:
                 assert len(X.generator.data) == len(X.data) == length
-                assert X.data.index.is_integer()
+                assert pd.api.types.is_integer_dtype(X.data.index)
                 assert X.data.index.dtype == np.int64
 
         def check_all(X, length):
