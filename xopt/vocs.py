@@ -1,11 +1,11 @@
 import warnings
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import ConfigDict, conlist, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from xopt.errors import FeasibilityError
 
 from xopt.pydantic import XoptBaseModel
@@ -35,6 +35,9 @@ class ConstraintEnum(str, Enum):
             for member in cls:
                 if member.name.lower() == name.lower():
                     return member
+
+
+variables_type = dict[str, tuple[float, float]]
 
 
 class VOCS(XoptBaseModel):
@@ -91,15 +94,15 @@ class VOCS(XoptBaseModel):
         Returns the cumulative optimum for the given DataFrame.
     """
 
-    variables: dict[str, conlist(float, min_length=2, max_length=2)] = Field(
+    variables: dict[str, tuple[float, float]] = Field(
         default={},
         description="input variable names with a list of minimum and maximum values",
     )
-    constraints: dict[
-        str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
-    ] = Field(
-        default={},
-        description="constraint names with a list of constraint type and value",
+    constraints: dict[str, tuple[float | ConstraintEnum, float | ConstraintEnum]] = (
+        Field(
+            default={},
+            description="constraint names with a list of constraint type and value",
+        )
     )
     objectives: dict[str, ObjectiveEnum] = Field(
         default={}, description="objective names with type of objective"
@@ -1019,14 +1022,14 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         )
 
 
-def validate_variable_bounds(variable_dict: dict[str, list[float]]):
+def validate_variable_bounds(variable_dict: dict[str, Any]):
     """
     Check to make sure that bounds for variables are specified correctly. Raises
     ValueError if anything is incorrect
     """
 
     for name, value in variable_dict.items():
-        if not isinstance(value, list):
+        if not isinstance(value, Iterable):
             raise ValueError(f"Bounds specified for `{name}` must be a list.")
         if not len(value) == 2:
             raise ValueError(

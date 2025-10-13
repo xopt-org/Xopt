@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from botorch.acquisition import AcquisitionFunction
@@ -81,7 +81,18 @@ class LBFGSOptimizer(NumericalOptimizer):
         5.0, description="maximum time for optimization in seconds"
     )
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(validate_assignment=True, extra="allow")
+
+    def __init__(
+        self,
+        **kwargs: Any,
+    ):
+        """
+        Initialize the LBFGS optimizer.
+
+        """
+
+        super().__init__(**kwargs)
 
     def optimize(self, function, bounds, n_candidates=1, **kwargs):
         """

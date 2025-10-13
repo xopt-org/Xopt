@@ -5,7 +5,14 @@ from typing import Dict, Optional
 
 import pandas as pd
 import torch
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    PositiveFloat,
+    PositiveInt,
+    ValidationInfo,
+    field_validator,
+)
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -74,7 +81,7 @@ class TurboController(XoptBaseModel, ABC):
     """
 
     vocs: VOCS = Field(exclude=True, description="VOCS object")
-    dim: PositiveInt = Field(
+    dim: PositiveInt | None = Field(
         None, description="number of dimensions in the optimization problem"
     )
     batch_size: PositiveInt = Field(1, description="number of trust regions to use")
@@ -91,11 +98,11 @@ class TurboController(XoptBaseModel, ABC):
         description="maximum base length of trust region",
     )
     failure_counter: int = Field(0, description="number of failures since reset", ge=0)
-    failure_tolerance: PositiveInt = Field(
+    failure_tolerance: PositiveInt | None = Field(
         None, description="number of failures to trigger a trust region expansion"
     )
     success_counter: int = Field(0, description="number of successes since reset", ge=0)
-    success_tolerance: PositiveInt = Field(
+    success_tolerance: PositiveInt | None = Field(
         None,
         description="number of successes to trigger a trust region contraction",
     )
@@ -292,7 +299,7 @@ class OptimizeTurboController(TurboController):
     )
 
     @field_validator("vocs", mode="after")
-    def vocs_validation(cls, info):
+    def vocs_validation(cls, info: ValidationInfo):
         if not info.objectives:
             raise ValueError(
                 "optimize turbo controller must have an objective specified"

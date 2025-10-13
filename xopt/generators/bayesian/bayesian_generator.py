@@ -179,12 +179,20 @@ class BayesianGenerator(Generator, ABC):
     )
 
     @classmethod
-    def get_compatible_turbo_controllers(cls) -> list[type[TurboController]]:
+    def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
         if compatible is None:
-            return []
-        compatible = cast(ModelPrivateAttr, compatible)
-        return compatible.get_default()
+            return [None]
+
+        compatible_list: list[type[TurboController] | None] = []
+        # If it's a ModelPrivateAttr, get the default value
+        if isinstance(compatible, ModelPrivateAttr):
+            compatible = compatible.get_default()
+        # Defensive: ensure it's a list
+        compatible_list = list(compatible) if compatible is not None else []
+        if None not in compatible_list:
+            compatible_list.append(None)
+        return compatible_list
 
     @classmethod
     def get_compatible_numerical_optimizers(
@@ -255,7 +263,11 @@ class BayesianGenerator(Generator, ABC):
         if cls._compatible_turbo_controllers is None:
             raise ValueError("no turbo controllers are compatible with this generator")
 
-        compatible_turbo_controllers = cls.get_compatible_turbo_controllers()
+        compatible_turbo_controllers = [
+            turbo_controller
+            for turbo_controller in cls.get_compatible_turbo_controllers()
+            if turbo_controller is not None
+        ]
 
         if len(compatible_turbo_controllers) == 0:
             raise ValueError("no turbo controllers are compatible with this generator")
