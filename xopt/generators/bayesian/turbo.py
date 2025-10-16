@@ -298,6 +298,8 @@ class OptimizeTurboController(TurboController):
         None, description="best objective value found so far"
     )
 
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, info: ValidationInfo):
         if not info.objectives:
