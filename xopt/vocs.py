@@ -341,7 +341,7 @@ class VOCS(XoptBaseModel):
     def grid_inputs(
         self,
         n: int | dict[str, int],
-        custom_bounds: dict = None,
+        custom_bounds: dict[str, list[float]] | None = None,
         include_constants: bool = True,
     ) -> pd.DataFrame:
         """
@@ -401,7 +401,7 @@ class VOCS(XoptBaseModel):
         mesh = np.meshgrid(*grid_axes)
         inputs = {key: mesh[i].flatten() for i, key in enumerate(bounds.keys())}
 
-        if include_constants and self.constants is not None:
+        if include_constants:
             for key, value in self.constants.items():
                 inputs[key] = np.full_like(next(iter(inputs.values())), value)
 
@@ -438,9 +438,9 @@ class VOCS(XoptBaseModel):
         # append constants if requested
         if include_constants:
             constants = self.constants
-            if constants is not None:
-                for name, val in constants.items():
-                    inner_copy[name] = val
+
+            for name, val in constants.items():
+                inner_copy[name] = val
 
         return inner_copy
 
@@ -469,7 +469,7 @@ class VOCS(XoptBaseModel):
 
     def variable_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
@@ -491,7 +491,7 @@ class VOCS(XoptBaseModel):
 
     def objective_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "objective_",
         return_raw: bool = False,
     ) -> pd.DataFrame:
@@ -517,7 +517,7 @@ class VOCS(XoptBaseModel):
 
     def constraint_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
@@ -540,7 +540,7 @@ class VOCS(XoptBaseModel):
 
     def observable_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "observable_",
     ) -> pd.DataFrame:
         """
@@ -562,7 +562,7 @@ class VOCS(XoptBaseModel):
 
     def feasibility_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
@@ -1009,7 +1009,7 @@ def form_feasibility_data(constraints: dict, data, prefix="feasible_") -> pd.Dat
 
 def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
     variable_data = data.loc[:, vocs.variable_names].values
-    bounds = vocs.bounds
+    bounds = vocs.bounds  # type: ignore
 
     is_out_of_bounds_lower = variable_data < bounds[0, :]
     is_out_of_bounds_upper = variable_data > bounds[1, :]
@@ -1022,7 +1022,7 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         )
 
 
-def validate_variable_bounds(variable_dict: dict[str, Any]):
+def validate_variable_bounds(variable_dict: dict[str, tuple[float, float]]) -> None:
     """
     Check to make sure that bounds for variables are specified correctly. Raises
     ValueError if anything is incorrect
@@ -1043,8 +1043,8 @@ def validate_variable_bounds(variable_dict: dict[str, Any]):
 
 
 def clip_variable_bounds(
-    vocs: VOCS, custom_bounds: dict[str, list[float]]
-) -> dict[str, list[float]]:
+    vocs: VOCS, custom_bounds: dict[str, list[float]] | None = None
+) -> dict[str, tuple[float, float]]:
     """
     Return new bounds as intersection of vocs and custom bounds
     """
@@ -1053,18 +1053,15 @@ def clip_variable_bounds(
     else:
         variable_bounds = vocs.variables
 
-        if not isinstance(custom_bounds, dict):
-            raise TypeError("`custom_bounds` must be a dict")
-
         try:
             validate_variable_bounds(custom_bounds)
         except ValueError:
             raise ValueError("specified `custom_bounds` not valid")
 
-        vars_clipped_lb_list = []
-        vars_clipped_ub_list = []
+        vars_clipped_lb_list: list[str] = []
+        vars_clipped_ub_list: list[str] = []
 
-        final_bounds = {}
+        final_bounds: dict[str, tuple[float, float]] = {}
         for var, (lb, ub) in variable_bounds.items():
             if var in custom_bounds:
                 clb = custom_bounds[var][0]
@@ -1084,9 +1081,9 @@ def clip_variable_bounds(
                 else:
                     vars_clipped_ub_list.append(var)
                     fub = ub
-                final_bounds[var] = [flb, fub]
+                final_bounds[var] = (flb, fub)
             else:
-                final_bounds[var] = [lb, ub]
+                final_bounds[var] = (lb, ub)
 
         if vars_clipped_lb_list:
             warnings.warn(

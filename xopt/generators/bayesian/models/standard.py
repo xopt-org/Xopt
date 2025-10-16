@@ -1,7 +1,7 @@
 import os.path
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 import botorch.settings
 import pandas as pd
@@ -93,24 +93,25 @@ class StandardModelConstructor(ModelConstructor):
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
     @field_validator("covar_modules", "mean_modules", mode="before")
-    def validate_torch_modules(cls, v):
-        if not isinstance(v, dict):
+    def validate_torch_modules(cls, value: Any):
+        if not isinstance(value, dict):
             raise ValueError("must be dict")
         else:
-            for key, val in v.items():
+            value = cast(dict[str, Any], value)
+            for key, val in value.items():
                 if isinstance(val, str):
                     if val.startswith("base64:"):
-                        v[key] = decode_torch_module(val)
+                        value[key] = decode_torch_module(val)
                     elif os.path.exists(val):
-                        v[key] = torch.load(val, weights_only=False)
+                        value[key] = torch.load(val, weights_only=False)
 
-        return v
+        return value
 
     @field_validator("trainable_mean_keys")
-    def validate_trainable_mean_keys(cls, v, info: ValidationInfo):
-        for name in v:
+    def validate_trainable_mean_keys(cls, value: Any, info: ValidationInfo):
+        for name in value:
             assert name in info.data["mean_modules"]
-        return v
+        return value
 
     def get_likelihood(
         self,

@@ -202,16 +202,16 @@ class BayesianGenerator(Generator, ABC):
         return compatible.get_default()
 
     @field_validator("model", mode="before")
-    def validate_torch_modules(cls, v):
-        if isinstance(v, str):
-            if v.startswith("base64:"):
-                v = decode_torch_module(v)
-            elif os.path.exists(v):
-                v = torch.load(v, weights_only=False)
-        return v
+    def validate_torch_modules(cls, value: Any):
+        if isinstance(value, str):
+            if value.startswith("base64:"):
+                value = decode_torch_module(value)
+            elif os.path.exists(value):
+                value = torch.load(value, weights_only=False)
+        return value
 
     @field_validator("gp_constructor", mode="before")
-    def validate_gp_constructor(cls, value):
+    def validate_gp_constructor(cls, value: Any):
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
             value = StandardModelConstructor()
