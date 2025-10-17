@@ -264,7 +264,7 @@ def get_objective_data(
         # have all objectives, dont need to fill in missing ones
         weights = np.ones(len(objectives_names))
         for i, k in enumerate(objectives_names):
-            operator = vocs.objectives[k].upper()
+            operator = vocs.objectives[k].__class__.__name__
             if operator not in OBJECTIVE_WEIGHT:
                 raise ValueError(f"Unknown objective operator: {operator}")
 
@@ -284,7 +284,7 @@ def get_objective_data(
             if k not in data:
                 array_list.append(np.full((length, 1), np.inf))
                 continue
-            operator = vocs.objectives[k].upper()
+            operator = vocs.objectives[k].__class__.__name__
             if operator not in OBJECTIVE_WEIGHT:
                 raise ValueError(f"Unknown objective operator: {operator}")
 
@@ -669,7 +669,7 @@ def cumulative_optimum(vocs, data: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------
 # dataframe utilities
 
-OBJECTIVE_WEIGHT = {"MINIMIZE": 1.0, "MAXIMIZE": -1.0}
+OBJECTIVE_WEIGHT = {"MinimizeObjective": 1.0, "MaximizeObjective": -1.0}
 
 
 def validate_variable_bounds(variable_dict: dict[str, list[float]]):

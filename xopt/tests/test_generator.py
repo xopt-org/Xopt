@@ -1,6 +1,6 @@
 import json
 from copy import deepcopy
-
+import pandas as pd
 import pytest
 
 from xopt.errors import VOCSError
@@ -36,6 +36,12 @@ class TestGenerator:
 
         with pytest.raises(VOCSError):
             PatchGenerator(vocs=test_vocs)
+
+    def test_add_data(self):
+        gen = PatchGenerator(vocs=TEST_VOCS_BASE)
+        data = [{"x1": 1.0, "x2": 2.0, "y1": 3.0}]
+        gen.ingest(data)
+        assert (gen.data == pd.DataFrame(data)).all().all()
 
     @pytest.mark.parametrize("name", list_available_generators())
     def test_serialization_loading(self, name):
