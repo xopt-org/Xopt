@@ -1,15 +1,19 @@
 from datetime import datetime
-from pydantic import Field, Discriminator
+from itertools import chain
+from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
+import json
 import logging
 import numpy as np
 import os
 import pandas as pd
 import time
+import warnings
 
 from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
-
+from ...errors import DataError
 from ...generator import StateOwner
+from ...vocs import VOCS
 from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
 from .operators import (
@@ -279,6 +283,10 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Directory to save algorithm state and population history.
     checkpoint_freq : int, default=1
         Frequency (in generations) at which to save checkpoints.
+    checkpoint_file : str, optional
+        Path to checkpoint file to load from. If provided, the generator will be initialized
+        from the checkpoint state. The user-provided VOCS must match the checkpoint VOCS exactly.
+        User-specified parameters will override checkpoint values.
     deduplicate_output : bool, default=True
         Whether to ensure all generated candidates are unique.
 
@@ -311,6 +319,12 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     name = "nsga2"
     supports_multi_objective: bool = True
     supports_constraints: bool = True
+    supports_single_objective: bool = True
+
+    # Checkpoint loading
+    checkpoint_file: str | None = Field(
+        None, description="Path to checkpoint file to load from", exclude=True
+    )
 
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[
@@ -369,6 +383,109 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
+
+    @staticmethod
+    def _load_checkpoint_data(fname: str) -> dict:
+        """
+        Internal function to load generator data from checkpoint file as well as VOCS object.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the checkpoint file
+
+        Returns
+        -------
+        dict
+            Dictionary containing VOCS and checkpoint data
+        """
+        # Load the VOCS object
+        vocs_fname = os.path.join(os.path.dirname(fname), "../vocs.txt")
+        if not os.path.exists(vocs_fname):
+            raise ValueError(
+                f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
+                "output directory is required for loading from checkpoint."
+            )
+        with open(vocs_fname) as f:
+            vocs = VOCS.from_dict(json.load(f))
+
+        # Load the checkpoint
+        with open(fname) as f:
+            checkpoint_data = json.load(f)
+
+        return {"vocs": vocs, **checkpoint_data}
+
+    @model_validator(mode="before")
+    @classmethod
+    def load_from_checkpoint(cls, values):
+        """
+        Load from checkpoint file if checkpoint_file is provided.
+        """
+        # Case when a checkpoint file has been supplied
+        if isinstance(values, dict) and "checkpoint_file" in values:
+            checkpoint_file = values.pop("checkpoint_file")
+            if checkpoint_file is not None:
+                # Load checkpoint data
+                checkpoint_data = cls._load_checkpoint_data(checkpoint_file)
+
+                # Merge with user data precedence
+                merged_data = {**checkpoint_data, **values}
+                return merged_data
+
+        # No checkpoint
+        return values
+
+    @model_validator(mode="after")
+    def vocs_compatible(self):
+        """
+        Check that the VOCS object is compatible with our checkpoint
+        For selection and the genetic operators to work correctly, all
+        incoming variables, objectives, and constraints must exist as
+        keys in pop/child
+        """
+        if self.pop or self.child:
+            # The keys present in all individuals
+            all_individuals = chain(self.pop, self.child)
+            all_keys = set.intersection(*(set(x.keys()) for x in all_individuals))
+
+            # Check that all required VOCS keys exist in the checkpoint populations
+            if not all_keys.issuperset(
+                self.vocs.variable_names
+                + self.vocs.objective_names
+                + self.vocs.constraint_names
+            ):
+                raise ValueError(
+                    "User-provided VOCS is not compatible with existing population "
+                    "or child data from checkpoint."
+                )
+
+            # Filter individuals outside of variable bounds
+            # Use __setattr__ to not recursively apply validation
+            n_ind = len(self.pop) + len(self.child)
+            object.__setattr__(
+                self, "pop", [x for x in self.pop if self.data_in_bounds(x)]
+            )
+            object.__setattr__(
+                self, "child", [x for x in self.child if self.data_in_bounds(x)]
+            )
+
+            # Check how many individuals we filtered and report
+            n_filtered = n_ind - (len(self.pop) + len(self.child))
+            if n_filtered > 0:
+                warnings.warn(
+                    f"Filtered {n_filtered} individuals from population/children "
+                    "that lay outside of variable bounds."
+                )
+
+        return self
+
+    def data_in_bounds(self, data: dict) -> bool:
+        """
+        Returns true if every variable in the data dictionary is within bounds.
+        """
+        return all(
+            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+        )
 
     def _generate(self, n_candidates: int) -> list[dict]:
         self.ensure_output_dir_setup()
@@ -440,13 +557,26 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     def add_data(self, new_data: pd.DataFrame):
         self.ensure_output_dir_setup()
 
+        # Validate data is at least compatible with selection / genetic operators
+        vocs_names = (
+            self.vocs.variable_names
+            + self.vocs.objective_names
+            + self.vocs.constraint_names
+        )
+        if not set(vocs_names).issubset(set(new_data.columns)):
+            missing_cols = set(vocs_names).difference(set(new_data.columns))
+            raise DataError(
+                "New data must contain at least all variables, objectives, and constraints as columns"
+                f" (missing columns: {missing_cols})"
+            )
+
         # Pass to parent class for inclusion in self.data
         super().add_data(new_data)
 
         # Record the function evaluations
         self.fevals += len(new_data)
         self.child.extend(new_data.to_dict(orient="records"))
-        self._logger.info(
+        self._logger.debug(
             f"adding {len(new_data)} new evaluated individuals to generator"
         )
 
@@ -490,21 +620,33 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             if self.output_dir is not None:
                 save_start_t = time.perf_counter()
 
-                # Save all of the data
+                # Save all Xopt data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
                     f.write(self.vocs.to_json())
 
-                # Save this generation to the population file
+                # Construct the DataFrame for this population
                 pop_df = pd.DataFrame(self.pop)
                 pop_df["xopt_generation"] = self.n_generations
+
+                # Normalize the columns in the DataFrame
+                # Avoid schema changing part way through optimization so we can write CSV in append mode
+                columns = self.vocs.all_names + [
+                    "xopt_generation",
+                    "xopt_candidate_idx",
+                    "xopt_runtime",
+                    "xopt_error",
+                ]
+                pop_df = pop_df.reindex(columns=columns)
+
+                # Write population DataFrame to file
                 csv_path = os.path.join(self.output_dir, "populations.csv")
                 pop_df.to_csv(
                     csv_path, index=False, mode="a", header=not os.path.isfile(csv_path)
                 )
 
                 # Log some things
-                self._logger.info(
+                self._logger.debug(
                     f'saved optimization data to "{self.output_dir}" '
                     f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
                 )
@@ -542,7 +684,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Now we have a unique filename
         with open(checkpoint_path, "w") as f:
             f.write(self.to_json())
-        self._logger.info(f'saved checkpoint file "{checkpoint_path}"')
+        self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
         self.data = data

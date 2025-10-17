@@ -107,7 +107,7 @@ class TurboController(XoptBaseModel, ABC):
     scale_factor: float = Field(
         2.0, description="multiplier to increase or decrease trust region", ge=1.0
     )
-    restrict_model_data: Optional[bool] = Field(
+    restrict_model_data: bool = Field(
         True, description="flag to restrict model data to within the trust region"
     )
 
@@ -489,7 +489,7 @@ class EntropyTurboController(TurboController):
     """
 
     name: str = Field("EntropyTurboController", frozen=True)
-    _best_entropy: float = None
+    _best_entropy: Optional[float] = None
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         """
@@ -532,3 +532,7 @@ class EntropyTurboController(TurboController):
                 self.update_trust_region()
             else:
                 self._best_entropy = entropy
+
+    def reset(self):
+        super().reset()
+        self._best_entropy = None

@@ -9,6 +9,7 @@ nav:
     - Examples:
         - Basics:
             - examples/basic/xopt_basic.ipynb
+            - examples/basic/xopt_cli.md
             - examples/basic/xopt_parallel.ipynb
             - examples/basic/xopt_vocs.ipynb
             - examples/basic/xopt_evaluator.ipynb
@@ -44,8 +45,13 @@ nav:
             - CNSGA: examples/ga/cnsga_tnk.ipynb
             - NSGA-II:
               - examples/ga/nsga2/index.md
-              - "Python Interface": examples/ga/nsga2/nsga2_python.ipynb
-              - "Output Conversion": examples/ga/nsga2/nsga2_to_cnsga.ipynb
+              - "YAML Interface":
+                - examples/ga/nsga2/yaml_interface/index.md
+                - examples/ga/nsga2/yaml_interface/nsga2_yaml.ipynb
+                - "Download Template": examples/ga/nsga2/yaml_interface/assets/yaml_runner_example.zip
+              - examples/ga/nsga2/nsga2_python.ipynb
+              - examples/ga/nsga2/nsga2_to_cnsga.ipynb
+              - examples/ga/nsga2/genetic_operators.ipynb
 
         - Sequential:
             - Nelder-Mead: examples/sequential/neldermead.ipynb
@@ -156,3 +162,6 @@ plugins:
           rendering:
             show_source: true
             show_root_heading: true
+
+hooks:
+  - docs/hooks/zip_generator.py

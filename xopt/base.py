@@ -15,6 +15,7 @@ from pydantic import (
     ValidationInfo,
 )
 
+from .errors import DataError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
@@ -386,7 +387,12 @@ class Xopt(XoptBaseModel):
             if new_data.index.dtype != np.int64:
                 new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
-        self.generator.ingest(new_data.to_dict(orient="records"))
+        # Pass data to generator, continue in case of invalid data when strict=False
+        try:
+            self.generator.ingest(new_data.to_dict(orient="records"))
+        except DataError as exc:
+            if self.strict:
+                raise exc
 
     def reset_data(self):
         """

@@ -1,16 +1,18 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import List
+from typing import Any, List
 
 import gpytorch
 import numpy as np
 import pandas as pd
+from pydantic import ValidationInfo
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
+from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -189,7 +191,11 @@ def interpolate_points(df, num_points=10):
     return interpolated_points
 
 
-def validate_turbo_controller_base(value, valid_controller_types, info):
+def validate_turbo_controller_base(
+    value: Any,
+    valid_controller_types: list[type[TurboController]],
+    info: ValidationInfo,
+):
     """Validate turbo controller input"""
 
     # get string names of available controller types
@@ -229,17 +235,13 @@ def validate_turbo_controller_base(value, valid_controller_types, info):
             )
 
     # check if turbo controller is compatabile with the generator
-    valid_type = False
     for controller_type in valid_controller_types:
         if isinstance(value, controller_type):
-            valid_type = True
-
-    if not valid_type:
+            return value
+    else:
         raise ValueError(
             f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
         )
-
-    return value
 
 
 class MeanVarModelWrapper(torch.nn.Module):
