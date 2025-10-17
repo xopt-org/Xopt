@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from xopt.errors import FeasibilityError
-from generator_standard.vocs import (
+from gest_api.vocs import (
     VOCS,
     GreaterThanConstraint,
     LessThanConstraint,

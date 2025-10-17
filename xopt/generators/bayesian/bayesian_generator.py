@@ -3,8 +3,7 @@ import os
 import time
 import warnings
 from abc import ABC, abstractmethod
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -28,7 +27,6 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from generator_standard.vocs import ContinuousVariable
 
 from xopt.errors import XoptError, FeasibilityError
 from xopt.generator import Generator
@@ -420,7 +418,9 @@ class BayesianGenerator(Generator, ABC):
             raise ValueError("no data available to build model")
 
         # get input bounds
-        variable_bounds = {name: ele.domain for name, ele in self.vocs.variables.items()}
+        variable_bounds = {
+            name: ele.domain for name, ele in self.vocs.variables.items()
+        }
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds

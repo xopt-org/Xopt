@@ -8,7 +8,7 @@ import torch
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
 from torch import Tensor
 
-from generator_standard.vocs import VOCS
+from gest_api.vocs import VOCS
 
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE

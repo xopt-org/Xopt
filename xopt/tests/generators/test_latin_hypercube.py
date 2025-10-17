@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.stats import qmc
 
-from generator_standard.vocs import ContinuousVariable
+from gest_api.vocs import ContinuousVariable
 
 from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
@@ -35,7 +35,9 @@ class TestLatinHypercubeGenerator:
             for config in configs:
                 # Get the samples from xopt
                 test_vocs = deepcopy(TEST_VOCS_BASE)
-                test_vocs.variables = {f"x{i + 1}": ContinuousVariable(domain=[0, 1]) for i in range(dim)}
+                test_vocs.variables = {
+                    f"x{i + 1}": ContinuousVariable(domain=[0, 1]) for i in range(dim)
+                }
                 gen = LatinHypercubeGenerator(
                     vocs=test_vocs, seed=1, batch_size=n_samples, **config
                 )

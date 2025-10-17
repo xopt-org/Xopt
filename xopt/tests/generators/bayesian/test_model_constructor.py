@@ -17,7 +17,7 @@ from gpytorch.means import ConstantMean
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
 
-from generator_standard.vocs import VOCS, ContinuousVariable
+from gest_api.vocs import VOCS, ContinuousVariable
 
 from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,
@@ -135,7 +135,7 @@ class TestModelConstructor:
     def test_model_w_same_data(self):
         test_data = deepcopy(TEST_VOCS_DATA)
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        test_vocs.variables["x1"] = ContinuousVariable(domain = [5.0, 6.0])
+        test_vocs.variables["x1"] = ContinuousVariable(domain=[5.0, 6.0])
         constructor = StandardModelConstructor()
 
         # set all of the elements of a given input variable to the same value

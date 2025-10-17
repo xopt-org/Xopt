@@ -16,7 +16,7 @@ from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.mobo import MOBOGenerator
-from generator_standard.vocs import VOCS, ContinuousVariable, MaximizeObjective
+from gest_api.vocs import VOCS, ContinuousVariable, MaximizeObjective
 from xopt.vocs import convert_dataframe_to_inputs
 
 logger = logging.getLogger()

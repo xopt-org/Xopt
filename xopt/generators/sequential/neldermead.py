@@ -9,7 +9,12 @@ from pydantic import ConfigDict, Field, field_validator
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
-from xopt.vocs import VOCS, get_objective_data, get_variable_data, validate_variable_bounds
+from xopt.vocs import (
+    VOCS,
+    get_objective_data,
+    get_variable_data,
+    validate_variable_bounds,
+)
 
 logger = logging.getLogger(__name__)
 

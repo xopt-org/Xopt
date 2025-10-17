@@ -5,7 +5,7 @@ import pytest
 import torch
 from botorch.acquisition import ExpectedImprovement
 
-from generator_standard.vocs import (
+from gest_api.vocs import (
     VOCS,
     MinimizeObjective,
     MaximizeObjective,
@@ -29,6 +29,7 @@ cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
 
 set_options = create_set_options_helper(data=TEST_VOCS_DATA)
+
 
 class TestExpectedImprovement:
     def test_init(self):

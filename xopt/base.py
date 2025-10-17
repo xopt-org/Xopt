@@ -23,7 +23,7 @@ from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import validate_input_data, random_inputs, grid_inputs
-from generator_standard.vocs import VOCS
+from gest_api.vocs import VOCS
 
 logger = logging.getLogger(__name__)
 
@@ -492,7 +492,9 @@ class Xopt(XoptBaseModel):
         pd.DataFrame
             The results of the evaluations added to the internal DataFrame.
         """
-        gi = grid_inputs(self.vocs, n_samples, custom_bounds=custom_bounds, include_constants=True)
+        gi = grid_inputs(
+            self.vocs, n_samples, custom_bounds=custom_bounds, include_constants=True
+        )
         result = self.evaluate_data(gi)
         return result
 

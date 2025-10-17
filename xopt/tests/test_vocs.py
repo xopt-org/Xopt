@@ -18,19 +18,16 @@ from xopt.vocs import (
     select_best,
     grid_inputs,
     get_objective_data,
-    get_constraint_data,
-    get_feasibility_data,
-    get_observable_data,
     validate_input_data,
     extract_data,
 )
-from generator_standard.vocs import (
+from gest_api.vocs import (
     VOCS,
     ContinuousVariable,
     DiscreteVariable,
-    ObjectiveTypeEnum,
+    MinimizeObjective,
+    ExploreObjective,
     LessThanConstraint,
-    BoundsConstraint,
 )
 
 
@@ -117,8 +114,8 @@ class TestVOCS(object):
         assert vocs.constraint_names == ["c"]
         assert isinstance(vocs.variables["x"], ContinuousVariable)
         assert isinstance(vocs.variables["y"], DiscreteVariable)
-        assert vocs.objectives["z"] == ObjectiveTypeEnum.MINIMIZE
-        assert vocs.objectives["zzz"] == ObjectiveTypeEnum.EXPLORE
+        assert vocs.objectives["z"] == MinimizeObjective
+        assert vocs.objectives["zzz"] == ExploreObjective
         assert isinstance(vocs.constraints["c"], LessThanConstraint)
 
         assert vocs.n_inputs == 2
