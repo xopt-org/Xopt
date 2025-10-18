@@ -98,6 +98,15 @@ class TurboController(XoptBaseModel, ABC):
         2.0,
         description="maximum base length of trust region",
     )
+
+    failure_tolerance: PositiveInt = Field(
+        1, description="number of failures to trigger a trust region contraction", ge=1
+    )
+
+    success_tolerance: PositiveInt = Field(
+        1, description="number of successes to trigger a trust region expansion", ge=1
+    )
+
     failure_counter: int = Field(0, description="number of failures since reset", ge=0)
 
     success_counter: int = Field(0, description="number of successes since reset", ge=0)
@@ -119,30 +128,22 @@ class TurboController(XoptBaseModel, ABC):
     def dim(self) -> int:
         return self.vocs.n_variables
 
-    @computed_field
-    @property
-    def failure_tolerance(self) -> int:
-        _failure_tolerance = int(
-            math.ceil(
-                max([2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size])
-            )
-        )
-        return _failure_tolerance
-
-    @computed_field
-    @property
-    def success_tolerance(self) -> int:
-        _success_tolerance = int(
-            math.ceil(
-                max([2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size])
-            )
-        )
-        return _success_tolerance
-
     def __init__(self, **kwargs: Any):
         # dim = vocs.n_variables
 
         super().__init__(**kwargs)
+
+        self.success_tolerance = int(
+            math.ceil(
+                max([2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size])
+            )
+        )
+
+        self.failure_tolerance = int(
+            math.ceil(
+                max([2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size])
+            )
+        )
 
         # get the initial state for the turbo controller for resetting
         self._initial_state = self.model_dump()
