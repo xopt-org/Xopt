@@ -761,10 +761,10 @@ class RCDSGenerator(SequentialGenerator):
         objective_name = self.vocs.objective_names[
             0
         ]  # rcds only supports one objective
-        direction = self.vocs.objectives[objective_name]
-        if direction == "MINIMIZE":
+        direction = self.vocs.objectives[objective_name].__class__.__name__
+        if direction == "MinimizeObjective":
             self._sign = 1
-        elif direction == "MAXIMIZE":
+        elif direction == "MaximizeObjective":
             self._sign = -1
 
         x0, f0 = self._get_initial_point()

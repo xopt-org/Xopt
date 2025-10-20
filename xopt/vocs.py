@@ -614,8 +614,8 @@ def select_best(vocs, data: pd.DataFrame, n: int = 1):
             "Cannot select best point if no points satisfy the given constraints. "
         )
 
-    ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
-    obj = vocs.objectives[vocs.objective_names[0]]
+    ascending_flag = {"MinimizeObjective": True, "MaximizeObjective": False}
+    obj = vocs.objectives[vocs.objective_names[0]].__class__.__name__
     obj_name = vocs.objective_names[0]
 
     res = (
