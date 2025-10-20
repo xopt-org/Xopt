@@ -164,8 +164,8 @@ def convert_dataframe_to_inputs(
     if include_constants:
         constants = vocs.constants
         if constants is not None:
-            for name, val in constants.items():
-                inner_copy[name] = val
+            for name, var in constants.items():
+                inner_copy[name] = var.value
 
     return inner_copy
 
@@ -654,8 +654,8 @@ def cumulative_optimum(vocs, data: pd.DataFrame) -> pd.DataFrame:
     if data.empty:
         return pd.DataFrame()
     obj_name = vocs.objective_names[0]
-    obj = vocs.objectives[obj_name]
-    get_opt = np.nanmax if obj == "MAXIMIZE" else np.nanmin
+    obj = vocs.objectives[obj_name].__class__.__name__
+    get_opt = np.nanmax if obj == "MaximizeObjective" else np.nanmin
     feasible = get_feasibility_data(vocs, data)["feasible"]
     feasible_obj_values = [
         data[obj_name].values[i] if feasible[i] else np.nan for i in range(len(data))

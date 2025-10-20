@@ -114,8 +114,8 @@ class TestVOCS(object):
         assert vocs.constraint_names == ["c"]
         assert isinstance(vocs.variables["x"], ContinuousVariable)
         assert isinstance(vocs.variables["y"], DiscreteVariable)
-        assert vocs.objectives["z"] == MinimizeObjective
-        assert vocs.objectives["zzz"] == ExploreObjective
+        assert isinstance(vocs.objectives["z"], MinimizeObjective)
+        assert isinstance(vocs.objectives["zzz"], ExploreObjective)
         assert isinstance(vocs.constraints["c"], LessThanConstraint)
 
         assert vocs.n_inputs == 2
