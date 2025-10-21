@@ -299,7 +299,7 @@ class TestModelConstructor:
                 covar2 = None
 
             input_transform = Normalize(
-                test_vocs.n_variables, bounds=torch.tensor(test_vocs.bounds)
+                test_vocs.n_variables, bounds=torch.tensor(test_vocs.bounds).T
             )
             benchmark_model = SingleTaskGP(
                 train_X,
