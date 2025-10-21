@@ -7,9 +7,6 @@ from botorch.acquisition import ExpectedImprovement
 
 from gest_api.vocs import (
     VOCS,
-    MinimizeObjective,
-    MaximizeObjective,
-    ExploreObjective,
 )
 
 from xopt.base import Xopt
@@ -114,7 +111,7 @@ class TestExpectedImprovement:
         train_data = pd.DataFrame({"x1": train_x.numpy(), "y1": train_y.numpy()})
         test_x = torch.linspace(0.0, 1.0, 1000)
 
-        for objective in [MinimizeObjective(), MaximizeObjective(), ExploreObjective()]:
+        for objective in ["MINIMIZE", "MAXIMIZE"]:
             vocs = VOCS(
                 **{"variables": {"x1": [0.0, 1.0]}, "objectives": {"y1": objective}}
             )

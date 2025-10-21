@@ -3,7 +3,7 @@ import os
 import time
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -954,9 +954,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     "need to specify reference point for the following "
                     f"objective {name}"
                 )
-            if self.vocs.objectives[name] == "MINIMIZE":
+            if self.vocs.objectives[name].__class__.__name__ == "MinimizeObjective":
                 pt += [-ref_val]
-            elif self.vocs.objectives[name] == "MAXIMIZE":
+            elif self.vocs.objectives[name].__class__.__name__ == "MaximizeObjective":
                 pt += [ref_val]
             else:
                 raise ValueError(

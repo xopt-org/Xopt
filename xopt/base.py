@@ -296,8 +296,8 @@ class Xopt(XoptBaseModel):
         inputs = deepcopy(input_dict)
 
         # add constants to input data
-        for name, value in self.vocs.constants.items():
-            inputs[name] = value
+        for name, ele in self.vocs.constants.items():
+            inputs[name] = ele.value
 
         validate_input_data(self.vocs, DataFrame(inputs, index=[0]))
         return self.evaluator.evaluate(input_dict)

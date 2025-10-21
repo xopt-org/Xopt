@@ -304,7 +304,10 @@ class OptimizeTurboController(TurboController):
 
     @property
     def minimize(self) -> bool:
-        return self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE"
+        return (
+            self.vocs.objectives[self.vocs.objective_names[0]].__class__.__name__
+            == "MinimizeObjective"
+        )
 
     def _set_best_point_value(self, data):
         """

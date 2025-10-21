@@ -85,9 +85,15 @@ def set_botorch_weights(vocs: VOCS):
         # set weights according to the index of the models -- corresponds to the
         # ordering of output names
         for objective_name in vocs.objective_names:
-            if vocs.objectives[objective_name] == "MINIMIZE":
+            if (
+                vocs.objectives[objective_name].__class__.__name__
+                == "MinimizeObjective"
+            ):
                 weights[output_names.index(objective_name)] = -1.0
-            elif vocs.objectives[objective_name] == "MAXIMIZE":
+            elif (
+                vocs.objectives[objective_name].__class__.__name__
+                == "MaximizeObjective"
+            ):
                 weights[output_names.index(objective_name)] = 1.0
     if vocs.n_objectives == 0:
         # if no objectives exist this may be an exploration problem, weight each
