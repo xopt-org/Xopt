@@ -5,6 +5,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from xopt.base import Xopt
 from xopt.errors import DataError
@@ -22,11 +23,6 @@ from xopt.resources.test_functions.modified_tnk import (
 )
 
 from xopt.vocs import VOCS
-
-# Temp until NSGA2 tests are fixed
-import pytest
-
-pytest.skip("skipping test module", allow_module_level=True)
 
 
 def test_nsga2():

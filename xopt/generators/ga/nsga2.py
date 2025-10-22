@@ -484,7 +484,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Returns true if every variable in the data dictionary is within bounds.
         """
         return all(
-            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+            bnd.domain[0] <= data[key] <= bnd.domain[1]
+            for key, bnd in self.vocs.variables.items()
         )
 
     def _generate(self, n_candidates: int) -> list[dict]:
@@ -529,10 +530,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             )
         else:
             vars = np.vstack(
-                [
-                    np.random.uniform(x[0], x[1], n_candidates)
-                    for x in np.array(self.vocs.bounds).T
-                ]
+                [np.random.uniform(x[0], x[1], n_candidates) for x in self.vocs.bounds]
             ).T
             candidates = [
                 {k: v for k, v in zip(self.vocs.variable_names, individual)}
