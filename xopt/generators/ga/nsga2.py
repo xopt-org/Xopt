@@ -406,8 +406,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
                 "output directory is required for loading from checkpoint."
             )
+
         with open(vocs_fname) as f:
-            vocs = VOCS.from_dict(json.load(f))
+            vocs = VOCS(**json.load(f))
 
         # Load the checkpoint
         with open(fname) as f:
@@ -621,7 +622,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # Save all Xopt data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
-                    f.write(self.vocs.to_json())
+                    json.dump(self.vocs.dict(), f)
 
                 # Construct the DataFrame for this population
                 pop_df = pd.DataFrame(self.pop)

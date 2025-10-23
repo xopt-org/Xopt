@@ -113,7 +113,7 @@ def test_nsga2_output_data():
         # Check that the VOCS file contains valid JSON
         with open(os.path.join(output_dir, "vocs.txt"), "r") as f:
             vocs_dict = json.load(f)
-            VOCS.from_dict(vocs_dict)
+            VOCS(**vocs_dict)
 
         # Verify that the log file exists and has content
         with open(os.path.join(output_dir, "log.txt"), "r") as f:
