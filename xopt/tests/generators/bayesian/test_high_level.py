@@ -29,7 +29,7 @@ class TestHighLevel:
         acq = ucb_gen.get_acquisition(model)
 
         n = 10
-        bounds = torch.tensor(ucb_gen.vocs.bounds)
+        bounds = torch.tensor(ucb_gen.vocs.bounds, dtype=torch.double)
         x = torch.linspace(*bounds[0], n)
         y = torch.linspace(*bounds[1], n)
         xx, yy = torch.meshgrid(x, y)

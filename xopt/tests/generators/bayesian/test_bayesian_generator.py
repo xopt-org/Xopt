@@ -153,7 +153,9 @@ class TestBayesianGenerator(TestCase):
         model = gen.train_model(X.data)
 
         # test input normalization
-        input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds).T)
+        input_transform = Normalize(
+            1, bounds=torch.tensor(sinusoid_vocs.bounds, dtype=torch.double).T
+        )
         for inputs in model.train_inputs:
             assert torch.allclose(
                 inputs[0].unsqueeze(-1).T,

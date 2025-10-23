@@ -161,7 +161,7 @@ class TurboController(XoptBaseModel, ABC):
             The trust region bounds.
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds).T
+        bounds = torch.tensor(self.vocs.bounds, dtype=torch.double).T
 
         if self.center_x is not None:
             # get bounds width

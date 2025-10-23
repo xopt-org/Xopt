@@ -807,7 +807,7 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds).T
+        return torch.tensor(self.vocs.bounds, dtype=torch.double).T
 
     def _get_optimization_bounds(self):
         """

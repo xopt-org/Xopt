@@ -299,7 +299,8 @@ class TestModelConstructor:
                 covar2 = None
 
             input_transform = Normalize(
-                test_vocs.n_variables, bounds=torch.tensor(test_vocs.bounds).T
+                test_vocs.n_variables,
+                bounds=torch.tensor(test_vocs.bounds, dtype=torch.double).T,
             )
             benchmark_model = SingleTaskGP(
                 train_X,
@@ -378,7 +379,7 @@ class TestModelConstructor:
 
         # define test points
         # test equivalence
-        bounds = torch.tensor(vocs.bounds)
+        bounds = torch.tensor(vocs.bounds, dtype=torch.double)
         n = 10
         x = torch.linspace(*bounds.T[0], n)
         y = torch.linspace(*bounds.T[1], n)
