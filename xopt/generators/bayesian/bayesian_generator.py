@@ -27,6 +27,7 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
+from gest_api.vocs import MinimizeObjective, MaximizeObjective
 
 from xopt.errors import XoptError, FeasibilityError
 from xopt.generator import Generator
@@ -954,9 +955,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     "need to specify reference point for the following "
                     f"objective {name}"
                 )
-            if self.vocs.objectives[name].__class__.__name__ == "MinimizeObjective":
+            if isinstance(self.vocs.objectives[name], MinimizeObjective):
                 pt += [-ref_val]
-            elif self.vocs.objectives[name].__class__.__name__ == "MaximizeObjective":
+            elif isinstance(self.vocs.objectives[name], MaximizeObjective):
                 pt += [ref_val]
             else:
                 raise ValueError(

@@ -8,7 +8,7 @@ import torch
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
 from torch import Tensor
 
-from gest_api.vocs import VOCS
+from gest_api.vocs import VOCS, MinimizeObjective
 
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
@@ -304,9 +304,8 @@ class OptimizeTurboController(TurboController):
 
     @property
     def minimize(self) -> bool:
-        return (
-            self.vocs.objectives[self.vocs.objective_names[0]].__class__.__name__
-            == "MinimizeObjective"
+        return isinstance(
+            self.vocs.objectives[self.vocs.objective_names[0]], MinimizeObjective
         )
 
     def _set_best_point_value(self, data):
