@@ -1,5 +1,4 @@
 import warnings
-import re
 
 import numpy as np
 import pandas as pd
@@ -224,25 +223,10 @@ def get_variable_data(
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
 
-    def custom_sort_key(s):
-        """
-        Split each string into its alphabetical and numeric parts.
-        If the string is purely alphabetical, it sorts normally.
-        If it's alphanumeric, it sorts by the letter(s) first, then by the number.
-        """
-        match = re.match(r"([a-zA-Z]+)(\d+)?$", s)
-        if match:
-            alpha = match.group(1)
-            num = int(match.group(2)) if match.group(2) else -1
-            return (alpha, num)
-        else:
-            return (s, -1)
-
     # Pick out columns in right order
-    variables = sorted(vocs.variables, key=custom_sort_key)
-    vdata = data.loc[:, variables].copy()
+    vdata = data.loc[:, vocs.variable_names].copy()
     # Rename to add prefix
-    vdata.rename({k: prefix + k for k in variables})
+    vdata.rename({k: prefix + k for k in vocs.variable_names})
     return vdata
 
 
