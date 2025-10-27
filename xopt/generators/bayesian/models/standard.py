@@ -191,12 +191,12 @@ class StandardModelConstructor(ModelConstructor):
     def validate_train_config(cls, v, info: ValidationInfo):
         if v is None:
             return v
-        if info.data["method"] == "adam":
+        if info.data["train_method"] == "adam":
             if not isinstance(v, AdamNumericalOptimizerConfig):
                 raise ValueError(
                     "train_config must be of type AdamOptimizerConfig when method is 'adam'"
                 )
-        elif info.data["method"] == "lbfgs":
+        elif info.data["train_method"] == "lbfgs":
             if not isinstance(v, LBFGSNumericalOptimizerConfig):
                 raise ValueError(
                     "train_config must be of type LBFGSOptimizerConfig when method is 'lbfgs'"
