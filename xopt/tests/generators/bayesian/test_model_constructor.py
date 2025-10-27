@@ -24,7 +24,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import (
     BatchedModelConstructor,
-    StandardModelConstructor,
+    LBFGSNumericalOptimizerConfig, StandardModelConstructor,
 )
 from xopt.generators.bayesian.utils import get_training_data_batched
 from xopt.resources.testing import (
@@ -52,6 +52,15 @@ class TestModelConstructor:
             test_vocs, test_data, device=device_map[use_cuda]
         )
         verify_state_device(model, device=device_map[use_cuda])
+
+    def test_standard_with_numerical(self):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+        constructor = StandardModelConstructor(train_config=LBFGSNumericalOptimizerConfig(gtol=1e-3))
+
+        model = constructor.build_model_from_vocs(
+            test_vocs, test_data
+        )
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_standard_adam(self, use_cuda):
