@@ -15,7 +15,7 @@ from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 from gest_api.vocs import MinimizeObjective, MaximizeObjective
 
 from xopt.generators.bayesian.turbo import TurboController
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 def get_training_data(
@@ -300,7 +300,7 @@ def torch_trace_gp_model(
         raise ValueError(
             "ModelListGP is not supported for JIT tracing - use individual models"
         )
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
     )
@@ -365,7 +365,7 @@ def torch_compile_gp_model(
     """
     if isinstance(model, ModelListGP):
         raise ValueError("ModelListGP is not supported - use individual models")
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
@@ -414,7 +414,7 @@ def torch_trace_acqf(
         The keyword arguments for the torch tensor.
     """
     # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
@@ -465,7 +465,7 @@ def torch_compile_acqf(
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
         if verify:
-            rand_point = vocs.random_inputs()[0]
+            rand_point = random_inputs(vocs)[0]
             rand_vec = torch.stack(
                 [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
             )

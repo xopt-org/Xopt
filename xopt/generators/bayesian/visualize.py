@@ -470,7 +470,7 @@ def plot_model_prediction(
         )
         if output_name in vocs.constraint_names:
             axis.axhline(
-                y=vocs.constraints[output_name][1],
+                y=vocs.constraints[output_name].value,
                 color=color,
                 linestyle=":",
                 label="Constraint Threshold",
