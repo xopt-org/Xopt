@@ -286,7 +286,7 @@ class BayesianGenerator(Generator, ABC):
         -----
         This method appends the new data to the existing data in the generator.
         """
-        self.data = pd.concat([self.data, new_data], axis=0)
+        self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
 
     def generate(self, n_candidates: int) -> list[dict]:
         """

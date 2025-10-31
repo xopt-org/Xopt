@@ -134,7 +134,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
 
         """
         if self.data is not None:
-            self.data = pd.concat([self.data, new_data], axis=0)
+            self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
         else:
             self.data = new_data
 
