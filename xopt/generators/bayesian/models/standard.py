@@ -49,10 +49,10 @@ class NumericalOptimizerConfig(XoptBaseModel):
 
 class LBFGSNumericalOptimizerConfig(NumericalOptimizerConfig):
     gtol: float = Field(
-        1e-4, description="projected gradient tolerance, scipy default is 1e-5"
+        1e-5, description="projected gradient tolerance, scipy default is 1e-5"
     )
     ftol: float = Field(
-        2e-8,
+        2.2e-9,
         description="function tolerance, scipy default is 1e7 * np.finfo(float).eps = "
         "2.2204460492503131e-09",
     )
@@ -104,6 +104,10 @@ class StandardModelConstructor(ModelConstructor):
 
     train_model : bool
         Flag to specify if the model should be trained (fitted to data).
+
+    train_config : NumericalOptimizerConfig
+        Configuration of the numerical optimizer.
+
     """
 
     name: str = Field("standard", frozen=True)
