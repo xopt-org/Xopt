@@ -49,7 +49,7 @@ class SequentialGenerator(Generator, StateOwner):
 
         # do not call super, this will likely need to be customized for some generators
         if self.data is not None:
-            self.data = pd.concat([self.data, new_data], axis=0)
+            self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
         else:
             self.data = new_data
 

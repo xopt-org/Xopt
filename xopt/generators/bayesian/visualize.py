@@ -1059,7 +1059,7 @@ def _generate_input_mesh(
     torch.Tensor
         The input mesh for visualization.
     """
-    x_lim = torch.tensor([vocs.variables[k] for k in variable_names])
+    x_lim = torch.tensor([vocs.variables[k].bounds for k in variable_names])
     x_i = [torch.linspace(*x_lim[i], n_grid) for i in range(x_lim.shape[0])]
     x_mesh = torch.meshgrid(*x_i, indexing="ij")
     x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh]).double()
