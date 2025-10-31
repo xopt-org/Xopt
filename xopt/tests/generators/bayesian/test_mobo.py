@@ -13,6 +13,7 @@ from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
+from xopt.generators.bayesian.models.standard import BatchedModelConstructor
 from xopt.numerical_optimizer import GridOptimizer
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
@@ -71,6 +72,24 @@ class TestMOBOGenerator:
         assert len(candidate) == 2
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate_batched(self, use_cuda):
+        for vocs in [TEST_VOCS_BASE_MO, TEST_VOCS_BASE_MO_NC]:
+            gen = MOBOGenerator(
+                vocs=vocs,
+                gp_constructor=BatchedModelConstructor(),
+                reference_point=TEST_VOCS_REF_POINT,
+            )
+            set_options(gen, use_cuda, add_data=True)
+
+            candidate = gen.generate(1)
+            assert len(candidate) == 1
+
+            candidate = gen.generate(2)
+            assert len(candidate) == 2
+
+            check_generator_tensor_locations(gen, device_map[use_cuda])
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_round_trip(self, use_cuda):

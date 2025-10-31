@@ -9,6 +9,7 @@ import torch
 from xopt.base import Xopt
 from xopt.errors import GeneratorWarning
 from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.models.standard import BatchedModelConstructor
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
@@ -65,6 +66,23 @@ class TestUpperConfidenceBoundGenerator:
 
         assert isinstance(gen.computation_time, pd.DataFrame)
         assert len(gen.computation_time) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate_batched_c(self, use_cuda):
+        gen = UpperConfidenceBoundGenerator(
+            vocs=TEST_VOCS_BASE, gp_constructor=BatchedModelConstructor()
+        )
+        set_options(gen, use_cuda, add_data=True)
+
+        candidate = generate_without_warnings(gen, 1)
+        assert len(candidate) == 1
+
+        with warnings.catch_warnings(record=True) as w:
+            candidate = gen.generate(2)
+            assert sum(issubclass(x.category, GeneratorWarning) for x in w) == 1
+        assert len(candidate) == 2
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
 
