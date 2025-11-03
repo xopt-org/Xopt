@@ -1,1 +1,1 @@
-::: xopt.vocs.VOCS
+::: xopt.vocs
