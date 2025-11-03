@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from generator_standard.vocs import VOCS
+from gest_api.vocs import VOCS
 
 from xopt import Evaluator, Xopt
 from xopt.errors import FeasibilityError

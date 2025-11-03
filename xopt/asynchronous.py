@@ -72,8 +72,8 @@ class AsynchronousXopt(Xopt):
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
         # add constants to input data
-        for name, value in self.vocs.constants.items():
-            input_data[name] = value
+        for name, ele in self.vocs.constants.items():
+            input_data[name] = ele.value
 
         # Reindex input dataframe
         input_data.index = np.arange(

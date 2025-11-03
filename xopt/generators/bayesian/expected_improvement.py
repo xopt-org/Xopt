@@ -18,7 +18,7 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
-from xopt.vocs import get_objective_data
+from xopt.vocs import get_objective_data, get_observable_data
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
@@ -133,7 +133,9 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         """
         if isinstance(objective, CustomXoptObjective):
             best_f = objective(
-                torch.tensor(self.vocs.observable_data(data).to_numpy(), **self.tkwargs)
+                torch.tensor(
+                    get_observable_data(self.vocs, data).to_numpy(), **self.tkwargs
+                )
             ).max()
         else:
             # analytic acquisition function for single candidate generation

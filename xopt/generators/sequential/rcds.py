@@ -7,6 +7,7 @@ import pandas as pd
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
+from gest_api.vocs import MinimizeObjective, MaximizeObjective
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 logger = logging.getLogger(__name__)
@@ -762,9 +763,9 @@ class RCDSGenerator(SequentialGenerator):
             0
         ]  # rcds only supports one objective
         direction = self.vocs.objectives[objective_name]
-        if direction == "MINIMIZE":
+        if isinstance(direction, MinimizeObjective):
             self._sign = 1
-        elif direction == "MAXIMIZE":
+        elif isinstance(direction, MaximizeObjective):
             self._sign = -1
 
         x0, f0 = self._get_initial_point()

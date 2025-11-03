@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 
 from xopt.errors import FeasibilityError
-from generator_standard.vocs import (
+from gest_api.vocs import (
     VOCS,
     GreaterThanConstraint,
     LessThanConstraint,
     BoundsConstraint,
+    MaximizeObjective,
 )
 
 
@@ -164,8 +165,8 @@ def convert_dataframe_to_inputs(
     if include_constants:
         constants = vocs.constants
         if constants is not None:
-            for name, val in constants.items():
-                inner_copy[name] = val
+            for name, var in constants.items():
+                inner_copy[name] = var.value
 
     return inner_copy
 
@@ -204,6 +205,8 @@ def get_variable_data(
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     data : Union[pd.DataFrame, List[Dict]]
         The data to be processed.
     prefix : str, optional
@@ -221,10 +224,9 @@ def get_variable_data(
         data = pd.DataFrame(data)
 
     # Pick out columns in right order
-    variables = sorted(vocs.variables)
-    vdata = data.loc[:, variables].copy()
+    vdata = data.loc[:, vocs.variable_names].copy()
     # Rename to add prefix
-    vdata.rename({k: prefix + k for k in variables})
+    vdata.rename({k: prefix + k for k in vocs.variable_names})
     return vdata
 
 
@@ -614,8 +616,8 @@ def select_best(vocs, data: pd.DataFrame, n: int = 1):
             "Cannot select best point if no points satisfy the given constraints. "
         )
 
-    ascending_flag = {"MINIMIZE": True, "MAXIMIZE": False}
-    obj = vocs.objectives[vocs.objective_names[0]]
+    ascending_flag = {"MinimizeObjective": True, "MaximizeObjective": False}
+    obj = vocs.objectives[vocs.objective_names[0]].__class__.__name__
     obj_name = vocs.objective_names[0]
 
     res = (
@@ -655,7 +657,7 @@ def cumulative_optimum(vocs, data: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
     obj_name = vocs.objective_names[0]
     obj = vocs.objectives[obj_name]
-    get_opt = np.nanmax if obj == "MAXIMIZE" else np.nanmin
+    get_opt = np.nanmax if isinstance(obj, MaximizeObjective) else np.nanmin
     feasible = get_feasibility_data(vocs, data)["feasible"]
     feasible_obj_values = [
         data[obj_name].values[i] if feasible[i] else np.nan for i in range(len(data))

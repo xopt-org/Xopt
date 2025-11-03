@@ -22,7 +22,7 @@ from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
 from xopt.generator import Generator
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, get_feasibility_data
 
 from .objectives import feasibility
 from .utils import torch_compile_gp_model, torch_trace_gp_model
@@ -470,7 +470,7 @@ def plot_model_prediction(
         )
         if output_name in vocs.constraint_names:
             axis.axhline(
-                y=vocs.constraints[output_name][1],
+                y=vocs.constraints[output_name].value,
                 color=color,
                 linestyle=":",
                 label="Constraint Threshold",
@@ -1059,7 +1059,7 @@ def _generate_input_mesh(
     torch.Tensor
         The input mesh for visualization.
     """
-    x_lim = torch.tensor([vocs.variables[k] for k in variable_names])
+    x_lim = torch.tensor([vocs.variables[k].domain for k in variable_names])
     x_i = [torch.linspace(*x_lim[i], n_grid) for i in range(x_lim.shape[0])]
     x_mesh = torch.meshgrid(*x_i, indexing="ij")
     x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh]).double()
@@ -1219,10 +1219,12 @@ def _get_feasible_samples(
         (In-)feasible samples as a tuple of x and y values.
     """
     max_idx = idx + 1 if not idx == -1 else None
-    if "feasible_" + output_name in vocs.feasibility_data(data).columns:
-        feasible = vocs.feasibility_data(data).iloc[:max_idx]["feasible_" + output_name]
+    if "feasible_" + output_name in get_feasibility_data(vocs, data).columns:
+        feasible = get_feasibility_data(vocs, data).iloc[:max_idx][
+            "feasible_" + output_name
+        ]
     else:
-        feasible = vocs.feasibility_data(data).iloc[:max_idx]["feasible"]
+        feasible = get_feasibility_data(vocs, data).iloc[:max_idx]["feasible"]
     selector = feasible if not reverse else ~feasible
     x = data.iloc[:max_idx][variable_names][selector].to_numpy()
     y = data.iloc[:max_idx][output_name][selector].to_numpy()

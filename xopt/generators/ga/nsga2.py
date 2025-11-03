@@ -406,8 +406,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
                 "output directory is required for loading from checkpoint."
             )
+
         with open(vocs_fname) as f:
-            vocs = VOCS.from_dict(json.load(f))
+            vocs = VOCS(**json.load(f))
 
         # Load the checkpoint
         with open(fname) as f:
@@ -484,7 +485,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Returns true if every variable in the data dictionary is within bounds.
         """
         return all(
-            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+            bnd.domain[0] <= data[key] <= bnd.domain[1]
+            for key, bnd in self.vocs.variables.items()
         )
 
     def _generate(self, n_candidates: int) -> list[dict]:
@@ -529,10 +531,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             )
         else:
             vars = np.vstack(
-                [
-                    np.random.uniform(x[0], x[1], n_candidates)
-                    for x in np.array(self.vocs.bounds).T
-                ]
+                [np.random.uniform(x[0], x[1], n_candidates) for x in self.vocs.bounds]
             ).T
             candidates = [
                 {k: v for k, v in zip(self.vocs.variable_names, individual)}
@@ -623,7 +622,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # Save all Xopt data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
-                    f.write(self.vocs.to_json())
+                    json.dump(self.vocs.dict(), f)
 
                 # Construct the DataFrame for this population
                 pop_df = pd.DataFrame(self.pop)

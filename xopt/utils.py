@@ -14,7 +14,7 @@ import torch
 import traceback
 import yaml
 
-from generator_standard.vocs import VOCS, GreaterThanConstraint
+from gest_api.vocs import VOCS, GreaterThanConstraint
 
 from .generator import Generator
 from .pydantic import get_descriptions_defaults

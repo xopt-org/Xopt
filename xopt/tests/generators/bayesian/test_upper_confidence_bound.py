@@ -180,7 +180,7 @@ class TestUpperConfidenceBoundGenerator:
             """
         )
         _ = X.random_evaluate(10, seed=0)
-        test_x = torch.linspace(*X.vocs.variables["x1"].domain, 10)
+        test_x = torch.linspace(*X.vocs.variables["x1"].domain, 10, dtype=torch.float64)
         model = X.generator.train_model(X.data)
         acq = X.generator.get_acquisition(model)
         with pytest.warns(UserWarning):

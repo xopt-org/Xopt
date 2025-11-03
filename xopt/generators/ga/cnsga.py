@@ -307,7 +307,7 @@ def cnsga_toolbox(vocs: VOCS, selection: str = "auto") -> deap_base.Toolbox:
     var_labels = vocs.variable_names
     obj_labels = vocs.objective_names
 
-    bound_low, bound_up = vocs.bounds
+    bound_low, bound_up = list(map(list, zip(*vocs.bounds)))  # transpose list of bounds
     # DEAP does not like arrays, needs tuples.
     bound_low = tuple(bound_low)
     bound_up = tuple(bound_up)

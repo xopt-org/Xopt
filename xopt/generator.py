@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Optional, List
 
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
@@ -9,13 +9,10 @@ from pydantic_core.core_schema import ValidationInfo
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
 
-from generator_standard.vocs import VOCS
-from generator_standard.generator import Generator as BaseGenerator
+from gest_api.vocs import VOCS
+from gest_api.generator import Generator as BaseGenerator
 
 logger = logging.getLogger(__name__)
-
-from abc import ABC, abstractmethod
-from typing import Iterable, Optional, List
 
 
 class Generator(XoptBaseModel, BaseGenerator, ABC):
@@ -137,7 +134,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
 
         """
         if self.data is not None:
-            self.data = pd.concat([self.data, new_data], axis=0)
+            self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
         else:
             self.data = new_data
 

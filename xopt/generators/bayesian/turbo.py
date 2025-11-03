@@ -8,7 +8,7 @@ import torch
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
 from torch import Tensor
 
-from generator_standard.vocs import VOCS
+from gest_api.vocs import VOCS, MinimizeObjective
 
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
@@ -161,7 +161,7 @@ class TurboController(XoptBaseModel, ABC):
             The trust region bounds.
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds).T
+        bounds = torch.tensor(self.vocs.bounds, dtype=torch.double).T
 
         if self.center_x is not None:
             # get bounds width
@@ -304,7 +304,9 @@ class OptimizeTurboController(TurboController):
 
     @property
     def minimize(self) -> bool:
-        return self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE"
+        return isinstance(
+            self.vocs.objectives[self.vocs.objective_names[0]], MinimizeObjective
+        )
 
     def _set_best_point_value(self, data):
         """

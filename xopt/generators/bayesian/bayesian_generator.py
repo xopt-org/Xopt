@@ -3,7 +3,6 @@ import os
 import time
 import warnings
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
@@ -28,7 +27,7 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from generator_standard.vocs import ContinuousVariable
+from gest_api.vocs import MinimizeObjective, MaximizeObjective
 
 from xopt.errors import XoptError, FeasibilityError
 from xopt.generator import Generator
@@ -287,7 +286,7 @@ class BayesianGenerator(Generator, ABC):
         -----
         This method appends the new data to the existing data in the generator.
         """
-        self.data = pd.concat([self.data, new_data], axis=0)
+        self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
 
     def generate(self, n_candidates: int) -> list[dict]:
         """
@@ -420,7 +419,9 @@ class BayesianGenerator(Generator, ABC):
             raise ValueError("no data available to build model")
 
         # get input bounds
-        variable_bounds = {name: ele.domain for name, ele in self.vocs.variables.items()}
+        variable_bounds = {
+            name: ele.domain for name, ele in self.vocs.variables.items()
+        }
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -806,7 +807,7 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds).T
+        return torch.tensor(self.vocs.bounds, dtype=torch.double).T
 
     def _get_optimization_bounds(self):
         """
@@ -954,9 +955,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     "need to specify reference point for the following "
                     f"objective {name}"
                 )
-            if self.vocs.objectives[name] == "MINIMIZE":
+            if isinstance(self.vocs.objectives[name], MinimizeObjective):
                 pt += [-ref_val]
-            elif self.vocs.objectives[name] == "MAXIMIZE":
+            elif isinstance(self.vocs.objectives[name], MaximizeObjective):
                 pt += [ref_val]
             else:
                 raise ValueError(

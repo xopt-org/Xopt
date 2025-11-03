@@ -3,9 +3,7 @@ import torch
 from torch import Tensor
 from unittest.mock import MagicMock, patch
 
-from generator_standard.vocs import (
-    LessThanConstraint, GreaterThanConstraint
-)
+from gest_api.vocs import LessThanConstraint, GreaterThanConstraint
 
 from xopt.generators.bayesian.objectives import feasibility
 from xopt.generators.bayesian.objectives import create_constraint_callables
@@ -24,7 +22,10 @@ class DummyVOCS:
 
 @pytest.fixture
 def dummy_vocs():
-    constraints = {"c1": LessThanConstraint(value=0.0), "c2": GreaterThanConstraint(value=1.0)}
+    constraints = {
+        "c1": LessThanConstraint(value=0.0),
+        "c2": GreaterThanConstraint(value=1.0),
+    }
     output_names = ["c1", "c2", "y1"]
     return DummyVOCS(constraints=constraints, output_names=output_names)
 
@@ -177,7 +178,10 @@ def test_create_constraint_callables_greater_than():
 
 def test_create_constraint_callables_multiple():
     class V:
-        constraints = {"c1": LessThanConstraint(value=0.0), "c2": GreaterThanConstraint(value=1.0)}
+        constraints = {
+            "c1": LessThanConstraint(value=0.0),
+            "c2": GreaterThanConstraint(value=1.0),
+        }
         output_names = ["c1", "c2"]
         constraint_names = ["c1", "c2"]
 
@@ -216,7 +220,10 @@ def test_create_constraint_callables_empty_dict():
 
 def test_create_constraint_callables_partial_and_signature():
     class V:
-        constraints = {"c1": LessThanConstraint(value=2.0), "c2": GreaterThanConstraint(value=-1.0)}
+        constraints = {
+            "c1": LessThanConstraint(value=2.0),
+            "c2": GreaterThanConstraint(value=-1.0),
+        }
         output_names = ["c1", "c2"]
         constraint_names = ["c1", "c2"]
 

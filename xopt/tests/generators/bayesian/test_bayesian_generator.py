@@ -10,7 +10,7 @@ from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
 
-from generator_standard.vocs import ContinuousVariable
+from gest_api.vocs import ContinuousVariable
 
 from xopt import VOCS
 from xopt.base import Xopt
@@ -153,7 +153,9 @@ class TestBayesianGenerator(TestCase):
         model = gen.train_model(X.data)
 
         # test input normalization
-        input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds).T)
+        input_transform = Normalize(
+            1, bounds=torch.tensor(sinusoid_vocs.bounds, dtype=torch.double).T
+        )
         for inputs in model.train_inputs:
             assert torch.allclose(
                 inputs[0].unsqueeze(-1).T,

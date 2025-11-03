@@ -28,7 +28,7 @@ dependencies = [
   "tqdm",
   "orjson",
   "matplotlib",
-  "campa-generator-standard @ git+https://github.com/campa-consortium/generator_standard"
+  "gest-api @ git+https://github.com/campa-consortium/gest-api"
 ]
 description = "Flexible optimization of arbitrary problems in Python."
 dynamic = [ "version" ]
