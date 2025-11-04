@@ -231,17 +231,19 @@ def get_variable_data(
 
 
 def get_objective_data(
-    vocs,
+    objectives,
     data: pd.DataFrame | list[dict],
     prefix: str = "objective_",
     return_raw: bool = False,
 ) -> pd.DataFrame:
     """
     Returns a dataframe containing objective data transformed according to
-    `vocs.objectives` such that we always assume minimization.
+    `objectives` such that we always assume minimization.
 
     Parameters
     ----------
+    objectives: dict
+        The objectives defining the problem, from VOCS.
     data : Union[pd.DataFrame, List[Dict]]
         The data to be processed.
     prefix : str, optional
@@ -254,19 +256,19 @@ def get_objective_data(
     pd.DataFrame
         The processed dataframe.
     """
-    if not vocs.objectives:
+    if not objectives:
         return pd.DataFrame([])
 
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
 
-    objectives_names = sorted(vocs.objectives.keys())
+    objectives_names = sorted(objectives.keys())
 
     if set(data.columns).issuperset(set(objectives_names)):
         # have all objectives, dont need to fill in missing ones
         weights = np.ones(len(objectives_names))
         for i, k in enumerate(objectives_names):
-            operator = vocs.objectives[k].__class__.__name__
+            operator = objectives[k].__class__.__name__
             if operator not in OBJECTIVE_WEIGHT:
                 raise ValueError(f"Unknown objective operator: {operator}")
 
@@ -286,7 +288,7 @@ def get_objective_data(
             if k not in data:
                 array_list.append(np.full((length, 1), np.inf))
                 continue
-            operator = vocs.objectives[k].__class__.__name__
+            operator = objectives[k].__class__.__name__
             if operator not in OBJECTIVE_WEIGHT:
                 raise ValueError(f"Unknown objective operator: {operator}")
 
