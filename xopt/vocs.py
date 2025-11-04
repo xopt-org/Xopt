@@ -29,6 +29,8 @@ def random_inputs(
 
     Parameters
     ----------
+    vocs : VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     n : int, optional
         Number of samples to generate. Defaults to None.
     custom_bounds : dict, optional
@@ -78,6 +80,8 @@ def grid_inputs(
 
     Parameters
     ----------
+    vocs : VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     n : Union[int, Dict[str, int]]
         Number of points to generate along each axis. If an integer is provided, the same number of points
         is used for all variables. If a dictionary is provided, it should have variable names as keys and
@@ -144,6 +148,8 @@ def convert_dataframe_to_inputs(
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     data : pd.DataFrame
         The dataframe to extract inputs from.
     include_constants : bool, optional
@@ -181,6 +187,8 @@ def convert_numpy_to_inputs(
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     inputs : np.ndarray
         The 2D numpy array to convert.
     include_constants : bool, optional
@@ -196,7 +204,7 @@ def convert_numpy_to_inputs(
 
 
 def get_variable_data(
-    vocs,
+    vocs: VOCS,
     data: pd.DataFrame | list[dict],
     prefix: str = "variable_",
 ) -> pd.DataFrame:
@@ -231,7 +239,7 @@ def get_variable_data(
 
 
 def get_objective_data(
-    vocs,
+    vocs: VOCS,
     data: pd.DataFrame | list[dict],
     prefix: str = "objective_",
     return_raw: bool = False,
@@ -307,7 +315,7 @@ def get_objective_data(
 
 
 def get_constraint_data(
-    vocs,
+    vocs: VOCS,
     data: pd.DataFrame | list[dict],
     prefix: str = "constraint_",
 ) -> pd.DataFrame:
@@ -317,6 +325,8 @@ def get_constraint_data(
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     data : Union[pd.DataFrame, List[Dict]]
         The data to be processed.
     prefix : str, optional
@@ -357,7 +367,7 @@ def get_constraint_data(
 
 
 def get_observable_data(
-    vocs,
+    vocs: VOCS,
     data: pd.DataFrame | list[dict],
     prefix: str = "observable_",
 ) -> pd.DataFrame:
@@ -366,6 +376,8 @@ def get_observable_data(
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     data : Union[pd.DataFrame, List[Dict]]
         The data to be processed.
     prefix : str, optional
@@ -395,7 +407,7 @@ def get_observable_data(
 
 
 def get_feasibility_data(
-    vocs,
+    vocs: VOCS,
     data: pd.DataFrame | list[dict],
     prefix: str = "feasible_",
 ) -> pd.DataFrame:
@@ -435,13 +447,15 @@ def get_feasibility_data(
     return fdata
 
 
-def normalize_inputs(vocs, input_points: pd.DataFrame) -> pd.DataFrame:
+def normalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize input data (transform data into the range [0,1]) based on the
     variable ranges defined in the VOCS.
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     input_points : pd.DataFrame
         A DataFrame containing input data to be normalized.
 
@@ -473,13 +487,15 @@ def normalize_inputs(vocs, input_points: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame([])
 
 
-def denormalize_inputs(vocs, input_points: pd.DataFrame) -> pd.DataFrame:
+def denormalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
     """
     Denormalize input data (transform data from the range [0,1]) based on the
     variable ranges defined in the VOCS.
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     input_points : pd.DataFrame
         A DataFrame containing normalized input data in the range [0,1].
 
@@ -511,19 +527,21 @@ def denormalize_inputs(vocs, input_points: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame([])
 
 
-def validate_input_data(vocs, input_points: pd.DataFrame) -> None:
+def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
     """
     Validates input data. Raises an error if the input data does not satisfy
     requirements given by vocs.
 
     Parameters
     ----------
-        input_points : DataFrame
-            Input data to be validated.
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
+    input_points : DataFrame
+        Input data to be validated.
 
     Returns
     -------
-        None
+    None
 
     Raises
     ------
@@ -543,7 +561,7 @@ def validate_input_data(vocs, input_points: pd.DataFrame) -> None:
         )
 
 
-def extract_data(vocs, data: pd.DataFrame, return_raw=False, return_valid=False):
+def extract_data(vocs: VOCS, data: pd.DataFrame, return_raw=False, return_valid=False):
     """
     split dataframe into seperate dataframes for variables, objectives and
     constraints based on vocs - objective data is transformed based on
@@ -551,24 +569,26 @@ def extract_data(vocs, data: pd.DataFrame, return_raw=False, return_valid=False)
 
     Parameters
     ----------
-        data: DataFrame
-            Dataframe to be split
-        return_raw : bool, optional
-            If True, return untransformed objective data
-        return_valid : bool, optional
-            If True, only return data that satisfies all of the contraint
-            conditions.
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
+    data: DataFrame
+        Dataframe to be split
+    return_raw : bool, optional
+        If True, return untransformed objective data
+    return_valid : bool, optional
+        If True, only return data that satisfies all of the contraint
+        conditions.
 
     Returns
     -------
-        variable_data : DataFrame
-            Dataframe containing variable data
-        objective_data : DataFrame
-            Dataframe containing objective data
-        constraint_data : DataFrame
-            Dataframe containing constraint data
-        observable_data : DataFrame
-            Dataframe containing observable data
+    variable_data : DataFrame
+        Dataframe containing variable data
+    objective_data : DataFrame
+        Dataframe containing objective data
+    constraint_data : DataFrame
+        Dataframe containing constraint data
+    observable_data : DataFrame
+        Dataframe containing observable data
     """
     variable_data = get_variable_data(vocs, data, "")
     objective_data = get_objective_data(vocs, data, "", return_raw)
@@ -587,7 +607,7 @@ def extract_data(vocs, data: pd.DataFrame, return_raw=False, return_valid=False)
     return variable_data, objective_data, constraint_data, observable_data
 
 
-def select_best(vocs, data: pd.DataFrame, n: int = 1):
+def select_best(vocs: VOCS, data: pd.DataFrame, n: int = 1):
     """
     get the best value and point for a given data set based on vocs
     - does not work for multi-objective problems
@@ -595,16 +615,18 @@ def select_best(vocs, data: pd.DataFrame, n: int = 1):
 
     Parameters
     ----------
-        data: DataFrame
-            Dataframe to select best point from
-        n: int, optional
-            Number of best points to return
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
+    data: DataFrame
+        Dataframe to select best point from
+    n: int, optional
+        Number of best points to return
 
     Returns
     -------
-        index: index of best point
-        value: value of best point
-        params: input parameters that give the best point
+    index: index of best point
+    value: value of best point
+    params: input parameters that give the best point
     """
     if vocs.n_objectives != 1:
         raise NotImplementedError("cannot select best point when n_objectives is not 1")
@@ -638,12 +660,14 @@ def select_best(vocs, data: pd.DataFrame, n: int = 1):
     )
 
 
-def cumulative_optimum(vocs, data: pd.DataFrame) -> pd.DataFrame:
+def cumulative_optimum(vocs: VOCS, data: pd.DataFrame) -> pd.DataFrame:
     """
     Returns the cumulative optimum for the given DataFrame.
 
     Parameters
     ----------
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     data: DataFrame
         Data for which the cumulative optimum shall be calculated.
 
@@ -680,6 +704,20 @@ def validate_variable_bounds(variable_dict: dict[str, list[float]]):
     """
     Check to make sure that bounds for variables are specified correctly. Raises
     ValueError if anything is incorrect
+
+    Parameters
+    ----------
+    variable_dict : dict[str, list[float]]
+        Dictionary of variable bounds to validate
+
+    Raises
+    ------
+    ValueError
+        If bounds are not specified correctly
+
+    Returns
+    -------
+    None
     """
 
     for name, value in variable_dict.items():
@@ -701,6 +739,18 @@ def clip_variable_bounds(
 ) -> dict[str, list[float]]:
     """
     Return new bounds as intersection of vocs and custom bounds
+
+    Parameters
+    ----------
+    vocs : VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
+    custom_bounds : dict[str, list[float]]
+        Custom bounds for the variables.
+
+    Returns
+    -------
+    dict[str, list[float]]
+        The final bounds after clipping custom bounds with vocs bounds.
     """
     if custom_bounds is None:
         final_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
