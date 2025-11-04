@@ -231,7 +231,7 @@ def get_variable_data(
 
 
 def get_objective_data(
-    objectives,
+    vocs,
     data: pd.DataFrame | list[dict],
     prefix: str = "objective_",
     return_raw: bool = False,
@@ -242,8 +242,8 @@ def get_objective_data(
 
     Parameters
     ----------
-    objectives: dict
-        The objectives defining the problem, from VOCS.
+    vocs: VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
     data : Union[pd.DataFrame, List[Dict]]
         The data to be processed.
     prefix : str, optional
@@ -256,19 +256,19 @@ def get_objective_data(
     pd.DataFrame
         The processed dataframe.
     """
-    if not objectives:
+    if not vocs.objectives:
         return pd.DataFrame([])
 
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
 
-    objectives_names = sorted(objectives.keys())
+    objectives_names = sorted(vocs.objectives.keys())
 
     if set(data.columns).issuperset(set(objectives_names)):
         # have all objectives, dont need to fill in missing ones
         weights = np.ones(len(objectives_names))
         for i, k in enumerate(objectives_names):
-            operator = objectives[k].__class__.__name__
+            operator = vocs.objectives[k].__class__.__name__
             if operator not in OBJECTIVE_WEIGHT:
                 raise ValueError(f"Unknown objective operator: {operator}")
 
@@ -288,7 +288,7 @@ def get_objective_data(
             if k not in data:
                 array_list.append(np.full((length, 1), np.inf))
                 continue
-            operator = objectives[k].__class__.__name__
+            operator = vocs.objectives[k].__class__.__name__
             if operator not in OBJECTIVE_WEIGHT:
                 raise ValueError(f"Unknown objective operator: {operator}")
 
