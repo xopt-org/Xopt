@@ -14,5 +14,5 @@ do
     fi
 
     echo "Executing $file"
-    jupyter nbconvert --to notebook --execute $file --inplace --ExecutePreprocessor.raise_on_error=True
+    jupyter nbconvert --to notebook --execute $file --inplace
 done
