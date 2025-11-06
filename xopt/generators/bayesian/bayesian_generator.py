@@ -22,7 +22,6 @@ from pydantic import (
     field_validator,
     PositiveInt,
     SerializeAsAny,
-    model_validator,
 )
 from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
@@ -202,6 +201,7 @@ class BayesianGenerator(Generator, ABC):
         return compatible.get_default()
 
     @field_validator("model", mode="before")
+    @classmethod
     def validate_torch_modules(cls, value: Any):
         if isinstance(value, str):
             if value.startswith("base64:"):
@@ -211,6 +211,7 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @field_validator("gp_constructor", mode="before")
+    @classmethod
     def validate_gp_constructor(cls, value: Any):
         constructor_dict = {"standard": StandardModelConstructor}
         if value is None:
@@ -223,16 +224,18 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name = value.pop("name")
+            _value = cast(dict[str, Any], value)
+            name = _value.pop("name", "")
             if name in constructor_dict:
-                value = constructor_dict[name](**value)
+                value = constructor_dict[name](**_value)
             else:
                 raise ValueError(f"{value} not found")
 
         return value
 
     @field_validator("numerical_optimizer", mode="before")
-    def validate_numerical_optimizer(cls, value):
+    @classmethod
+    def validate_numerical_optimizer(cls, value: Any):
         optimizer_dict: dict[str, type[NumericalOptimizer]] = {
             "grid": GridOptimizer,
             "LBFGS": LBFGSOptimizer,
@@ -247,14 +250,18 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            name: str = value.pop("name")
+            _value = cast(dict[str, Any], value)
+            name: str = _value.pop("name", "")
             if name in optimizer_dict:
-                value = optimizer_dict[name](**value)
+                value = optimizer_dict[name](**_value)
             else:
-                raise ValueError(f"{value} not found")
+                raise ValueError(f"{_value} not found")
+        else:
+            raise ValueError(f"{value} not recognized as NumericalOptimizer")
         return value
 
     @field_validator("turbo_controller", mode="before")
+    @classmethod
     def validate_turbo_controller(cls, value: Any, info: ValidationInfo):
         """note default behavior is no use of turbo"""
         if value is None:
@@ -277,6 +284,7 @@ class BayesianGenerator(Generator, ABC):
             )
 
     @field_validator("computation_time", mode="before")
+    @classmethod
     def validate_computation_time(cls, value):
         if isinstance(value, dict):
             value = pd.DataFrame(value)
@@ -728,26 +736,27 @@ class BayesianGenerator(Generator, ABC):
     def _get_acquisition(self, model):
         pass
 
-    def _get_objective(self):
+    @classmethod
+    def _get_objective(cls):
         """
         Return default objective (scalar objective) determined by vocs or if
         defined in custom_objective. Module is already on target device.
         """
         # check to make sure that if we specify a custom objective that no objectives
         # are specified in vocs
-        if self.custom_objective is not None:
-            if self.vocs.n_objectives:
+        if cls.custom_objective is not None:
+            if cls.vocs.n_objectives:
                 raise RuntimeError(
                     "cannot specify objectives in VOCS "
                     "and a custom objective for the generator at the "
                     "same time"
                 )
 
-            objective = self.custom_objective
+            objective = cls.custom_objective
         else:
-            objective = create_mc_objective(self.vocs)
+            objective = create_mc_objective(cls.vocs)
 
-        return objective.to(**self.tkwargs)
+        return objective.to(**cls.tkwargs)
 
     def _get_constraint_callables(self):
         """return constraint callable determined by vocs"""
@@ -929,6 +938,7 @@ class BayesianGenerator(Generator, ABC):
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
     reference_point: dict[str, float] = Field(
+        {},
         description="dict specifying reference point for multi-objective optimization",
     )
     pareto_front_history: Optional[pd.DataFrame] = Field(
@@ -940,17 +950,27 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     supports_multi_objective: bool = True
 
     @field_validator("pareto_front_history", mode="before")
-    def validate_pareto_front_history(cls, value):
+    @classmethod
+    def validate_pareto_front_history(cls, value: Any):
         return pd.DataFrame(value) if value is not None else None
 
-    @model_validator(mode="after")
-    def validate_reference_point(self):
-        # Note: this is called for EVERY field change and is bad for performance
-        # but we need to check in model validator to ensure vocs field has been set by field validators
-        objective_names = self.vocs.objective_names
-        if not set(self.reference_point.keys()) == set(objective_names):
-            raise XoptError("reference point must contain all objective names in vocs")
-        return self
+    @field_validator("reference_point", mode="after")
+    @classmethod
+    def validate_reference_point(cls, value: dict[str, float], info: ValidationInfo):
+        # set default reference point if not specified
+        objective_names: list[str] = info.data["vocs"].objective_names
+
+        if set(value.keys()) != set(objective_names):
+            logger.warning(
+                "reference point must contain all objective names in vocs, "
+                "setting missing objectives to 0.0"
+            )
+            cls.reference_point = {
+                name: value.get(name, 0.0) for name in objective_names
+            }
+            value = cls.reference_point
+
+        return value
 
     @property
     def torch_reference_point(self):

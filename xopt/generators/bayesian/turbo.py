@@ -82,6 +82,9 @@ class TurboController(XoptBaseModel, ABC):
         Reset the controller to the initial state.
     """
 
+    _failure_counter: int = 0
+    _success_counter: int = 0
+
     vocs: VOCS = Field(exclude=True, description="VOCS object")
     batch_size: PositiveInt = Field(
         1, description="number of trust regions to use", ge=1
@@ -107,10 +110,6 @@ class TurboController(XoptBaseModel, ABC):
         1, description="number of successes to trigger a trust region expansion", ge=1
     )
 
-    failure_counter: int = Field(0, description="number of failures since reset", ge=0)
-
-    success_counter: int = Field(0, description="number of successes since reset", ge=0)
-
     center_x: Optional[Dict[str, float]] = Field(
         None, description="center point of trust region"
     )
@@ -129,8 +128,6 @@ class TurboController(XoptBaseModel, ABC):
         return self.vocs.n_variables
 
     def __init__(self, **kwargs: Any):
-        # dim = vocs.n_variables
-
         super().__init__(**kwargs)
 
         self.success_tolerance = int(
@@ -208,12 +205,12 @@ class TurboController(XoptBaseModel, ABC):
         """
         Update the trust region based on success and failure counters.
         """
-        if self.success_counter == self.success_tolerance:  # Expand trust region
+        if self._success_counter == self.success_tolerance:  # Expand trust region
             self.length = min(self.scale_factor * self.length, self.length_max)
-            self.success_counter = 0
-        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
+            self._success_counter = 0
+        elif self._failure_counter == self.failure_tolerance:  # Shrink trust region
             self.length = max(self.length / self.scale_factor, self.length_min)
-            self.failure_counter = 0
+            self._failure_counter = 0
 
     def get_data_in_trust_region(
         self, data: pd.DataFrame, generator: "BayesianGenerator"
@@ -387,8 +384,8 @@ class OptimizeTurboController(TurboController):
 
         # if none of the candidates are valid count this as a failure
         if len(recent_f_data) == 0:
-            self.success_counter = 0
-            self.failure_counter += 1
+            self._success_counter = 0
+            self._failure_counter += 1
 
         else:
             # if we had previous feasible points we need to compare with previous
@@ -399,11 +396,11 @@ class OptimizeTurboController(TurboController):
 
             # note: add in small tolerance to account for numerical issues
             if Y_last <= best_value + 1e-40:
-                self.success_counter += 1
-                self.failure_counter = 0
+                self._success_counter += 1
+                self._failure_counter = 0
             else:
-                self.success_counter = 0
-                self.failure_counter += 1
+                self._success_counter = 0
+                self._failure_counter += 1
 
         self.update_trust_region()
 
@@ -482,11 +479,11 @@ class SafetyTurboController(TurboController):
         feas_fraction = last_batch["feasible"].sum() / len(last_batch)
 
         if feas_fraction > self.min_feasible_fraction:
-            self.success_counter += 1
-            self.failure_counter = 0
+            self._success_counter += 1
+            self._failure_counter = 0
         else:
-            self.success_counter = 0
-            self.failure_counter += 1
+            self._success_counter = 0
+            self._failure_counter += 1
 
         self.update_trust_region()
 
@@ -542,12 +539,12 @@ class EntropyTurboController(TurboController):
 
             if self._best_entropy is not None:
                 if entropy < self._best_entropy:
-                    self.success_counter += 1
-                    self.failure_counter = 0
+                    self._success_counter += 1
+                    self._failure_counter = 0
                     self._best_entropy = entropy
                 else:
-                    self.success_counter = 0
-                    self.failure_counter += 1
+                    self._success_counter = 0
+                    self._failure_counter += 1
 
                 self.update_trust_region()
             else:

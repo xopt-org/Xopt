@@ -120,11 +120,13 @@ class VOCS(XoptBaseModel):
     )
 
     @field_validator("variables")
+    @classmethod
     def correct_bounds_specification(cls, v):
         validate_variable_bounds(v)
         return v
 
     @field_validator("constraints")
+    @classmethod
     def correct_list_types(cls, v):
         """make sure that constraint list types are correct"""
         for _, item in v.items():

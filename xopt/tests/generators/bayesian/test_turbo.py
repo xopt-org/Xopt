@@ -139,8 +139,8 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 0
-        assert turbo_state.failure_counter == 1
+        assert turbo_state._success_counter == 0
+        assert turbo_state._failure_counter == 1
 
         # make next step to better (lower) value
         test_data = {
@@ -152,8 +152,8 @@ class TestTurbo(TestCase):
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 1
-        assert turbo_state.failure_counter == 0
+        assert turbo_state._success_counter == 1
+        assert turbo_state._failure_counter == 0
 
         # make next step to worse (higher) value
         test_data = {
@@ -165,8 +165,8 @@ class TestTurbo(TestCase):
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 0
-        assert turbo_state.failure_counter == 1
+        assert turbo_state._success_counter == 0
+        assert turbo_state._failure_counter == 1
 
         # 2D maximization
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -180,8 +180,8 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(gen.vocs)
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 0
-        assert turbo_state.failure_counter == 1
+        assert turbo_state._success_counter == 0
+        assert turbo_state._failure_counter == 1
 
         # make next step to better (higher) value
         test_data = {
@@ -193,8 +193,8 @@ class TestTurbo(TestCase):
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 1
-        assert turbo_state.failure_counter == 0
+        assert turbo_state._success_counter == 1
+        assert turbo_state._failure_counter == 0
 
         # make next step to worse (lower) value
         test_data = {
@@ -206,8 +206,8 @@ class TestTurbo(TestCase):
         gen.add_data(pd.DataFrame(test_data))
         gen.train_model()
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 0
-        assert turbo_state.failure_counter == 1
+        assert turbo_state._success_counter == 0
+        assert turbo_state._failure_counter == 1
 
     def test_restrict_data(self):
         # test in 1D
@@ -246,8 +246,8 @@ class TestTurbo(TestCase):
         turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
         turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
-        assert turbo_state.success_counter == 0
-        assert turbo_state.failure_counter == 1
+        assert turbo_state._success_counter == 0
+        assert turbo_state._failure_counter == 1
 
         tr = turbo_state.get_trust_region(gen)
         assert tr[0].numpy() >= test_vocs.bounds[0]
@@ -260,8 +260,8 @@ class TestTurbo(TestCase):
         new_data["c1"] = n_c
         gen.add_data(new_data)
         turbo_state.update_state(gen)
-        assert turbo_state.success_counter == 0
-        assert turbo_state.failure_counter == 2
+        assert turbo_state._success_counter == 0
+        assert turbo_state._failure_counter == 2
 
         # test will all invalid data
         data = deepcopy(TEST_VOCS_DATA)
@@ -364,7 +364,7 @@ class TestTurbo(TestCase):
 
         turbo_state = OptimizeTurboController(test_vocs, failure_tolerance=5)
         turbo_state.update_state(gen, 2)
-        assert turbo_state.success_counter == 1
+        assert turbo_state._success_counter == 1
 
     def test_in_generator(self):
         vocs = VOCS(
@@ -409,7 +409,7 @@ class TestTurbo(TestCase):
         sturbo.update_state(gen)
 
         assert sturbo.center_x == {"x": 0.75}
-        assert sturbo.failure_counter == 1
+        assert sturbo._failure_counter == 1
 
         # test batch case where all data is good
         test_data2 = pd.DataFrame(
@@ -420,8 +420,8 @@ class TestTurbo(TestCase):
         gen.add_data(test_data2)
 
         sturbo.update_state(gen, previous_batch_size=3)
-        assert sturbo.success_counter == 1
-        assert sturbo.failure_counter == 0
+        assert sturbo._success_counter == 1
+        assert sturbo._failure_counter == 0
 
         # test batch case where only some of the data is good
         # note default `min_feasible_fraction` is 0.75
@@ -432,8 +432,8 @@ class TestTurbo(TestCase):
         gen.add_data(test_data3)
 
         sturbo.update_state(gen, previous_batch_size=3)
-        assert sturbo.success_counter == 0
-        assert sturbo.failure_counter == 1
+        assert sturbo._success_counter == 0
+        assert sturbo._failure_counter == 1
 
         # test vocs validation
         test_vocs = VOCS(
@@ -527,29 +527,29 @@ class TestTurbo(TestCase):
         controller.update_state(gen)
         assert controller.best_value is not None
         controller.length = 5.0
-        controller.success_counter = 10
-        controller.failure_counter = 5
+        controller._success_counter = 10
+        controller._failure_counter = 5
         controller.center_x = {"x1": 0.5}
 
         controller.reset()
         assert controller.length == 0.25
-        assert controller.success_counter == 0
-        assert controller.failure_counter == 0
+        assert controller._success_counter == 0
+        assert controller._failure_counter == 0
         assert controller.center_x is None
         assert controller.best_value is None
 
         controller = SafetyTurboController(gen.vocs)
         controller.update_state(gen)
         controller.length = 5.0
-        controller.success_counter = 10
-        controller.failure_counter = 5
+        controller._success_counter = 10
+        controller._failure_counter = 5
         controller.center_x = {"x1": 0.5}
         controller.min_feasible_fraction = 0.7
 
         controller.reset()
         assert controller.length == 0.25
-        assert controller.success_counter == 0
-        assert controller.failure_counter == 0
+        assert controller._success_counter == 0
+        assert controller._failure_counter == 0
         assert controller.center_x is None
         assert controller.min_feasible_fraction == 0.75
 

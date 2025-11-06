@@ -67,7 +67,7 @@ class Generator(XoptBaseModel, ABC):
         exclude=True,
     )
 
-    vocs: VOCS = Field(description="generator VOCS", exclude=True)
+    vocs: VOCS = Field(VOCS(), description="generator VOCS", exclude=True)
     data: Optional[pd.DataFrame] = Field(
         None, description="generator data", exclude=True
     )
@@ -75,31 +75,33 @@ class Generator(XoptBaseModel, ABC):
     model_config = ConfigDict(validate_assignment=True)
 
     @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info: ValidationInfo):
-        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+    @classmethod
+    def validate_vocs(cls, value: VOCS, info: ValidationInfo):
+        if value.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
-        if v.n_objectives == 1:
+        if value.n_objectives == 1:
             if not info.data["supports_single_objective"]:
                 raise VOCSError(
                     "this generator does not support single objective optimization"
                 )
-        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+        elif value.n_objectives > 1 and not info.data["supports_multi_objective"]:
             raise VOCSError(
                 "this generator does not support multi-objective optimization"
             )
 
-        return v
+        return value
 
     @field_validator("data", mode="before")
-    def validate_data(cls, v):
-        if isinstance(v, dict):
+    @classmethod
+    def validate_data(cls, value: Any):
+        if isinstance(value, dict):
             try:
-                v = pd.DataFrame(v)
+                value = pd.DataFrame(value)
             except IndexError:
-                v = pd.DataFrame(v, index=[0])
-        return v
+                value = pd.DataFrame(value, index=[0])
+        return value
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         """
         Initialize the generator.
 
@@ -123,7 +125,7 @@ class Generator(XoptBaseModel, ABC):
         else:
             self.data = new_data
 
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """overwrite model dump to remove faux class attrs"""
 
         res = super().model_dump(*args, **kwargs)
