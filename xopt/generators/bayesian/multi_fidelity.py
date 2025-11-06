@@ -74,6 +74,7 @@ class MultiFidelityGenerator(MOBOGenerator):
     reference_point: Optional[Dict[str, float]] = None
     supports_multi_objective: bool = True
     supports_batch_generation: bool = True
+    supports_constraints: bool = True
 
     __doc__ = """Implements Multi-fidelity Bayesian optimization
         Assumes a fidelity parameter [0,1]
@@ -101,10 +102,6 @@ class MultiFidelityGenerator(MOBOGenerator):
         """
         v.variables["s"] = ContinuousVariable(domain=[0, 1])
         v.objectives["s"] = MaximizeObjective()
-        if len(v.constraints):
-            raise ValueError(
-                "constraints are not currently supported in multi-fidelity BO"
-            )
 
         return v
 
