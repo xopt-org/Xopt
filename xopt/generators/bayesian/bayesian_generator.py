@@ -736,27 +736,26 @@ class BayesianGenerator(Generator, ABC):
     def _get_acquisition(self, model):
         pass
 
-    @classmethod
-    def _get_objective(cls):
+    def _get_objective(self):
         """
         Return default objective (scalar objective) determined by vocs or if
         defined in custom_objective. Module is already on target device.
         """
         # check to make sure that if we specify a custom objective that no objectives
         # are specified in vocs
-        if cls.custom_objective is not None:
-            if cls.vocs.n_objectives:
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
                 raise RuntimeError(
                     "cannot specify objectives in VOCS "
                     "and a custom objective for the generator at the "
                     "same time"
                 )
 
-            objective = cls.custom_objective
+            objective = self.custom_objective
         else:
-            objective = create_mc_objective(cls.vocs)
+            objective = create_mc_objective(self.vocs)
 
-        return objective.to(**cls.tkwargs)
+        return objective.to(**self.tkwargs)
 
     def _get_constraint_callables(self):
         """return constraint callable determined by vocs"""
@@ -961,14 +960,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         objective_names: list[str] = info.data["vocs"].objective_names
 
         if set(value.keys()) != set(objective_names):
-            logger.warning(
-                "reference point must contain all objective names in vocs, "
-                "setting missing objectives to 0.0"
-            )
-            cls.reference_point = {
-                name: value.get(name, 0.0) for name in objective_names
-            }
-            value = cls.reference_point
+            raise XoptError("reference point must contain all objective names in vocs")
 
         return value
 

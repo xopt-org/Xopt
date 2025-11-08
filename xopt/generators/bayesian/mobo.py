@@ -56,24 +56,23 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
     _compatible_turbo_controllers = [SafetyTurboController]
 
-    @classmethod
-    def _get_objective(cls) -> MCMultiOutputObjective:
+    def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
         """
-        if cls.custom_objective is not None:
-            if cls.vocs.n_objectives:
+        if self.custom_objective is not None:
+            if self.vocs.n_objectives:
                 raise RuntimeError(
                     "cannot specify objectives in VOCS "
                     "and a custom objective for the generator at the "
                     "same time"
                 )
 
-            objective = cls.custom_objective
+            objective = self.custom_objective
         else:
-            objective = create_mobo_objective(cls.vocs)
+            objective = create_mobo_objective(self.vocs)
 
-        return objective.to(**cls.tkwargs)
+        return objective.to(**self.tkwargs)
 
     def get_acquisition(self, model: torch.nn.Module):
         """

@@ -10,6 +10,7 @@ from pydantic import (
     Field,
     PositiveFloat,
     PositiveInt,
+    PrivateAttr,
     computed_field,
     field_validator,
 )
@@ -82,10 +83,10 @@ class TurboController(XoptBaseModel, ABC):
         Reset the controller to the initial state.
     """
 
-    _failure_counter: int = 0
-    _success_counter: int = 0
+    _failure_counter: int = PrivateAttr(0)
+    _success_counter: int = PrivateAttr(0)
 
-    vocs: VOCS = Field(exclude=True, description="VOCS object")
+    vocs: VOCS = Field(..., description="VOCS object")
     batch_size: PositiveInt = Field(
         1, description="number of trust regions to use", ge=1
     )
@@ -103,11 +104,11 @@ class TurboController(XoptBaseModel, ABC):
     )
 
     failure_tolerance: PositiveInt = Field(
-        1, description="number of failures to trigger a trust region contraction", ge=1
+        0, description="number of failures to trigger a trust region contraction", ge=1
     )
 
     success_tolerance: PositiveInt = Field(
-        1, description="number of successes to trigger a trust region expansion", ge=1
+        0, description="number of successes to trigger a trust region expansion", ge=1
     )
 
     center_x: Optional[Dict[str, float]] = Field(
@@ -122,28 +123,34 @@ class TurboController(XoptBaseModel, ABC):
 
     model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
 
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
+        if self.success_tolerance == 0:
+            self.success_tolerance = int(
+                math.ceil(
+                    max(
+                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
+                    )
+                )
+            )
+
+        if self.failure_tolerance == 0:
+            self.failure_tolerance = int(
+                math.ceil(
+                    max(
+                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
+                    )
+                )
+            )
+
+        # get the initial state for the turbo controller for resetting
+        self._initial_state = self.model_dump()
+
     @computed_field
     @property
     def dim(self) -> int:
         return self.vocs.n_variables
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-
-        self.success_tolerance = int(
-            math.ceil(
-                max([2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size])
-            )
-        )
-
-        self.failure_tolerance = int(
-            math.ceil(
-                max([2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size])
-            )
-        )
-
-        # get the initial state for the turbo controller for resetting
-        self._initial_state = self.model_dump()
 
     def get_trust_region(self, generator: "BayesianGenerator") -> Tensor:
         """
@@ -265,9 +272,15 @@ class TurboController(XoptBaseModel, ABC):
         """
         Reset the controller to the initial state.
         """
+        excluded_attrs = {"name", "dim"}
+
         for name, val in self._initial_state.items():
-            if not name == "name":
+            if name not in excluded_attrs:
                 self.__setattr__(name, val)
+
+        # reset private attributes
+        self._failure_counter = 0
+        self._success_counter = 0
 
 
 class OptimizeTurboController(TurboController):
@@ -303,6 +316,9 @@ class OptimizeTurboController(TurboController):
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
 
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, value: VOCS):
@@ -446,6 +462,9 @@ class SafetyTurboController(TurboController):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, value: VOCS):
         if not value.constraints:
@@ -507,6 +526,9 @@ class EntropyTurboController(TurboController):
 
     name: str = Field("EntropyTurboController", frozen=True)
     _best_entropy: Optional[float] = None
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
 
     def update_state(self, generator, previous_batch_size: int = 1) -> None:
         """

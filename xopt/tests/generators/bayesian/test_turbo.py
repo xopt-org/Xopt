@@ -36,14 +36,14 @@ class TestTurbo(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.variables = {"x1": [0, 1]}
 
-        state = OptimizeTurboController(test_vocs)
+        state = OptimizeTurboController(vocs=test_vocs)
         assert state.dim == 1
         assert state.failure_tolerance == 2
         assert state.success_tolerance == 2
         assert state.minimize
 
         test_vocs.objectives[test_vocs.objective_names[0]] = "MAXIMIZE"
-        state = OptimizeTurboController(test_vocs)
+        state = OptimizeTurboController(vocs=test_vocs)
         assert state.dim == 1
         assert state.failure_tolerance == 2
         assert state.success_tolerance == 2
@@ -79,7 +79,7 @@ class TestTurbo(TestCase):
         # test not allowed generator type
         with pytest.raises(ValueError):
             UpperConfidenceBoundGenerator(
-                vocs=test_vocs, turbo_controller=EntropyTurboController(test_vocs)
+                vocs=test_vocs, turbo_controller=EntropyTurboController(vocs=test_vocs)
             )
 
         # test validation from serialized turbo controller
@@ -108,7 +108,7 @@ class TestTurbo(TestCase):
         gen.add_data(TEST_VOCS_DATA)
         gen.train_model()
 
-        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs)
         turbo_state.update_state(gen)
         tr = turbo_state.get_trust_region(gen)
         assert tr[0].numpy() >= test_vocs.bounds[0]
@@ -120,7 +120,7 @@ class TestTurbo(TestCase):
         gen.add_data(TEST_VOCS_DATA)
         gen.train_model()
 
-        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs)
         turbo_state.update_state(gen)
         tr = turbo_state.get_trust_region(gen)
 
@@ -137,7 +137,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
         gen.train_model()
 
-        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs)
         turbo_state.update_state(gen)
         assert turbo_state._success_counter == 0
         assert turbo_state._failure_counter == 1
@@ -178,7 +178,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
         gen.train_model()
 
-        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs)
         turbo_state.update_state(gen)
         assert turbo_state._success_counter == 0
         assert turbo_state._failure_counter == 1
@@ -214,7 +214,7 @@ class TestTurbo(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
         gen = UpperConfidenceBoundGenerator(
-            vocs=test_vocs, turbo_controller=OptimizeTurboController(test_vocs)
+            vocs=test_vocs, turbo_controller=OptimizeTurboController(vocs=test_vocs)
         )
         gen.add_data(TEST_VOCS_DATA)
         gen.train_model()
@@ -243,7 +243,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
         gen.train_model()
 
-        turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs, failure_tolerance=5)
         turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
         assert turbo_state._success_counter == 0
@@ -273,7 +273,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
-        turbo_state = OptimizeTurboController(gen.vocs)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs)
         with pytest.raises(FeasibilityError):
             turbo_state.update_state(gen)
 
@@ -291,7 +291,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
-        turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs, failure_tolerance=5)
         turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
 
@@ -309,14 +309,14 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
-        turbo_state = OptimizeTurboController(gen.vocs, failure_tolerance=5)
+        turbo_state = OptimizeTurboController(vocs=gen.vocs, failure_tolerance=5)
         turbo_state.update_state(gen)
         assert turbo_state.center_x == {"x1": best_x}
 
     def test_set_best_point(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        turbo_state = OptimizeTurboController(test_vocs)
+        turbo_state = OptimizeTurboController(vocs=test_vocs)
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
 
@@ -336,7 +336,7 @@ class TestTurbo(TestCase):
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives[test_vocs.objective_names[0]] = "MAXIMIZE"
 
-        turbo_state = OptimizeTurboController(test_vocs)
+        turbo_state = OptimizeTurboController(vocs=test_vocs)
         assert not turbo_state.minimize
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(TEST_VOCS_DATA)
@@ -362,7 +362,7 @@ class TestTurbo(TestCase):
         gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
         gen.add_data(data)
 
-        turbo_state = OptimizeTurboController(test_vocs, failure_tolerance=5)
+        turbo_state = OptimizeTurboController(vocs=test_vocs, failure_tolerance=5)
         turbo_state.update_state(gen, 2)
         assert turbo_state._success_counter == 1
 
@@ -493,7 +493,7 @@ class TestTurbo(TestCase):
             vocs=vocs,
             algorithm=algorithm,
             turbo_controller=EntropyTurboController(
-                vocs, success_tolerance=2, failure_tolerance=2
+                vocs=vocs, success_tolerance=2, failure_tolerance=2
             ),
         )
 
@@ -513,7 +513,7 @@ class TestTurbo(TestCase):
             BaxGenerator(
                 vocs=vocs,
                 algorithm=algorithm,
-                turbo_controller=OptimizeTurboController(vocs),
+                turbo_controller=OptimizeTurboController(vocs=vocs),
             )
 
     def test_turbo_restart(self):
@@ -523,7 +523,7 @@ class TestTurbo(TestCase):
         gen.add_data(data)
         gen.train_model()
 
-        controller = OptimizeTurboController(gen.vocs)
+        controller = OptimizeTurboController(vocs=gen.vocs)
         controller.update_state(gen)
         assert controller.best_value is not None
         controller.length = 5.0
@@ -538,7 +538,7 @@ class TestTurbo(TestCase):
         assert controller.center_x is None
         assert controller.best_value is None
 
-        controller = SafetyTurboController(gen.vocs)
+        controller = SafetyTurboController(vocs=gen.vocs)
         controller.update_state(gen)
         controller.length = 5.0
         controller._success_counter = 10

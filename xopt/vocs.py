@@ -18,10 +18,17 @@ class ObjectiveEnum(str, Enum):
 
     # Allow any case
     @classmethod
-    def _missing_(cls, name):
+    def _missing_(cls, value: object):
+        if value is None:
+            raise ValueError("ObjectiveEnum value cannot be None")
+        try:
+            sval = str(value)
+        except Exception:
+            raise ValueError(f"ObjectiveEnum value must be a string, got {type(value)}")
         for member in cls:
-            if member.name.lower() == name.lower():
+            if member.name.lower() == sval.lower():
                 return member
+        raise ValueError(f"Unknown ObjectiveEnum value: {value}")
 
 
 class ConstraintEnum(str, Enum):
@@ -30,11 +37,19 @@ class ConstraintEnum(str, Enum):
 
     # Allow any case
     @classmethod
-    def _missing_(cls, name):
-        if isinstance(name, str):
-            for member in cls:
-                if member.name.lower() == name.lower():
-                    return member
+    def _missing_(cls, value: object):
+        if value is None:
+            raise ValueError("ConstraintEnum value cannot be None")
+        try:
+            sval = str(value)
+        except Exception:
+            raise ValueError(
+                f"ConstraintEnum value must be a string, got {type(value)}"
+            )
+        for member in cls:
+            if member.name.lower() == sval.lower():
+                return member
+        raise ValueError(f"Unknown ConstraintEnum value: {value}")
 
 
 variables_type = dict[str, tuple[float, float]]
@@ -98,11 +113,9 @@ class VOCS(XoptBaseModel):
         default={},
         description="input variable names with a list of minimum and maximum values",
     )
-    constraints: dict[str, tuple[float | ConstraintEnum, float | ConstraintEnum]] = (
-        Field(
-            default={},
-            description="constraint names with a list of constraint type and value",
-        )
+    constraints: dict[str, tuple[ConstraintEnum, float]] = Field(
+        default={},
+        description="constraint names with a list of constraint type and value",
     )
     objectives: dict[str, ObjectiveEnum] = Field(
         default={}, description="objective names with type of objective"
@@ -119,15 +132,55 @@ class VOCS(XoptBaseModel):
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
 
-    @field_validator("variables")
+    @field_validator("variables", mode="after")
     @classmethod
-    def correct_bounds_specification(cls, v):
+    def correct_bounds_specification(cls, v: dict[str, tuple[float, float]]):
         validate_variable_bounds(v)
         return v
 
-    @field_validator("constraints")
+    @field_validator("constraints", mode="before")
     @classmethod
-    def correct_list_types(cls, v):
+    def fix_constraints(cls, value: Any):
+        if not isinstance(value, dict):
+            raise ValueError("must be a dictionary")
+
+        for key, val in value.items():
+            if len(val) != 2:
+                raise ValueError(
+                    f"constraint specification list must have length 2 for key '{key}'"
+                )
+
+            # convert lists to tuples
+            if isinstance(val, list):
+                try:
+                    _val = tuple(val)
+                    value[key] = _val
+                except Exception as e:
+                    raise ValueError(
+                        f"could not convert list to tuple for key '{key}'"
+                    ) from e
+
+            # convert first element to constraint enum
+            try:
+                _val = ConstraintEnum(val[0])
+                value[key] = (_val, val[1])
+            except Exception:
+                raise ValueError(f"unknown constraint type '{val[0]}' for key '{key}'")
+
+            # convert second element to float
+            try:
+                _val = float(val[1])
+                value[key] = (val[0], _val)
+            except Exception as e:
+                raise ValueError(
+                    f"could not convert {val[1]} to float for key '{key}'"
+                ) from e
+
+        return value
+
+    @field_validator("constraints", mode="after")
+    @classmethod
+    def correct_list_types(cls, v: dict[str, tuple[str, float]]):
         """make sure that constraint list types are correct"""
         for _, item in v.items():
             if not isinstance(item[0], str):
@@ -289,10 +342,10 @@ class VOCS(XoptBaseModel):
 
     def random_inputs(
         self,
-        n: int = None,
-        custom_bounds: dict[str, list[float]] = None,
+        n: int | None = None,
+        custom_bounds: dict[str, list[float]] | None = None,
         include_constants: bool = True,
-        seed: int = None,
+        seed: int | None = None,
     ) -> list[dict]:
         """
         Uniform sampling of the variables.
