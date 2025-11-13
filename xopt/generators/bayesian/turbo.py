@@ -86,7 +86,7 @@ class TurboController(XoptBaseModel, ABC):
     _failure_counter: int = PrivateAttr(0)
     _success_counter: int = PrivateAttr(0)
 
-    vocs: VOCS = Field(..., description="VOCS object")
+    vocs: VOCS = Field(description="VOCS object")
     batch_size: PositiveInt = Field(
         1, description="number of trust regions to use", ge=1
     )

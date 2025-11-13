@@ -93,12 +93,12 @@ class Xopt(XoptBaseModel):
         Serializes the Xopt configuration to a JSON string.
     """
 
-    vocs: VOCS = Field(..., description="VOCS object for Xopt")
+    vocs: VOCS = Field(description="VOCS object for Xopt")
     generator: SerializeAsAny[Generator] = Field(
-        ..., description="generator object for Xopt"
+        description="generator object for Xopt"
     )
     evaluator: SerializeAsAny[Evaluator] = Field(
-        ..., description="evaluator object for Xopt"
+        description="evaluator object for Xopt"
     )
     strict: bool = Field(
         True,
