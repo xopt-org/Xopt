@@ -11,6 +11,7 @@ from pydantic import (
     PositiveFloat,
     PositiveInt,
     PrivateAttr,
+    ValidationInfo,
     computed_field,
     field_validator,
 )
@@ -104,11 +105,15 @@ class TurboController(XoptBaseModel, ABC):
     )
 
     failure_tolerance: PositiveInt = Field(
-        0, description="number of failures to trigger a trust region contraction", ge=1
+        0,
+        description="number of failures to trigger a trust region contraction",
+        ge=1,
     )
 
     success_tolerance: PositiveInt = Field(
-        0, description="number of successes to trigger a trust region expansion", ge=1
+        0,
+        description="number of successes to trigger a trust region expansion",
+        ge=1,
     )
 
     center_x: Optional[Dict[str, float]] = Field(
@@ -126,24 +131,6 @@ class TurboController(XoptBaseModel, ABC):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        if self.success_tolerance == 0:
-            self.success_tolerance = int(
-                math.ceil(
-                    max(
-                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
-                    )
-                )
-            )
-
-        if self.failure_tolerance == 0:
-            self.failure_tolerance = int(
-                math.ceil(
-                    max(
-                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
-                    )
-                )
-            )
-
         # get the initial state for the turbo controller for resetting
         self._initial_state = self.model_dump()
 
@@ -151,6 +138,33 @@ class TurboController(XoptBaseModel, ABC):
     @property
     def dim(self) -> int:
         return self.vocs.n_variables
+
+    @field_validator("success_tolerance", "failure_tolerance", mode="before")
+    @classmethod
+    def validate_tolerances(cls, value: Any, info: ValidationInfo):
+        if isinstance(value, int):
+            if value < 1:
+                batch_size = info.data.get("batch_size", None)
+                if batch_size is None:
+                    raise ValueError(
+                        "batch_size must be set before inferring tolerances"
+                    )
+                vocs = info.data.get("vocs", None)
+                if vocs is None:
+                    raise ValueError("vocs must be set before inferring tolerances")
+                dim = vocs.n_variables
+
+                _value = int(
+                    math.ceil(
+                        max([2.0 / int(batch_size), float(dim) / 2.0 * int(batch_size)])
+                    )
+                )
+                if _value < 1:
+                    raise ValueError("Tolerance must be at least 1")
+                return _value
+        else:
+            raise ValueError("Tolerance must be a positive integer")
+        return value
 
     def get_trust_region(self, generator: "BayesianGenerator") -> Tensor:
         """
@@ -314,8 +328,9 @@ class OptimizeTurboController(TurboController):
     best_value: Optional[float] = Field(
         None, description="best objective value found so far"
     )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+    model_config = ConfigDict(
+        validate_assignment=True, arbitrary_types_allowed=True, extra="forbid"
+    )
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -459,7 +474,6 @@ class SafetyTurboController(TurboController):
         0.75,
         description="minimum feasible fraction to trigger trust region expansion/contraction",
     )
-
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     def __init__(self, **kwargs: Any):
@@ -526,11 +540,16 @@ class EntropyTurboController(TurboController):
 
     name: str = Field("EntropyTurboController", frozen=True)
     _best_entropy: Optional[float] = None
+    model_config = ConfigDict(
+        validate_assignment=True, arbitrary_types_allowed=True, extra="forbid"
+    )
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-    def update_state(self, generator, previous_batch_size: int = 1) -> None:
+    def update_state(
+        self, generator: "BayesianGenerator", previous_batch_size: int = 1
+    ) -> None:
         """
         Update the state of the controller.
 
