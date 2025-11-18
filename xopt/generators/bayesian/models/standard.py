@@ -92,6 +92,9 @@ class StandardModelConstructor(ModelConstructor):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
     @field_validator("covar_modules", "mean_modules", mode="before")
     def validate_torch_modules(cls, value: Any):
         if not isinstance(value, dict):

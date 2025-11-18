@@ -285,9 +285,17 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("computation_time", mode="before")
     @classmethod
-    def validate_computation_time(cls, value):
-        if isinstance(value, dict):
+    def validate_computation_time(cls, value: Any):
+        if value is None:
+            return value
+        elif isinstance(value, pd.DataFrame):
+            return value
+        elif isinstance(value, dict):
             value = pd.DataFrame(value)
+        else:
+            raise ValueError(
+                "computation_time must be a pandas DataFrame, dict, or None"
+            )
 
         return value
 
@@ -306,7 +314,7 @@ class BayesianGenerator(Generator, ABC):
         """
         self.data = pd.concat([self.data, new_data], axis=0)
 
-    def generate(self, n_candidates: int) -> list[dict]:
+    def generate(self, n_candidates: int):
         """
         Generate candidates using Bayesian Optimization.
 
@@ -402,7 +410,9 @@ class BayesianGenerator(Generator, ABC):
 
             return result.to_dict("records")
 
-    def train_model(self, data: pd.DataFrame = None, update_internal=True) -> Module:
+    def train_model(
+        self, data: pd.DataFrame | None = None, update_internal: bool = True
+    ) -> Module:
         """
         Train a Bayesian model for Bayesian Optimization.
 

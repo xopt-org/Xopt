@@ -4,7 +4,7 @@ from typing import Any, Optional
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
+from pydantic import Field, PositiveFloat, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -80,8 +80,6 @@ class LBFGSOptimizer(NumericalOptimizer):
     max_time: Optional[PositiveFloat] = Field(
         5.0, description="maximum time for optimization in seconds"
     )
-
-    model_config = ConfigDict(validate_assignment=True, extra="allow")
 
     def __init__(
         self,

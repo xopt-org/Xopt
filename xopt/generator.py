@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Hashable, Optional
 
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
@@ -67,7 +67,7 @@ class Generator(XoptBaseModel, ABC):
         exclude=True,
     )
 
-    vocs: VOCS = Field(VOCS(), description="generator VOCS", exclude=True)
+    vocs: VOCS = Field(description="generator VOCS", exclude=True)
     data: Optional[pd.DataFrame] = Field(
         None, description="generator data", exclude=True
     )
@@ -110,7 +110,7 @@ class Generator(XoptBaseModel, ABC):
         logger.info(f"Initialized generator {self.name}")
 
     @abstractmethod
-    def generate(self, n_candidates) -> list[dict]:
+    def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
         pass
 
     def add_data(self, new_data: pd.DataFrame):

@@ -6,7 +6,6 @@ from typing import Any, Dict, Optional, TYPE_CHECKING
 import pandas as pd
 import torch
 from pydantic import (
-    ConfigDict,
     Field,
     PositiveFloat,
     PositiveInt,
@@ -108,12 +107,14 @@ class TurboController(XoptBaseModel, ABC):
         0,
         description="number of failures to trigger a trust region contraction",
         ge=1,
+        validate_default=True,
     )
 
     success_tolerance: PositiveInt = Field(
         0,
         description="number of successes to trigger a trust region expansion",
         ge=1,
+        validate_default=True,
     )
 
     center_x: Optional[Dict[str, float]] = Field(
@@ -125,8 +126,6 @@ class TurboController(XoptBaseModel, ABC):
     restrict_model_data: bool = Field(
         True, description="flag to restrict model data to within the trust region"
     )
-
-    model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -328,9 +327,6 @@ class OptimizeTurboController(TurboController):
     best_value: Optional[float] = Field(
         None, description="best objective value found so far"
     )
-    model_config = ConfigDict(
-        validate_assignment=True, arbitrary_types_allowed=True, extra="forbid"
-    )
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -474,10 +470,6 @@ class SafetyTurboController(TurboController):
         0.75,
         description="minimum feasible fraction to trigger trust region expansion/contraction",
     )
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
 
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, value: VOCS):
@@ -540,12 +532,6 @@ class EntropyTurboController(TurboController):
 
     name: str = Field("EntropyTurboController", frozen=True)
     _best_entropy: Optional[float] = None
-    model_config = ConfigDict(
-        validate_assignment=True, arbitrary_types_allowed=True, extra="forbid"
-    )
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
 
     def update_state(
         self, generator: "BayesianGenerator", previous_batch_size: int = 1
