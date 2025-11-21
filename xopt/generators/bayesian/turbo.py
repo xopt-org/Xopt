@@ -290,7 +290,6 @@ class TurboController(XoptBaseModel, ABC):
         for name, val in self._initial_state.items():
             if name not in excluded_attrs:
                 self.__setattr__(name, val)
-
         # reset private attributes
         self._failure_counter = 0
         self._success_counter = 0

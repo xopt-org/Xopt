@@ -196,7 +196,9 @@ def decode_torch_module(modulestr: str):
 
 
 class XoptBaseModel(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+    model_config = ConfigDict(
+        validate_assignment=True, arbitrary_types_allowed=True, extra="forbid"
+    )
 
     @field_validator("*", mode="before")
     def validate_files(cls, value: Any, info: ValidationInfo):

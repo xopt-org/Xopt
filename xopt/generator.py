@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Hashable, Optional
 
 import pandas as pd
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from xopt.errors import VOCSError
@@ -72,8 +72,6 @@ class Generator(XoptBaseModel, ABC):
         None, description="generator data", exclude=True
     )
 
-    model_config = ConfigDict(validate_assignment=True)
-
     @field_validator("vocs", mode="after")
     @classmethod
     def validate_vocs(cls, value: VOCS, info: ValidationInfo):
@@ -100,14 +98,6 @@ class Generator(XoptBaseModel, ABC):
             except IndexError:
                 value = pd.DataFrame(value, index=[0])
         return value
-
-    def __init__(self, **kwargs: Any):
-        """
-        Initialize the generator.
-
-        """
-        super().__init__(**kwargs)
-        logger.info(f"Initialized generator {self.name}")
 
     @abstractmethod
     def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
