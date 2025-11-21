@@ -55,6 +55,7 @@ from xopt.generators.bayesian.utils import (
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
+from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 
@@ -944,11 +945,15 @@ class BayesianGenerator(Generator, ABC):
         return torch.tensor(max_travel_bounds)
 
 
+MOBO_DEFAULT_REF_POINT = 0.0
+
+
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
     reference_point: dict[str, float] = Field(
         {},
         description="dict specifying reference point for multi-objective optimization",
+        validate_default=True,
     )
     pareto_front_history: Optional[pd.DataFrame] = Field(
         None,
@@ -963,11 +968,39 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def validate_pareto_front_history(cls, value: Any):
         return pd.DataFrame(value) if value is not None else None
 
+    @field_validator("reference_point", mode="before")
+    @classmethod
+    def validate_reference_point_before(
+        cls, value: Any, info: ValidationInfo
+    ) -> dict[str, float]:
+        if not isinstance(value, dict):
+            raise ValueError(
+                "reference_point must be a dict of objective names to values"
+            )
+
+        _value = cast(dict[str, float], value)
+
+        if _value == {}:
+            # set default reference point if not specified
+
+            _vocs: VOCS | None = info.data.get("vocs", None)
+            if _vocs is None:
+                raise ValueError(
+                    "vocs must be specified to set default reference point"
+                )
+
+            _value: dict[str, float] = {
+                obj_name: MOBO_DEFAULT_REF_POINT for obj_name in _vocs.objective_names
+            }
+
+        return _value
+
     @field_validator("reference_point", mode="after")
     @classmethod
     def validate_reference_point(cls, value: dict[str, float], info: ValidationInfo):
         # set default reference point if not specified
-        objective_names: list[str] = info.data["vocs"].objective_names
+        _vocs: VOCS | None = info.data.get("vocs", None)
+        objective_names = _vocs.objective_names if _vocs is not None else []
 
         if set(value.keys()) != set(objective_names):
             raise XoptError("reference point must contain all objective names in vocs")
