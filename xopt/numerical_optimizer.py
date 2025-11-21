@@ -29,10 +29,14 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
     @abstractmethod
     def optimize(
-        self, function: AcquisitionFunction, bounds: Tensor, n_candidates=1, **kwargs
-    ):
+        self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        **kwargs: Any,
+    ) -> Tensor:
         """Optimize a function to produce a number of candidate points that minimize the function."""
-        pass
+        raise NotImplementedError
 
 
 class LBFGSOptimizer(NumericalOptimizer):
@@ -92,7 +96,13 @@ class LBFGSOptimizer(NumericalOptimizer):
 
         super().__init__(**kwargs)
 
-    def optimize(self, function, bounds, n_candidates=1, **kwargs):
+    def optimize(
+        self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        **kwargs: Any,
+    ) -> Tensor:
         """
         Optimize the given acquisition function within the specified bounds.
 
@@ -173,13 +183,19 @@ class GridOptimizer(NumericalOptimizer):
         10, description="number of grid points per axis used for optimization"
     )
 
-    def optimize(self, function, bounds, n_candidates=1):
+    def optimize(
+        self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        **kwargs: Any,
+    ) -> Tensor:
         """
         Optimize the given acquisition function within the specified bounds.
 
         Parameters
         ----------
-        function : Callable
+        function : AcquisitionFunction
             The acquisition function to be optimized.
         bounds : Tensor
             A tensor specifying the bounds for the optimization. It must have the shape [2, ndim].

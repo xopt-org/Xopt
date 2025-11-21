@@ -20,14 +20,13 @@ class FeasibilityObjective(GenericMCObjective):
         infeasible_cost: float = 0.0,
         eta: float = 1e-3,
     ) -> None:
-        def ones_callable(Z, X=None):
+        def ones_callable(Z: Tensor, X: Optional[Tensor] = None):
             return torch.ones(Z.shape[:-1])
 
         super().__init__(objective=ones_callable)
         self.constraints = constraints
-        if type(eta) is not Tensor:
-            eta = torch.full((len(constraints),), eta)
-        self.register_buffer("eta", eta)
+        _eta = torch.full((len(constraints),), eta)
+        self.register_buffer("eta", _eta)
         self.register_buffer("infeasible_cost", torch.as_tensor(infeasible_cost))
 
     def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
@@ -59,7 +58,7 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         self,
         model: Model,
         base_acquisition: MCAcquisitionFunction,
-        constraints: List[Callable],
+        constraints: List[Callable[[Tensor], Tensor]] | None = None,
         posterior_transform: Optional[PosteriorTransform] = None,
         X_pending: Optional[Tensor] = None,
         sampler: Optional[MCSampler] = None,

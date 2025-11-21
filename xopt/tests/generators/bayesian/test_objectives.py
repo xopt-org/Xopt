@@ -6,6 +6,8 @@ from xopt.generators.bayesian.objectives import feasibility
 from xopt.generators.bayesian.objectives import create_constraint_callables
 import functools
 
+from xopt.vocs import VOCS
+
 
 class DummyVOCS:
     def __init__(self, constraints=None, output_names=None):
@@ -187,24 +189,11 @@ def test_create_constraint_callables_multiple():
     assert res2.shape == (1,)
 
 
-def test_create_constraint_callables_none():
-    class V:
-        constraints = None
-        output_names = ["y1"]
-        constraint_names = []
-
-    vocs = V()
-    callables = create_constraint_callables(vocs)
-    assert callables is None
-
-
 def test_create_constraint_callables_empty_dict():
-    class V:
-        constraints = {}
-        output_names = ["y1"]
-        constraint_names = []
-
-    vocs = V()
+    vocs = VOCS(
+        constraints={},
+        objectives={"y1": "MINIMIZE"},
+    )
     callables = create_constraint_callables(vocs)
     assert callables == []
 
@@ -215,7 +204,7 @@ def test_create_constraint_callables_partial_and_signature():
         output_names = ["c1", "c2"]
         constraint_names = ["c1", "c2"]
 
-    vocs = V()
+    vocs = VOCS(constraints={"c1": ("LESS_THAN", 2.0), "c2": ("GREATER_THAN", -1.0)})
     callables = create_constraint_callables(vocs)
 
     # Check that each callable is a functools.partial object

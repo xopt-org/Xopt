@@ -42,7 +42,7 @@ from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
 
-JSON_ENCODERS = {
+JSON_ENCODERS: dict[type, Callable[[Any], Any]] = {
     # function/method type distinguished for class members
     # and not recognized as callables
     FunctionType: lambda x: f"{x.__module__}.{x.__qualname__}",
@@ -75,8 +75,11 @@ JSON_ENCODERS = {
 
 
 def recursive_serialize(
-    v, base_key="", serialize_torch=False, serialize_inline: bool = False
-) -> dict:
+    v: dict[str, Any],
+    base_key: str = "",
+    serialize_torch: bool = False,
+    serialize_inline: bool = False,
+) -> dict[str, Any]:
     for key in list(v):
         if isinstance(v[key], dict):
             v[key] = recursive_serialize(v[key], key, serialize_torch, serialize_inline)
@@ -114,12 +117,12 @@ def recursive_serialize(
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 
 
-def recursive_deserialize(v: dict) -> dict:
+def recursive_deserialize(v: dict[str, Any]) -> dict[str, Any]:
     """deserialize strings from xopt outputs"""
     for key, value in v.items():
         # process dicts
         if isinstance(value, dict):
-            v[key] = recursive_deserialize(value)
+            v[key] = recursive_deserialize(cast(dict[str, Any], value))
 
         elif isinstance(value, str):
             if value in DECODERS:
@@ -129,7 +132,11 @@ def recursive_deserialize(v: dict) -> dict:
 
 
 def orjson_dumps(
-    v: BaseModel, *, base_key="", serialize_torch=False, serialize_inline=False
+    v: BaseModel,
+    *,
+    base_key: str = "",
+    serialize_torch: bool = False,
+    serialize_inline: bool = False,
 ) -> str:
     # TODO: move away from borrowing pydantic v1 encoder preset
     json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
@@ -142,25 +149,39 @@ def orjson_dumps(
     )
 
 
-def orjson_dumps_custom(v: BaseModel, *, default, base_key="", **kwargs) -> str:
-    v = recursive_serialize(v.model_dump(), base_key=base_key, **kwargs)
-    return orjson.dumps(v, default=default).decode()
+def orjson_dumps_custom(
+    v: BaseModel,
+    *,
+    default: Callable[[Any], Any],
+    base_key: str = "",
+    serialize_torch: bool = False,
+    serialize_inline: bool = False,
+) -> str:
+    _v = recursive_serialize(
+        v.model_dump(),
+        base_key=base_key,
+        serialize_torch=serialize_torch,
+        serialize_inline=serialize_inline,
+    )
+    return orjson.dumps(_v, default=default).decode()
 
 
-def orjson_dumps_except_root(v: BaseModel, *, base_key="", **kwargs) -> dict:
+def orjson_dumps_except_root(
+    v: BaseModel, *, base_key: str = "", **kwargs: Any
+) -> dict[str, Any]:
     """Same as above but start at fields of root model, instead of model itself"""
     dump = v.model_dump()
     encoded_dump = recursive_serialize(dump, base_key=base_key, **kwargs)
     return encoded_dump
 
 
-def orjson_loads(v, default=None) -> dict:
+def orjson_loads(v: Any) -> dict[str, Any]:
     v = orjson.loads(v)
     v = recursive_deserialize(v)
     return v
 
 
-def process_torch_module(module, name):
+def process_torch_module(module: torch.nn.Module, name: str):
     """save module to file based on module name and return file path to json"""
     # module_name = "".join(random.choices(string.ascii_uppercase + string.digits,
     #                                     k=7)) + ".pt"
@@ -169,7 +190,7 @@ def process_torch_module(module, name):
     return module_name
 
 
-def encode_torch_module(module):
+def encode_torch_module(module: torch.nn.Module) -> str:
     import base64
     import gzip
 
@@ -214,13 +235,13 @@ class XoptBaseModel(BaseModel):
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
         return orjson_dumps_except_root(self)
 
-    def to_json(self, **kwargs) -> str:
+    def to_json(self, **kwargs: Any) -> str:
         return orjson_dumps(self, **kwargs)
 
-    def json(self, **kwargs):
+    def json(self, **kwargs: Any) -> str:
         return self.to_json(**kwargs)
 
-    def yaml(self, **kwargs):
+    def yaml(self, **kwargs: Any) -> str:
         """serialize first then dump to yaml string"""
         output = json.loads(
             self.to_json(
@@ -238,11 +259,11 @@ class XoptBaseModel(BaseModel):
             return cls.from_yaml(file)
 
     @classmethod
-    def from_yaml(cls, yaml_obj: [str, TextIO]):
+    def from_yaml(cls, yaml_obj: str | TextIO):
         return cls.model_validate(remove_none_values(yaml.safe_load(yaml_obj)))
 
     @classmethod
-    def from_dict(cls, config: dict):
+    def from_dict(cls, config: dict[str, Any]):
         return cls.model_validate(remove_none_values(config))
 
 
@@ -262,7 +283,7 @@ def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
     description_dict: dict[str, Any] = {}
-    for name, val in model.model_fields.items():
+    for name, val in model.__class__.model_fields.items():
         try:
             if issubclass(getattr(model, name), XoptBaseModel):
                 description_dict[name] = get_descriptions_defaults(getattr(model, name))

@@ -8,6 +8,8 @@ import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Normalize, Standardize
+from botorch.models.transforms.input import InputTransform
+from botorch.models.transforms.outcome import OutcomeTransform
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood, Likelihood
@@ -110,8 +112,8 @@ class StandardModelConstructor(ModelConstructor):
 
         return value
 
-    @field_validator("trainable_mean_keys")
-    def validate_trainable_mean_keys(cls, value: Any, info: ValidationInfo):
+    @field_validator("trainable_mean_keys", mode="after")
+    def validate_trainable_mean_keys(cls, value: list[str], info: ValidationInfo):
         for name in value:
             assert name in info.data["mean_modules"]
         return value
@@ -131,7 +133,7 @@ class StandardModelConstructor(ModelConstructor):
             The likelihood for the model.
 
         """
-        tkwargs = {"dtype": dtype, "device": device}
+        tkwargs: dict[str, Any] = {"dtype": dtype, "device": device}
         if self.custom_noise_prior is not None:
             likelihood = GaussianLikelihood(
                 noise_prior=self.custom_noise_prior,
@@ -156,10 +158,10 @@ class StandardModelConstructor(ModelConstructor):
 
     def build_model(
         self,
-        input_names: List[str],
-        outcome_names: List[str],
+        input_names: list[str],
+        outcome_names: list[str],
         data: pd.DataFrame,
-        input_bounds: Dict[str, List] = None,
+        input_bounds: dict[str, list[float]] | None = None,
         dtype: torch.dtype = torch.double,
         device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
@@ -168,13 +170,13 @@ class StandardModelConstructor(ModelConstructor):
 
         Parameters
         ----------
-        input_names : List[str]
+        input_names : list[str]
             Names of input variables.
-        outcome_names : List[str]
+        outcome_names : list[str]
             Names of outcome variables.
         data : pd.DataFrame
             Data used for training the model.
-        input_bounds : Dict[str, List], optional
+        input_bounds : dict[str, list[float]], optional
             Bounds for input variables.
         dtype : torch.dtype, optional
             Data type for the model (default is torch.double).
@@ -188,7 +190,7 @@ class StandardModelConstructor(ModelConstructor):
 
         """
         # build model
-        tkwargs = {"dtype": dtype, "device": device}
+        tkwargs: dict[str, Any] = {"dtype": dtype, "device": device}
         models = []
 
         # validate if model caching can be used if requested
@@ -216,7 +218,7 @@ class StandardModelConstructor(ModelConstructor):
                 input_names, outcome_name, data
             )
             # collect arguments into a single dict
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "input_transform": input_transform,
                 "outcome_transform": outcome_transform,
                 "covar_module": covar_module,
@@ -274,7 +276,11 @@ class StandardModelConstructor(ModelConstructor):
         return full_model.to(**tkwargs)
 
     def build_mean_module(
-        self, name, mean_modules, input_transform, outcome_transform
+        self,
+        name: str,
+        mean_modules: dict[str, Module],
+        input_transform: InputTransform,
+        outcome_transform: OutcomeTransform,
     ) -> Optional[CustomMean]:
         """
         Build the mean module for the output specified by name.
@@ -305,7 +311,7 @@ class StandardModelConstructor(ModelConstructor):
         return mean_module
 
     @staticmethod
-    def _get_module(base, name):
+    def _get_module(base: Any, name: str):
         """
         Get the module for a given name.
 
@@ -325,11 +331,18 @@ class StandardModelConstructor(ModelConstructor):
         if isinstance(base, Module):
             return deepcopy(base)
         elif isinstance(base, dict):
-            return deepcopy(base.pop(name, None))
+            _base = cast(dict[str, Module], base)
+            return deepcopy(_base.pop(name, None))
         else:
             return None
 
-    def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
+    def _get_input_transform(
+        self,
+        outcome_name: str,
+        input_names: list[str],
+        input_bounds: dict[str, list[float]] | None,
+        tkwargs: dict[str, Any],
+    ):
         """get input transform based on the supplied bounds and attributes"""
         # get input bounds
         if input_bounds is None:

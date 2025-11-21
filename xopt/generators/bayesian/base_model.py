@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Union
+from collections.abc import Sequence, Mapping
+from typing import Any, Union
 import warnings
 
 import pandas as pd
@@ -56,10 +57,10 @@ class ModelConstructor(XoptBaseModel, ABC):
     @abstractmethod
     def build_model(
         self,
-        input_names: List[str],
-        outcome_names: List[str],
+        input_names: list[str],
+        outcome_names: list[str],
         data: pd.DataFrame,
-        input_bounds: Dict[str, List] = None,
+        input_bounds: Mapping[str, Sequence[float]] | None = None,
         dtype: torch.dtype = torch.double,
         device: Union[torch.device, str] = "cpu",
     ) -> ModelListGP:
@@ -68,13 +69,13 @@ class ModelConstructor(XoptBaseModel, ABC):
 
         Parameters
         ----------
-        input_names : List[str]
+        input_names : list[str]
             Names of input variables.
-        outcome_names : List[str]
+        outcome_names : list[str]
             Names of outcome variables.
         data : pd.DataFrame
             Data used for training the model.
-        input_bounds : Dict[str, List], optional
+        input_bounds : dict[str, Sequence[float]], optional
             Bounds for input variables.
         dtype : torch.dtype, optional
             Data type for the model (default is torch.double).
@@ -87,7 +88,7 @@ class ModelConstructor(XoptBaseModel, ABC):
             The trained botorch model.
 
         """
-        pass
+        raise NotImplementedError
 
     def build_model_from_vocs(
         self,
@@ -123,7 +124,9 @@ class ModelConstructor(XoptBaseModel, ABC):
         )
 
     @staticmethod
-    def build_single_task_gp(X: Tensor, Y: Tensor, train=True, **kwargs) -> Model:
+    def build_single_task_gp(
+        X: Tensor, Y: Tensor, train: bool = True, **kwargs: Any
+    ) -> Model:
         """
         Utility method for creating and training simple SingleTaskGP models.
 
@@ -155,7 +158,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
     @staticmethod
     def build_heteroskedastic_gp(
-        X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs
+        X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs: Any
     ) -> Model:
         """
         Utility method for creating and training heteroskedastic SingleTaskGP models.

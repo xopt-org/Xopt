@@ -16,7 +16,6 @@ from botorch.acquisition import (
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
-from gpytorch import Module
 from pydantic import (
     Field,
     field_validator,
@@ -408,11 +407,11 @@ class BayesianGenerator(Generator, ABC):
                         num_points=self.n_interpolate_points,
                     )
 
-            return result.to_dict("records")
+            return result.to_dict("records")  # type: ignore # return type is list[dict]
 
     def train_model(
         self, data: pd.DataFrame | None = None, update_internal: bool = True
-    ) -> Module:
+    ) -> Model:
         """
         Train a Bayesian model for Bayesian Optimization.
 
@@ -442,6 +441,8 @@ class BayesianGenerator(Generator, ABC):
         if the 'update_internal' flag is set to True.
         """
         if data is None:
+            if self.data is None:
+                raise ValueError("no data available to build model")
             data = self.get_training_data(self.data)
         if data.empty:
             raise ValueError("no data available to build model")
@@ -456,7 +457,7 @@ class BayesianGenerator(Generator, ABC):
                 variable_bounds = dict(
                     zip(
                         self.vocs.variable_names,
-                        self.turbo_controller.get_trust_region(self).numpy().T,
+                        self.turbo_controller.get_trust_region(self).numpy().T,  # type: ignore
                     )
                 )
 
@@ -474,13 +475,15 @@ class BayesianGenerator(Generator, ABC):
                     bounds = [f_data.min(), f_data.max()]
                     if bounds[1] - bounds[0] < 1e-8:
                         bounds[1] = bounds[0] + 1e-8
-                    variable_bounds[key] = bounds
+                    variable_bounds[key] = bounds  # type: ignore
+
+        input_bounds = {name: variable_bounds[name] for name in self.model_input_names}
 
         _model = self.gp_constructor.build_model(
             self.model_input_names,
             self.vocs.output_names,
             data,
-            {name: variable_bounds[name] for name in self.model_input_names},
+            input_bounds,
             **self.tkwargs,
         )
 
@@ -489,13 +492,13 @@ class BayesianGenerator(Generator, ABC):
 
         return _model
 
-    def propose_candidates(self, model: Module, n_candidates: int = 1) -> Tensor:
+    def propose_candidates(self, model: Model, n_candidates: int = 1) -> Tensor:
         """
         Propose candidates using Bayesian Optimization.
 
         Parameters
         ----------
-        model : Module
+        model : Model
             The trained Bayesian model.
         n_candidates : int, optional
             The number of candidates to propose (default is 1).
@@ -586,7 +589,7 @@ class BayesianGenerator(Generator, ABC):
         """
         return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
 
-    def get_acquisition(self, model: Module) -> AcquisitionFunction:
+    def get_acquisition(self, model: Model) -> AcquisitionFunction:
         """
         Define the acquisition function based on the given GP model.
 
@@ -594,7 +597,7 @@ class BayesianGenerator(Generator, ABC):
 
         Parameters
         ----------
-        model : Module
+        model : Model
             The BoTorch model to be used for generating the acquisition function.
 
         Returns
@@ -607,8 +610,6 @@ class BayesianGenerator(Generator, ABC):
             If the provided 'model' is None. A valid model is required to create the
             acquisition function.
         """
-        if model is None:
-            raise ValueError("model cannot be None")
 
         # get base acquisition function
         acq = self._get_acquisition(model)
@@ -636,6 +637,8 @@ class BayesianGenerator(Generator, ABC):
     def get_optimum(self):
         """select the best point(s) given by the
         model using the Posterior mean"""
+        if self.model is None:
+            raise XoptError("no model defined to get optimum from")
         acq = qUpperConfidenceBound(
             model=self.model, beta=0.0, objective=self._get_objective()
         )
@@ -651,7 +654,7 @@ class BayesianGenerator(Generator, ABC):
         if self.fixed_features is not None:
             acq = self._apply_fixed_features(acq)
 
-            indices = []
+            indices: list[int] = []
             for idx, name in enumerate(self.vocs.variable_names):
                 if name not in self.fixed_features:
                     indices += [idx]
@@ -666,7 +669,7 @@ class BayesianGenerator(Generator, ABC):
 
         return self._process_candidates(result)
 
-    def visualize_model(self, **kwargs):
+    def visualize_model(self, **kwargs: Any):
         """Display GP model predictions for the selected output(s).
 
         The GP models are displayed with respect to the named variables. If None are given, the list of variables in
@@ -711,7 +714,7 @@ class BayesianGenerator(Generator, ABC):
         """
         return visualize_generator_model(self, **kwargs)
 
-    def _get_initial_conditions(self, n_candidates=1) -> Union[Tensor, None]:
+    def _get_initial_conditions(self, n_candidates: int = 1) -> Union[Tensor, None]:
         """overwrite if algorithm should specifiy initial candidates for optimizing
         the acquisition function"""
         return None
@@ -722,19 +725,23 @@ class BayesianGenerator(Generator, ABC):
 
         if self.fixed_features is not None:
             results = pd.DataFrame(
-                candidates.detach().cpu().numpy(), columns=self._candidate_names
+                candidates.detach().cpu().numpy(),
+                columns=self._candidate_names,  # type: ignore
             )
             for name, val in self.fixed_features.items():
                 results[name] = val
 
         else:
             results = self.vocs.convert_numpy_to_inputs(
-                candidates.detach().cpu().numpy(), include_constants=False
+                candidates.detach().cpu().numpy(),
+                include_constants=False,  # type: ignore
             )
 
         return results
 
-    def _get_sampler(self, model):
+    def _get_sampler(self, model: Model):
+        if self.data is None:
+            raise XoptError("no data available to build sampler")
         input_data = self.get_input_data(self.data)
         sampler = get_sampler(
             model.posterior(input_data),
@@ -743,8 +750,8 @@ class BayesianGenerator(Generator, ABC):
         return sampler
 
     @abstractmethod
-    def _get_acquisition(self, model):
-        pass
+    def _get_acquisition(self, model: Model) -> AcquisitionFunction:
+        raise NotImplementedError
 
     def _get_objective(self):
         """
@@ -774,26 +781,26 @@ class BayesianGenerator(Generator, ABC):
             constraint_callables = None
         return constraint_callables
 
-    def _apply_fixed_features(self, acq):
+    def _apply_fixed_features(self, acq: AcquisitionFunction) -> AcquisitionFunction:
         """apply fixed features to the acquisition function if needed"""
         if self.fixed_features is not None:
             # get input dim
             dim = len(self.model_input_names)
-            columns = []
-            values = []
+            columns: list[int] = []
+            _values: list[float] = []
             for name, value in self.fixed_features.items():
                 columns.append(self.model_input_names.index(name))
-                values.append(value)
+                _values.append(value)
 
             # necessary because fixed feature acq must get tensor - it searches for dtype/device
-            values = torch.tensor(values).to(**self.tkwargs)
+            values = torch.tensor(_values).to(**self.tkwargs)
             acq = FixedFeatureAcquisitionFunction(
                 acq_function=acq, d=dim, columns=columns, values=values
             )
         return acq
 
     @property
-    def tkwargs(self):
+    def tkwargs(self) -> dict[str, Any]:
         # set device and data type for generator
         device = "cpu"
         if self.use_cuda:
@@ -812,7 +819,7 @@ class BayesianGenerator(Generator, ABC):
         """variable names corresponding to trained model"""
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
-            for name, val in self.fixed_features.items():
+            for name, _ in self.fixed_features.items():
                 if name not in variable_names:
                     variable_names += [name]
         return variable_names
@@ -833,7 +840,7 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds)
+        return torch.tensor(self.vocs.bounds)  # type: ignore
 
     def _get_optimization_bounds(self):
         """
@@ -884,7 +891,7 @@ class BayesianGenerator(Generator, ABC):
         bounds = bounds.to(**self.tkwargs)
         return bounds
 
-    def _get_max_travel_distances_region(self, bounds):
+    def _get_max_travel_distances_region(self, bounds: torch.Tensor) -> torch.Tensor:
         """
         Calculate the region for maximum travel distances based on the current bounds
         and the last observation.

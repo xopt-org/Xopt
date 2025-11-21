@@ -1,3 +1,4 @@
+from typing import Any
 from pandas import DataFrame
 import torch
 from botorch.acquisition import (
@@ -6,6 +7,7 @@ from botorch.acquisition import (
     qLogExpectedImprovement,
     FixedFeatureAcquisitionFunction,
 )
+from botorch.models.model import Model
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -75,7 +77,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         acq = acq.to(**self.tkwargs)
         return acq
 
-    def _get_acquisition(self, model: torch.nn.Module):
+    def _get_acquisition(self, model: Model):
         """
         Get the acquisition function for Bayesian Optimization.
 
@@ -114,7 +116,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
 
         return acq
 
-    def _get_best_f(self, data: DataFrame, objective: CustomXoptObjective):
+    def _get_best_f(self, data: DataFrame, objective: Any):
         """
         Get the best function value for Expected Improvement based on the objective.
 
@@ -137,7 +139,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         else:
             # analytic acquisition function for single candidate generation
             best_f = -torch.tensor(
-                self.vocs.objective_data(data).min().values, **self.tkwargs
+                self.vocs.objective_data(data).min().to_numpy(), **self.tkwargs
             )
 
         return best_f

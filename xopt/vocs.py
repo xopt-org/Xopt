@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 import warnings
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any, Hashable, Iterable, cast
 
 import numpy as np
 import pandas as pd
@@ -144,7 +145,8 @@ class VOCS(XoptBaseModel):
         if not isinstance(value, dict):
             raise ValueError("must be a dictionary")
 
-        for key, val in value.items():
+        _value = cast(dict[str, Sequence[Any]], value)
+        for key, val in _value.items():
             if len(val) != 2:
                 raise ValueError(
                     f"constraint specification list must have length 2 for key '{key}'"
@@ -154,7 +156,7 @@ class VOCS(XoptBaseModel):
             if isinstance(val, list):
                 try:
                     _val = tuple(val)
-                    value[key] = _val
+                    _value[key] = _val
                 except Exception as e:
                     raise ValueError(
                         f"could not convert list to tuple for key '{key}'"
@@ -163,20 +165,20 @@ class VOCS(XoptBaseModel):
             # convert first element to constraint enum
             try:
                 _val = ConstraintEnum(val[0])
-                value[key] = (_val, val[1])
+                _value[key] = (_val, val[1])
             except Exception:
                 raise ValueError(f"unknown constraint type '{val[0]}' for key '{key}'")
 
             # convert second element to float
             try:
                 _val = float(val[1])
-                value[key] = (val[0], _val)
+                _value[key] = (val[0], _val)
             except Exception as e:
                 raise ValueError(
                     f"could not convert {val[1]} to float for key '{key}'"
                 ) from e
 
-        return value
+        return _value
 
     @field_validator("constraints", mode="after")
     @classmethod
@@ -346,7 +348,7 @@ class VOCS(XoptBaseModel):
         custom_bounds: dict[str, list[float]] | None = None,
         include_constants: bool = True,
         seed: int | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[Hashable, Any]]:
         """
         Uniform sampling of the variables.
 
@@ -370,7 +372,7 @@ class VOCS(XoptBaseModel):
         list[dict]
             A list of dictionaries containing the sampled inputs.
         """
-        inputs = {}
+        inputs: dict[Hashable, float | np.typing.NDArray[np.float64]] = {}
         if seed is None:
             rng_sample_function = np.random.random
         else:
@@ -385,13 +387,13 @@ class VOCS(XoptBaseModel):
             inputs[key] = x * a + (1 - x) * b
 
         # Constants
-        if include_constants and self.constants is not None:
+        if include_constants:
             inputs.update(self.constants)
 
         if n is None:
             return [inputs]
         else:
-            return pd.DataFrame(inputs).to_dict("records")
+            return pd.DataFrame(inputs).to_dict("records")  # type: ignore
 
     def grid_inputs(
         self,
@@ -500,7 +502,9 @@ class VOCS(XoptBaseModel):
         return inner_copy
 
     def convert_numpy_to_inputs(
-        self, inputs: np.ndarray, include_constants: bool = True
+        self,
+        inputs: np.typing.NDArray[np.floating],
+        include_constants: bool = True,
     ) -> pd.DataFrame:
         """
         Convert 2D numpy array to list of dicts (inputs) for evaluation.

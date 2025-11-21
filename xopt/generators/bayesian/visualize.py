@@ -8,6 +8,7 @@ from typing import (
     TypeVar,
     TypedDict,
     Union,
+    TYPE_CHECKING,
 )
 
 import gpytorch
@@ -21,7 +22,8 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
-from xopt.generator import Generator
+if TYPE_CHECKING:
+    from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.vocs import VOCS
 
 from .objectives import feasibility
@@ -37,8 +39,8 @@ class Array(np.ndarray, Generic[DType]):
 
 
 def visualize_generator_model(
-    generator: Generator, interactive: bool = False, **kwargs
-) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+    generator: "BayesianGenerator", interactive: bool = False, **kwargs: Any
+) -> Tuple[Figure, Union[Axes, np.typing.ArrayLike]]:
     """Visualizes GP model predictions for the specified output(s).
 
     This function generates a visualization of the Gaussian Process (GP) models associated with the provided generator.
@@ -122,7 +124,7 @@ def visualize_model(
     model_compile_mode: Optional[str] = None,
     tkwargs: Optional[dict[str, Any]] = None,
     interactive: bool = False,
-) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+) -> Tuple[Figure, Union[Axes, np.typing.ArrayLike]]:
     """Displays GP model predictions for the selected output(s).
 
     The GP models are displayed with respect to the named variables. If None are given, the list of variables in
@@ -1195,7 +1197,7 @@ def _get_feasible_samples(
     variable_names: list[str],
     idx: int = -1,
     reverse: bool = False,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.typing.NDArray[np.floating], np.typing.NDArray[np.floating]]:
     """Returns the feasible samples for the given output.
 
     Parameters
@@ -1350,7 +1352,7 @@ def _get_figure_config(
     return figure_config
 
 
-def _get_figure_from_axes(axes):
+def _get_figure_from_axes(axes: Any):
     """Returns the figure corresponding to the given axes object.
 
     Parameters

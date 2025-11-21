@@ -105,14 +105,12 @@ class TimeDependentModelConstructor(StandardModelConstructor):
                 )
 
                 if self.initialize_spectral_kernel_from_data:
-                    train_X, train_Y, train_Yvar = get_training_data(
-                        new_input_names, name, data
-                    )
+                    train_X, train_Y, _ = get_training_data(new_input_names, name, data)
 
                     # can only initialize spectral kernel from data if there are
                     # more than one training data point
                     if len(train_X) > 1:
-                        spectral_kernel.initialize_from_data(train_X, train_Y)
+                        spectral_kernel.initialize_from_data(train_X, train_Y)  # type: ignore # kwargs not necessary
                     else:
                         raise RuntimeWarning(
                             "cannot initialize spectral kernel from a "

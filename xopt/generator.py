@@ -111,7 +111,7 @@ class Generator(XoptBaseModel, ABC):
 
     @abstractmethod
     def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
-        pass
+        raise NotImplementedError
 
     def add_data(self, new_data: pd.DataFrame):
         """
@@ -142,7 +142,7 @@ class StateOwner:
     of data loading on deserialization.
     """
 
-    def set_data(self, data: pd.DataFrame):
+    def set_data(self, data: pd.DataFrame) -> None:
         """
         Set the full dataset for the generator. Typically only used when loading from a save file.
 

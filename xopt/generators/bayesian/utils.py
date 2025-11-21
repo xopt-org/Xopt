@@ -1,6 +1,6 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import Any, List, cast
+from typing import Any, cast
 
 import gpytorch
 import numpy as np
@@ -17,14 +17,14 @@ from xopt.vocs import VOCS
 
 
 def get_training_data(
-    input_names: List[str], outcome_name: str, data: pd.DataFrame
-) -> (torch.Tensor, torch.Tensor):
+    input_names: list[str], outcome_name: str, data: pd.DataFrame
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
     """
     Creates training data from input data frame.
 
     Parameters
     ----------
-    input_names : List[str]
+    input_names : list[str]
         List of input feature names.
 
     outcome_name : str
@@ -155,7 +155,7 @@ def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     return out_bounds
 
 
-def interpolate_points(df, num_points=10):
+def interpolate_points(df: pd.DataFrame, num_points: int = 10) -> pd.DataFrame:
     """
     Generates interpolated points between two points specified by a pandas DataFrame.
 
@@ -248,29 +248,29 @@ def validate_turbo_controller_base(
 
 
 class MeanVarModelWrapper(torch.nn.Module):
-    def __init__(self, model):
+    def __init__(self, model: gpytorch.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         output_dist = self.model(x)
         return output_dist.mean, output_dist.variance
 
 
 class MeanVarModelWrapperPosterior(torch.nn.Module):
-    def __init__(self, model):
+    def __init__(self, model: Model):
         super().__init__()
         self.model = model
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         output_dist = self.model.posterior(x)
         return output_dist.mean, output_dist.variance
 
 
 def torch_trace_gp_model(
-    model: Model,
+    model: gpytorch.Module,
     vocs: VOCS,
-    tkwargs: dict,
+    tkwargs: dict[str, Any],
     posterior: bool = True,
     grad: bool = False,
     batch_size: int = 1,
