@@ -29,10 +29,14 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
     @abstractmethod
     def optimize(
-        self, function: AcquisitionFunction, bounds: Tensor, n_candidates=1, **kwargs
-    ):
+        self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        **kwargs: Any,
+    ) -> Tensor:
         """Optimize a function to produce a number of candidate points that minimize the function."""
-        pass
+        raise NotImplementedError
 
 
 class LBFGSOptimizer(NumericalOptimizer):
@@ -81,18 +85,13 @@ class LBFGSOptimizer(NumericalOptimizer):
         5.0, description="maximum time for optimization in seconds"
     )
 
-    def __init__(
+    def optimize(
         self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
         **kwargs: Any,
     ):
-        """
-        Initialize the LBFGS optimizer.
-
-        """
-
-        super().__init__(**kwargs)
-
-    def optimize(self, function, bounds, n_candidates=1, **kwargs):
         """
         Optimize the given acquisition function within the specified bounds.
 

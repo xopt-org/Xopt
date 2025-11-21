@@ -1,6 +1,6 @@
 import warnings
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 import numpy as np
 import pandas as pd
@@ -132,6 +132,42 @@ class VOCS(XoptBaseModel):
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
 
+    @field_validator("variables", mode="before")
+    @classmethod
+    def fix_variables(cls, value: Any) -> dict[str, tuple[float, float]]:
+        if not isinstance(value, dict):
+            raise ValueError("must be a dictionary")
+
+        for key, val in value.items():
+            if not isinstance(key, str):
+                raise ValueError("variable keys must be strings")
+
+            if not isinstance(val, Iterable):
+                raise ValueError("constraint values must be iterable")
+
+            # convert lists to tuples
+            if not isinstance(val, tuple):
+                try:
+                    _val = tuple(val)
+                    value[key] = _val
+                except Exception as e:
+                    raise ValueError(
+                        f"could not convert list to tuple for key '{key}'"
+                    ) from e
+
+            # convert elements to float
+            try:
+                _val = (float(val[0]), float(val[1]))
+                value[key] = _val
+            except Exception as e:
+                raise ValueError(
+                    f"could not convert {val} to tuple of floats for key '{key}'"
+                ) from e
+
+        _value = cast(dict[str, tuple[float, float]], value)
+
+        return _value
+
     @field_validator("variables", mode="after")
     @classmethod
     def correct_bounds_specification(cls, v: dict[str, tuple[float, float]]):
@@ -140,18 +176,19 @@ class VOCS(XoptBaseModel):
 
     @field_validator("constraints", mode="before")
     @classmethod
-    def fix_constraints(cls, value: Any):
+    def fix_constraints(cls, value: Any) -> dict[str, tuple[ConstraintEnum, float]]:
         if not isinstance(value, dict):
             raise ValueError("must be a dictionary")
 
         for key, val in value.items():
-            if len(val) != 2:
-                raise ValueError(
-                    f"constraint specification list must have length 2 for key '{key}'"
-                )
+            if not isinstance(key, str):
+                raise ValueError("constraint keys must be strings")
+
+            if not isinstance(val, Iterable):
+                raise ValueError("constraint values must be iterable")
 
             # convert lists to tuples
-            if isinstance(val, list):
+            if not isinstance(val, tuple):
                 try:
                     _val = tuple(val)
                     value[key] = _val
@@ -176,7 +213,9 @@ class VOCS(XoptBaseModel):
                     f"could not convert {val[1]} to float for key '{key}'"
                 ) from e
 
-        return value
+        _value = cast(dict[str, tuple[ConstraintEnum, float]], value)
+
+        return _value
 
     @field_validator("constraints", mode="after")
     @classmethod

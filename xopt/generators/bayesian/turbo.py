@@ -104,14 +104,14 @@ class TurboController(XoptBaseModel, ABC):
     )
 
     failure_tolerance: PositiveInt = Field(
-        0,
+        0,  # default will be set based on dim and batch_size within validator if not provided
         description="number of failures to trigger a trust region contraction",
         ge=1,
         validate_default=True,
     )
 
     success_tolerance: PositiveInt = Field(
-        0,
+        0,  # default will be set based on dim and batch_size within validator if not provided
         description="number of successes to trigger a trust region expansion",
         ge=1,
         validate_default=True,
@@ -327,9 +327,6 @@ class OptimizeTurboController(TurboController):
     best_value: Optional[float] = Field(
         None, description="best objective value found so far"
     )
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
 
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, value: VOCS):
