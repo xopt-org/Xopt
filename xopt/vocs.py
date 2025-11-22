@@ -52,9 +52,6 @@ class ConstraintEnum(str, Enum):
         raise ValueError(f"Unknown ConstraintEnum value: {value}")
 
 
-variables_type = dict[str, tuple[float, float]]
-
-
 class VOCS(XoptBaseModel):
     """
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
