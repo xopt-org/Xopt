@@ -945,9 +945,6 @@ class BayesianGenerator(Generator, ABC):
         return torch.tensor(max_travel_bounds)
 
 
-MOBO_DEFAULT_REF_POINT = 0.0
-
-
 class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     name = "multi_objective_bayesian_generator"
     reference_point: dict[str, float] = Field(
@@ -967,55 +964,6 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     @classmethod
     def validate_pareto_front_history(cls, value: Any):
         return pd.DataFrame(value) if value is not None else None
-
-    # @field_validator("reference_point", mode="before")
-    # @classmethod
-    # def validate_reference_point_before(
-    #     cls, value: Any, info: ValidationInfo
-    # ) -> dict[str, float]:
-    #     if not isinstance(value, dict):
-    #         raise ValueError(
-    #             "reference_point must be a dict of objective names to values"
-    #         )
-
-    #     _vocs: VOCS | None = info.data.get("vocs", None)
-    #     if _vocs is None:
-    #         raise ValueError("vocs must be specified to set default reference point")
-
-    #     _value = cast(dict[str, float], value)
-
-    #     if _value == {}:
-    #         # set default reference point if not specified
-    #         logger.warning(
-    #             "no reference point specified for multi-objective "
-    #             "optimization, using default of "
-    #             f"{MOBO_DEFAULT_REF_POINT} "
-    #             "for all objectives"
-    #         )
-    #         _value: dict[str, float] = {
-    #             obj_name: MOBO_DEFAULT_REF_POINT for obj_name in _vocs.objective_names
-    #         }
-    #     else:
-    #         # Remove invalid reference points and update with default if needed
-    #         value_keys = set(_value.keys())
-
-    #         # Remove invalid reference points
-    #         for obj_name in value_keys:
-    #             if obj_name not in _vocs.objective_names:
-    #                 _value.pop(obj_name)  # remove invalid objective name
-
-    #                 logger.warning(f"objective name {obj_name} not found in vocs")
-    #         # Add missing objective names with default value
-    #         for obj_name in _vocs.objective_names:
-    #             if obj_name not in _value:
-    #                 _value[obj_name] = MOBO_DEFAULT_REF_POINT
-
-    #                 logger.warning(
-    #                     f"objective name {obj_name} not found in reference point, "
-    #                     f"adding with default value {MOBO_DEFAULT_REF_POINT}"
-    #                 )
-
-    #     return _value
 
     @field_validator("reference_point", mode="after")
     @classmethod
