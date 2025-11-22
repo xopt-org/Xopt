@@ -142,6 +142,9 @@ class VOCS(XoptBaseModel):
             if not isinstance(val, Iterable):
                 raise ValueError("constraint values must be iterable")
 
+            if len(val) != 2:
+                raise ValueError("variable bounds must have length 2")
+
             # convert lists to tuples
             if not isinstance(val, tuple):
                 try:
@@ -183,6 +186,9 @@ class VOCS(XoptBaseModel):
 
             if not isinstance(val, Iterable):
                 raise ValueError("constraint values must be iterable")
+
+            if len(val) != 2:
+                raise ValueError("constraint bounds must have length 2")
 
             # convert lists to tuples
             if not isinstance(val, tuple):
