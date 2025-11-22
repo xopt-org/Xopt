@@ -203,7 +203,9 @@ def validate_turbo_controller_base(
         controller.__name__: controller for controller in valid_controller_types
     }
 
-    vocs = info.data.get("vocs", VOCS())
+    vocs = info.data.get("vocs", None)
+    if vocs is None:
+        raise ValueError("vocs must be provided to validate turbo controller")
 
     if isinstance(value, str):
         # handle old string input
