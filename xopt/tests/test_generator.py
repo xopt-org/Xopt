@@ -11,6 +11,7 @@ from xopt.generators import (
     list_available_generators,
 )
 from xopt.resources.testing import TEST_VOCS_BASE
+from gest_api.vocs import VOCS
 
 
 class PatchGenerator(Generator):
@@ -22,6 +23,13 @@ class PatchGenerator(Generator):
     supports_batch_generation: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
+
+    def generate(self, n_candidates) -> list[dict]:
+        pass
+
+
+class PatchGeneratorNoConstraints(Generator):
+    name = "patch_generator_no_constraints"
 
     def generate(self, n_candidates) -> list[dict]:
         pass
@@ -81,3 +89,25 @@ class TestGenerator:
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
+
+    def test_generator_constraints_validation(self):
+        vocs_with_constraints = VOCS(
+            variables={"x1": [0, 1], "x2": [0, 1]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0.0]},
+        )
+
+        with pytest.raises(
+            VOCSError, match="this generator does not support constraints"
+        ):
+            PatchGeneratorNoConstraints(vocs=vocs_with_constraints)
+
+    def test_data_validator_indexerror(self):
+        data_dict = {"x1": 1.0, "x2": 2.0}
+        gen = PatchGenerator(vocs=TEST_VOCS_BASE, data=data_dict)
+        # Should fallback to pd.DataFrame(data_dict, index=[0])
+        assert isinstance(gen.data, pd.DataFrame)
+        assert gen.data.shape[0] == 1
+        assert set(gen.data.columns) == {"x1", "x2"}
+        assert gen.data.iloc[0]["x1"] == 1.0
+        assert gen.data.iloc[0]["x2"] == 2.0

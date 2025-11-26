@@ -102,7 +102,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
             if name in constructor_dict:
                 value = constructor_dict[name](**value)
             else:
-                raise ValueError(f"{value} not found")
+                raise ValueError(f"Constructor '{name}' not found")
 
         return value
 
