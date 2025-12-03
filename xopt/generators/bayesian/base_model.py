@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 import warnings
 
 import pandas as pd
@@ -50,7 +50,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
     @abstractmethod

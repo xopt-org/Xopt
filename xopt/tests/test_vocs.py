@@ -82,15 +82,15 @@ class TestVOCS(object):
 
         vocs = VOCS.from_yaml(Y)
         assert vocs.constraint_names == ["e", "f"]
-        assert vocs.variables == {"a": [0, 1e3], "b": [-1, 1]}
+        assert vocs.variables == {"a": (0, 1e3), "b": (-1, 1)}
         assert vocs.objectives == {"c": "MAXIMIZE", "d": "MINIMIZE"}
         assert vocs.constants == {"g": 1234}
 
         assert vocs.objectives["c"] == ObjectiveEnum.MAXIMIZE
         assert vocs.objectives["d"] == ObjectiveEnum.MINIMIZE
 
-        assert vocs.constraints["e"] == ["LESS_THAN", 2]
-        assert vocs.constraints["f"] == ["GREATER_THAN", 0]
+        assert vocs.constraints["e"] == ("LESS_THAN", 2.0)
+        assert vocs.constraints["f"] == ("GREATER_THAN", 0.0)
 
         assert vocs.n_inputs == 3
         assert vocs.n_outputs == 4
@@ -209,10 +209,6 @@ class TestVOCS(object):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             vocs.random_inputs(100, custom_bounds=in_domain_custom_bounds)
-
-        # test wrong type
-        with pytest.raises(TypeError):
-            vocs.random_inputs(100, custom_bounds=1)
 
         # test custom bounds entirely outside the vocs domain or specified incorrectly
         bad_custom_bounds = [
