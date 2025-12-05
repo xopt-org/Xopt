@@ -209,7 +209,7 @@ class GridOptimizer(NumericalOptimizer):
         xx = torch.meshgrid(*linspace_list, indexing="ij")
 
         if dim == 1:
-            mesh_pts = linspace_list[0].double()
+            mesh_pts = linspace_list[0].double().unsqueeze(-1)
         else:
             mesh_pts = torch.stack(xx).flatten(start_dim=1).T.double()
 
@@ -219,7 +219,5 @@ class GridOptimizer(NumericalOptimizer):
         # get the best n_candidates
         _, indicies = torch.sort(f_values.squeeze(), descending=True)
         x_max = mesh_pts[indicies][:n_candidates]
-        if dim == 1:
-            x_max = x_max.unsqueeze(-1)
 
         return x_max
