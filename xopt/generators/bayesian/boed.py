@@ -1,8 +1,10 @@
+from typing import Callable, Optional
+from matplotlib import pyplot as plt
 import pyro
 import pyro.distributions as dist
 import torch
 import logging
-from pydantic import PositiveFloat
+from pydantic import Field, PositiveFloat
 from pyro.contrib.oed.eig import marginal_eig
 from pyro.infer import SVI, Trace_ELBO
 from pyro.optim import Adam
@@ -37,6 +39,10 @@ class BOEDGenerator(BayesianGenerator):
     model_function: callable
     model_priors: dict[str, dist.Distribution]
     measurement_noise: PositiveFloat
+
+    model: Optional[Callable] = Field(
+        None, description="botorch model used by the generator to perform optimization"
+    )
 
     history: list[dict[str, torch.Tensor]] = []
 
@@ -93,36 +99,21 @@ class BOEDGenerator(BayesianGenerator):
         for name, value in learned_params.items():
             logger.debug(f"{name}: {value}")
 
+        self.model = self.get_model(learned_params)
+        return self.model
+
+    def get_predictive(self):
+        if self.model is None:
+            raise ValueError("Model has not been trained yet.")
+
         return_sites = ["y", "_RETURN"] + list(self.model_priors.keys())
         predictive = Predictive(
-            current_model, guide=guide, num_samples=800, return_sites=return_sites
+            self.model,
+            guide=self.get_guide(),
+            num_samples=800,
+            return_sites=return_sites,
         )
-
-        return predictive, learned_params
-
-    def generate(self, n_candidates) -> list[dict]:
-        """
-        Generate new candidate experiments based on the current data.
-
-        """
-        predictive, learned_params = self.train_model(self.data)
-
-        current_model = self.get_model(learned_params)
-
-        # now use the trained model to select new experiments
-        candidate_designs = torch.linspace(0, 6, 100).unsqueeze(-1)
-
-        acqf = self._get_acquisition(current_model)
-        eig = acqf(candidate_designs)
-
-        # handle nan values in log eig
-        eig = torch.nan_to_num(eig, nan=float("-inf"))
-
-        best_x = candidate_designs[torch.argmax(eig).detach()]
-
-        return [
-            {self.vocs.variable_names[0]: best_x.item()} for _ in range(n_candidates)
-        ]
+        return predictive
 
     def _get_acquisition(self, model):
         """
@@ -134,29 +125,9 @@ class BOEDGenerator(BayesianGenerator):
             The probabilistic model for which to compute the acquisition function.
         """
 
-        def acquisition(x):
-            pyro.clear_param_store()
-            num_steps, start_lr, end_lr = 1000, 0.1, 0.001
-            optimizer = pyro.optim.ExponentialLR(
-                {
-                    "optimizer": torch.optim.Adam,
-                    "optim_args": {"lr": start_lr},
-                    "gamma": (end_lr / start_lr) ** (1 / num_steps),
-                }
-            )
-
-            eig = marginal_eig(
-                model,
-                x,
-                "y",
-                list(self.model_priors.keys()),
-                num_samples=100,  # number of mc samples for estimating the EIG
-                num_steps=num_steps,
-                guide=self.get_marginal_guide(),
-                optim=optimizer,
-                final_num_samples=10000,  # number of iterations for minimizing the KL divergence of the marginal distribution
-            )
-            return eig.log()
+        acquisition = EIGAcquisitionFunction(
+            model, list(self.model_priors.keys()), self.measurement_noise
+        )
 
         return acquisition
 
@@ -238,6 +209,24 @@ class BOEDGenerator(BayesianGenerator):
 
         return guide
 
+
+class EIGAcquisitionFunction(torch.nn.Module):
+    """
+    Acquisition function that computes the expected information gain (EIG)
+    for Bayesian Optimal Experimental Design (BOED).
+
+    Parameters
+    ----------
+    model : Callable
+        The probabilistic model used to compute the EIG.
+    """
+
+    def __init__(self, model: Callable, eig_keys: list[str], measurement_noise: float):
+        super().__init__()
+        self.model = model
+        self.eig_keys = eig_keys
+        self.measurement_noise = measurement_noise
+
     # define a marginal guide
     def get_marginal_guide(self):
         # define a marginal guide
@@ -249,3 +238,44 @@ class BOEDGenerator(BayesianGenerator):
             pyro.sample("y", dist.Normal(q_y, self.measurement_noise).to_event(1))
 
         return marginal_guide
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the EIG acquisition function at the given points.
+
+        Parameters
+        ----------
+        x : Tensor
+            The input points where the acquisition function is evaluated.
+
+        Returns
+        -------
+        Tensor
+            The computed EIG values at the input points.
+        """
+
+        pyro.clear_param_store()
+        num_steps, start_lr, end_lr = 1000, 0.1, 0.001
+        optimizer = pyro.optim.ExponentialLR(
+            {
+                "optimizer": torch.optim.Adam,
+                "optim_args": {"lr": start_lr},
+                "gamma": (end_lr / start_lr) ** (1 / num_steps),
+            }
+        )
+
+        eig = marginal_eig(
+            self.model,
+            x,
+            "y",
+            self.eig_keys,
+            num_samples=100,  # number of mc samples for estimating the EIG
+            num_steps=num_steps,
+            guide=self.get_marginal_guide(),
+            optim=optimizer,
+            final_num_samples=10000,  # number of iterations for minimizing the KL divergence of the marginal distribution
+        )
+        log_eig = eig.log()
+        output = torch.nan_to_num(log_eig, nan=float("-inf"))
+
+        return output
