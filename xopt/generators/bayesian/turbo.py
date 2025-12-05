@@ -1,13 +1,23 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import pandas as pd
 import torch
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, field_validator
+from pydantic import (
+    Field,
+    PositiveFloat,
+    PositiveInt,
+    PrivateAttr,
+    ValidationInfo,
+    computed_field,
+    field_validator,
+)
 from torch import Tensor
 
+if TYPE_CHECKING:
+    from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
 from xopt.vocs import VOCS
@@ -73,11 +83,13 @@ class TurboController(XoptBaseModel, ABC):
         Reset the controller to the initial state.
     """
 
-    vocs: VOCS = Field(exclude=True, description="VOCS object")
-    dim: PositiveInt = Field(
-        None, description="number of dimensions in the optimization problem"
+    _failure_counter: int = PrivateAttr(0)
+    _success_counter: int = PrivateAttr(0)
+
+    vocs: VOCS = Field(description="VOCS object")
+    batch_size: PositiveInt = Field(
+        1, description="number of trust regions to use", ge=1
     )
-    batch_size: PositiveInt = Field(1, description="number of trust regions to use")
     length: float = Field(
         0.25,
         description="base length of trust region",
@@ -90,15 +102,21 @@ class TurboController(XoptBaseModel, ABC):
         2.0,
         description="maximum base length of trust region",
     )
-    failure_counter: int = Field(0, description="number of failures since reset", ge=0)
+
     failure_tolerance: PositiveInt = Field(
-        None, description="number of failures to trigger a trust region expansion"
+        0,  # default will be set based on dim and batch_size within validator if not provided
+        description="number of failures to trigger a trust region contraction",
+        ge=1,
+        validate_default=True,
     )
-    success_counter: int = Field(0, description="number of successes since reset", ge=0)
+
     success_tolerance: PositiveInt = Field(
-        None,
-        description="number of successes to trigger a trust region contraction",
+        0,  # default will be set based on dim and batch_size within validator if not provided
+        description="number of successes to trigger a trust region expansion",
+        ge=1,
+        validate_default=True,
     )
+
     center_x: Optional[Dict[str, float]] = Field(
         None, description="center point of trust region"
     )
@@ -109,36 +127,45 @@ class TurboController(XoptBaseModel, ABC):
         True, description="flag to restrict model data to within the trust region"
     )
 
-    model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
-
-    def __init__(self, vocs: VOCS, **kwargs):
-        dim = vocs.n_variables
-
-        super(TurboController, self).__init__(vocs=vocs, dim=dim, **kwargs)
-
-        # initialize tolerances if not specified
-        if self.failure_tolerance is None:
-            self.failure_tolerance = int(
-                math.ceil(
-                    max(
-                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
-                    )
-                )
-            )
-
-        if self.success_tolerance is None:
-            self.success_tolerance = int(
-                math.ceil(
-                    max(
-                        [2.0 / self.batch_size, float(self.dim) / 2.0 * self.batch_size]
-                    )
-                )
-            )
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
 
         # get the initial state for the turbo controller for resetting
         self._initial_state = self.model_dump()
 
-    def get_trust_region(self, generator) -> Tensor:
+    @computed_field
+    @property
+    def dim(self) -> int:
+        return self.vocs.n_variables
+
+    @field_validator("success_tolerance", "failure_tolerance", mode="before")
+    @classmethod
+    def validate_tolerances(cls, value: Any, info: ValidationInfo):
+        if isinstance(value, int):
+            if value < 1:
+                batch_size = info.data.get("batch_size", None)
+                if batch_size is None:
+                    raise ValueError(
+                        "batch_size must be set before inferring tolerances"
+                    )
+                vocs = info.data.get("vocs", None)
+                if vocs is None:
+                    raise ValueError("vocs must be set before inferring tolerances")
+                dim = vocs.n_variables
+
+                _value = int(
+                    math.ceil(
+                        max([2.0 / int(batch_size), float(dim) / 2.0 * int(batch_size)])
+                    )
+                )
+                if _value < 1:
+                    raise ValueError("Tolerance must be at least 1")
+                return _value
+        else:
+            raise ValueError("Tolerance must be a positive integer")
+        return value
+
+    def get_trust_region(self, generator: "BayesianGenerator") -> Tensor:
         """
         Return the trust region based on the generator. The trust region is a
         rectangular region around a center point. The sides of the trust region are
@@ -159,7 +186,7 @@ class TurboController(XoptBaseModel, ABC):
             The trust region bounds.
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds)
+        bounds = torch.tensor(self.vocs.bounds)  # type: ignore
 
         if self.center_x is not None:
             # get bounds width
@@ -172,7 +199,7 @@ class TurboController(XoptBaseModel, ABC):
 
             # default weights are 1 (if there is no model or a model without
             # lengthscales)
-            weights = 1.0
+            weights: float = 1.0
 
             if model is not None:
                 if model.models[0].covar_module.lengthscale is not None:
@@ -198,14 +225,16 @@ class TurboController(XoptBaseModel, ABC):
         """
         Update the trust region based on success and failure counters.
         """
-        if self.success_counter == self.success_tolerance:  # Expand trust region
+        if self._success_counter == self.success_tolerance:  # Expand trust region
             self.length = min(self.scale_factor * self.length, self.length_max)
-            self.success_counter = 0
-        elif self.failure_counter == self.failure_tolerance:  # Shrink trust region
+            self._success_counter = 0
+        elif self._failure_counter == self.failure_tolerance:  # Shrink trust region
             self.length = max(self.length / self.scale_factor, self.length_min)
-            self.failure_counter = 0
+            self._failure_counter = 0
 
-    def get_data_in_trust_region(self, data: pd.DataFrame, generator):
+    def get_data_in_trust_region(
+        self, data: pd.DataFrame, generator: "BayesianGenerator"
+    ):
         """
         Get subset of data in the trust region.
 
@@ -237,7 +266,9 @@ class TurboController(XoptBaseModel, ABC):
         return data.iloc[mask.numpy()]
 
     @abstractmethod
-    def update_state(self, generator, previous_batch_size: int = 1) -> None:
+    def update_state(
+        self, generator: "BayesianGenerator", previous_batch_size: int = 1
+    ) -> None:
         """
         Abstract method to update the state of the controller.
 
@@ -254,9 +285,14 @@ class TurboController(XoptBaseModel, ABC):
         """
         Reset the controller to the initial state.
         """
+        excluded_attrs = {"name", "dim"}
+
         for name, val in self._initial_state.items():
-            if not name == "name":
+            if name not in excluded_attrs:
                 self.__setattr__(name, val)
+        # reset private attributes
+        self._failure_counter = 0
+        self._success_counter = 0
 
 
 class OptimizeTurboController(TurboController):
@@ -292,19 +328,19 @@ class OptimizeTurboController(TurboController):
     )
 
     @field_validator("vocs", mode="after")
-    def vocs_validation(cls, info):
-        if not info.objectives:
+    def vocs_validation(cls, value: VOCS):
+        if not value.objectives:
             raise ValueError(
                 "optimize turbo controller must have an objective specified"
             )
 
-        return info
+        return value
 
     @property
     def minimize(self) -> bool:
         return self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE"
 
-    def _set_best_point_value(self, data):
+    def _set_best_point_value(self, data: pd.DataFrame):
         """
         Set the best point value based on the data.
 
@@ -327,7 +363,9 @@ class OptimizeTurboController(TurboController):
             variable_data.loc[best_idx][self.vocs.variable_names].iloc[0].to_dict()
         )
 
-    def update_state(self, generator, previous_batch_size: int = 1) -> None:
+    def update_state(
+        self, generator: "BayesianGenerator", previous_batch_size: int = 1
+    ) -> None:
         """
         Update turbo state class using min of data points that are feasible.
         If no points in the data set are feasible raise an error.
@@ -369,8 +407,8 @@ class OptimizeTurboController(TurboController):
 
         # if none of the candidates are valid count this as a failure
         if len(recent_f_data) == 0:
-            self.success_counter = 0
-            self.failure_counter += 1
+            self._success_counter = 0
+            self._failure_counter += 1
 
         else:
             # if we had previous feasible points we need to compare with previous
@@ -381,11 +419,11 @@ class OptimizeTurboController(TurboController):
 
             # note: add in small tolerance to account for numerical issues
             if Y_last <= best_value + 1e-40:
-                self.success_counter += 1
-                self.failure_counter = 0
+                self._success_counter += 1
+                self._failure_counter = 0
             else:
-                self.success_counter = 0
-                self.failure_counter += 1
+                self._success_counter = 0
+                self._failure_counter += 1
 
         self.update_trust_region()
 
@@ -430,15 +468,17 @@ class SafetyTurboController(TurboController):
     )
 
     @field_validator("vocs", mode="after")
-    def vocs_validation(cls, info):
-        if not info.constraints:
+    def vocs_validation(cls, value: VOCS):
+        if not value.constraints:
             raise ValueError(
                 "safety turbo controller can only be used with constraints"
             )
 
-        return info
+        return value
 
-    def update_state(self, generator, previous_batch_size: int = 1):
+    def update_state(
+        self, generator: "BayesianGenerator", previous_batch_size: int = 1
+    ):
         """
         Update the state of the controller.
 
@@ -460,11 +500,11 @@ class SafetyTurboController(TurboController):
         feas_fraction = last_batch["feasible"].sum() / len(last_batch)
 
         if feas_fraction > self.min_feasible_fraction:
-            self.success_counter += 1
-            self.failure_counter = 0
+            self._success_counter += 1
+            self._failure_counter = 0
         else:
-            self.success_counter = 0
-            self.failure_counter += 1
+            self._success_counter = 0
+            self._failure_counter += 1
 
         self.update_trust_region()
 
@@ -489,7 +529,9 @@ class EntropyTurboController(TurboController):
     name: str = Field("EntropyTurboController", frozen=True)
     _best_entropy: Optional[float] = None
 
-    def update_state(self, generator, previous_batch_size: int = 1) -> None:
+    def update_state(
+        self, generator: "BayesianGenerator", previous_batch_size: int = 1
+    ) -> None:
         """
         Update the state of the controller.
 
@@ -520,12 +562,12 @@ class EntropyTurboController(TurboController):
 
             if self._best_entropy is not None:
                 if entropy < self._best_entropy:
-                    self.success_counter += 1
-                    self.failure_counter = 0
+                    self._success_counter += 1
+                    self._failure_counter = 0
                     self._best_entropy = entropy
                 else:
-                    self.success_counter = 0
-                    self.failure_counter += 1
+                    self._success_counter = 0
+                    self._failure_counter += 1
 
                 self.update_trust_region()
             else:

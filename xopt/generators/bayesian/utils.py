@@ -1,6 +1,6 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import Any, List
+from typing import Any, List, cast
 
 import gpytorch
 import numpy as np
@@ -203,6 +203,10 @@ def validate_turbo_controller_base(
         controller.__name__: controller for controller in valid_controller_types
     }
 
+    vocs = info.data.get("vocs", None)
+    if vocs is None:
+        raise ValueError("vocs must be provided to validate turbo controller")
+
     if isinstance(value, str):
         # handle old string input
         if value == "optimize":
@@ -212,12 +216,13 @@ def validate_turbo_controller_base(
 
         # create turbo controller from string input
         if value in controller_types:
-            value = controller_types[value](info.data["vocs"])
+            value = controller_types[value](vocs=vocs)
         else:
             raise ValueError(
                 f"{value} not found, available values are {controller_types.keys()}"
             )
     elif isinstance(value, dict):
+        value = cast(dict[str, Any], value)
         value_copy = deepcopy(value)
         # create turbo controller from dict input
         if "name" not in value:
@@ -225,10 +230,10 @@ def validate_turbo_controller_base(
         name = value_copy.pop("name")
         if name in controller_types:
             # pop unnecessary elements
-            for ele in ["dim"]:
+            for ele in ["dim", "vocs"]:
                 value_copy.pop(ele, None)
 
-            value = controller_types[name](vocs=info.data["vocs"], **value_copy)
+            value = controller_types[name](vocs=vocs, **value_copy)
         else:
             raise ValueError(
                 f"{value} not found, available values are {controller_types.keys()}"

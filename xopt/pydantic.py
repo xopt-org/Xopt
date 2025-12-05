@@ -9,7 +9,17 @@ from concurrent.futures import Future
 from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, List, Optional, TextIO, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    TextIO,
+    TypeVar,
+    cast,
+)
 
 import numpy as np
 import orjson
@@ -189,7 +199,7 @@ class XoptBaseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @field_validator("*", mode="before")
-    def validate_files(cls, value, info: ValidationInfo):
+    def validate_files(cls, value: Any, info: ValidationInfo):
         if isinstance(value, str):
             if os.path.exists(value):
                 extension = value.split(".")[-1]
@@ -236,11 +246,13 @@ class XoptBaseModel(BaseModel):
         return cls.model_validate(remove_none_values(config))
 
 
-def remove_none_values(d):
+def remove_none_values(d: Any) -> Any:
     if isinstance(d, dict):
+        d = cast(dict[str, Any], d)
         # Create a copy of the dictionary to avoid modifying the original while iterating
         d = {k: remove_none_values(v) for k, v in d.items() if v is not None}
     elif isinstance(d, list):
+        d = cast(list[Any], d)
         # If it's a list, recursively process each item in the list
         d = [remove_none_values(item) for item in d]
     return d
@@ -249,7 +261,7 @@ def remove_none_values(d):
 def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
-    description_dict = {}
+    description_dict: dict[str, Any] = {}
     for name, val in model.model_fields.items():
         try:
             if issubclass(getattr(model, name), XoptBaseModel):
