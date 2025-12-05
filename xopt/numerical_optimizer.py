@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from matplotlib import pyplot as plt
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
@@ -207,17 +206,12 @@ class GridOptimizer(NumericalOptimizer):
         ]
 
         xx = torch.meshgrid(*linspace_list, indexing="ij")
-
-        if dim == 1:
-            mesh_pts = linspace_list[0].double().unsqueeze(-1)
-        else:
-            mesh_pts = torch.stack(xx).flatten(start_dim=1).T.double()
+        mesh_pts = torch.stack(xx).flatten(start_dim=1).T.double()
 
         # evaluate the function on grid points
         f_values = function(mesh_pts.unsqueeze(1))
 
         # get the best n_candidates
-        _, indicies = torch.sort(f_values.squeeze(), descending=True)
-        x_max = mesh_pts[indicies][:n_candidates]
-
-        return x_max
+        _, indicies = torch.sort(f_values)
+        x_min = mesh_pts[indicies.squeeze().flipud()]
+        return x_min[:n_candidates]
