@@ -1,14 +1,13 @@
+import logging
 from typing import Callable, Optional
-from matplotlib import pyplot as plt
+
 import pyro
 import pyro.distributions as dist
 import torch
-import logging
 from pydantic import Field, PositiveFloat
 from pyro.contrib.oed.eig import marginal_eig
-from pyro.infer import SVI, Trace_ELBO
+from pyro.infer import SVI, Predictive, Trace_ELBO
 from pyro.optim import Adam
-from pyro.infer import Predictive
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
@@ -87,8 +86,8 @@ class BOEDGenerator(BayesianGenerator):
             loss=Trace_ELBO(),
         )
         num_iters = 2000
-        for i in range(num_iters):
-            elbo = svi.step(xs)
+        for _ in range(num_iters):
+            svi.step(xs)
 
         # after training, get the best parameters
         learned_params = {}
@@ -264,6 +263,12 @@ class EIGAcquisitionFunction(torch.nn.Module):
             }
         )
 
+        # incoming x shape: batch_shape x q x d -- need to reduce to batch_shape x d
+        # note that if this is not done, marginal_eig will not error out, but will produce wrong results
+        x = x.squeeze(-2)
+        if x.dim() != 2:
+            raise ValueError("Input x must have shape (batch_shape, 1, d).")
+
         eig = marginal_eig(
             self.model,
             x,
@@ -278,4 +283,4 @@ class EIGAcquisitionFunction(torch.nn.Module):
         log_eig = eig.log()
         output = torch.nan_to_num(log_eig, nan=float("-inf"))
 
-        return output
+        return output.squeeze(-1)  # squeeze the last dim (should be 1)
