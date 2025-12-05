@@ -38,6 +38,12 @@ class BOEDGenerator(BayesianGenerator):
     model_function: callable
     model_priors: dict[str, dist.Distribution]
     measurement_noise: PositiveFloat
+    train_lr: PositiveFloat = Field(
+        0.01, description="learning rate used during model training"
+    )
+    train_steps: int = Field(
+        1000, description="number of steps used during model training"
+    )
 
     model: Optional[Callable] = Field(
         None, description="botorch model used by the generator to perform optimization"
@@ -69,6 +75,7 @@ class BOEDGenerator(BayesianGenerator):
         n_candidates : int
             The number of candidate experiments to generate.
         """
+        pyro.clear_param_store()
         # start with training a model with historical data
         xs = torch.tensor(data[self.vocs.variable_names].values).float().flatten()
         ys = torch.tensor(data[self.vocs.observable_names].values).float().flatten()
@@ -78,14 +85,28 @@ class BOEDGenerator(BayesianGenerator):
 
         current_model = self.get_model(self.history[-1])
         guide = self.get_guide()
+
+        num_steps, start_lr, end_lr = (
+            self.train_steps,
+            self.train_lr,
+            self.train_lr / 10.0,
+        )
+        optimizer = pyro.optim.ExponentialLR(
+            {
+                "optimizer": torch.optim.Adam,
+                "optim_args": {"lr": start_lr},
+                "gamma": (end_lr / start_lr) ** (1 / num_steps),
+            }
+        )
+
         conditioned_model = pyro.condition(current_model, {"y": ys})
         svi = SVI(
             conditioned_model,
             guide,
-            Adam({"lr": 0.01}),
+            optim=optimizer,
             loss=Trace_ELBO(),
         )
-        num_iters = 2000
+        num_iters = num_steps
         for _ in range(num_iters):
             svi.step(xs)
 
