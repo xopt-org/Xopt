@@ -18,8 +18,7 @@ def f(X):
     # q_reduction converts it into `sample_shape x batch_shape`
     # sample_reduction converts it into `batch_shape`-dim Tensor of acquisition values
     # so, final fake tensor needs to have ndim=1
-    result = torch.amax(X, dim=(1, 2))
-    return result
+    return -torch.sum((X - 0.5) ** 2, dim=-1)
 
 
 class TestNumericalOptimizers:
@@ -54,6 +53,19 @@ class TestNumericalOptimizers:
             for ncandidate in [1, 3]:
                 candidates = optimizer.optimize(f, bounds, ncandidate)
                 assert candidates.shape == torch.Size([ncandidate, ndim])
+
+    def test_grid_optimizer_numerical_result(self):
+        # test quadratic function
+        def g(X):
+            return -torch.sum((X - 0.5) ** 2, dim=-1)
+
+        for ndim in [1, 2, 3]:
+            optimizer = GridOptimizer(n_grid_points=21)
+            bounds = torch.stack((torch.zeros(ndim), torch.ones(ndim)))
+            candidates = optimizer.optimize(g, bounds, n_candidates=1)
+            assert torch.allclose(
+                candidates, torch.tensor([0.5] * ndim).double(), atol=1e-2
+            )
 
     def test_in_xopt(self):
         vocs = deepcopy(tnk_vocs)
