@@ -1,7 +1,7 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -23,6 +23,9 @@ from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
+
+if TYPE_CHECKING:
+    from xopt.stopping_conditions import StoppingCondition
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,9 @@ class Xopt(XoptBaseModel):
     serialize_inline : bool
         A flag indicating whether Torch models should be stored via binary string
         directly inside the main configuration file.
+    stopping_condition : StoppingCondition, optional
+        An optional stopping condition to check during optimization. If provided,
+        the optimization will stop when this condition is met.
 
     Methods
     -------
@@ -121,6 +127,10 @@ class Xopt(XoptBaseModel):
         False,
         description="flag to indicate if torch models"
         " should be stored inside main config file",
+    )
+    stopping_condition: Optional["StoppingCondition"] = Field(
+        None,
+        description="optional stopping condition to check during optimization",
     )
 
     @model_validator(mode="before")
@@ -258,21 +268,34 @@ class Xopt(XoptBaseModel):
 
     def run(self):
         """
-        Run until the maximum number of evaluations is reached or the generator is done.
-
+        Run until the stopping criteria are met.
+        
+        Stops when any of the following conditions are met:
+        1. Maximum number of evaluations is reached (if max_evaluations is set)
+        2. Stopping condition is met (if stopping_condition is set)
+        3. Generator is done
         """
-        # TODO: implement stopping criteria class
         logger.info("Running Xopt")
-        if self.max_evaluations is None:
-            raise ValueError("max_evaluations must be set to call Xopt.run()")
+        
+        # Require at least one stopping criterion
+        if self.max_evaluations is None and self.stopping_condition is None:
+            raise ValueError(
+                "Either max_evaluations or stopping_condition must be set to call Xopt.run()"
+            )
 
         while True:
-            # Stopping criteria
+            # Check stopping criteria
             if self.max_evaluations is not None:
                 if self.n_data >= self.max_evaluations:
                     logger.info(
                         f"Xopt is done. Max evaluations {self.max_evaluations} reached."
                     )
+                    break
+            
+            # Check custom stopping condition
+            if self.stopping_condition is not None:
+                if self.data is not None and self.stopping_condition.should_stop(self.data, self.vocs):
+                    logger.info("Xopt is done. Stopping condition met.")
                     break
 
             self.step()
