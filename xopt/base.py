@@ -1,7 +1,7 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -23,9 +23,6 @@ from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
-
-if TYPE_CHECKING:
-    from xopt.stopping_conditions import StoppingCondition
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +125,7 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if torch models"
         " should be stored inside main config file",
     )
-    stopping_condition: Optional["StoppingCondition"] = Field(
+    stopping_condition: Optional[Any] = Field(
         None,
         description="optional stopping condition to check during optimization",
     )
@@ -193,6 +190,14 @@ class Xopt(XoptBaseModel):
         else:
             generator.set_data(v)
 
+        return v
+
+    @field_validator("stopping_condition", mode="before")
+    @classmethod
+    def validate_stopping_condition(cls, v):
+        """Validate that stopping condition has should_stop method."""
+        if v is not None and not hasattr(v, "should_stop"):
+            raise ValueError("stopping_condition must have a should_stop method")
         return v
 
     @property
@@ -269,14 +274,14 @@ class Xopt(XoptBaseModel):
     def run(self):
         """
         Run until the stopping criteria are met.
-        
+
         Stops when any of the following conditions are met:
         1. Maximum number of evaluations is reached (if max_evaluations is set)
         2. Stopping condition is met (if stopping_condition is set)
         3. Generator is done
         """
         logger.info("Running Xopt")
-        
+
         # Require at least one stopping criterion
         if self.max_evaluations is None and self.stopping_condition is None:
             raise ValueError(
@@ -291,10 +296,12 @@ class Xopt(XoptBaseModel):
                         f"Xopt is done. Max evaluations {self.max_evaluations} reached."
                     )
                     break
-            
+
             # Check custom stopping condition
             if self.stopping_condition is not None:
-                if self.data is not None and self.stopping_condition.should_stop(self.data, self.vocs):
+                if self.data is not None and self.stopping_condition.should_stop(
+                    self.data, self.vocs
+                ):
                     logger.info("Xopt is done. Stopping condition met.")
                     break
 
