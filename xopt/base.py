@@ -51,9 +51,6 @@ class Xopt(XoptBaseModel):
     dump_file : str, optional
         An optional file path for dumping attributes of the xopt object and the
         results of evaluations.
-    max_evaluations : int, optional
-        An optional maximum number of evaluations to perform. If set, the optimization
-        process will stop after reaching this limit.
     data : DataFrame, optional
         An optional DataFrame object for storing internal data related to the optimization
         process.
@@ -110,9 +107,6 @@ class Xopt(XoptBaseModel):
     )
     dump_file: Optional[str] = Field(
         None, description="file to dump the results of the evaluations"
-    )
-    max_evaluations: Optional[int] = Field(
-        None, description="maximum number of evaluations to perform"
     )
     data: Optional[DataFrame] = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
@@ -276,27 +270,16 @@ class Xopt(XoptBaseModel):
         Run until the stopping criteria are met.
 
         Stops when any of the following conditions are met:
-        1. Maximum number of evaluations is reached (if max_evaluations is set)
-        2. Stopping condition is met (if stopping_condition is set)
-        3. Generator is done
+        1. Stopping condition is met (if stopping_condition is set)
+        2. Generator is done
         """
         logger.info("Running Xopt")
 
-        # Require at least one stopping criterion
-        if self.max_evaluations is None and self.stopping_condition is None:
-            raise ValueError(
-                "Either max_evaluations or stopping_condition must be set to call Xopt.run()"
-            )
+        # Require stopping criterion
+        if self.stopping_condition is None:
+            raise ValueError("stopping_condition must be set to call Xopt.run()")
 
         while True:
-            # Check stopping criteria
-            if self.max_evaluations is not None:
-                if self.n_data >= self.max_evaluations:
-                    logger.info(
-                        f"Xopt is done. Max evaluations {self.max_evaluations} reached."
-                    )
-                    break
-
             # Check custom stopping condition
             if self.stopping_condition is not None:
                 if self.data is not None and self.stopping_condition.should_stop(

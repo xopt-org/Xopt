@@ -59,14 +59,22 @@ class TestStoppingConditionIntegration:
         """Test TargetValueCondition integration."""
         generator = LatinHypercubeGenerator(vocs=simple_vocs)
 
+        # Use CompositeCondition to combine target with max evaluations fallback
+        stopping_condition = CompositeCondition(
+            conditions=[
+                TargetValueCondition(
+                    objective_name="f1", target_value=0.5, tolerance=0.1
+                ),
+                MaxEvaluationsCondition(max_evaluations=20),  # Fallback limit
+            ],
+            logic="or",
+        )
+
         X = Xopt(
             vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
-            stopping_condition=TargetValueCondition(
-                objective_name="f1", target_value=0.5, tolerance=0.1
-            ),
-            max_evaluations=20,  # Fallback limit
+            stopping_condition=stopping_condition,
         )
 
         X.run()
@@ -109,14 +117,22 @@ class TestStoppingConditionIntegration:
         flat_evaluator = Evaluator(function=flat_function)
         generator = LatinHypercubeGenerator(vocs=simple_vocs)
 
+        # Use CompositeCondition with max evaluations fallback
+        stopping_condition = CompositeCondition(
+            conditions=[
+                ConvergenceCondition(
+                    objective_name="f1", improvement_threshold=0.1, patience=3
+                ),
+                MaxEvaluationsCondition(max_evaluations=20),  # Fallback limit
+            ],
+            logic="or",
+        )
+
         X = Xopt(
             vocs=simple_vocs,
             evaluator=flat_evaluator,
             generator=generator,
-            stopping_condition=ConvergenceCondition(
-                objective_name="f1", improvement_threshold=0.1, patience=3
-            ),
-            max_evaluations=20,
+            stopping_condition=stopping_condition,
         )
 
         X.run()
@@ -132,35 +148,37 @@ class TestStoppingConditionIntegration:
             vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
-            # No stopping_condition or max_evaluations
+            # No stopping_condition
         )
 
-        with pytest.raises(
-            ValueError, match="Either stopping_condition or max_evaluations must be set"
-        ):
+        with pytest.raises(ValueError, match="stopping_condition must be set"):
             X.run()
 
-    def test_max_evaluations_as_fallback(self, simple_vocs, evaluator):
-        """Test that max_evaluations can be used as fallback when stopping condition never triggers."""
+    def test_composite_condition_fallback(self, simple_vocs, evaluator):
+        """Test that CompositeCondition can be used with max evaluations fallback."""
         generator = LatinHypercubeGenerator(vocs=simple_vocs)
 
-        # Create a condition that will never trigger
-        never_stop_condition = TargetValueCondition(
-            objective_name="f1",
-            target_value=-999.0,  # Impossible to reach
+        # Create a condition with max evaluations fallback
+        stopping_condition = CompositeCondition(
+            conditions=[
+                TargetValueCondition(
+                    objective_name="f1", target_value=-999.0
+                ),  # Never reaches
+                MaxEvaluationsCondition(max_evaluations=7),  # Should trigger first
+            ],
+            logic="or",
         )
 
         X = Xopt(
             vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
-            stopping_condition=never_stop_condition,
-            max_evaluations=7,
+            stopping_condition=stopping_condition,
         )
 
         X.run()
 
-        # Should stop at max_evaluations since condition never triggers
+        # Should stop at 7 evaluations since target is never reached
         assert len(X.data) == 7
 
     def test_stopping_condition_from_dict(self, simple_vocs, evaluator):
@@ -181,22 +199,3 @@ class TestStoppingConditionIntegration:
 
         X.run()
         assert len(X.data) == 6
-
-    def test_stopping_condition_priority_over_max_evaluations(
-        self, simple_vocs, evaluator
-    ):
-        """Test that stopping condition takes priority over max_evaluations."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
-
-        X = Xopt(
-            vocs=simple_vocs,
-            evaluator=evaluator,
-            generator=generator,
-            stopping_condition=MaxEvaluationsCondition(max_evaluations=3),
-            max_evaluations=10,  # Higher fallback limit
-        )
-
-        X.run()
-
-        # Should stop at 3 (from stopping condition), not 10 (from max_evaluations)
-        assert len(X.data) == 3
