@@ -587,7 +587,7 @@ class BayesianGenerator(Generator, ABC):
         """
         return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
 
-    def get_acquisition(self, model: Module) -> AcquisitionFunction:
+    def get_acquisition(self, model: Model) -> AcquisitionFunction:
         """
         Define the acquisition function based on the given GP model.
 
@@ -595,7 +595,7 @@ class BayesianGenerator(Generator, ABC):
 
         Parameters
         ----------
-        model : Module
+        model : Model
             The BoTorch model to be used for generating the acquisition function.
 
         Returns
@@ -744,7 +744,7 @@ class BayesianGenerator(Generator, ABC):
         return sampler
 
     @abstractmethod
-    def _get_acquisition(self, model):
+    def _get_acquisition(self, model: Model):
         pass
 
     def _get_objective(self):
