@@ -7,9 +7,18 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Annotated, List
+
 import pandas as pd
-from pydantic import Field, field_validator, ConfigDict
+from pydantic import (
+    ConfigDict,
+    Field,
+    PositiveFloat,
+    PositiveInt,
+    SerializeAsAny,
+    field_serializer,
+    field_validator,
+)
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -45,6 +54,36 @@ class StoppingCondition(XoptBaseModel, ABC):
         pass
 
 
+# Type alias for lists of stopping conditions with proper serialization
+StoppingConditionList = List[Annotated[StoppingCondition, SerializeAsAny]]
+
+
+def get_stopping_condition(name: str) -> type[StoppingCondition]:
+    """
+    Retrieve a stopping condition class by its name.
+
+    Parameters
+    ----------
+    name : str
+        Name of the stopping condition class.
+
+    Returns
+    -------
+    type[StoppingCondition]
+        The stopping condition class.
+
+    Raises
+    ------
+    ValueError
+        If no stopping condition with the given name is found.
+    """
+    subclasses = StoppingCondition.__subclasses__()
+    for subclass in subclasses:
+        if subclass.__name__ == name:
+            return subclass
+    raise ValueError(f"No stopping condition found with name: {name}")
+
+
 class MaxEvaluationsCondition(StoppingCondition):
     """
     Stop after a maximum number of evaluations.
@@ -55,14 +94,9 @@ class MaxEvaluationsCondition(StoppingCondition):
         Maximum number of function evaluations before stopping.
     """
 
-    max_evaluations: int = Field(description="Maximum number of function evaluations")
-
-    @field_validator("max_evaluations")
-    @classmethod
-    def validate_max_evaluations(cls, v):
-        if v <= 0:
-            raise ValueError("max_evaluations must be positive")
-        return v
+    max_evaluations: PositiveInt = Field(
+        description="Maximum number of function evaluations"
+    )
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop if we've reached the maximum number of evaluations."""
@@ -85,16 +119,9 @@ class TargetValueCondition(StoppingCondition):
 
     objective_name: str = Field(description="Name of the objective to monitor")
     target_value: float = Field(description="Target value for the objective")
-    tolerance: float = Field(
+    tolerance: PositiveFloat = Field(
         default=1e-6, description="Tolerance for reaching the target"
     )
-
-    @field_validator("tolerance")
-    @classmethod
-    def validate_tolerance(cls, v):
-        if v < 0:
-            raise ValueError("tolerance must be non-negative")
-        return v
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop if objective reaches target value within tolerance."""
@@ -137,29 +164,15 @@ class ConvergenceCondition(StoppingCondition):
     objective_name: str = Field(
         description="Name of the objective to monitor for convergence"
     )
-    improvement_threshold: float = Field(
+    improvement_threshold: PositiveFloat = Field(
         description="Minimum improvement required to continue optimization"
     )
-    patience: int = Field(
+    patience: PositiveInt = Field(
         description="Number of evaluations to wait without improvement"
     )
     relative: bool = Field(
         default=False, description="Whether to use relative improvement"
     )
-
-    @field_validator("improvement_threshold")
-    @classmethod
-    def validate_improvement_threshold(cls, v):
-        if v < 0:
-            raise ValueError("improvement_threshold must be non-negative")
-        return v
-
-    @field_validator("patience")
-    @classmethod
-    def validate_patience(cls, v):
-        if v <= 0:
-            raise ValueError("patience must be positive")
-        return v
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop if no improvement for specified patience."""
@@ -240,13 +253,13 @@ class StagnationCondition(StoppingCondition):
         if self.objective_name not in data.columns:
             return False
 
-        if len(data) < self.patience:
+        if len(data) < self.patience + 1:
             return False
 
         objective_type = vocs.objectives[self.objective_name]
         objective_values = data[self.objective_name].dropna()
 
-        if len(objective_values) < self.patience:
+        if len(objective_values) < self.patience + 1:
             return False
 
         # Track the best value seen so far
@@ -363,65 +376,13 @@ class ObjectiveThresholdCondition(StoppingCondition):
             ).any()
 
 
-class VarianceCondition(StoppingCondition):
-    """
-    Stop when the variance of recent objective values falls below threshold.
-
-    Parameters
-    ----------
-    objective_name : str
-        Name of the objective to monitor.
-    variance_threshold : float
-        Minimum variance threshold.
-    window_size : int
-        Number of recent evaluations to consider for variance calculation.
-    """
-
-    objective_name: str = Field(description="Name of the objective to monitor")
-    variance_threshold: float = Field(description="Minimum variance threshold")
-    window_size: int = Field(description="Number of recent evaluations to consider")
-
-    @field_validator("variance_threshold")
-    @classmethod
-    def validate_variance_threshold(cls, v):
-        if v < 0:
-            raise ValueError("variance_threshold must be non-negative")
-        return v
-
-    @field_validator("window_size")
-    @classmethod
-    def validate_window_size(cls, v):
-        if v <= 1:
-            raise ValueError("window_size must be greater than 1")
-        return v
-
-    def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
-        """Stop when variance of recent values is below threshold."""
-        if data.empty or self.objective_name not in vocs.objectives:
-            return False
-
-        if self.objective_name not in data.columns:
-            return False
-
-        objective_values = data[self.objective_name].dropna()
-
-        if len(objective_values) < self.window_size:
-            return False
-
-        # Calculate variance of the most recent window_size values
-        recent_values = objective_values.iloc[-self.window_size :]
-        variance = recent_values.var()
-
-        return variance < self.variance_threshold
-
-
 class CompositeCondition(StoppingCondition):
     """
     Combine multiple stopping conditions with AND/OR logic.
 
     Parameters
     ----------
-    conditions : List[StoppingCondition]
+    conditions : StoppingConditionList
         List of stopping conditions to combine.
     logic : str, optional
         Logic to combine conditions: "and" or "or" (default: "or").
@@ -434,12 +395,37 @@ class CompositeCondition(StoppingCondition):
         default="or", description="Logic to combine conditions: 'and' or 'or'"
     )
 
-    @field_validator("conditions")
-    @classmethod
+    @field_validator("conditions", mode="before")
     def validate_conditions(cls, v):
         if len(v) == 0:
             raise ValueError("At least one condition must be provided")
-        return v
+
+        # process list to ensure all are StoppingCondition instances
+        validated_conditions = []
+        for condition in v:
+            if isinstance(condition, dict):
+                name = condition.pop("name")
+                sc_class = get_stopping_condition(name)
+                condition = sc_class(**condition)
+            elif isinstance(condition, StoppingCondition):
+                pass
+            else:
+                raise ValueError(
+                    "Each condition must be a StoppingCondition instance or a dict"
+                )
+            validated_conditions.append(condition)
+
+        return validated_conditions
+
+    @field_serializer("conditions")
+    @classmethod
+    def serialize_conditions(cls, v):
+        serialized_conditions = []
+        for condition in v:
+            serialized_conditions.append(
+                condition.model_dump() | {"name": condition.__class__.__name__}
+            )
+        return serialized_conditions
 
     @field_validator("logic")
     @classmethod
@@ -456,71 +442,3 @@ class CompositeCondition(StoppingCondition):
             return all(results)
         else:  # "or"
             return any(results)
-
-
-class RelativeImprovementCondition(StoppingCondition):
-    """
-    Stop when relative improvement falls below threshold.
-
-    Parameters
-    ----------
-    objective_name : str
-        Name of the objective to monitor.
-    relative_threshold : float
-        Relative improvement threshold (e.g., 0.01 for 1% improvement).
-    window_size : int
-        Number of evaluations to compare for improvement.
-    """
-
-    objective_name: str = Field(description="Name of the objective to monitor")
-    relative_threshold: float = Field(description="Relative improvement threshold")
-    window_size: int = Field(description="Number of evaluations to compare")
-
-    @field_validator("relative_threshold")
-    @classmethod
-    def validate_relative_threshold(cls, v):
-        if v < 0:
-            raise ValueError("relative_threshold must be non-negative")
-        return v
-
-    @field_validator("window_size")
-    @classmethod
-    def validate_window_size(cls, v):
-        if v <= 1:
-            raise ValueError("window_size must be greater than 1")
-        return v
-
-    def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
-        """Stop when relative improvement is below threshold."""
-        if data.empty or self.objective_name not in vocs.objectives:
-            return False
-
-        if self.objective_name not in data.columns:
-            return False
-
-        if len(data) < self.window_size:
-            return False
-
-        objective_type = vocs.objectives[self.objective_name]
-        objective_values = data[self.objective_name].dropna()
-
-        if len(objective_values) < self.window_size:
-            return False
-
-        # Compare best value in recent window with baseline
-        recent_values = objective_values.iloc[-self.window_size :]
-        baseline = objective_values.iloc[-(self.window_size + 1)]
-
-        if objective_type.upper() == "MINIMIZE":
-            best_recent = recent_values.min()
-            improvement = baseline - best_recent
-        else:  # MAXIMIZE
-            best_recent = recent_values.max()
-            improvement = best_recent - baseline
-
-        if abs(baseline) > 1e-12:
-            relative_improvement = improvement / abs(baseline)
-        else:
-            relative_improvement = 0.0
-
-        return relative_improvement < self.relative_threshold

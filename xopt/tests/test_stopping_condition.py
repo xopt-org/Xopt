@@ -2,17 +2,24 @@
 Test the integration of stopping conditions with Xopt.run()
 """
 
+import json
+
+import pandas as pd
 import pytest
+
 from xopt import (
-    Xopt,
     VOCS,
     Evaluator,
-    MaxEvaluationsCondition,
-    TargetValueCondition,
-    CompositeCondition,
-    ConvergenceCondition,
+    Xopt,
 )
 from xopt.generators.scipy import LatinHypercubeGenerator
+from xopt.stopping_conditions import (
+    CompositeCondition,
+    ConvergenceCondition,
+    MaxEvaluationsCondition,
+    StagnationCondition,
+    TargetValueCondition,
+)
 
 
 class TestStoppingConditionIntegration:
@@ -41,104 +48,167 @@ class TestStoppingConditionIntegration:
         """Create evaluator with test function."""
         return Evaluator(function=test_function)
 
-    def test_max_evaluations_condition(self, simple_vocs, evaluator):
-        """Test MaxEvaluationsCondition integration."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
-
-        X = Xopt(
-            vocs=simple_vocs,
-            evaluator=evaluator,
-            generator=generator,
-            stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
+    def test_max_evaluation(self, simple_vocs, evaluator):
+        """test with explict dataset max evaluations"""
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.3],
+                "x2": [0.1, 0.2, 0.3],
+                "f1": [0.5, 0.4, 0.3],
+            }
         )
+        condition = MaxEvaluationsCondition(max_evaluations=5)
+        assert not condition.should_stop(data, simple_vocs)
 
-        X.run()
-        assert len(X.data) == 5
+        condition = MaxEvaluationsCondition(max_evaluations=2)
+        assert condition.should_stop(data, simple_vocs)
 
-    def test_target_value_condition(self, simple_vocs, evaluator):
-        """Test TargetValueCondition integration."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
-
-        # Use CompositeCondition to combine target with max evaluations fallback
-        stopping_condition = CompositeCondition(
-            conditions=[
-                TargetValueCondition(
-                    objective_name="f1", target_value=0.5, tolerance=0.1
-                ),
-                MaxEvaluationsCondition(max_evaluations=20),  # Fallback limit
-            ],
-            logic="or",
+    def test_target_value(self, simple_vocs, evaluator):
+        """test with explict dataset target value"""
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.3],
+                "x2": [0.1, 0.2, 0.3],
+                "f1": [0.5, 0.4, 0.3],
+            }
         )
-
-        X = Xopt(
-            vocs=simple_vocs,
-            evaluator=evaluator,
-            generator=generator,
-            stopping_condition=stopping_condition,
+        condition = TargetValueCondition(
+            objective_name="f1", target_value=0.25, tolerance=0.01
         )
+        assert not condition.should_stop(data, simple_vocs)
 
-        X.run()
+        condition = TargetValueCondition(
+            objective_name="f1", target_value=0.35, tolerance=0.01
+        )
+        assert condition.should_stop(data, simple_vocs)
 
-        # Should either reach target or hit max evaluations
-        best_value = X.data["f1"].min()
-        assert best_value <= 0.6 or len(X.data) == 20
+        vocs_max = VOCS(
+            variables=simple_vocs.variables,
+            objectives={"f1": "MAXIMIZE"},
+        )
+        condition = TargetValueCondition(
+            objective_name="f1", target_value=0.25, tolerance=0.01
+        )
+        assert condition.should_stop(data, vocs_max)
 
-    def test_composite_condition(self, simple_vocs, evaluator):
-        """Test CompositeCondition integration."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        condition = TargetValueCondition(
+            objective_name="f1", target_value=0.65, tolerance=0.01
+        )
+        assert not condition.should_stop(data, vocs_max)
 
-        composite_condition = CompositeCondition(
+    def test_convergence(self, simple_vocs, evaluator):
+        """test with explict dataset convergence"""
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                "x2": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                "f1": [0.5, 0.4, 0.35, 0.34, 0.339, 0.338],
+            }
+        )
+        condition = ConvergenceCondition(
+            objective_name="f1", improvement_threshold=0.01, patience=2
+        )
+        assert condition.should_stop(data, simple_vocs)
+
+        condition = ConvergenceCondition(
+            objective_name="f1", improvement_threshold=0.001, patience=2
+        )
+        assert not condition.should_stop(data, simple_vocs)
+
+    def test_stagnation(self, simple_vocs, evaluator):
+        """test with explict dataset stagnation"""
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                "x2": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                "f1": [0.5, 0.4, 0.35, 0.34, 0.35, 0.5],
+            }
+        )
+        condition = StagnationCondition(objective_name="f1", patience=2, tolerance=0.01)
+        assert condition.should_stop(data, simple_vocs)
+
+        condition = StagnationCondition(objective_name="f1", patience=2, tolerance=0.01)
+        assert not condition.should_stop(data.iloc[:4], simple_vocs)
+
+    def test_composite(self, simple_vocs, evaluator):
+        """test with explict dataset composite condition"""
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                "x2": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                "f1": [0.5, 0.4, 0.35, 0.34, 0.339, 0.338],
+            }
+        )
+        condition = CompositeCondition(
             conditions=[
                 MaxEvaluationsCondition(max_evaluations=10),
-                TargetValueCondition(objective_name="f1", target_value=0.01),
+                TargetValueCondition(
+                    objective_name="f1", target_value=0.4, tolerance=0.01
+                ),
             ],
-            logic="or",  # Stop if either condition is met
+            logic="or",
         )
+        assert condition.should_stop(data, simple_vocs)
+
+        condition = CompositeCondition(
+            conditions=[
+                MaxEvaluationsCondition(max_evaluations=5),
+                TargetValueCondition(
+                    objective_name="f1", target_value=0.25, tolerance=0.01
+                ),
+            ],
+            logic="or",
+        )
+        assert condition.should_stop(data, simple_vocs)
+
+    @pytest.mark.parametrize(
+        "condition",
+        [
+            MaxEvaluationsCondition(max_evaluations=10),
+            TargetValueCondition(objective_name="f1", target_value=0.1, tolerance=0.01),
+            ConvergenceCondition(
+                objective_name="f1", improvement_threshold=0.01, patience=5
+            ),
+            StagnationCondition(objective_name="f1", patience=5, tolerance=1e-8),
+            CompositeCondition(
+                conditions=[
+                    MaxEvaluationsCondition(max_evaluations=10),
+                    TargetValueCondition(
+                        objective_name="f1", target_value=0.1, tolerance=0.01
+                    ),
+                ],
+                logic="or",
+            ),
+        ],
+        ids=[
+            "max_evaluations",
+            "target_value",
+            "convergence",
+            "stagnation",
+            "composite_or",
+        ],
+    )
+    def test_conditions_in_xopt(self, simple_vocs, evaluator, condition):
+        """Test each stopping condition individually."""
+        generator = LatinHypercubeGenerator(vocs=simple_vocs)
 
         X = Xopt(
             vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
-            stopping_condition=composite_condition,
+            stopping_condition=condition,
         )
 
         X.run()
 
-        # Should stop before or at 10 evaluations
-        assert len(X.data) <= 10
+        # Basic assertions depending on condition type
+        if isinstance(condition, MaxEvaluationsCondition):
+            assert len(X.data) == condition.max_evaluations
 
-    def test_convergence_condition(self, simple_vocs, evaluator):
-        """Test ConvergenceCondition integration."""
-
-        # Create data that will show little improvement
-        def flat_function(input_dict):
-            return {"f1": 1.0}  # Always returns the same value
-
-        flat_evaluator = Evaluator(function=flat_function)
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
-
-        # Use CompositeCondition with max evaluations fallback
-        stopping_condition = CompositeCondition(
-            conditions=[
-                ConvergenceCondition(
-                    objective_name="f1", improvement_threshold=0.1, patience=3
-                ),
-                MaxEvaluationsCondition(max_evaluations=20),  # Fallback limit
-            ],
-            logic="or",
-        )
-
-        X = Xopt(
-            vocs=simple_vocs,
-            evaluator=flat_evaluator,
-            generator=generator,
-            stopping_condition=stopping_condition,
-        )
-
-        X.run()
-
-        # Should converge quickly due to no improvement
-        assert len(X.data) <= 10
+        # test round trip serialization
+        info = json.loads(X.json())
+        info["evaluator"] = evaluator
+        Xopt(**info)
 
     def test_no_stopping_condition_raises_error(self, simple_vocs, evaluator):
         """Test that run() without stopping condition raises ValueError."""
@@ -153,49 +223,3 @@ class TestStoppingConditionIntegration:
 
         with pytest.raises(ValueError, match="stopping_condition must be set"):
             X.run()
-
-    def test_composite_condition_fallback(self, simple_vocs, evaluator):
-        """Test that CompositeCondition can be used with max evaluations fallback."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
-
-        # Create a condition with max evaluations fallback
-        stopping_condition = CompositeCondition(
-            conditions=[
-                TargetValueCondition(
-                    objective_name="f1", target_value=-999.0
-                ),  # Never reaches
-                MaxEvaluationsCondition(max_evaluations=7),  # Should trigger first
-            ],
-            logic="or",
-        )
-
-        X = Xopt(
-            vocs=simple_vocs,
-            evaluator=evaluator,
-            generator=generator,
-            stopping_condition=stopping_condition,
-        )
-
-        X.run()
-
-        # Should stop at 7 evaluations since target is never reached
-        assert len(X.data) == 7
-
-    def test_stopping_condition_from_dict(self, simple_vocs, evaluator):
-        """Test creating Xopt with stopping condition from dict."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
-
-        # This tests that stopping conditions can be serialized/deserialized
-        # For now, we'll create the condition directly since we haven't
-        # implemented dict-based creation yet
-        condition = MaxEvaluationsCondition(max_evaluations=6)
-
-        X = Xopt(
-            vocs=simple_vocs,
-            evaluator=evaluator,
-            generator=generator,
-            stopping_condition=condition,
-        )
-
-        X.run()
-        assert len(X.data) == 6

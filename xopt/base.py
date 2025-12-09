@@ -9,20 +9,22 @@ import yaml
 from pandas import DataFrame
 from pydantic import (
     Field,
-    field_validator,
-    model_validator,
     SerializeAsAny,
     ValidationInfo,
+    field_validator,
+    model_validator,
 )
 
-from .errors import DataError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
+from xopt.stopping_conditions import StoppingCondition, get_stopping_condition
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
+
+from .errors import DataError
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +121,7 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if torch models"
         " should be stored inside main config file",
     )
-    stopping_condition: Optional[Any] = Field(
+    stopping_condition: SerializeAsAny[StoppingCondition] = Field(
         None,
         description="optional stopping condition to check during optimization",
     )
@@ -190,8 +192,12 @@ class Xopt(XoptBaseModel):
     @classmethod
     def validate_stopping_condition(cls, v):
         """Validate that stopping condition has should_stop method."""
-        if v is not None and not hasattr(v, "should_stop"):
-            raise ValueError("stopping_condition must have a should_stop method")
+        # handle deserialization
+        if isinstance(v, dict):
+            name = v.pop("name")
+            sc_class = get_stopping_condition(name)
+            v = sc_class(**v)
+
         return v
 
     @property
@@ -599,6 +605,11 @@ class Xopt(XoptBaseModel):
         dict_result["data"] = (
             json.loads(self.data.to_json()) if self.data is not None else None
         )
+
+        if "stopping_condition" in dict_result:
+            dict_result["stopping_condition"] = {
+                "name": self.stopping_condition.__class__.__name__
+            } | dict_result["stopping_condition"]
 
         # TODO: implement version checking
         # dict_result["xopt_version"] = __version__
