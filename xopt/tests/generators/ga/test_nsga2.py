@@ -22,6 +22,7 @@ from xopt.resources.test_functions.modified_tnk import (
     modified_tnk_vocs,
 )
 
+from xopt.stopping_conditions import MaxEvaluationsCondition
 from xopt.vocs import VOCS
 
 
@@ -33,7 +34,7 @@ def test_nsga2():
         generator=NSGA2Generator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
         vocs=tnk_vocs,
-        max_evaluations=5,
+        stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
     )
     X.run()
 
@@ -46,7 +47,7 @@ def test_nsga2_single_objective():
         generator=NSGA2Generator(vocs=modified_tnk_vocs),
         evaluator=Evaluator(function=evaluate_modified_TNK),
         vocs=modified_tnk_vocs,
-        max_evaluations=5,
+        stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
     )
 
     X.run()
@@ -69,7 +70,7 @@ def test_nsga2_output_data():
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
             vocs=tnk_vocs,
-            max_evaluations=30,  # Run for 3 generations
+            stopping_condition=MaxEvaluationsCondition(max_evaluations=30),  # Run for 3 generations
         )
         X.run()
 

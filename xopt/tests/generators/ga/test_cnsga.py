@@ -10,6 +10,7 @@ from xopt.resources.test_functions.modified_tnk import (
     evaluate_modified_TNK,
     modified_tnk_vocs,
 )
+from xopt.stopping_conditions import MaxEvaluationsCondition
 
 
 def test_cnsga():
@@ -30,7 +31,7 @@ def test_cnsga_single_objective():
         generator=CNSGAGenerator(vocs=modified_tnk_vocs),
         evaluator=Evaluator(function=evaluate_modified_TNK),
         vocs=modified_tnk_vocs,
-        max_evaluations=5,
+        stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
     )
     X.run()
 
@@ -78,7 +79,9 @@ def test_cnsga_baddf():
 
 def test_cnsga_from_yaml():
     YAML = """
-    max_evaluations: 10
+    stopping_condition:
+        name: MaxEvaluationsCondition
+        max_evaluations: 10
     dump_file: null
     data: null
     generator:
@@ -112,7 +115,9 @@ def test_cnsga_from_yaml():
 
 def test_cnsga_no_constraints():
     YAML = """
-    max_evaluations: 10
+    stopping_condition:
+        name: MaxEvaluationsCondition
+        max_evaluations: 10
     dump_file: null
     data: null
     generator:
