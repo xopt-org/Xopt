@@ -278,6 +278,9 @@ class Xopt(XoptBaseModel):
 
             self.step()
 
+        # at the end, call the finalize method for the generator
+        self.generator.finalize()
+
     def evaluate(self, input_dict: Dict):
         """
         Evaluate a candidate without storing data.
