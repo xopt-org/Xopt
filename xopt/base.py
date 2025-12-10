@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 from copy import deepcopy
@@ -566,7 +567,9 @@ class Xopt(XoptBaseModel):
 
         """
         result = super().model_dump(**kwargs)
-        result["generator"] = {"name": self.generator.name} | result["generator"]
+        if not isinstance(result["generator"], dict):
+            result["generator"] = {"name": result["generator"]}
+        result["generator"] = {"name": getattr(self.generator, "name", inspect.getmodule(self.generator).__name__)} | result["generator"]
         return result
 
     def json(self, **kwargs) -> str:
@@ -586,9 +589,9 @@ class Xopt(XoptBaseModel):
         """
         result = super().to_json(**kwargs)
         dict_result = json.loads(result)
-        dict_result["generator"] = {"name": self.generator.name} | dict_result[
-            "generator"
-        ]
+        if not isinstance(dict_result["generator"], dict):
+            dict_result["generator"] = {"name": dict_result["generator"]}
+        dict_result["generator"] = {"name": getattr(self.generator, "name", inspect.getmodule(self.generator).__name__)} | dict_result["generator"]
         dict_result["data"] = (
             json.loads(self.data.to_json()) if self.data is not None else None
         )
