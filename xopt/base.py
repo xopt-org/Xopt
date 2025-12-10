@@ -278,6 +278,8 @@ class Xopt(XoptBaseModel):
                     break
 
             self.step()
+        if inspect.ismethod(self.generator.finalize):
+            self.generator.finalize()
 
     def evaluate(self, input_dict: Dict):
         """
