@@ -8,7 +8,7 @@ from pydantic import Field, PositiveFloat
 from pyro.contrib.oed.eig import marginal_eig
 from pyro.infer import SVI, Predictive, Trace_ELBO
 from pyro.optim import Adam
-
+import matplotlib.pyplot as plt
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,9 @@ class BOEDGenerator(BayesianGenerator):
     train_steps: int = Field(
         1000, description="number of steps used during model training"
     )
+    visualize_training: bool = Field(
+        False, description="flag to visualize SVI training"
+    )
 
     model: Optional[Callable] = Field(
         None, description="botorch model used by the generator to perform optimization"
@@ -58,7 +61,9 @@ class BOEDGenerator(BayesianGenerator):
         """
         params = {}
         for name, distribution in self.model_priors.items():
-            if isinstance(distribution, dist.Normal):
+            if isinstance(distribution, dist.Normal) or isinstance(
+                distribution, dist.LogNormal
+            ):
                 params[f"{name}_loc"] = distribution.loc
                 params[f"{name}_scale"] = distribution.scale
             elif isinstance(distribution, dist.Gamma):
@@ -94,7 +99,7 @@ class BOEDGenerator(BayesianGenerator):
         optimizer = pyro.optim.ExponentialLR(
             {
                 "optimizer": torch.optim.Adam,
-                "optim_args": {"lr": start_lr},
+                "optim_args": {"lr": start_lr, "betas": (0.95, 0.999)},
                 "gamma": (end_lr / start_lr) ** (1 / num_steps),
             }
         )
@@ -104,11 +109,18 @@ class BOEDGenerator(BayesianGenerator):
             conditioned_model,
             guide,
             optim=optimizer,
-            loss=Trace_ELBO(),
+            loss=Trace_ELBO(num_particles=10, vectorize_particles=True),
         )
         num_iters = num_steps
+        losses = []
         for _ in range(num_iters):
-            svi.step(xs)
+            loss = svi.step(xs)
+            losses.append(float(loss))
+
+        if self.visualize_training:
+            plt.figure()
+            plt.semilogy(losses)
+            plt.title("SVI training loss")
 
         # after training, get the best parameters
         learned_params = {}
@@ -168,6 +180,14 @@ class BOEDGenerator(BayesianGenerator):
                             parameters[f"{name}_scale"],
                         ),
                     )
+                elif isinstance(distribution, dist.LogNormal):
+                    sampled_params[name] = pyro.sample(
+                        name,
+                        dist.LogNormal(
+                            parameters[f"{name}_loc"],
+                            parameters[f"{name}_scale"],
+                        ),
+                    )
                 elif isinstance(distribution, dist.Gamma):
                     sampled_params[name] = pyro.sample(
                         name,
@@ -202,6 +222,18 @@ class BOEDGenerator(BayesianGenerator):
                     pyro.sample(
                         name,
                         dist.Normal(
+                            pyro.param(f"{name}_loc", distribution.loc),
+                            pyro.param(
+                                f"{name}_scale",
+                                distribution.scale,
+                                constraint=dist.constraints.positive,
+                            ),
+                        ),
+                    )
+                elif isinstance(distribution, dist.LogNormal):
+                    pyro.sample(
+                        name,
+                        dist.LogNormal(
                             pyro.param(f"{name}_loc", distribution.loc),
                             pyro.param(
                                 f"{name}_scale",
