@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 import torch
 from botorch.acquisition import ExpectedImprovement
+from botorch.acquisition import FixedFeatureAcquisitionFunction
 
 from gest_api.vocs import (
     VOCS,
@@ -140,3 +141,29 @@ class TestExpectedImprovement:
 
             # difference should be small
             assert torch.abs(an_candidate - candidate) < 1e-6
+
+    def test_fixed_features_application(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": [0.0, 1.0]},
+            objectives={"y1": "MINIMIZE"},
+        )
+
+        gen = ExpectedImprovementGenerator(vocs=vocs)
+        gen.fixed_features = {"x1": 0.5}
+
+        # Mock model
+        class MockModel:
+            def posterior(self, X):
+                return None
+
+        model = MockModel()
+
+        # Call get_acquisition and check if FixedFeatureAcquisitionFunction is applied
+        acq = gen.get_acquisition(model)
+        assert isinstance(acq, FixedFeatureAcquisitionFunction)
+        assert acq.values.detach().item() == 0.5  # Fixed value for x1
+
+    def test_get_acquisition_raises_value_error(self):
+        gen = ExpectedImprovementGenerator(vocs=TEST_VOCS_BASE)
+        with pytest.raises(ValueError, match="model cannot be None"):
+            gen.get_acquisition(None)

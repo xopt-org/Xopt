@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from botorch.acquisition import UpperConfidenceBound
 
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
@@ -19,6 +20,7 @@ from xopt.generators.bayesian.utils import (
 )
 from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
+from xopt.vocs import random_inputs
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
@@ -365,3 +367,56 @@ class TestUtils:
             m3 = v3
             assert torch.allclose(m1, m2, rtol=1e-5)
             assert torch.allclose(m1, m3, rtol=1e-5)
+
+    def test_trace_gp_model_model_list_error(self):
+        from botorch.models import ModelListGP
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        model = ModelListGP()
+        with pytest.raises(ValueError):
+            torch_trace_gp_model(model, vocs, {}, posterior=True)
+
+    def test_compile_gp_model_model_list_error(self):
+        from botorch.models import ModelListGP
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        model = ModelListGP()
+        with pytest.raises(ValueError):
+            torch_compile_gp_model(model, vocs, {}, posterior=True)
+
+    def test_compile_gp_model_mean_mismatch(self):
+        class DummyModel(torch.nn.Module):
+            def forward(self, x):
+                class DummyDist:
+                    mean = torch.tensor([1.0])
+                    variance = torch.tensor([2.0])
+
+                return DummyDist()
+
+    def test_torch_trace_acqf(self):
+        evaluator = Evaluator(function=xtest_callable)
+        gen = UpperConfidenceBoundGenerator(
+            vocs=TEST_VOCS_BASE,
+        )
+        gen.numerical_optimizer.n_restarts = 2
+        gen.n_monte_carlo_samples = 4
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X.random_evaluate(100)
+        for _ in range(1):
+            X.step()
+
+        gen = X.generator
+        model = gen.train_model().models[0]
+        acq = UpperConfidenceBound(model, beta=0.1)
+        tkwargs = {"device": torch.device("cpu"), "dtype": torch.double}
+        traced_acq = torch_trace_acqf(acq, gen.vocs, tkwargs)
+        assert isinstance(traced_acq, torch.jit.ScriptModule)
+        # Check output shape matches original
+        rand_point = random_inputs(gen.vocs)[0]
+        rand_vec = torch.stack(
+            [rand_point[k] * torch.ones(1) for k in gen.vocs.variable_names], dim=1
+        ).to(**tkwargs)
+        test_x = rand_vec.unsqueeze(-2)
+        orig_out = acq(test_x)
+        traced_out = traced_acq(test_x)
+        assert torch.allclose(orig_out, traced_out, rtol=1e-6)
