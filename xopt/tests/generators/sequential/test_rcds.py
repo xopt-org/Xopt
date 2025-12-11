@@ -57,7 +57,9 @@ class TestRCDSGenerator:
 
     def test_rcds_yaml(self):
         YAML = """
-        max_evaluations: 100
+        stopping_condition:
+            name: MaxEvaluationsCondition
+            max_evaluations: 100
         generator:
             name: rcds
             init_mat: null
