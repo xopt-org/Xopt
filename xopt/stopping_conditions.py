@@ -54,10 +54,6 @@ class StoppingCondition(XoptBaseModel, ABC):
         pass
 
 
-# Type alias for lists of stopping conditions with proper serialization
-StoppingConditionList = List[Annotated[StoppingCondition, SerializeAsAny]]
-
-
 def get_stopping_condition(name: str) -> type[StoppingCondition]:
     """
     Retrieve a stopping condition class by its name.
@@ -382,7 +378,7 @@ class CompositeCondition(StoppingCondition):
 
     Parameters
     ----------
-    conditions : StoppingConditionList
+    conditions : List[StoppingCondition]
         List of stopping conditions to combine.
     logic : str, optional
         Logic to combine conditions: "and" or "or" (default: "or").
