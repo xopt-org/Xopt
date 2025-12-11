@@ -7,7 +7,7 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
-from typing import Annotated, List
+from typing import List
 
 import pandas as pd
 from pydantic import (
@@ -15,7 +15,6 @@ from pydantic import (
     Field,
     PositiveFloat,
     PositiveInt,
-    SerializeAsAny,
     field_serializer,
     field_validator,
 )
