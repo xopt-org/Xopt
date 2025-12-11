@@ -447,41 +447,13 @@ class BayesianGenerator(Generator, ABC):
         if data.empty:
             raise ValueError("no data available to build model")
 
-        # get input bounds
-        variable_bounds = deepcopy(self.vocs.variables)
-
-        # if turbo restrict points is true then set the bounds to the trust region
-        # bounds
-        if self.turbo_controller is not None:
-            if self.turbo_controller.restrict_model_data:
-                variable_bounds = dict(
-                    zip(
-                        self.vocs.variable_names,
-                        self.turbo_controller.get_trust_region(self).numpy().T,
-                    )
-                )
-
-        # add fixed feature bounds if requested
-        if self.fixed_features is not None:
-            # get bounds for each fixed_feature (vocs bounds take precedent)
-            for key in self.fixed_features:
-                if key not in variable_bounds:
-                    if key not in data:
-                        raise KeyError(
-                            "generator data needs to contain fixed feature "
-                            f"column name `{key}`"
-                        )
-                    f_data = data[key]
-                    bounds = [f_data.min(), f_data.max()]
-                    if bounds[1] - bounds[0] < 1e-8:
-                        bounds[1] = bounds[0] + 1e-8
-                    variable_bounds[key] = bounds
+        variable_bounds = self.get_model_input_bounds(data)
 
         _model = self.gp_constructor.build_model(
             self.model_input_names,
             self.vocs.output_names,
             data,
-            {name: variable_bounds[name] for name in self.model_input_names},
+            variable_bounds,
             **self.tkwargs,
         )
 
@@ -817,6 +789,38 @@ class BayesianGenerator(Generator, ABC):
                 if name not in variable_names:
                     variable_names += [name]
         return variable_names
+    
+    def get_model_input_bounds(self, data: pd.DataFrame) -> Dict[str, List[float]]:
+        """variable bounds corresponding to trained model"""
+        variable_bounds = deepcopy(self.vocs.variables)
+
+        # if turbo restrict points is true then set the bounds to the trust region
+        # bounds
+        if self.turbo_controller is not None:
+            if self.turbo_controller.restrict_model_data:
+                variable_bounds = dict(
+                    zip(
+                        self.vocs.variable_names,
+                        self.turbo_controller.get_trust_region(self).numpy().T,
+                    )
+                )
+
+        # add fixed feature bounds if requested
+        if self.fixed_features is not None:
+            # get bounds for each fixed_feature (vocs bounds take precedent)
+            for key in self.fixed_features:
+                if key not in variable_bounds:
+                    if key not in data:
+                        raise KeyError(
+                            "generator data needs to contain fixed feature "
+                            f"column name `{key}`"
+                        )
+                    f_data = data[key]
+                    bounds = [f_data.min(), f_data.max()]
+                    if bounds[1] - bounds[0] < 1e-8:
+                        bounds[1] = bounds[0] + 1e-8
+                    variable_bounds[key] = bounds
+        return variable_bounds
 
     @property
     def _candidate_names(self):
