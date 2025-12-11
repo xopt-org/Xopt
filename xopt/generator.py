@@ -97,8 +97,14 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         if isinstance(v, dict):
             try:
                 v = pd.DataFrame(v)
-            except IndexError:
-                v = pd.DataFrame(v, index=[0])
+            except Exception as e:
+                # Pydantic catches this first
+                if isinstance(
+                    e, ValueError
+                ) and "If using all scalar values, you must pass an index" in str(e):
+                    v = pd.DataFrame(v, index=[0])
+                else:
+                    raise
         return v
 
     def _validate_vocs(self, vocs: VOCS):
