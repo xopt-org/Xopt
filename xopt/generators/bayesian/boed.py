@@ -1,3 +1,4 @@
+from copy import deepcopy
 import logging
 from typing import Callable, Optional
 
@@ -7,7 +8,6 @@ import torch
 from pydantic import Field, PositiveFloat
 from pyro.contrib.oed.eig import marginal_eig
 from pyro.infer import SVI, Predictive, Trace_ELBO
-from pyro.optim import Adam
 import matplotlib.pyplot as plt
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 
@@ -60,7 +60,8 @@ class BOEDGenerator(BayesianGenerator):
         values of the parameters is taken from the prior distributions.
         """
         params = {}
-        for name, distribution in self.model_priors.items():
+        priors = deepcopy(self.model_priors)
+        for name, distribution in priors.items():
             if isinstance(distribution, dist.Normal) or isinstance(
                 distribution, dist.LogNormal
             ):
@@ -138,7 +139,7 @@ class BOEDGenerator(BayesianGenerator):
         if self.model is None:
             raise ValueError("Model has not been trained yet.")
 
-        return_sites = ["y", "_RETURN"] + list(self.model_priors.keys())
+        return_sites = ["y", "_RETURN", "noise"] + list(self.model_priors.keys())
         predictive = Predictive(
             self.model,
             guide=self.get_guide(),
@@ -204,11 +205,16 @@ class BOEDGenerator(BayesianGenerator):
             # get model output
             output = self.model_function(x, **sampled_params)
 
+            noise = pyro.sample(
+                "noise",
+                dist.LogNormal(torch.tensor(-2.0), torch.tensor(0.01)),
+            ).unsqueeze(-1)
+
             with pyro.plate_stack("data", x.shape[:-1]):
                 # observe data
                 y = pyro.sample(
                     "y",
-                    dist.Normal(output, self.measurement_noise).to_event(1),
+                    dist.Normal(output, noise).to_event(1),
                 )
                 return output
 
@@ -216,8 +222,10 @@ class BOEDGenerator(BayesianGenerator):
 
     def get_guide(self):
         # define a guide function
+        priors = deepcopy(self.model_priors)
+
         def guide(l):
-            for name, distribution in self.model_priors.items():
+            for name, distribution in priors.items():
                 if isinstance(distribution, dist.Normal):
                     pyro.sample(
                         name,
@@ -258,6 +266,21 @@ class BOEDGenerator(BayesianGenerator):
                             ),
                         ),
                     )
+
+            pyro.sample(
+                "noise",
+                dist.LogNormal(
+                    pyro.param(
+                        "noise_loc",
+                        torch.tensor(-2.0),
+                    ),
+                    pyro.param(
+                        "noise_scale",
+                        torch.tensor(0.1),
+                        constraint=dist.constraints.positive,
+                    ),
+                ),
+            )
 
         return guide
 
@@ -337,3 +360,65 @@ class EIGAcquisitionFunction(torch.nn.Module):
         output = torch.nan_to_num(log_eig, nan=float("-inf"))
 
         return output.squeeze(-1)  # squeeze the last dim (should be 1)
+
+
+def visualize_boed(X):
+    X.generator.train_model(X.data)
+    predictive = X.generator.get_predictive()
+
+    bounds = torch.tensor(X.vocs.bounds.flatten())
+    test_x = torch.linspace(*bounds, 100)
+    pred = predictive(test_x)
+    y = pred["y"]
+
+    # plot the predictions
+    fig, ax = plt.subplots()
+    ax.set_title("BOED Model Predictions")
+    ax.plot(test_x.numpy(), y.quantile(0.5, dim=0).numpy())
+    l = y.quantile(0.05, dim=0).numpy()
+    u = y.quantile(0.95, dim=0).numpy()
+
+    ax.fill_between(test_x.numpy(), l, u, alpha=0.3)
+    ax.scatter(
+        X.data[X.vocs.variable_names[0]],
+        X.data[X.vocs.observable_names[0]],
+        color="red",
+    )
+
+    # overlay a few samples from the learned model
+    for i in range(10):
+        ax.plot(test_x.numpy(), y[i].numpy(), color="gray", alpha=0.15)
+
+    # plot the eig
+    # X.generator.visualize_model()
+
+    current_model = X.generator.model
+    acqf = X.generator._get_acquisition(current_model)
+    candidate_designs = torch.linspace(*bounds, 1000).unsqueeze(-1)
+    eig = acqf(candidate_designs)
+
+    fig, ax = plt.subplots()
+    ax.plot(candidate_designs.numpy(), eig.detach().numpy())
+    ax.set_title("Log-EIG Acquisition Function")
+
+    fig, ax = plt.subplots(1, len(X.generator.model_priors.keys()), figsize=(15, 5))
+    fig.suptitle("Posterior vs Prior Distributions")
+    for i, (name, prior) in enumerate(X.generator.model_priors.items()):
+        h, bins = torch.histogram(pred[name], bins=30, density=True)
+        width = (bins[1] - bins[0]).numpy()
+        ax[i].bar(
+            bins[:-1].numpy(),
+            h.detach().numpy(),
+            width=width,
+            alpha=0.5,
+            label="Posterior",
+        )
+
+        ax[i].plot(
+            bins.numpy(),
+            torch.exp(prior.log_prob(bins)).detach().numpy(),
+            "r",
+            label="Prior",
+        )
+        ax[i].set_title(name)
+        ax[i].legend()
