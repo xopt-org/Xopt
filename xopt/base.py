@@ -1,4 +1,3 @@
-import inspect
 import json
 import logging
 from copy import deepcopy
@@ -22,7 +21,7 @@ from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
-from xopt.utils import explode_all_columns, get_generator_name
+from xopt.utils import explode_all_columns, get_generator_name, has_finalize
 from xopt.vocs import validate_input_data, random_inputs, grid_inputs
 from gest_api.vocs import VOCS
 
@@ -278,7 +277,7 @@ class Xopt(XoptBaseModel):
                     break
 
             self.step()
-        if inspect.ismethod(self.generator.finalize):
+        if has_finalize(self.generator):
             self.generator.finalize()
 
     def evaluate(self, input_dict: Dict):

@@ -65,7 +65,6 @@ class TestXoptPlusAPOSMM:
         )
         x = Xopt(generator=gen, evaluator=evaluator, vocs=vocs, max_evaluations=45)
         x.run()
-        x.generator.finalize()
         assert x.data.shape[0] == 45
         assert all(x.data["local_pt"][-5:]), (
             "last 5 points should be local_pt, as communicated by APOSMM"
