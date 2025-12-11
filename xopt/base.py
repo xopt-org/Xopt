@@ -568,7 +568,7 @@ class Xopt(XoptBaseModel):
 
         """
         result = super().model_dump(**kwargs)
-        if not isinstance(result["generator"], dict):
+        if not isinstance(result["generator"], dict):  # may return as module.path
             result["generator"] = {"name": result["generator"]}
         result["generator"] = {"name": get_generator_name(self.generator)} | result[
             "generator"
@@ -592,7 +592,7 @@ class Xopt(XoptBaseModel):
         """
         result = super().to_json(**kwargs)
         dict_result = json.loads(result)
-        if not isinstance(dict_result["generator"], dict):
+        if not isinstance(dict_result["generator"], dict):  # may return as module.path
             dict_result["generator"] = {"name": dict_result["generator"]}
         dict_result["generator"] = {
             "name": get_generator_name(self.generator)
