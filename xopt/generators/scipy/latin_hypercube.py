@@ -12,8 +12,8 @@ class LatinHypercubeGenerator(Generator):
     Latin hypercube sampling (intended for sampling data for surrogate model generation).
     Samples get generated in batches of size batch_size and then returned to user in chunks of requested size.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the generator.
     supports_batch_generation : bool
@@ -31,8 +31,8 @@ class LatinHypercubeGenerator(Generator):
     seed : Optional[int]
         Random seed.
 
-    Methods:
-    --------
+    Methods
+    -------
     initialize_batch(self)
         Initialize a new batch of samples.
     generate(self, n_candidate: int) -> List[Dict[str, float]]
@@ -110,13 +110,13 @@ class LatinHypercubeGenerator(Generator):
         """
         Generate a specified number of candidate samples.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         n_candidate : int
             The number of candidate samples to generate.
 
-        Returns:
-        --------
+        Returns
+        -------
         List[Dict[str, float]]
             A list of dictionaries containing the generated samples.
         """

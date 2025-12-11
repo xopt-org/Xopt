@@ -1,11 +1,11 @@
 import warnings
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Iterable, cast
 
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import ConfigDict, conlist, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from xopt.errors import FeasibilityError
 
 from xopt.pydantic import XoptBaseModel
@@ -18,10 +18,17 @@ class ObjectiveEnum(str, Enum):
 
     # Allow any case
     @classmethod
-    def _missing_(cls, name):
+    def _missing_(cls, value: object):
+        if value is None:
+            raise ValueError("ObjectiveEnum value cannot be None")
+        try:
+            sval = str(value)
+        except Exception:
+            raise ValueError(f"ObjectiveEnum value must be a string, got {type(value)}")
         for member in cls:
-            if member.name.lower() == name.lower():
+            if member.name.lower() == sval.lower():
                 return member
+        raise ValueError(f"Unknown ObjectiveEnum value: {value}")
 
 
 class ConstraintEnum(str, Enum):
@@ -30,11 +37,19 @@ class ConstraintEnum(str, Enum):
 
     # Allow any case
     @classmethod
-    def _missing_(cls, name):
-        if isinstance(name, str):
-            for member in cls:
-                if member.name.lower() == name.lower():
-                    return member
+    def _missing_(cls, value: object):
+        if value is None:
+            raise ValueError("ConstraintEnum value cannot be None")
+        try:
+            sval = str(value)
+        except Exception:
+            raise ValueError(
+                f"ConstraintEnum value must be a string, got {type(value)}"
+            )
+        for member in cls:
+            if member.name.lower() == sval.lower():
+                return member
+        raise ValueError(f"Unknown ConstraintEnum value: {value}")
 
 
 class VOCS(XoptBaseModel):
@@ -42,8 +57,8 @@ class VOCS(XoptBaseModel):
     Variables, Objectives, Constraints, and other Settings (VOCS) data structure
     to describe optimization problems.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     variables : Dict[str, conlist(float, min_length=2, max_length=2)]
         Input variable names with a list of minimum and maximum values.
     constraints : Dict[str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)]
@@ -55,8 +70,8 @@ class VOCS(XoptBaseModel):
     observables : List[str]
         Observation names tracked alongside objectives and constraints.
 
-    Methods:
-    --------
+    Methods
+    -------
     from_yaml(cls, yaml_text: str) -> 'VOCS'
         Create a VOCS object from a YAML string.
     as_yaml(self) -> str
@@ -91,13 +106,11 @@ class VOCS(XoptBaseModel):
         Returns the cumulative optimum for the given DataFrame.
     """
 
-    variables: dict[str, conlist(float, min_length=2, max_length=2)] = Field(
+    variables: dict[str, tuple[float, float]] = Field(
         default={},
         description="input variable names with a list of minimum and maximum values",
     )
-    constraints: dict[
-        str, conlist(Union[float, ConstraintEnum], min_length=2, max_length=2)
-    ] = Field(
+    constraints: dict[str, tuple[ConstraintEnum, float]] = Field(
         default={},
         description="constraint names with a list of constraint type and value",
     )
@@ -116,13 +129,100 @@ class VOCS(XoptBaseModel):
         validate_assignment=True, use_enum_values=True, extra="forbid"
     )
 
-    @field_validator("variables")
-    def correct_bounds_specification(cls, v):
+    @field_validator("variables", mode="before")
+    @classmethod
+    def fix_variables(cls, value: Any) -> dict[str, tuple[float, float]]:
+        if not isinstance(value, dict):
+            raise ValueError("must be a dictionary")
+
+        for key, val in value.items():
+            if not isinstance(key, str):
+                raise ValueError("variable keys must be strings")
+
+            if not isinstance(val, Iterable):
+                raise ValueError("constraint values must be iterable")
+
+            if len(val) != 2:
+                raise ValueError("variable bounds must have length 2")
+
+            # convert lists to tuples
+            if not isinstance(val, tuple):
+                try:
+                    _val = tuple(val)
+                    value[key] = _val
+                except Exception as e:
+                    raise ValueError(
+                        f"could not convert list to tuple for key '{key}'"
+                    ) from e
+
+            # convert elements to float
+            try:
+                _val = (float(val[0]), float(val[1]))
+                value[key] = _val
+            except Exception as e:
+                raise ValueError(
+                    f"could not convert {val} to tuple of floats for key '{key}'"
+                ) from e
+
+        _value = cast(dict[str, tuple[float, float]], value)
+
+        return _value
+
+    @field_validator("variables", mode="after")
+    @classmethod
+    def correct_bounds_specification(cls, v: dict[str, tuple[float, float]]):
         validate_variable_bounds(v)
         return v
 
-    @field_validator("constraints")
-    def correct_list_types(cls, v):
+    @field_validator("constraints", mode="before")
+    @classmethod
+    def fix_constraints(cls, value: Any) -> dict[str, tuple[ConstraintEnum, float]]:
+        if not isinstance(value, dict):
+            raise ValueError("must be a dictionary")
+
+        for key, val in value.items():
+            if not isinstance(key, str):
+                raise ValueError("constraint keys must be strings")
+
+            if not isinstance(val, Iterable):
+                raise ValueError("constraint values must be iterable")
+
+            if len(val) != 2:
+                raise ValueError("constraint bounds must have length 2")
+
+            # convert lists to tuples
+            if not isinstance(val, tuple):
+                try:
+                    _val = tuple(val)
+                    value[key] = _val
+                except Exception as e:
+                    raise ValueError(
+                        f"could not convert list to tuple for key '{key}'"
+                    ) from e
+
+            # convert first element to constraint enum
+            try:
+                _val = ConstraintEnum(val[0])
+                value[key] = (_val, val[1])
+            except Exception:
+                raise ValueError(f"unknown constraint type '{val[0]}' for key '{key}'")
+
+            # convert second element to float
+            try:
+                _val = float(val[1])
+                value[key] = (val[0], _val)
+            except Exception as e:
+                raise ValueError(
+                    f"could not convert {val[1]} to float for key '{key}'"
+                ) from e
+
+        _value = cast(dict[str, tuple[ConstraintEnum, float]], value)
+
+        return _value
+
+    @field_validator("constraints", mode="after")
+    @classmethod
+    def correct_list_types(cls, v: dict[str, tuple[str, float]]):
         """make sure that constraint list types are correct"""
         for _, item in v.items():
             if not isinstance(item[0], str):
@@ -284,10 +384,10 @@ class VOCS(XoptBaseModel):
 
     def random_inputs(
         self,
-        n: int = None,
-        custom_bounds: dict[str, list[float]] = None,
+        n: int | None = None,
+        custom_bounds: dict[str, list[float]] | None = None,
         include_constants: bool = True,
-        seed: int = None,
+        seed: int | None = None,
     ) -> list[dict]:
         """
         Uniform sampling of the variables.
@@ -338,7 +438,7 @@ class VOCS(XoptBaseModel):
     def grid_inputs(
         self,
         n: int | dict[str, int],
-        custom_bounds: dict = None,
+        custom_bounds: dict[str, list[float]] | None = None,
         include_constants: bool = True,
     ) -> pd.DataFrame:
         """
@@ -398,7 +498,7 @@ class VOCS(XoptBaseModel):
         mesh = np.meshgrid(*grid_axes)
         inputs = {key: mesh[i].flatten() for i, key in enumerate(bounds.keys())}
 
-        if include_constants and self.constants is not None:
+        if include_constants:
             for key, value in self.constants.items():
                 inputs[key] = np.full_like(next(iter(inputs.values())), value)
 
@@ -435,9 +535,9 @@ class VOCS(XoptBaseModel):
         # append constants if requested
         if include_constants:
             constants = self.constants
-            if constants is not None:
-                for name, val in constants.items():
-                    inner_copy[name] = val
+
+            for name, val in constants.items():
+                inner_copy[name] = val
 
         return inner_copy
 
@@ -466,7 +566,7 @@ class VOCS(XoptBaseModel):
 
     def variable_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "variable_",
     ) -> pd.DataFrame:
         """
@@ -488,7 +588,7 @@ class VOCS(XoptBaseModel):
 
     def objective_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "objective_",
         return_raw: bool = False,
     ) -> pd.DataFrame:
@@ -514,7 +614,7 @@ class VOCS(XoptBaseModel):
 
     def constraint_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "constraint_",
     ) -> pd.DataFrame:
         """
@@ -537,7 +637,7 @@ class VOCS(XoptBaseModel):
 
     def observable_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "observable_",
     ) -> pd.DataFrame:
         """
@@ -559,7 +659,7 @@ class VOCS(XoptBaseModel):
 
     def feasibility_data(
         self,
-        data: pd.DataFrame | list[dict],
+        data: pd.DataFrame | list[dict[str, Any]],
         prefix: str = "feasible_",
     ) -> pd.DataFrame:
         """
@@ -1006,7 +1106,7 @@ def form_feasibility_data(constraints: dict, data, prefix="feasible_") -> pd.Dat
 
 def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
     variable_data = data.loc[:, vocs.variable_names].values
-    bounds = vocs.bounds
+    bounds = vocs.bounds  # type: ignore
 
     is_out_of_bounds_lower = variable_data < bounds[0, :]
     is_out_of_bounds_upper = variable_data > bounds[1, :]
@@ -1019,14 +1119,14 @@ def validate_input_data(vocs: VOCS, data: pd.DataFrame) -> None:
         )
 
 
-def validate_variable_bounds(variable_dict: dict[str, list[float]]):
+def validate_variable_bounds(variable_dict: dict[str, tuple[float, float]]) -> None:
     """
     Check to make sure that bounds for variables are specified correctly. Raises
     ValueError if anything is incorrect
     """
 
     for name, value in variable_dict.items():
-        if not isinstance(value, list):
+        if not isinstance(value, Iterable):
             raise ValueError(f"Bounds specified for `{name}` must be a list.")
         if not len(value) == 2:
             raise ValueError(
@@ -1040,8 +1140,8 @@ def validate_variable_bounds(variable_dict: dict[str, list[float]]):
 
 
 def clip_variable_bounds(
-    vocs: VOCS, custom_bounds: dict[str, list[float]]
-) -> dict[str, list[float]]:
+    vocs: VOCS, custom_bounds: dict[str, list[float]] | None = None
+) -> dict[str, tuple[float, float]]:
     """
     Return new bounds as intersection of vocs and custom bounds
     """
@@ -1050,18 +1150,15 @@ def clip_variable_bounds(
     else:
         variable_bounds = vocs.variables
 
-        if not isinstance(custom_bounds, dict):
-            raise TypeError("`custom_bounds` must be a dict")
-
         try:
             validate_variable_bounds(custom_bounds)
         except ValueError:
             raise ValueError("specified `custom_bounds` not valid")
 
-        vars_clipped_lb_list = []
-        vars_clipped_ub_list = []
+        vars_clipped_lb_list: list[str] = []
+        vars_clipped_ub_list: list[str] = []
 
-        final_bounds = {}
+        final_bounds: dict[str, tuple[float, float]] = {}
         for var, (lb, ub) in variable_bounds.items():
             if var in custom_bounds:
                 clb = custom_bounds[var][0]
@@ -1081,9 +1178,9 @@ def clip_variable_bounds(
                 else:
                     vars_clipped_ub_list.append(var)
                     fub = ub
-                final_bounds[var] = [flb, fub]
+                final_bounds[var] = (flb, fub)
             else:
-                final_bounds[var] = [lb, ub]
+                final_bounds[var] = (lb, ub)
 
         if vars_clipped_lb_list:
             warnings.warn(

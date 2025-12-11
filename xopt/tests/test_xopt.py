@@ -68,14 +68,14 @@ class TestXopt:
             constraints:
                 c1: [GREATER_THAN, 0]
                 c2: [LESS_THAN, 0.5]
-            constants: {a: dummy_constant}
+            constants: {a: 0}
 
         """
         X = Xopt.from_yaml(YAML)
-        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+        assert X.vocs.variables == {"x1": (0, 3.14159), "x2": (0, 3.14159)}
 
         X = Xopt(YAML)
-        assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+        assert X.vocs.variables == {"x1": (0, 3.14159), "x2": (0, 3.14159)}
 
         with pytest.raises(ValueError):
             Xopt(YAML, 1)
@@ -87,7 +87,7 @@ class TestXopt:
         yaml.dump(yaml.safe_load(YAML), open("test.yml", "w"))
         for ele in [False, True]:
             X = from_file("test.yml", ele)
-            assert X.vocs.variables == {"x1": [0, 3.14159], "x2": [0, 3.14159]}
+            assert X.vocs.variables == {"x1": (0, 3.14159), "x2": (0, 3.14159)}
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)

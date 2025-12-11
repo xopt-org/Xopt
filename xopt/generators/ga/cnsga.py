@@ -21,8 +21,8 @@ class CNSGAGenerator(Generator):
     """
     Constrained Non-dominated Sorting Genetic Algorithm (CNSGA) generator.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     name : str
         The name of the generator.
     supports_multi_objective : bool
@@ -44,8 +44,8 @@ class CNSGAGenerator(Generator):
     population : Optional[pd.DataFrame]
         The DataFrame containing the population.
 
-    Methods:
-    --------
+    Methods
+    -------
     create_children(self) -> List[Dict]
         Create children for the next generation.
     add_data(self, new_data: pd.DataFrame)
@@ -65,6 +65,7 @@ class CNSGAGenerator(Generator):
     name = "cnsga"
     supports_multi_objective: bool = True
     supports_constraints: bool = True
+    supports_single_objective: bool = True
     population_size: int = Field(64, description="Population size")
     crossover_probability: confloat(ge=0, le=1) = Field(
         0.9, description="Crossover probability"
@@ -104,8 +105,8 @@ class CNSGAGenerator(Generator):
         """
         Create children for the next generation.
 
-        Returns:
-        --------
+        Returns
+        -------
         List[Dict]
             A list of dictionaries containing the generated children.
         """
@@ -133,8 +134,8 @@ class CNSGAGenerator(Generator):
         """
         Add new data to the generator.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         new_data : pd.DataFrame
             The new data to be added.
         """
@@ -159,13 +160,13 @@ class CNSGAGenerator(Generator):
         """
         Generate a specified number of candidate samples.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         n_candidates : int
             The number of candidate samples to generate.
 
-        Returns:
-        --------
+        Returns
+        -------
         List[Dict]
             A list of dictionaries containing the generated samples.
         """
@@ -179,8 +180,8 @@ class CNSGAGenerator(Generator):
         """
         Write the current offspring to a CSV file.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str, optional
             The file path to save the offspring. If None, a timestamped filename is generated.
         """
@@ -199,8 +200,8 @@ class CNSGAGenerator(Generator):
         """
         Write the current population to a CSV file.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str, optional
             The file path to save the population. If None, a timestamped filename is generated.
         """
@@ -219,8 +220,8 @@ class CNSGAGenerator(Generator):
         """
         Load a population from a CSV file.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         filename : str
             The file path to load the population from.
         """
@@ -237,8 +238,8 @@ class CNSGAGenerator(Generator):
         """
         Convenience property for `population_size`.
 
-        Returns:
-        --------
+        Returns
+        -------
         int
             The population size.
         """
@@ -249,8 +250,8 @@ def uniform(low: float, up: float, size: Optional[int] = None) -> List[float]:
     """
     Generate a list of uniform random numbers.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     low : float
         The lower bound of the uniform distribution.
     up : float
@@ -258,8 +259,8 @@ def uniform(low: float, up: float, size: Optional[int] = None) -> List[float]:
     size : int, optional
         The number of random numbers to generate. If None, a single random number is generated.
 
-    Returns:
-    --------
+    Returns
+    -------
     List[float]
         A list of uniform random numbers.
     """
@@ -273,21 +274,21 @@ def cnsga_toolbox(vocs: VOCS, selection: str = "auto") -> deap_base.Toolbox:
     """
     Creates a DEAP toolbox from VOCS dict for use with CNSGA.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     vocs : VOCS
         The VOCS object containing the variables, objectives, and constraints.
     selection : str, optional
         The selection algorithm to use. Options are "nsga2", "nsga3", "spea2", and "auto".
         Defaults to "auto".
 
-    Returns:
-    --------
+    Returns
+    -------
     deap_base.Toolbox
         The DEAP toolbox.
 
-    Raises:
-    -------
+    Raises
+    ------
     ValueError
         If an invalid selection algorithm is specified.
     """
@@ -394,15 +395,15 @@ def pop_from_data(data: pd.DataFrame, vocs: VOCS) -> List:
     """
     Return a list of DEAP deap_creator.Individual from a dataframe.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     data : pd.DataFrame
         The DataFrame containing the data.
     vocs : VOCS
         The VOCS object containing the variables, objectives, and constraints.
 
-    Returns:
-    --------
+    Returns
+    -------
     List[deap_creator.Individual]
         A list of DEAP individuals.
     """
@@ -427,8 +428,8 @@ def cnsga_select(
     """
     Applies DEAP's select algorithm to the population in data.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     data : pd.DataFrame
         The DataFrame containing the data.
     n : int
@@ -438,8 +439,8 @@ def cnsga_select(
     toolbox : deap_base.Toolbox
         The DEAP toolbox.
 
-    Returns:
-    --------
+    Returns
+    -------
     pd.DataFrame
         The DataFrame containing the selected individuals.
 
@@ -464,8 +465,8 @@ def cnsga_variation(
     Varies the population (from variables in data) by applying crossover and mutation
     using DEAP's varAnd algorithm.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     data : pd.DataFrame
         The DataFrame containing the data.
     vocs : VOCS
@@ -477,8 +478,8 @@ def cnsga_variation(
     mutation_probability : float, optional
         The probability of mutation. Defaults to 1.0.
 
-    Returns:
-    --------
+    Returns
+    -------
     pd.DataFrame
         The DataFrame containing the new individuals to evaluate.
 

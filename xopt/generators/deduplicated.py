@@ -129,7 +129,7 @@ class DeduplicatedGeneratorBase(Generator):
         msg = f"generated {len(candidates)} candidates in {1000 * (time.perf_counter() - start_t):.2f}ms"
         if self.deduplicate_output:
             msg += f" (removed {n_removed} duplicate individuals)"
-        self._logger.info(msg)
+        self._logger.debug(msg)
         return candidates
 
     def _generate(self, n_candidates: int) -> list[dict]:

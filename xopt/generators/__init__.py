@@ -1,12 +1,11 @@
 import json
+from typing import Any
 import warnings
-from typing import List
+from xopt.errors import XoptError
+from xopt.generators.random import RandomGenerator
+from xopt.generator import Generator
 
-from ..errors import XoptError
-from .random import RandomGenerator
-
-# by default only load random generator
-registered_generators = [
+registered_generators: list[type[Generator]] = [
     RandomGenerator,
 ]
 
@@ -31,7 +30,7 @@ all_generator_names = {
 }
 
 
-def list_available_generators() -> List[str]:
+def list_available_generators() -> list[str]:
     try_load_all_generators()
     return list(generators.keys())
 
@@ -42,7 +41,7 @@ def try_load_all_generators():
             get_generator_dynamic(gn)
 
 
-def get_generator_dynamic(name: str):
+def get_generator_dynamic(name: str) -> type[Generator]:
     if name in generators:
         return generators[name]
 
@@ -88,7 +87,7 @@ def get_generator_dynamic(name: str):
             UpperConfidenceBoundGenerator,
         )
 
-        registered_generators = [
+        registered_generators: list[type[Generator]] = [
             UpperConfidenceBoundGenerator,
             MOBOGenerator,
             BayesianExplorationGenerator,
@@ -99,7 +98,6 @@ def get_generator_dynamic(name: str):
         for gen in registered_generators:
             generators[gen.name] = gen
         return generators[name]
-
     elif name in all_generator_names["ga"]:
         try:
             from xopt.generators.ga import CNSGAGenerator, NSGA2Generator
@@ -136,8 +134,8 @@ def get_generator(name: str):
 
 def get_generator_defaults(
     name: str,
-) -> dict:
-    defaults = {}
+) -> dict[str, Any]:
+    defaults: dict[str, Any] = {}
     generator_class = get_generator(name)
     for k in generator_class.model_fields:
         if k in [

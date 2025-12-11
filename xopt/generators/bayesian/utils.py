@@ -1,16 +1,18 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import List
+from typing import Any, List, cast
 
 import gpytorch
 import numpy as np
 import pandas as pd
+from pydantic import ValidationInfo
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
+from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS
 
 
@@ -189,13 +191,21 @@ def interpolate_points(df, num_points=10):
     return interpolated_points
 
 
-def validate_turbo_controller_base(value, valid_controller_types, info):
+def validate_turbo_controller_base(
+    value: Any,
+    valid_controller_types: list[type[TurboController]],
+    info: ValidationInfo,
+):
     """Validate turbo controller input"""
 
     # get string names of available controller types
     controller_types = {
         controller.__name__: controller for controller in valid_controller_types
     }
+
+    vocs = info.data.get("vocs", None)
+    if vocs is None:
+        raise ValueError("vocs must be provided to validate turbo controller")
 
     if isinstance(value, str):
         # handle old string input
@@ -206,12 +216,13 @@ def validate_turbo_controller_base(value, valid_controller_types, info):
 
         # create turbo controller from string input
         if value in controller_types:
-            value = controller_types[value](info.data["vocs"])
+            value = controller_types[value](vocs=vocs)
         else:
             raise ValueError(
                 f"{value} not found, available values are {controller_types.keys()}"
             )
     elif isinstance(value, dict):
+        value = cast(dict[str, Any], value)
         value_copy = deepcopy(value)
         # create turbo controller from dict input
         if "name" not in value:
@@ -219,27 +230,23 @@ def validate_turbo_controller_base(value, valid_controller_types, info):
         name = value_copy.pop("name")
         if name in controller_types:
             # pop unnecessary elements
-            for ele in ["dim"]:
+            for ele in ["dim", "vocs"]:
                 value_copy.pop(ele, None)
 
-            value = controller_types[name](vocs=info.data["vocs"], **value_copy)
+            value = controller_types[name](vocs=vocs, **value_copy)
         else:
             raise ValueError(
                 f"{value} not found, available values are {controller_types.keys()}"
             )
 
     # check if turbo controller is compatabile with the generator
-    valid_type = False
     for controller_type in valid_controller_types:
         if isinstance(value, controller_type):
-            valid_type = True
-
-    if not valid_type:
+            return value
+    else:
         raise ValueError(
             f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
         )
-
-    return value
 
 
 class MeanVarModelWrapper(torch.nn.Module):
@@ -484,8 +491,8 @@ def compute_hypervolume_and_pf(
     Compute the hypervolume and pareto front
     given a set of points assuming maximization.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     X : torch.Tensor
         The input points.
     Y : torch.Tensor
@@ -493,8 +500,8 @@ def compute_hypervolume_and_pf(
     reference_point : torch.Tensor
         The reference point for hypervolume calculation.
 
-    Returns:
-    --------
+    Returns
+    -------
     pareto_front_X : torch.Tensor
         The points on the Pareto front. Returns None if no pareto front exists.
     pareto_front_Y : torch.Tensor
