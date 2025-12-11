@@ -63,8 +63,8 @@ class TestMPI:
         YAML = """
         stopping_condition:
             name: MaxEvaluationsCondition
-            max_evaluations: 10   
-                 
+            max_evaluations: 10
+
         generator:
             name: cnsga
             population_size: 64
