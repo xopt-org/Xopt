@@ -18,7 +18,7 @@ def test_cnsga():
         generator=CNSGAGenerator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
         vocs=tnk_vocs,
-        max_evaluations=5,
+        stopping_condition=MaxEvaluationsCondition(max_evaluations=10),
     )
     X.run()
 

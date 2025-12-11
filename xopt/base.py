@@ -121,7 +121,7 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if torch models"
         " should be stored inside main config file",
     )
-    stopping_condition: SerializeAsAny[StoppingCondition] = Field(
+    stopping_condition: Optional[SerializeAsAny[StoppingCondition]] = Field(
         None,
         description="optional stopping condition to check during optimization",
     )
@@ -607,9 +607,10 @@ class Xopt(XoptBaseModel):
         )
 
         if "stopping_condition" in dict_result:
-            dict_result["stopping_condition"] = {
-                "name": self.stopping_condition.__class__.__name__
-            } | dict_result["stopping_condition"]
+            if dict_result["stopping_condition"] is not None:
+                dict_result["stopping_condition"] = {
+                    "name": self.stopping_condition.__class__.__name__
+                } | dict_result["stopping_condition"]
 
         # TODO: implement version checking
         # dict_result["xopt_version"] = __version__

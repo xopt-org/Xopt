@@ -70,7 +70,9 @@ def test_nsga2_output_data():
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
             vocs=tnk_vocs,
-            stopping_condition=MaxEvaluationsCondition(max_evaluations=30),  # Run for 3 generations
+            stopping_condition=MaxEvaluationsCondition(
+                max_evaluations=30
+            ),  # Run for 3 generations
         )
         X.run()
 
@@ -233,7 +235,9 @@ def nsga2_optimization_with_checkpoint():
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
             vocs=vocs,
-            max_evaluations=20,  # Run for 2 generations
+            stopping_condition=MaxEvaluationsCondition(
+                max_evaluations=20
+            ),  # Run for 2 generations
         )
         X.run()
 
@@ -280,7 +284,9 @@ def test_nsga2_checkpoint_reload_python(nsga2_optimization_with_checkpoint):
         generator=restored_generator,
         evaluator=Evaluator(function=evaluate_TNK),
         vocs=tnk_vocs,
-        max_evaluations=10,  # Run for 1 more generation
+        stopping_condition=MaxEvaluationsCondition(
+            max_evaluations=10
+        ),  # Run for 1 more generation
     )
     X_restored.run()
 
@@ -304,7 +310,9 @@ def test_nsga2_checkpoint_reload_yaml(nsga2_optimization_with_checkpoint):
 
     # Construct config file
     yaml = f"""
-    max_evaluations: 20
+    stopping_condition:
+      name: MaxEvaluationsCondition
+      max_evaluations: 20
 
     generator:
       name: nsga2
@@ -898,7 +906,9 @@ def test_nsga2_output_inhomogenous_data():
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
             vocs=tnk_vocs,
-            max_evaluations=30,  # Run for 3 generations
+            stopping_condition=MaxEvaluationsCondition(
+                max_evaluations=30
+            ),  # Run for 3 generations
         )
 
         # Fill up a few populations with data
@@ -952,7 +962,7 @@ def test_nsga2_vocs_not_present_in_add_data():
         generator=NSGA2Generator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
         vocs=tnk_vocs,
-        max_evaluations=10,
+        stopping_condition=MaxEvaluationsCondition(max_evaluations=10),
     )
     X.run()
 
