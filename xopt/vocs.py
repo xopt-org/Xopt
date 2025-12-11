@@ -1,5 +1,4 @@
 import warnings
-
 import numpy as np
 import pandas as pd
 
@@ -721,7 +720,7 @@ def validate_variable_bounds(variable_dict: dict[str, list[float]]):
     """
 
     for name, value in variable_dict.items():
-        if not isinstance(value, list):
+        if not isinstance(value, Iterable):
             raise ValueError(f"Bounds specified for `{name}` must be a list.")
         if not len(value) == 2:
             raise ValueError(
@@ -735,8 +734,8 @@ def validate_variable_bounds(variable_dict: dict[str, list[float]]):
 
 
 def clip_variable_bounds(
-    vocs: VOCS, custom_bounds: dict[str, list[float]]
-) -> dict[str, list[float]]:
+    vocs: VOCS, custom_bounds: dict[str, list[float]] | None = None
+) -> dict[str, tuple[float, float]]:
     """
     Return new bounds as intersection of vocs and custom bounds
 
@@ -757,18 +756,15 @@ def clip_variable_bounds(
     else:
         variable_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
 
-        if not isinstance(custom_bounds, dict):
-            raise TypeError("`custom_bounds` must be a dict")
-
         try:
             validate_variable_bounds(custom_bounds)
         except ValueError:
             raise ValueError("specified `custom_bounds` not valid")
 
-        vars_clipped_lb_list = []
-        vars_clipped_ub_list = []
+        vars_clipped_lb_list: list[str] = []
+        vars_clipped_ub_list: list[str] = []
 
-        final_bounds = {}
+        final_bounds: dict[str, tuple[float, float]] = {}
         for var, (lb, ub) in variable_bounds.items():
             if var in custom_bounds:
                 clb = custom_bounds[var][0]
@@ -788,9 +784,9 @@ def clip_variable_bounds(
                 else:
                     vars_clipped_ub_list.append(var)
                     fub = ub
-                final_bounds[var] = [flb, fub]
+                final_bounds[var] = (flb, fub)
             else:
-                final_bounds[var] = [lb, ub]
+                final_bounds[var] = (lb, ub)
 
         if vars_clipped_lb_list:
             warnings.warn(

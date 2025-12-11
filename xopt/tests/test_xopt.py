@@ -70,7 +70,7 @@ class TestXopt:
             constraints:
                 c1: [GREATER_THAN, 0]
                 c2: [LESS_THAN, 0.5]
-            constants: {a: dummy_constant}
+            constants: {a: 0}
 
         """
         X = Xopt.from_yaml(YAML)
@@ -99,6 +99,7 @@ class TestXopt:
                 "x1": ContinuousVariable(domain=[0, 3.14159]),
                 "x2": ContinuousVariable(domain=[0, 3.14159]),
             }
+
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)

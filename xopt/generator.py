@@ -2,6 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Optional, List
 
+
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
@@ -107,7 +108,6 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     def __init__(self, **kwargs):
         """
         Initialize the generator.
-
         """
         super().__init__(**kwargs)
         logger.info(f"Initialized generator {self.name}")
@@ -123,7 +123,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         return self._is_done
 
     @abstractmethod
-    def generate(self, n_candidates) -> list[dict]:
+    def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
         pass
 
     def add_data(self, new_data: pd.DataFrame):
@@ -138,7 +138,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         else:
             self.data = new_data
 
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """overwrite model dump to remove faux class attrs"""
 
         res = super().model_dump(*args, **kwargs)
