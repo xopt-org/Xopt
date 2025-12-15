@@ -18,8 +18,7 @@ from pydantic import (
     field_serializer,
     field_validator,
 )
-from botorch.optim.stopping import ExpMAStoppingCriterion
-import torch
+
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
