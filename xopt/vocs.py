@@ -1,4 +1,5 @@
 import warnings
+from typing import Iterable
 import numpy as np
 import pandas as pd
 
@@ -753,6 +754,8 @@ def clip_variable_bounds(
     """
     if custom_bounds is None:
         final_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
+    elif not isinstance(custom_bounds, dict):
+        raise TypeError("specified `custom_bounds` must be a dict")
     else:
         variable_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
 

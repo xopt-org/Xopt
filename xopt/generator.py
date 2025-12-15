@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Optional, List
+from typing import Any, ClassVar, Optional, List, Hashable
 
 
 import pandas as pd

@@ -117,22 +117,12 @@ class TestVOCS(object):
         assert isinstance(vocs.objectives["z"], MinimizeObjective)
         assert isinstance(vocs.objectives["zzz"], ExploreObjective)
         assert isinstance(vocs.constraints["c"], LessThanConstraint)
-
+        assert vocs.variables["x"].domain == [0.0, 6.283185307179586]
+        assert vocs.variables["y"].values == {0.0, 1.0, 2.0}
+        assert vocs.constraints["c"].value == 0.0
         assert vocs.n_inputs == 2
-        vocs = VOCS.from_yaml(Y)
-        assert vocs.constraint_names == ["e", "f"]
-        assert vocs.variables == {"a": (0, 1e3), "b": (-1, 1)}
-        assert vocs.objectives == {"c": "MAXIMIZE", "d": "MINIMIZE"}
-        assert vocs.constants == {"g": 1234}
-
-        assert vocs.objectives["c"] == ObjectiveEnum.MAXIMIZE
-        assert vocs.objectives["d"] == ObjectiveEnum.MINIMIZE
-
-        assert vocs.constraints["e"] == ("LESS_THAN", 2.0)
-        assert vocs.constraints["f"] == ("GREATER_THAN", 0.0)
-
-        assert vocs.n_inputs == 3
-        assert vocs.n_outputs == 4
+        assert vocs.n_variables == 2
+        assert vocs.n_outputs == 3
 
     def test_random_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)

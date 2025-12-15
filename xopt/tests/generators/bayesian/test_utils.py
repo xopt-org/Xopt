@@ -17,10 +17,17 @@ from xopt.generators.bayesian.utils import (
     torch_compile_gp_model,
     torch_trace_acqf,
     torch_trace_gp_model,
+    interpolate_points,
+    validate_turbo_controller_base,
 )
 from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
-from xopt.vocs import random_inputs
+from xopt.vocs import random_inputs, VOCS
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
+
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
@@ -420,3 +427,64 @@ class TestUtils:
         orig_out = acq(test_x)
         traced_out = traced_acq(test_x)
         assert torch.allclose(orig_out, traced_out, rtol=1e-6)
+
+    def test_interpolate_points_invalid_rows(self):
+        # Create a DataFrame with more than two rows
+        df_invalid = pd.DataFrame({"x": [0, 1, 2], "y": [0, 1, 2]})
+
+        # Expect a ValueError when calling interpolate_points
+        with pytest.raises(
+            ValueError, match="Input DataFrame must have exactly two rows."
+        ):
+            interpolate_points(df_invalid)
+
+    def test_validate_turbo_controller_base_all_branches(self):
+        class DummyInfo:
+            data = {
+                "vocs": VOCS(
+                    variables={"x": [0, 1]},
+                    objectives={"y": "MAXIMIZE"},
+                    constraints={},
+                    observables=["y"],
+                )
+            }
+
+        info = DummyInfo()
+        valid_types = [OptimizeTurboController, SafetyTurboController]
+
+        # String input: "optimize"
+        result = validate_turbo_controller_base("optimize", valid_types, info)
+        assert isinstance(result, OptimizeTurboController)
+
+        # String input: invalid
+        with pytest.raises(ValueError, match="not found"):
+            validate_turbo_controller_base("invalid", valid_types, info)
+
+        # Dict input: valid
+        result = validate_turbo_controller_base(
+            {"name": "OptimizeTurboController"}, valid_types, info
+        )
+        assert isinstance(result, OptimizeTurboController)
+
+        # Dict input: missing name
+        with pytest.raises(ValueError, match="needs to have a `name` attribute"):
+            validate_turbo_controller_base({}, valid_types, info)
+
+        # Dict input: invalid name
+        with pytest.raises(ValueError, match="not found"):
+            validate_turbo_controller_base(
+                {"name": "InvalidController"}, valid_types, info
+            )
+
+        # Add constraints to info
+        info.data["vocs"].constraints = {"c1": ["LESS_THAN", 0.5]}
+        # String input: "safety"
+        result = validate_turbo_controller_base("safety", valid_types, info)
+        assert isinstance(result, SafetyTurboController)
+
+        # Wrong type: not a valid controller
+        class DummyController:
+            pass
+
+        with pytest.raises(ValueError, match="not allowed for this generator"):
+            validate_turbo_controller_base(DummyController(), valid_types, info)
