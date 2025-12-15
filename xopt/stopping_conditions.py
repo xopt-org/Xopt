@@ -18,6 +18,8 @@ from pydantic import (
     field_serializer,
     field_validator,
 )
+from botorch.optim.stopping import ExpMAStoppingCriterion
+import torch
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
@@ -87,14 +89,37 @@ class MaxEvaluationsCondition(StoppingCondition):
     ----------
     max_evaluations : int
         Maximum number of function evaluations before stopping.
+    count_valid_only : bool, optional
+        Whether to count only valid evaluations (default: False).
+    use_dataframe_index : bool, optional
+        Whether to use the dataframe index to count evaluations (default: False).
     """
 
     max_evaluations: PositiveInt = Field(
         description="Maximum number of function evaluations"
     )
+    count_valid_only: bool = Field(
+        default=False,
+        description="Whether to count only valid evaluations that do not raise errors",
+    )
+    use_dataframe_index: bool = Field(
+        default=False,
+        description="Whether to use the dataframe index to count evaluations",
+    )
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop if we've reached the maximum number of evaluations."""
+        if data.empty:
+            return False
+
+        if self.use_dataframe_index:
+            # assume index starts at 0
+            return max(data.index) + 1 >= self.max_evaluations
+
+        if self.count_valid_only:
+            valid_data = data[data["error"].isna()] if "error" in data.columns else data
+            return len(valid_data) >= self.max_evaluations
+
         return len(data) >= self.max_evaluations
 
 
@@ -156,9 +181,7 @@ class ConvergenceCondition(StoppingCondition):
         Whether to use relative improvement (default: False).
     """
 
-    objective_name: str = Field(
-        description="Name of the objective to monitor for convergence"
-    )
+    objective_name: str = Field(description="Name of the objective to monitor")
     improvement_threshold: PositiveFloat = Field(
         description="Minimum improvement required to continue optimization"
     )
@@ -319,58 +342,6 @@ class FeasibilityCondition(StoppingCondition):
         return False
 
 
-class ObjectiveThresholdCondition(StoppingCondition):
-    """
-    Stop when an objective crosses a threshold value.
-
-    Parameters
-    ----------
-    objective_name : str
-        Name of the objective to monitor.
-    threshold : float
-        Threshold value for the objective.
-    direction : str, optional
-        Direction of threshold crossing: "below", "above", or "either" (default: "either").
-    """
-
-    objective_name: str = Field(description="Name of the objective to monitor")
-    threshold: float = Field(description="Threshold value for the objective")
-    direction: str = Field(
-        default="either",
-        description="Direction of threshold crossing: 'below', 'above', or 'either'",
-    )
-
-    @field_validator("direction")
-    @classmethod
-    def validate_direction(cls, v):
-        if v.lower() not in ["below", "above", "either"]:
-            raise ValueError("direction must be 'below', 'above', or 'either'")
-        return v.lower()
-
-    def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
-        """Stop when objective crosses threshold."""
-        if data.empty or self.objective_name not in vocs.objectives:
-            return False
-
-        if self.objective_name not in data.columns:
-            return False
-
-        objective_values = data[self.objective_name].dropna()
-
-        if len(objective_values) == 0:
-            return False
-
-        if self.direction == "below":
-            return (objective_values < self.threshold).any()
-        elif self.direction == "above":
-            return (objective_values > self.threshold).any()
-        else:  # "either"
-            return (
-                (objective_values < self.threshold)
-                | (objective_values > self.threshold)
-            ).any()
-
-
 class CompositeCondition(StoppingCondition):
     """
     Combine multiple stopping conditions with AND/OR logic.
@@ -431,9 +402,14 @@ class CompositeCondition(StoppingCondition):
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Combine conditions using specified logic."""
-        results = [condition.should_stop(data, vocs) for condition in self.conditions]
+        results = []
+
+        for condition in self.conditions:
+            _should_stop = condition.should_stop(data, vocs)
+            if _should_stop and self.logic == "or":
+                return True
+            results.append(_should_stop)
 
         if self.logic == "and":
             return all(results)
-        else:  # "or"
-            return any(results)
+        return False

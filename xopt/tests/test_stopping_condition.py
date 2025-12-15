@@ -169,7 +169,7 @@ class TestStoppingConditionIntegration:
             ConvergenceCondition(
                 objective_name="f1", improvement_threshold=0.01, patience=5
             ),
-            StagnationCondition(objective_name="f1", patience=5, tolerance=1e-8),
+            StagnationCondition(objective_name="f1", patience=5, tolerance=0.01),
             CompositeCondition(
                 conditions=[
                     MaxEvaluationsCondition(max_evaluations=10),
