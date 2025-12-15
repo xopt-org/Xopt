@@ -14,6 +14,7 @@ nav:
             - examples/basic/xopt_vocs.ipynb
             - examples/basic/xopt_evaluator.ipynb
             - examples/basic/xopt_generator.ipynb
+            - examples/basic/xopt_stopping_condition.ipynb
         - Bayesian:
             - Gaussian Process Model Creation:
                 - Basic example: examples/gp_model_creation/model_creation.ipynb
