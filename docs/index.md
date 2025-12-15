@@ -69,7 +69,7 @@ Xopt usage for a simple optimization problem.
 
 Configuring an Xopt run
 ===============
-Xopt runs can be specified via a YAML file or dictonary input. This requires `generator`, `evaluator`, and `vocs` to be specified, along with optional general options such as `max_evaluations`. An example to run a multi-objective optimiation of a user-defined function `my_function` is:
+Xopt runs can be specified via a YAML file or dictonary input. This requires `generator`, `evaluator`, and `vocs` to be specified. An example to run a multi-objective optimiation of a user-defined function `my_function` is:
 ```yaml
 generator:
     name: cnsga
@@ -94,7 +94,9 @@ vocs:
         c2: [LESS_THAN, 0.5]
     constants: {a: dummy_constant}
 
-max_evaluations: 6400
+stopping_condition:
+    name: MaxEvaluationsCondition
+    max_evaluations: 6400
 ```
 
 Xopt can also be used through a simple Python interface.
