@@ -161,7 +161,8 @@ class TestUtils(TestCase):
             assert len(df_all2) == 10
             # Test with additional kwargs
             df = read_csv(fname, last_n_lines=2, dtype={"col1": int, "col2": int})
-            assert df.dtypes["col1"] is int
+            assert pd.api.types.is_integer_dtype(df["col1"])
+
         finally:
             os.remove(fname)
 
