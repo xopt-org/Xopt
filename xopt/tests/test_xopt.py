@@ -100,7 +100,6 @@ class TestXopt:
                 "x2": ContinuousVariable(domain=[0, 3.14159]),
             }
 
-
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)
 
