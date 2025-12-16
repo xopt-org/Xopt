@@ -51,8 +51,10 @@ def test_configure_logger_replaces_handler():
     logger = logging.getLogger(logger_name)
     logger.info("first message")
     # Reconfigure with a new stream
-    handler2 = log.configure_logger(logger_name=logger_name, file=stream2, level="INFO")
+    log.configure_logger(logger_name=logger_name, file=stream2, level="INFO")
     logger.info("second message")
+    # Get the last handler attached to the logger
+    handler2 = logger.handlers[-1]
     handler2.flush()
     assert "second message" in stream2.getvalue()
     # The old handler should not receive new logs
