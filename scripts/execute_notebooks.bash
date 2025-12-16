@@ -34,10 +34,10 @@ do
     fi
 
     echo "Executing $file"
-    
+
     # Record start time for this notebook
     START_TIME=$(date +%s)
-    
+
     # Execute notebook and capture exit code
     if jupyter nbconvert --to notebook --execute $file --inplace; then
         END_TIME=$(date +%s)
