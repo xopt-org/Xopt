@@ -26,7 +26,7 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from gest_api.vocs import MinimizeObjective, MaximizeObjective
+from gest_api.vocs import MinimizeObjective, MaximizeObjective, VOCS
 
 from xopt.errors import XoptError, FeasibilityError
 from xopt.generator import Generator
