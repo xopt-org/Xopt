@@ -267,3 +267,19 @@ def test_objloader_validate_all_loader_variants():
 
     with pytest.raises(ValueError):
         ObjLoader[Dummy](loader={"callable": Other})
+
+
+def test_objloader_load_store_and_no_store():
+    class Dummy:
+        def __init__(self):
+            self.value = 42
+
+    loader = ObjLoader[Dummy]()
+    # Test store=False (should return a new Dummy instance, not store it)
+    result1 = loader.load(store=False)
+    assert isinstance(result1, Dummy)
+    assert loader.object is None  # Should not store
+    # Test store=True (should store the Dummy instance)
+    result2 = loader.load(store=True)
+    assert isinstance(result2, Dummy)
+    assert loader.object is result2  # Should store

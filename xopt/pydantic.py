@@ -417,7 +417,7 @@ class ObjLoader(
     def load(self, store: bool = False):
         # store object reference on loader
         if store:
-            self.object = self.loader.call()
+            self.object = self.loader()
             return self.object
 
         # return loaded object w/o storing
