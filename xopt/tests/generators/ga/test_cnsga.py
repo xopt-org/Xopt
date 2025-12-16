@@ -1,10 +1,14 @@
 from random import random
 
 import numpy as np
+import os
+import tempfile
+import pandas as pd
+import pytest
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
-from xopt.generators.ga.cnsga import CNSGAGenerator
+from xopt.generators.ga.cnsga import CNSGAGenerator, uniform, cnsga_toolbox
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.test_functions.modified_tnk import (
     evaluate_modified_TNK,
@@ -140,3 +144,91 @@ def test_cnsga_no_constraints():
     X.run()
     assert len(X.data) == 10
     assert all(~X.data["xopt_error"])
+
+
+def test_write_offspring_and_population():
+    gen = CNSGAGenerator(vocs=tnk_vocs, output_path=tempfile.gettempdir())
+    # Create dummy offspring and population
+    df = pd.DataFrame(
+        {
+            "x1": np.random.rand(5),
+            "x2": np.random.rand(5),
+            "y1": np.random.rand(5),
+            "y2": np.random.rand(5),
+            "c1": np.random.rand(5),
+            "c2": np.random.rand(5),
+        }
+    )
+    gen._offspring = df
+    gen.population = df
+    # Test write_offspring
+    gen.write_offspring()
+    # Test write_population
+    gen.write_population()
+    # Test with explicit filename
+    off_file = os.path.join(tempfile.gettempdir(), "offspring_test.csv")
+    pop_file = os.path.join(tempfile.gettempdir(), "population_test.csv")
+    gen.write_offspring(off_file)
+    gen.write_population(pop_file)
+    assert os.path.exists(off_file)
+    assert os.path.exists(pop_file)
+    # Clean up
+    os.remove(off_file)
+    os.remove(pop_file)
+
+
+def test_load_population_csv():
+    gen = CNSGAGenerator(vocs=tnk_vocs)
+    df = pd.DataFrame(
+        {
+            "x1": np.random.rand(5),
+            "x2": np.random.rand(5),
+            "y1": np.random.rand(5),
+            "y2": np.random.rand(5),
+            "c1": np.random.rand(5),
+            "c2": np.random.rand(5),
+        }
+    )
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+    df.to_csv(tmp.name, index_label="xopt_index")
+    tmp.close()
+    gen.load_population_csv(tmp.name)
+    assert hasattr(gen, "_loaded_population")
+    assert gen._loaded_population is not None
+    os.remove(tmp.name)
+
+
+def test_uniform():
+    # Test with lists
+    low = [0, 0]
+    up = [1, 1]
+    result = uniform(low, up)
+    assert len(result) == 2
+    assert all(0 <= x <= 1 for x in result)
+    # Test with scalars and size
+    result2 = uniform(0, 1, size=3)
+    assert len(result2) == 3
+    assert all(0 <= x <= 1 for x in result2)
+
+
+def test_cnsga_toolbox_options():
+    from xopt.vocs import VOCS
+
+    vocs = VOCS(
+        variables={"x1": [0, 1], "x2": [0, 1]},
+        objectives={"y1": "MINIMIZE", "y2": "MINIMIZE"},
+        constraints={"c1": ["GREATER_THAN", 0]},
+        constants={},
+    )
+    # Test default (auto/nsga2)
+    tb = cnsga_toolbox(vocs)
+    assert hasattr(tb, "select")
+    # Test nsga2
+    tb2 = cnsga_toolbox(vocs, selection="nsga2")
+    assert hasattr(tb2, "select")
+    # Test spea2
+    tb3 = cnsga_toolbox(vocs, selection="spea2")
+    assert hasattr(tb3, "select")
+    # Test invalid
+    with pytest.raises(ValueError):
+        cnsga_toolbox(vocs, selection="invalid")
