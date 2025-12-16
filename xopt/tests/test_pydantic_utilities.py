@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 import yaml
-from pydantic import BaseModel
+import inspect
+from pydantic import BaseModel, Field
 from xopt.pydantic import (
     recursive_serialize,
     recursive_deserialize,
@@ -24,6 +25,7 @@ from xopt.pydantic import (
     ObjLoader,
     NormalExecutor,
     SignatureModel,
+    validate_and_compose_signature,
 )
 
 
@@ -126,6 +128,42 @@ def test_get_descriptions_defaults():
     assert "a" in desc
 
 
+def test_get_descriptions_defaults_nested():
+    class Inner(XoptBaseModel):
+        """inner desc"""
+
+        x: int = 42
+
+    class Outer(XoptBaseModel):
+        """outer desc"""
+
+        inner: Inner = Inner()
+        y: float = 3.14
+
+    o = Outer()
+    desc = get_descriptions_defaults(o)
+    # Should recurse into inner and get its description dict
+    assert "inner" in desc
+    assert isinstance(desc["inner"], dict)
+    assert "x" in desc["inner"]
+    assert "y" in desc
+
+
+def test_get_descriptions_defaults_object_type():
+    class DummyCallable:
+        pass
+
+    class M(XoptBaseModel):
+        """desc"""
+
+        a: DummyCallable = Field(DummyCallable(), description="callable field")
+
+    m = M()
+    desc = get_descriptions_defaults(m)
+    # Should handle object/callable type
+    assert desc["a"][0] == "callable field"
+
+
 def test_objloader_minimal():
     class Dummy:
         pass
@@ -162,3 +200,70 @@ def test_baseexecutor_and_normalexecutor():
     assert be.submit(lambda x: x, 1) == "submitted"
     assert be.map(lambda x: x, [1, 2]) == ["mapped"]
     be.shutdown()
+
+
+def test_validate_and_compose_signature_tuple_and_empty():
+    def fn_tuple(x=(1, 2)):
+        pass
+
+    model = validate_and_compose_signature(fn_tuple)
+    # Should create a field with type tuple and default None
+    assert hasattr(model, "x")
+    assert model.model_fields["x"].annotation is tuple
+    assert model.model_fields["x"].default is None
+
+    def fn_empty(x=inspect.Parameter.empty):
+        pass
+
+    model = validate_and_compose_signature(fn_empty)
+    # Should create a field with type inspect.Parameter.empty and default inspect.Parameter.empty
+    assert hasattr(model, "x")
+    assert model.model_fields["x"].annotation == inspect.Parameter.empty
+    assert model.model_fields["x"].default == inspect.Parameter.empty
+
+    def fn_none(x=None):
+        pass
+
+    model = validate_and_compose_signature(fn_none)
+    # Should create a field with type inspect.Parameter.empty and default None
+    assert hasattr(model, "x")
+    assert model.model_fields["x"].annotation == inspect.Parameter.empty
+    assert model.model_fields["x"].default is None
+
+    def fn_int(x=5):
+        pass
+
+    model = validate_and_compose_signature(fn_int)
+    # Should create a field with type int and default 5
+    assert hasattr(model, "x")
+    assert model.model_fields["x"].annotation is int
+    assert model.model_fields["x"].default == 5
+
+
+def test_objloader_validate_all_loader_variants():
+    class Dummy:
+        pass
+
+    # Loader not in values: should create CallableModel with Dummy as callable
+    loader = ObjLoader[Dummy]()
+    assert loader.object_type == Dummy
+    assert isinstance(loader.loader, type(loader.loader))
+    # Loader is already a CallableModel
+    loader2 = ObjLoader[Dummy](loader=loader.loader)
+    assert loader2.object_type == Dummy
+    assert isinstance(loader2.loader, type(loader.loader))
+    # Loader is a dict with 'callable' key
+    loader3 = ObjLoader[Dummy](loader={"callable": Dummy})
+    assert loader3.object_type == Dummy
+    assert isinstance(loader3.loader, type(loader.loader))
+    # Loader is a dict without 'callable' key
+    loader4 = ObjLoader[Dummy](loader={})
+    assert loader4.object_type == Dummy
+    assert isinstance(loader4.loader, type(loader.loader))
+
+    # Loader with wrong callable type should raise ValueError
+    class Other:
+        pass
+
+    with pytest.raises(ValueError):
+        ObjLoader[Dummy](loader={"callable": Other})

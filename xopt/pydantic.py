@@ -265,18 +265,16 @@ def get_descriptions_defaults(model: XoptBaseModel):
 
     description_dict: dict[str, Any] = {}
     for name, val in model.model_fields.items():
-        try:
-            if issubclass(getattr(model, name), XoptBaseModel):
-                description_dict[name] = get_descriptions_defaults(getattr(model, name))
-            else:
-                description_dict[name] = [
-                    val.description,
-                    val.default,
-                ]
-
-        except TypeError:
-            # if the val is an object or callable type
-            description_dict[name] = val.description
+        value = getattr(model, name)
+        # Check if the value is a subclass of XoptBaseModel
+        if isinstance(value, XoptBaseModel):
+            description_dict[name] = get_descriptions_defaults(value)
+        else:
+            try:
+                description_dict[name] = [val.description, val.default]
+            except TypeError:
+                # if the val is an object or callable type
+                description_dict[name] = val.description
 
     return description_dict
 
