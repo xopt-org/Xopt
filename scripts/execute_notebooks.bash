@@ -4,8 +4,6 @@ NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
 
 SKIP="Xparallel"
 
-echo $NOTEBOOKS
-
 # Track execution statistics
 TOTAL=0
 SKIPPED=0
@@ -19,13 +17,15 @@ SKIPPED_NOTEBOOKS=()
 SUCCESS_NOTEBOOKS=()
 TIMING_INFO=()
 
+export SMOKE_TEST=True
+
 # Record overall start time
 SCRIPT_START=$(date +%s)
 
 for file in $NOTEBOOKS
 do
     TOTAL=$((TOTAL + 1))
-    
+
     if [[ "$file" == *"$SKIP"* ]]; then
         echo "Skipping $file"
         SKIPPED=$((SKIPPED + 1))
@@ -58,6 +58,8 @@ do
         # Continue to next notebook instead of exiting
     fi
 done
+
+export SMOKE_TEST=False
 
 # Calculate total script duration
 SCRIPT_END=$(date +%s)
