@@ -256,7 +256,7 @@ def remove_none_values(d: Any) -> Any:
     elif isinstance(d, list):
         d = cast(list[Any], d)
         # If it's a list, recursively process each item in the list
-        d = [remove_none_values(item) for item in d]
+        d = [remove_none_values(item) for item in d if item is not None]
     return d
 
 
@@ -545,8 +545,10 @@ class BaseExecutor(
         # Compose loader utility
         if values.get("loader") is not None:
             loader_values = values.get("loader")
-            loader = ObjLoader[executor_type](**loader_values)
-
+            if isinstance(loader_values, ObjLoader):
+                loader = loader_values
+            else:
+                loader = ObjLoader[executor_type](**loader_values)
         else:
             # maintain reference to original object
             loader_values = copy.copy(values)
@@ -554,7 +556,6 @@ class BaseExecutor(
             # if executor in values, need to remove
             if "executor" in loader_values:
                 loader_values.pop("executor")
-
             loader = ObjLoader[executor_type](**loader_values)
 
         # update encoders
@@ -720,7 +721,7 @@ class SignatureModel(BaseModel):
         n_pos_only = len(stored_args)
         positional_kwargs = []
         if len(args) < n_pos_only:
-            stored_args[:n_pos_only] = args
+            stored_args[: len(args)] = args
 
         else:
             stored_args = args[:n_pos_only]
