@@ -51,7 +51,7 @@ class StoppingCondition(XoptBaseModel, ABC):
         bool
             True if optimization should stop, False otherwise.
         """
-        pass
+        ...
 
 
 def get_stopping_condition(name: str) -> type[StoppingCondition]:
@@ -208,9 +208,6 @@ class ConvergenceCondition(StoppingCondition):
         objective_type = vocs.objectives[self.objective_name]
         objective_values = data[self.objective_name].dropna()
 
-        if len(objective_values) < self.patience + 1:
-            return False
-
         # Check improvement over the last 'patience' evaluations
         recent_values = objective_values.iloc[-(self.patience + 1) :]
 
@@ -244,26 +241,12 @@ class StagnationCondition(StoppingCondition):
     """
 
     objective_name: str = Field(description="Name of the objective to monitor")
-    patience: int = Field(
+    patience: PositiveInt = Field(
         description="Number of evaluations without improvement before stopping"
     )
-    tolerance: float = Field(
+    tolerance: PositiveFloat = Field(
         default=1e-8, description="Minimum improvement considered significant"
     )
-
-    @field_validator("patience")
-    @classmethod
-    def validate_patience(cls, v):
-        if v <= 0:
-            raise ValueError("patience must be positive")
-        return v
-
-    @field_validator("tolerance")
-    @classmethod
-    def validate_tolerance(cls, v):
-        if v < 0:
-            raise ValueError("tolerance must be non-negative")
-        return v
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop if no improvement in best value for specified patience."""
@@ -279,18 +262,11 @@ class StagnationCondition(StoppingCondition):
         objective_type = vocs.objectives[self.objective_name]
         objective_values = data[self.objective_name].dropna()
 
-        if len(objective_values) < self.patience + 1:
-            return False
-
         # Track the best value seen so far
         if objective_type.upper() == "MINIMIZE":
             cumulative_best = objective_values.cummin()
         else:  # MAXIMIZE
             cumulative_best = objective_values.cummax()
-
-        # Check if there's been improvement in the last 'patience' evaluations
-        if len(cumulative_best) < self.patience:
-            return False
 
         recent_best = cumulative_best.iloc[-1]
         past_best = cumulative_best.iloc[-(self.patience + 1)]
@@ -325,9 +301,6 @@ class FeasibilityCondition(StoppingCondition):
         # Use VOCS to determine feasibility
         feasibility_data = vocs.feasibility_data(data)
 
-        if "feasible" not in feasibility_data.columns:
-            return False
-
         if self.require_all_constraints:
             # Stop if any point is fully feasible
             return feasibility_data["feasible"].any()
@@ -340,8 +313,6 @@ class FeasibilityCondition(StoppingCondition):
             ]
             if constraint_columns:
                 return feasibility_data[constraint_columns].any().any()
-
-        return False
 
 
 class CompositeCondition(StoppingCondition):
