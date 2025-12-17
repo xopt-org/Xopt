@@ -32,5 +32,10 @@ jobs:
         shell: bash -l {0}
         run: |
           echo -e '## Test results\n\n```' >> "$GITHUB_STEP_SUMMARY"
-          pytest xopt/tests -v 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          pytest xopt/tests -v --cov=xopt --cov-report=term --cov-report=xml 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: xopt-org/xopt
