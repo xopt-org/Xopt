@@ -1,5 +1,7 @@
+import pandas as pd
 from xopt.generator import Generator
 from stable_baselines3.common.base_class import BaseAlgorithm
+from typing import List, Dict, Any, Union
 
 
 class ModelWrapper:
@@ -15,11 +17,9 @@ class ModelWrapper:
 
 
 class RLModelGenerator(Generator):
-    """RL Model generator. Utilizes an RL model to generate the set of points for evaluation
-
-
-    Turn this RL model params into VOCS
-        * Alternative: separately define. Ensure consistency?
+    """
+    RL Model generator. Utilizes an RL model to generate the set of points for evaluation.
+    This is configured to handle multi-variable optimization.
     """
 
     name = "rl_model_generator"
@@ -28,17 +28,16 @@ class RLModelGenerator(Generator):
     supports_single_objective: bool = True
     rl_model: ModelWrapper = None
 
-    def set_model(self, model):
+    def set_model(self, model: BaseAlgorithm):
         self.rl_model = ModelWrapper(model)
 
     @property
-    def model_input_names(self):
+    def model_input_names(self) -> List[str]:
         """variable names corresponding to trained model"""
-        variable_names = self.vocs.variable_names
-        return variable_names
+        return self.vocs.variable_names
 
-    def generate(self, n_candidates: int):
-        if self.data is None:
+    def generate(self, n_candidates: int) -> List[Dict[str, Union[float, Any]]]:
+        if self.data is None or len(self.data) == 0:
             raise RuntimeError(
                 "no data contained in generator, call `set_data` "
                 "method to set data, see also `Xopt.random_evaluate()`"
@@ -48,14 +47,22 @@ class RLModelGenerator(Generator):
 
         input_data = self.data[self.model_input_names]
 
-        candidates = [
-            input_data.values[i] + model.predict(input_data.values[i])[0]
-            for i in range(n_candidates)
-        ]  # TODO: Review this
+        current_states_array = input_data.values
+
+        candidates = []
+        for state in current_states_array:
+            action, _ = model.predict(state, deterministic=True)
+
+            if action.ndim > 1:
+                action = action.flatten()
+
+            new_candidate_state = state + action
+
+            candidates.append(new_candidate_state)
 
         results = self.vocs.convert_numpy_to_inputs(candidates, include_constants=False)
 
         return results
 
-    def set_data(self, data):
+    def set_data(self, data: pd.DataFrame):
         self.data = data
