@@ -1,7 +1,7 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import pandas as pd
 import torch
@@ -117,7 +117,7 @@ class TurboController(XoptBaseModel, ABC):
         validate_default=True,
     )
 
-    center_x: Optional[Dict[str, float]] = Field(
+    center_x: Optional[dict[str, float]] = Field(
         None, description="center point of trust region"
     )
     scale_factor: float = Field(
@@ -165,6 +165,22 @@ class TurboController(XoptBaseModel, ABC):
             raise ValueError("Tolerance must be a positive integer")
         return value
 
+    @field_validator("center_x", mode="after")
+    @classmethod
+    def validate_center_x_variables(
+        cls, value: Optional[dict[str, float]], info: ValidationInfo
+    ):
+        vocs: VOCS | None = info.data.get("vocs", None)
+        if value is not None and vocs is not None:
+            center_x_keys = set(value.keys())
+            vocs_variable_names = set(vocs.variable_names)
+            difference = vocs_variable_names ^ center_x_keys
+            if difference:
+                raise ValueError(
+                    f"center_x must contain all variable names in vocs or be None. Missing variables: {difference}"
+                )
+        return value
+
     def get_trust_region(self, generator: "BayesianGenerator") -> Tensor:
         """
         Return the trust region based on the generator. The trust region is a
@@ -191,6 +207,15 @@ class TurboController(XoptBaseModel, ABC):
         if self.center_x is not None:
             # get bounds width
             bound_widths = bounds[1] - bounds[0]
+
+            variable_names = self.vocs.variable_names
+            center_x_keys = set(self.center_x.keys())
+            vocs_variable_names = set(variable_names)
+            difference = vocs_variable_names ^ center_x_keys
+            if difference:
+                raise ValueError(
+                    f"center_x must contain all variable names in vocs. Missing variables: {difference}"
+                )
 
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
