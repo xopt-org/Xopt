@@ -28,7 +28,7 @@ dependencies = [
   "tqdm",
   "orjson",
   "matplotlib",
-  "gest-api @ git+https://github.com/campa-consortium/gest-api"
+  "gest-api @ git+https://github.com/campa-consortium/gest-api@main"
 ]
 description = "Flexible optimization of arbitrary problems in Python."
 dynamic = [ "version" ]
@@ -49,7 +49,8 @@ dev = [
   "python-lsp-server",
   "pygments",
   "dask",
-  "mpi4py"
+  "mpi4py",
+  "libensemble @ git+https://github.com/libensemble/libensemble@experimental/jlnav_plus_shuds_asktell",
 ]
 doc = [
   "mkdocs",
