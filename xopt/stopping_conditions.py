@@ -82,7 +82,10 @@ def get_stopping_condition(name: str) -> type[StoppingCondition]:
 
 class MaxEvaluationsCondition(StoppingCondition):
     """
-    Stop after a maximum number of evaluations.
+    Stop after a maximum number of evaluations. Evaluations can be counted
+    in different ways based on parameters. If count_valid_only is True, only
+    evaluations without errors are counted. If use_dataframe_index is True,
+    the dataframe index is used to count evaluations instead of the number of rows.
 
     Parameters
     ----------
