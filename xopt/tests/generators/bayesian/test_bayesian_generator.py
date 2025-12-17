@@ -16,6 +16,8 @@ from xopt import VOCS
 from xopt.base import Xopt
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
@@ -38,6 +40,19 @@ class PatchBayesianGenerator(BayesianGenerator):
 
 class MultiObjectivePatchBayesianGenerator(MultiObjectiveBayesianGenerator):
     supports_constraints: bool = True
+
+
+class DummyModelConstructor(ModelConstructor):
+    name: str = "dummy"
+
+    def build_model(self, *a, **k):
+        pass
+
+    def build_model_from_vocs(self, *a, **k):
+        pass
+
+    def build_single_task_gp(self, *a, **k):
+        pass
 
 
 class TestBayesianGenerator(TestCase):
@@ -300,3 +315,27 @@ class TestBayesianGenerator(TestCase):
         assert not gen.supports_single_objective
         with pytest.raises(VOCSError):
             gen.vocs = vocs
+
+    def test_validate_gp_constructor_none(self):
+        # Should return StandardModelConstructor instance
+        result = BayesianGenerator.validate_gp_constructor(None)
+        assert isinstance(result, StandardModelConstructor)
+
+    def test_validate_gp_constructor_instance(self):
+        dummy = DummyModelConstructor()
+        result = BayesianGenerator.validate_gp_constructor(dummy)
+        assert result is dummy
+
+    def test_validate_gp_constructor_str(self):
+        result = BayesianGenerator.validate_gp_constructor("standard")
+        assert isinstance(result, StandardModelConstructor)
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_gp_constructor("not_a_constructor")
+
+    def test_validate_gp_constructor_dict(self):
+        # Valid dict
+        result = BayesianGenerator.validate_gp_constructor({"name": "standard"})
+        assert isinstance(result, StandardModelConstructor)
+        # Invalid dict
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_gp_constructor({"name": "not_a_constructor"})
