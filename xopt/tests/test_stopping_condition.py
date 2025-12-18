@@ -13,6 +13,7 @@ from xopt import (
     Xopt,
 )
 from xopt.generators.scipy import LatinHypercubeGenerator
+from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.stopping_conditions import (
     CompositeCondition,
     ConvergenceCondition,
@@ -267,7 +268,7 @@ class TestStoppingConditionIntegration:
     )
     def test_conditions_in_xopt(self, simple_vocs, evaluator, condition):
         """Test each stopping condition individually."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
             vocs=simple_vocs,
@@ -275,7 +276,7 @@ class TestStoppingConditionIntegration:
             generator=generator,
             stopping_condition=condition,
         )
-
+        X.random_evaluate(1)
         X.run()
 
         # Basic assertions depending on condition type
