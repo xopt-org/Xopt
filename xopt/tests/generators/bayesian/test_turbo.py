@@ -99,6 +99,30 @@ class TestTurbo(TestCase):
                 vocs=test_vocs_2, turbo_controller="OptimizeTurboController"
             )
 
+    def test_center_x(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+
+        # Test None condition for center_x
+        center_x = None
+        turbo_state = OptimizeTurboController(vocs=test_vocs, center_x=center_x)
+        assert turbo_state.center_x is None
+
+        # Test valid center_x
+        center_x = {"x1": 0.5, "x2": 0.5}
+        turbo_state = OptimizeTurboController(vocs=test_vocs, center_x=center_x)
+        assert turbo_state.center_x == center_x
+
+        # Test incomplete center_x
+        center_x = {"x1": 0.5}
+
+        with pytest.raises(ValueError):
+            turbo_state = OptimizeTurboController(vocs=test_vocs, center_x=center_x)
+
+        # Test center_x with undefined variable
+        center_x = {"undefined_variable": 0.5, "x2": 0.5}
+        with pytest.raises(ValueError):
+            turbo_state = OptimizeTurboController(vocs=test_vocs, center_x=center_x)
+
     def test_get_trust_region(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
