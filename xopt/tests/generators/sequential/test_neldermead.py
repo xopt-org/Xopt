@@ -174,6 +174,9 @@ class TestNelderMeadGenerator:
 
         # Xopt Simplex
         YAML = """
+        stopping_condition:
+            name: MaxEvaluationsCondition
+            max_evaluations: 1000
         generator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
@@ -187,7 +190,6 @@ class TestNelderMeadGenerator:
             objectives: {y: MINIMIZE}
         """
         X = Xopt.from_yaml(YAML)
-        X.max_evaluations = 1000
         X.run()
 
         # Results should be the same
