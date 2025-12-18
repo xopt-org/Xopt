@@ -214,15 +214,6 @@ class TurboController(XoptBaseModel, ABC):
             # get bounds width
             bound_widths = bounds[1] - bounds[0]
 
-            variable_names = self.vocs.variable_names
-            center_x_keys = set(self.center_x.keys())
-            vocs_variable_names = set(variable_names)
-            difference = vocs_variable_names ^ center_x_keys
-            if difference:
-                raise ValueError(
-                    f"center_x must contain all variable names in vocs. Missing variables: {difference}"
-                )
-
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
                 [self.center_x[ele] for ele in self.vocs.variable_names],
