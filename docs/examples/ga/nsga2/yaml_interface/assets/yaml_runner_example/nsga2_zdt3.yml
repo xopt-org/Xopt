@@ -1,4 +1,6 @@
-max_evaluations: 5000
+stopping_condition:
+    name: MaxEvaluationsCondition
+    max_evaluations: 5000
 
 generator:
   name: nsga2  # Use `NSGA2Generator`

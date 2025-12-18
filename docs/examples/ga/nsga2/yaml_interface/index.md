@@ -84,7 +84,9 @@ The configuration file used to solve ZDT3 (n=30) with the `NSGA2Generator` is in
 Write this in a file in your project directory called `nsga2_zdt3.yml`.
 
 ```yaml
-max_evaluations: 5000
+stopping_condition:
+    name: MaxEvaluationsCondition
+    max_evaluations: 5000
 
 generator:
   name: nsga2  # Use `NSGA2Generator`
@@ -159,7 +161,9 @@ vocs:
 The topmost line defines the stopping condition.
 The optimizer will terminate after completing 5000 evaluations of the function.
 ```yaml
-max_evaluations: 5000
+stopping_condition:
+    name: MaxEvaluationsCondition
+    max_evaluations: 5000
 ```
 
 Next, we setup the generator.
