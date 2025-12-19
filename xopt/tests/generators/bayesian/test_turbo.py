@@ -123,6 +123,13 @@ class TestTurbo(TestCase):
         with pytest.raises(ValueError):
             turbo_state = OptimizeTurboController(vocs=test_vocs, center_x=center_x)
 
+        # Test center_x outside of bounds
+        center_x = {"x1": -1.0, "x2": 0.5}
+
+        turbo_state = OptimizeTurboController(vocs=test_vocs, center_x=center_x)
+        with pytest.raises(ValueError):
+            UpperConfidenceBoundGenerator(vocs=test_vocs, turbo_controller=turbo_state)
+
     def test_get_trust_region(self):
         # test in 1D
         test_vocs = deepcopy(TEST_VOCS_BASE)
