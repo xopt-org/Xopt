@@ -473,17 +473,16 @@ class TestModelConstructor:
         # test building models directly with no data
         with pytest.raises(ValueError):
             gp_constructor.build_single_task_gp(
-                X=torch.empty((0,1)),
-                Y=torch.empty((0,1)),
+                X=torch.empty((0, 1)),
+                Y=torch.empty((0, 1)),
             )
 
         with pytest.raises(ValueError):
             gp_constructor.build_heteroskedastic_gp(
-                X=torch.empty((0,1)),
-                Y=torch.empty((0,1)),
-                Yvar=torch.empty((0,1)),
+                X=torch.empty((0, 1)),
+                Y=torch.empty((0, 1)),
+                Yvar=torch.empty((0, 1)),
             )
-
 
     def test_custom_noise_prior(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -579,9 +578,11 @@ class TestModelConstructor:
         # Test build_single_task_gp without training
         model = StandardModelConstructor.build_single_task_gp(X, Y, train=False)
         assert isinstance(model, SingleTaskGP)
-        
-        # Test build_heteroskedastic_gp without training  
-        model_hetero = StandardModelConstructor.build_heteroskedastic_gp(X, Y, Yvar, train=False)
+
+        # Test build_heteroskedastic_gp without training
+        model_hetero = StandardModelConstructor.build_heteroskedastic_gp(
+            X, Y, Yvar, train=False
+        )
         assert isinstance(model_hetero, XoptHeteroskedasticSingleTaskGP)
 
     @pytest.fixture(autouse=True)
