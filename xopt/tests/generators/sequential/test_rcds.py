@@ -35,6 +35,13 @@ def eval_f_linear_offset(x):  # offset the optimal solution
     return {"y1": np.sum([(x - 2) ** 2 for x in x.values()])}
 
 
+def eval_f_linear_pos_nans(x):
+    val = np.sum([x**2 for x in x.values()])
+    if val > 1:
+        return {"y1": np.nan}
+    return {"y1": val}
+
+
 class TestRCDSGenerator:
     def test_rcds_generate_multiple_points(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -282,3 +289,16 @@ class TestRCDSGenerator:
         sm.current_gmadp = DummyGMADP()
         sm.update_obj(42)
         assert sm.current_gmadp.updated == 42
+
+    def test_rcds_nan_handling(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        test_vocs.variables = {f"x{i}": [-5, 5] for i in range(2)}
+        test_vocs.objectives = {"y1": "MINIMIZE"}
+        generator = RCDSGenerator(step=0.01, noise=0.00001, vocs=test_vocs)
+        evaluator = Evaluator(function=eval_f_linear_pos_nans)
+        X = Xopt(vocs=test_vocs, evaluator=evaluator, generator=generator)
+
+        X.random_evaluate(1)
+        for i in range(300):
+            X.step()
