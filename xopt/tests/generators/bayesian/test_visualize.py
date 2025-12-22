@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import pytest
 import numpy as np
 import torch
@@ -5,6 +6,9 @@ import pandas as pd
 from unittest.mock import MagicMock
 
 from xopt.generators.bayesian import visualize
+from xopt.generators.bayesian.upper_confidence_bound import (
+    UpperConfidenceBoundGenerator,
+)
 from xopt.vocs import VOCS
 
 
@@ -57,6 +61,38 @@ def data(vocs):
             "y": np.linspace(0, 1, 5),
             "z": np.linspace(0, 1, 5),
         }
+    )
+
+
+@pytest.mark.parametrize("show_acquisition", [True, False])
+@pytest.mark.parametrize("variable_names", [["x"], ["x", "y"]])
+def test_visualize_model(vocs, data, variable_names, show_acquisition):
+    generator = UpperConfidenceBoundGenerator(vocs=vocs)
+    generator.add_data(data)
+    generator.train_model()
+
+    fig, ax = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=variable_names,
+        n_grid=5,
+        show_acquisition=show_acquisition,
+    )
+    assert ax is not None
+
+    fig, ax = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=variable_names,
+        n_grid=5,
+        show_acquisition=show_acquisition,
+        axes=ax,
     )
 
 
