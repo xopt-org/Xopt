@@ -20,6 +20,7 @@ from xopt.generators.bayesian.bax.algorithms import (
     CurvatureGridOptimize,
 )
 from xopt.generators.bayesian.bax_generator import BaxGenerator
+from xopt.generators.bayesian.bax.visualize import visualize_virtual_objective
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
@@ -299,3 +300,47 @@ class TestBaxGenerator:
         # Edge values should be zero
         assert torch.all(result[:, 0] == 0)
         assert torch.all(result[:, -1] == 0)
+
+    def test_visualization(self):
+        evaluator = Evaluator(function=xtest_callable)
+        alg = GridOptimize()
+
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        gen = BaxGenerator(
+            vocs=test_vocs,
+            algorithm=alg,
+        )
+        gen.numerical_optimizer.n_restarts = 1
+
+        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
+
+        # initialize with single initial candidate
+        xopt.random_evaluate(3)
+        xopt.step()
+
+        visualize_virtual_objective(generator=xopt.generator)
+
+        with pytest.raises(ValueError):
+            visualize_virtual_objective(
+                generator=xopt.generator, variable_names=["x1", "x2", "x3"]
+            )
+
+        with pytest.raises(ValueError):
+            visualize_virtual_objective(
+                generator=xopt.generator, variable_names=["invalid_name"]
+            )
+
+        with pytest.raises(ValueError):
+            visualize_virtual_objective(
+                generator=xopt.generator, reference_point={"invalid_name": 0.5}
+            )
+
+        visualize_virtual_objective(
+            generator=xopt.generator, variable_names=["x1"], n_samples=5
+        )
+
+        xopt.generator.model = None
+        with pytest.raises(ValueError):
+            visualize_virtual_objective(generator=xopt.generator)
