@@ -1,4 +1,5 @@
 from copy import deepcopy
+import os
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -6,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from torch.nn import Module
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
@@ -14,7 +16,7 @@ from gest_api.vocs import ContinuousVariable
 
 from xopt import VOCS
 from xopt.base import Xopt
-from xopt.errors import VOCSError
+from xopt.errors import VOCSError, XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -23,6 +25,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     MultiObjectiveBayesianGenerator,
 )
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
+from xopt.pydantic import encode_torch_module
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import random_inputs
@@ -110,9 +113,45 @@ class TestBayesianGenerator(TestCase):
 
         assert CustomBayesianGenerator.get_compatible_turbo_controllers() == [None]
 
-    def test_validation(self):
+    def test_torch_module_validation(self):
         # test validate torch modules
-        BayesianGenerator.validate_torch_modules(torch.nn.ReLU())
+        encoded_module = encode_torch_module(torch.nn.Linear(5, 2))
+        exit_val = BayesianGenerator.validate_torch_modules("base64: " + encoded_module)
+        assert isinstance(exit_val, Module)
+
+        torch.save(torch.nn.Linear(3, 1), "test_module.pt")
+        exit_val = BayesianGenerator.validate_torch_modules("test_module.pt")
+        assert isinstance(exit_val, torch.nn.Linear)
+        os.remove("test_module.pt")
+
+        with pytest.raises(XoptError):
+            BayesianGenerator.validate_torch_modules("invalid_string")
+
+    def test_numerical_optimizer_validation(self):
+        # test with None
+        exit_val = BayesianGenerator.validate_numerical_optimizer(None)
+        assert exit_val == LBFGSOptimizer()
+
+        # test with class
+        exit_val = BayesianGenerator.validate_numerical_optimizer(GridOptimizer())
+        assert exit_val == GridOptimizer()
+
+        # test with string
+        exit_val = BayesianGenerator.validate_numerical_optimizer("LBFGS")
+        assert exit_val == LBFGSOptimizer()
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer("NotAnOptimizer")
+
+        # test with dict
+        exit_val = BayesianGenerator.validate_numerical_optimizer({"name": "grid"})
+        assert exit_val == GridOptimizer()
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer({"name": "NotAnOptimizer"})
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer(5)
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model_w_conditions(self):

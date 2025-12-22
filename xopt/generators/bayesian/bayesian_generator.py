@@ -209,6 +209,8 @@ class BayesianGenerator(Generator, ABC):
                 value = decode_torch_module(value)
             elif os.path.exists(value):
                 value = torch.load(value, weights_only=False)
+            else:
+                raise XoptError(f"cannot load torch module from {value}")
         return value
 
     @field_validator("gp_constructor", mode="before")
