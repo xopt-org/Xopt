@@ -1,10 +1,11 @@
 from copy import deepcopy
 import os
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationInfo
 import pytest
 import torch
 from torch.nn import Module
@@ -397,3 +398,30 @@ class TestBayesianGenerator(TestCase):
         # Invalid dict
         with pytest.raises(ValueError):
             BayesianGenerator.validate_gp_constructor({"name": "not_a_constructor"})
+
+    def test_validate_turbo_controller(self):
+        # Should return None
+        result = BayesianGenerator.validate_turbo_controller(None, {})
+        assert result is None
+
+        # Valid class instance
+        class CustomTurboController:
+            pass
+
+        custom_controller = CustomTurboController()
+        with pytest.raises(ValueError):
+            result = BayesianGenerator.validate_turbo_controller(custom_controller, {})
+
+        class CustomBayesianGenerator(BayesianGenerator):
+            _compatible_turbo_controllers = [CustomTurboController]
+
+        mock_info = MagicMock(ValidationInfo)
+        mock_info.data = {"vocs": {}}
+        result = CustomBayesianGenerator.validate_turbo_controller(
+            custom_controller, mock_info
+        )
+        assert result is custom_controller
+
+        # Invalid type
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_turbo_controller("invalid_string", {})

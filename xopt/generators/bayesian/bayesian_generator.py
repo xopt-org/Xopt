@@ -270,9 +270,6 @@ class BayesianGenerator(Generator, ABC):
         if value is None:
             return value
 
-        if cls._compatible_turbo_controllers is None:
-            raise ValueError("no turbo controllers are compatible with this generator")
-
         compatible_turbo_controllers = [
             turbo_controller
             for turbo_controller in cls.get_compatible_turbo_controllers()
