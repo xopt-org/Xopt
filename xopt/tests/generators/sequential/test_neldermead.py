@@ -89,16 +89,15 @@ class TestNelderMeadGenerator:
         gen = NelderMeadGenerator(vocs=test_vocs, initial_simplex=simplex)
         gen.add_data(X2.data)
         gen.generate()
-
-        # run with trace on
-        gen.trace = True
-        gen.generate()
+        gen.reset()
 
         # run with adaptive off
         X = Xopt.from_yaml(YAML)
         X.generator.adaptive = False
+        X.generator.trace = True
         X.random_evaluate(1)
-        X.generator.generate()
+        for _ in range(20):
+            X.step()
 
     def test_simplex_forced_init(self):
         """test to make sure that a re-loaded simplex generator works the same as the normal one at each step"""

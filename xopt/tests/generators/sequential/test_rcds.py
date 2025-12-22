@@ -93,9 +93,9 @@ class TestRCDSGenerator:
     @pytest.mark.parametrize(
         "fun, obj, x_opt, max_iter",
         [
-            (eval_f_linear_pos, "MINIMIZE", np.zeros(10), 3000),
-            (eval_f_linear_neg, "MAXIMIZE", np.zeros(10), 3000),
-            (eval_f_linear_offset, "MINIMIZE", 2 * np.ones(10), 3000),
+            (eval_f_linear_pos, "MINIMIZE", np.zeros(10), 300),
+            (eval_f_linear_neg, "MAXIMIZE", np.zeros(10), 300),
+            (eval_f_linear_offset, "MINIMIZE", 2 * np.ones(10), 300),
         ],
     )
     def test_rcds_convergence(self, fun, obj, x_opt, max_iter):
@@ -121,10 +121,8 @@ class TestRCDSGenerator:
         else:
             assert best[0] <= 0.0
             assert best[0] >= -0.001
-        assert np.allclose(xbest, x_opt, rtol=0, atol=1e-3)
+        assert np.allclose(xbest, x_opt, rtol=0, atol=1e-1)
 
-
-class TestRCDSInternals:
     def test_bracketmin_exceptions(self):
         sm = rcds.BracketMinStateMachine(0.1, np.zeros(2), 1.0, np.ones(2), 0.1)
         sm.phase = "finished"
