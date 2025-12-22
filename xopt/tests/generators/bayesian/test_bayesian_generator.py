@@ -66,6 +66,35 @@ class TestBayesianGenerator(TestCase):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.model_dump()
 
+        # test with no data
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        assert gen.data is None
+        with pytest.raises(RuntimeError):
+            gen.generate(1)
+
+        with pytest.raises(ValueError):
+            gen.train_model()
+
+        with pytest.raises(ValueError):
+            gen.get_acquisition(gen.model)
+
+        # test asking for batch generation when not supported
+        gen.supports_batch_generation = False
+        with pytest.raises(NotImplementedError):
+            gen.generate(2)
+
+        # test with n_interpolate_points but mutiple candidates
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.n_interpolate_points = 5
+        gen.supports_batch_generation = True
+        with pytest.raises(RuntimeError):
+            gen.generate(2)
+
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.data = pd.DataFrame()
+        with pytest.raises(ValueError):
+            gen.train_model()
+
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -425,3 +454,7 @@ class TestBayesianGenerator(TestCase):
         # Invalid type
         with pytest.raises(ValueError):
             BayesianGenerator.validate_turbo_controller("invalid_string", {})
+
+    def test_validate_computation_time(self):
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_computation_time(10)

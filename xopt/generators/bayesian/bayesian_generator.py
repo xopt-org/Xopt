@@ -443,6 +443,9 @@ class BayesianGenerator(Generator, ABC):
         """
         if data is None:
             data = self.get_training_data(self.data)
+            if data is None:
+                raise ValueError("no data available to build model")
+
         if data.empty:
             raise ValueError("no data available to build model")
 
@@ -746,7 +749,7 @@ class BayesianGenerator(Generator, ABC):
 
     @abstractmethod
     def _get_acquisition(self, model):
-        pass
+        pass  # pragma: no cover
 
     def _get_objective(self):
         """
