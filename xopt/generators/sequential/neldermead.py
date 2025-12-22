@@ -124,6 +124,10 @@ class NelderMeadGenerator(SequentialGenerator):
         0, description="How many points are considered manual/not part of simplex run"
     )
 
+    trace: bool = Field(
+        False, description="If True, print trace messages during optimization"
+    )
+
     _initial_simplex = None
     _initial_point = None
     _saved_options: Dict = None
@@ -293,6 +297,7 @@ class NelderMeadGenerator(SequentialGenerator):
             adaptive=self.adaptive,
             initial_simplex=self._initial_simplex,
             bounds=(mins, maxs),
+            trace=self.trace,
         )
 
         self.y = None
@@ -353,6 +358,7 @@ def _neldermead_generator(
     initial_simplex: Optional[np.ndarray] = None,
     adaptive: bool = True,
     bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    trace: bool = False,
 ) -> Optional[Tuple[np.ndarray, Tuple]]:
     """
     Modification of scipy.optimize._optimize._minimize_neldermead
@@ -381,7 +387,9 @@ def _neldermead_generator(
         Bounds on variables. There are two ways to specify the bounds:
             1. Instance of `Bounds` class.
             2. Sequence of ``(min, max)`` pairs for each element in `x`. None is used to specify no bound.
-
+    trace : bool, optional
+        If True, print trace messages.
+            
     Returns
     -------
     Optional[Tuple[np.ndarray, Tuple]]
@@ -394,7 +402,7 @@ def _neldermead_generator(
     # 1-5 during loop
 
     # TRACE flag is for performance, since it will prevent python message formatting if False
-    TRACE = False
+    TRACE = trace
 
     def log(s):
         print(s)

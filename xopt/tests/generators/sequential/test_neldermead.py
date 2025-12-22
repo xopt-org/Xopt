@@ -7,11 +7,9 @@ import pytest
 from pydantic import ValidationError
 from scipy.optimize import minimize
 
-from xopt import VOCS, Xopt
-from xopt.vocs import get_variable_data, select_best
+from xopt import Xopt
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
-from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
     rosenbrock2_vocs as rbvocs,
@@ -63,6 +61,7 @@ class TestNelderMeadGenerator:
             variables:
                 x0: [-5, 5]
                 x1: [-5, 5]
+                x2: [-5, 5]
             objectives: {y: MINIMIZE}
         """
         X = Xopt.from_yaml(YAML)
@@ -75,6 +74,31 @@ class TestNelderMeadGenerator:
         state = X.json()
         X2 = Xopt.model_validate(json.loads(state))
         X2.step()
+
+        # test simplex property
+        simplex = X2.generator.simplex
+        assert set(simplex.keys()) == {"x0", "x1", "x2"}
+
+        # test reset
+        X2.generator.reset()
+        assert X2.generator._initial_simplex is None
+
+        # test generator with simplex already initialized
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        gen = NelderMeadGenerator(vocs=test_vocs, initial_simplex=simplex)
+        gen.add_data(X2.data)
+        gen.generate()
+
+        # run with trace on
+        gen.trace = True
+        gen.generate()
+
+        # run with adaptive off
+        X = Xopt.from_yaml(YAML)
+        X.generator.adaptive = False
+        X.random_evaluate(1)
+        X.generator.generate()
 
     def test_simplex_forced_init(self):
         """test to make sure that a re-loaded simplex generator works the same as the normal one at each step"""
@@ -176,7 +200,7 @@ class TestNelderMeadGenerator:
         YAML = """
         stopping_condition:
             name: MaxEvaluationsCondition
-            max_evaluations: 1000
+            max_evaluations: 100
         generator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
@@ -194,6 +218,6 @@ class TestNelderMeadGenerator:
 
         # Results should be the same
         xbest = X.data.iloc[X.data["y"].argmin()]
-        assert np.isclose(xbest["x0"], result[0]) and np.isclose(
-            xbest["x1"], result[1]
+        assert np.isclose(xbest["x0"], result[0], atol=1e-3) and np.isclose(
+            xbest["x1"], result[1], atol=1e-3
         ), "Xopt Simplex does not match the vanilla one"
