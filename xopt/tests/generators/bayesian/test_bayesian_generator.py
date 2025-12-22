@@ -22,6 +22,7 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
 )
+from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import random_inputs
@@ -46,13 +47,13 @@ class DummyModelConstructor(ModelConstructor):
     name: str = "dummy"
 
     def build_model(self, *a, **k):
-        pass
+        pass  # pragma: no cover
 
     def build_model_from_vocs(self, *a, **k):
-        pass
+        pass  # pragma: no cover
 
     def build_single_task_gp(self, *a, **k):
-        pass
+        pass  # pragma: no cover
 
 
 class TestBayesianGenerator(TestCase):
@@ -94,6 +95,24 @@ class TestBayesianGenerator(TestCase):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
+
+    def test_class_methods(self):
+        # test base class
+        assert BayesianGenerator.get_compatible_turbo_controllers() == [None]
+        assert BayesianGenerator.get_compatible_numerical_optimizers() == [
+            LBFGSOptimizer,
+            GridOptimizer,
+        ]
+
+        # define separate class
+        class CustomBayesianGenerator(BayesianGenerator):
+            _compatible_turbo_controllers = None
+
+        assert CustomBayesianGenerator.get_compatible_turbo_controllers() == [None]
+
+    def test_validation(self):
+        # test validate torch modules
+        BayesianGenerator.validate_torch_modules(torch.nn.ReLU())
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model_w_conditions(self):

@@ -165,6 +165,7 @@ class TestBaxGenerator:
         gen = BaxGenerator(
             vocs=test_vocs,
             algorithm=alg,
+            algorithm_results_file="test",
         )
         gen.numerical_optimizer.n_restarts = 1
         gen.data = TEST_VOCS_DATA

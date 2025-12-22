@@ -183,8 +183,6 @@ class BayesianGenerator(Generator, ABC):
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
-        if compatible is None:
-            return [None]
 
         compatible_list: list[type[TurboController] | None] = []
         # If it's a ModelPrivateAttr, get the default value
