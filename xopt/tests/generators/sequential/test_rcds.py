@@ -37,7 +37,7 @@ def eval_f_linear_offset(x):  # offset the optimal solution
 
 def eval_f_linear_pos_nans(x):
     val = np.sum([x**2 for x in x.values()])
-    if val > 1:
+    if val < 2:
         return {"y1": np.nan}
     return {"y1": val}
 
@@ -299,6 +299,9 @@ class TestRCDSGenerator:
         evaluator = Evaluator(function=eval_f_linear_pos_nans)
         X = Xopt(vocs=test_vocs, evaluator=evaluator, generator=generator)
 
-        X.random_evaluate(1)
-        for i in range(300):
+        X.evaluate_data({"x0": 1.0, "x1": 1.0})
+        for i in range(50):
             X.step()
+
+        # check that all 50 steps have been completed
+        assert len(X.data) == 51
