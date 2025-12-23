@@ -1,14 +1,17 @@
-from matplotlib import pyplot as plt
-import pytest
-import numpy as np
-import torch
-import pandas as pd
 from unittest.mock import MagicMock
 
-from xopt.generators.bayesian import visualize
+import numpy as np
+import pandas as pd
+import pytest
+import torch
+from matplotlib import pyplot as plt
+
+from xopt import Evaluator, Xopt
+from xopt.generators.bayesian import MOBOGenerator, visualize
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
+from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.vocs import VOCS
 
 
@@ -206,6 +209,12 @@ def test_validate_names(vocs):
     assert outs == ["z"]
     assert vars_ == ["x"]
 
+    with pytest.raises(ValueError):
+        visualize._validate_names(["z"], ["x", "m", "n"], vocs)
+
+    with pytest.raises(ValueError):
+        visualize._validate_names(["z"], ["a"], vocs)
+
 
 def test_get_reference_point(vocs, data):
     ref = visualize._get_reference_point(None, vocs, data)
@@ -255,14 +264,6 @@ def test_get_axis():
 
 
 def test_in_generator():
-    # set values if testing
-
-    import pandas as pd
-
-    from xopt import Xopt, Evaluator
-    from xopt.generators.bayesian import MOBOGenerator
-    from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-
     evaluator = Evaluator(function=evaluate_TNK)
 
     generator = MOBOGenerator(vocs=tnk_vocs, reference_point={"y1": 1.5, "y2": 1.5})
