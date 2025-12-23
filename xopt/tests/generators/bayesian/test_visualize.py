@@ -201,12 +201,91 @@ def test_plot_samples_2d(vocs, data):
     assert ax is not None
 
 
-def test__validate_names(vocs):
+def test_validate_names(vocs):
     outs, vars_ = visualize._validate_names(["z"], ["x"], vocs)
     assert outs == ["z"]
     assert vars_ == ["x"]
 
 
-def test__get_reference_point(vocs, data):
+def test_get_reference_point(vocs, data):
     ref = visualize._get_reference_point(None, vocs, data)
     assert isinstance(ref, dict)
+
+
+def test_verify_axes():
+    with pytest.raises(ValueError):
+        visualize._verify_axes("str", 5, 5)
+
+    fig, ax = plt.subplots(2, 2)
+    visualize._verify_axes(ax, 2, 2)
+    with pytest.raises(ValueError):
+        visualize._verify_axes(ax, 3, 2)
+
+    fig, ax = plt.subplots(1, 3)
+    visualize._verify_axes(ax, 1, 3)
+    with pytest.raises(ValueError):
+        visualize._verify_axes(ax, 1, 2)
+
+    fig, ax = plt.subplots()
+    visualize._verify_axes(ax, 1, 1)
+
+
+def test_get_figure_from_axes():
+    fig, ax = plt.subplots()
+    returned_fig = visualize._get_figure_from_axes(ax)
+    assert returned_fig is fig
+
+    with pytest.raises(ValueError):
+        visualize._get_figure_from_axes(None)
+
+    with pytest.raises(ValueError):
+        visualize._get_figure_from_axes("str")
+
+    with pytest.raises(ValueError):
+        visualize._get_figure_from_axes(np.array([1, 2, 3]))
+
+
+def test_get_axis():
+    assert isinstance(visualize._get_axis(None), plt.Axes)
+    fig, ax = plt.subplots()
+    assert visualize._get_axis(ax) is ax
+
+    with pytest.raises(ValueError):
+        visualize._get_axis("str")
+
+
+def test_in_generator():
+    # set values if testing
+
+    import pandas as pd
+
+    from xopt import Xopt, Evaluator
+    from xopt.generators.bayesian import MOBOGenerator
+    from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
+
+    evaluator = Evaluator(function=evaluate_TNK)
+
+    generator = MOBOGenerator(vocs=tnk_vocs, reference_point={"y1": 1.5, "y2": 1.5})
+    generator.n_monte_carlo_samples = 1
+    generator.numerical_optimizer.n_restarts = 1
+    generator.numerical_optimizer.max_iter = 1
+    generator.gp_constructor.use_low_noise_prior = True
+
+    X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+
+    with pytest.raises(ValueError):
+        X.generator.visualize_model()
+
+    X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
+
+    X.step()
+
+    X.generator.visualize_model(
+        show_acquisition=True, show_feasibility=True, show_prior_mean=True
+    )
+    X.generator.visualize_model(
+        variable_names=["x1"],
+        show_acquisition=True,
+        show_feasibility=True,
+        show_prior_mean=True,
+    )
