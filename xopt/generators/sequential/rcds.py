@@ -785,7 +785,7 @@ class RCDSGenerator(SequentialGenerator):
 
     def _add_data(self, new_data: pd.DataFrame):
         # first update the rcds object from the last measurement
-        res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
+        res = new_data.iloc[-1][self.vocs.objective_names].to_numpy().item()
 
         if self._powell is not None:
             self._powell.update_obj(self._sign * res)
