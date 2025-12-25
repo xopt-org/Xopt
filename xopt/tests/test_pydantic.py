@@ -5,7 +5,7 @@ import os
 import tempfile
 from functools import partial
 from types import FunctionType, MethodType
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -428,6 +428,12 @@ def test_recursive_serialize_and_deserialize():
     deser = recursive_deserialize(d2.copy())
     assert deser["dtype"] == torch.float32
 
+    ser = recursive_serialize({"float": torch.float32, "unserizable": DummyModel()})
+    assert ser == {
+        "float": "torch.float32",
+        "unserizable": "xopt.tests.test_pydantic.DummyModel",
+    }
+
 
 def test_orjson_dumps_and_loads():
     m = DummyModel()
@@ -478,6 +484,10 @@ def test_xoptbasemodel_to_json_yaml(tmp_path):
     with pytest.raises(OSError):
         M.from_file("nonexistent.yaml")
 
+    # test torch load in XoptBaseModel
+    torch.save(torch.nn.Linear(2, 2), tmp_path / "model.pt")
+    M.validate_files(str(tmp_path / "model.pt"), None)
+
 
 def test_remove_none_values():
     d = {"a": 1, "b": None, "c": {"d": None, "e": 2}, "f": [None, 3]}
@@ -492,13 +502,13 @@ def test_get_descriptions_defaults():
         """desc"""
 
         a: int = 1
+        f: Callable = lambda x: x + 1
 
     m = M()
     desc = get_descriptions_defaults(m)
     assert "a" in desc
+    assert "f" in desc
 
-
-def test_get_descriptions_defaults_nested():
     class Inner(XoptBaseModel):
         """inner desc"""
 
@@ -518,8 +528,6 @@ def test_get_descriptions_defaults_nested():
     assert "x" in desc["inner"]
     assert "y" in desc
 
-
-def test_get_descriptions_defaults_object_type():
     class DummyCallable:
         pass
 
@@ -574,7 +582,7 @@ def test_baseexecutor_and_normalexecutor():
 
 def test_validate_and_compose_signature_tuple_and_empty():
     def fn_tuple(x=(1, 2)):
-        pass
+        pass  # pragma: no cover
 
     model = validate_and_compose_signature(fn_tuple)
     # Should create a field with type tuple and default None
@@ -583,7 +591,7 @@ def test_validate_and_compose_signature_tuple_and_empty():
     assert model.model_fields["x"].default is None
 
     def fn_empty(x=inspect.Parameter.empty):
-        pass
+        pass  # pragma: no cover
 
     model = validate_and_compose_signature(fn_empty)
     # Should create a field with type inspect.Parameter.empty and default inspect.Parameter.empty
@@ -592,7 +600,7 @@ def test_validate_and_compose_signature_tuple_and_empty():
     assert model.model_fields["x"].default == inspect.Parameter.empty
 
     def fn_none(x=None):
-        pass
+        pass  # pragma: no cover
 
     model = validate_and_compose_signature(fn_none)
     # Should create a field with type inspect.Parameter.empty and default None
@@ -601,7 +609,7 @@ def test_validate_and_compose_signature_tuple_and_empty():
     assert model.model_fields["x"].default is None
 
     def fn_int(x=5):
-        pass
+        pass  # pragma: no cover
 
     model = validate_and_compose_signature(fn_int)
     # Should create a field with type int and default 5
