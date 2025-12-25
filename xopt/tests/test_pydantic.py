@@ -548,6 +548,12 @@ def test_objloader_minimal():
 
     loader = ObjLoaderMinimal[Dummy]()
     assert loader.object_type == Dummy
+    
+    # test serialize object type
+    res = loader.serialize_object_type(None)
+    assert res is None
+    res = loader.serialize_object_type(Dummy)
+    assert res == f"{Dummy.__module__}.{Dummy.__name__}"
 
 
 def test_signaturemodel_build():
@@ -638,6 +644,10 @@ def test_objloader_validate_all_loader_variants():
     loader4 = ObjLoader[Dummy](loader={})
     assert loader4.object_type == Dummy
     assert isinstance(loader4.loader, type(loader.loader))
+
+    # test serialization of loader
+    for loader in [loader, loader2, loader3, loader4]:
+        loader.serialize_json()
 
     # Loader with wrong callable type should raise ValueError
     class Other:

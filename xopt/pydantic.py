@@ -444,7 +444,6 @@ class ObjLoaderMinimal(
 
     @field_serializer("object_type", when_used="json")
     def serialize_object_type(self, x):
-        print("object_type serializer", x)
         if x is None:
             return x
         return f"{x.__module__}.{x.__name__}"
