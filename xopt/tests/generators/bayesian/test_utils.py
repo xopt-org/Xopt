@@ -390,15 +390,6 @@ class TestUtils:
         with pytest.raises(ValueError):
             torch_compile_gp_model(model, vocs, {}, posterior=True)
 
-    def test_compile_gp_model_mean_mismatch(self):
-        class DummyModel(torch.nn.Module):
-            def forward(self, x):
-                class DummyDist:
-                    mean = torch.tensor([1.0])
-                    variance = torch.tensor([2.0])
-
-                return DummyDist()
-
     def test_torch_trace_acqf(self):
         evaluator = Evaluator(function=xtest_callable)
         gen = UpperConfidenceBoundGenerator(
