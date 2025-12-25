@@ -14,12 +14,26 @@ class TestMultiFidelityGenerator:
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
 
-        gen = MultiFidelityGenerator(vocs=vocs)
+        for ele in ["MAXIMIZE", "MINIMIZE"]:
+            vocs.objectives = {"y1": ele}
+            gen = MultiFidelityGenerator(vocs=vocs)
 
-        # test reference point
-        pt = gen.reference_point
-        assert pt == {"s": 0.0, "y1": 100.0}
-        assert gen.vocs.objective_names == ["y1", "s"]
+            # test reference point
+            pt = gen.reference_point
+            assert gen.vocs.objective_names == ["y1", "s"]
+
+            if ele == "MAXIMIZE":
+                assert pt == {"s": 0.0, "y1": -100.0}
+            else:
+                assert pt == {"s": 0.0, "y1": 100.0}
+
+            # test fidelity objective index
+            assert gen.fidelity_objective_index == 1
+            assert gen.fidelity_variable_index == 2
+
+        vocs.objectives = {"y1": "EXPLORE"}
+        with pytest.raises(ValueError):
+            MultiFidelityGenerator(vocs=vocs)
 
     def test_add_data(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -87,31 +101,38 @@ class TestMultiFidelityGenerator:
             == data[fidelity_parameter].to_numpy().sum() + 10
         )
 
+        # test model validation
+        with pytest.raises(ValueError):
+            generator.get_acquisition(None)
+
     def test_generation(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
 
         data = deepcopy(TEST_VOCS_DATA)
 
-        # add a fidelity parameter
-        fidelity_parameter = "s"
-        data[fidelity_parameter] = Series([1.0] * 10)
+        for ele in ["MAXIMIZE", "MINIMIZE"]:
+            vocs.objectives = {"y1": ele}
 
-        generator = MultiFidelityGenerator(vocs=vocs)
-        generator.numerical_optimizer.n_restarts = 1
+            # add a fidelity parameter
+            fidelity_parameter = "s"
+            data[fidelity_parameter] = Series([1.0] * 10)
 
-        generator.add_data(data)
+            generator = MultiFidelityGenerator(vocs=vocs)
+            generator.numerical_optimizer.n_restarts = 1
 
-        # test getting the objective
-        generator._get_objective()
+            generator.add_data(data)
 
-        # test single and and batch generation
-        generator.generate(1)
-        generator.generate(2)
+            # test getting the objective
+            generator._get_objective()
 
-        # test getting the best point at max fidelity
-        # get optimal value at max fidelity
-        generator.get_optimum()
+            # test single and and batch generation
+            generator.generate(1)
+            generator.generate(2)
+
+            # test getting the best point at max fidelity
+            # get optimal value at max fidelity
+            generator.get_optimum()
 
     def test_multi_objective(self):
         my_vocs = deepcopy(tnk_vocs)

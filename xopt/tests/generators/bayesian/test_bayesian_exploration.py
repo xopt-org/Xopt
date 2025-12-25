@@ -29,6 +29,10 @@ class TestBayesianExplorationGenerator:
         test_vocs2.objectives = {}
         test_vocs2.observables = ["y1"]
 
+        test_vocs3 = deepcopy(test_vocs)
+        test_vocs3.objectives = {}
+        test_vocs3.observables = []
+
         for ele in [test_vocs2]:
             gen = BayesianExplorationGenerator(
                 vocs=ele,
@@ -50,6 +54,9 @@ class TestBayesianExplorationGenerator:
             assert len(candidate) == 1
             candidate = gen.generate(5)
             assert len(candidate) == 5
+
+        with pytest.raises(ValueError):
+            BayesianExplorationGenerator(vocs=test_vocs3)
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)

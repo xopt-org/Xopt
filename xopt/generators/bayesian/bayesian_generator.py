@@ -183,8 +183,6 @@ class BayesianGenerator(Generator, ABC):
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
-        if compatible is None:
-            return [None]
 
         compatible_list: list[type[TurboController] | None] = []
         # If it's a ModelPrivateAttr, get the default value
@@ -211,6 +209,8 @@ class BayesianGenerator(Generator, ABC):
                 value = decode_torch_module(value)
             elif os.path.exists(value):
                 value = torch.load(value, weights_only=False)
+            else:
+                raise XoptError(f"cannot load torch module from {value}")
         return value
 
     @field_validator("gp_constructor", mode="before")
@@ -269,9 +269,6 @@ class BayesianGenerator(Generator, ABC):
         """note default behavior is no use of turbo"""
         if value is None:
             return value
-
-        if cls._compatible_turbo_controllers is None:
-            raise ValueError("no turbo controllers are compatible with this generator")
 
         compatible_turbo_controllers = [
             turbo_controller
@@ -446,6 +443,9 @@ class BayesianGenerator(Generator, ABC):
         """
         if data is None:
             data = self.get_training_data(self.data)
+            if data is None:
+                raise ValueError("no data available to build model")
+
         if data.empty:
             raise ValueError("no data available to build model")
 
@@ -749,7 +749,7 @@ class BayesianGenerator(Generator, ABC):
 
     @abstractmethod
     def _get_acquisition(self, model):
-        pass
+        pass  # pragma: no cover
 
     def _get_objective(self):
         """
