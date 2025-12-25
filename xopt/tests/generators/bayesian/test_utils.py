@@ -96,7 +96,6 @@ class TestUtils:
         assert pf_Y.shape[1] == 3
         assert hv > 0
 
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_jit(self, use_cuda):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -134,7 +133,7 @@ class TestUtils:
 
         x_grid = torch.tensor(
             pd.DataFrame(
-                gen.vocs.random_inputs(500, include_constants=False)
+                random_inputs(gen.vocs, 500, include_constants=False)
             ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
@@ -157,7 +156,6 @@ class TestUtils:
         t = np.array(t)
         print(f"JIT posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
 
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_compile(self, use_cuda):
         # For inductor + windows any, MSVC 2022 build tools are required
@@ -218,7 +216,9 @@ class TestUtils:
         print(f"JIT trace: {t2 - t1:.4f} seconds")
 
         x_grid = torch.tensor(
-            pd.DataFrame(gen.vocs.random_inputs(20, include_constants=False)).to_numpy()
+            pd.DataFrame(
+                random_inputs(gen.vocs, 20, include_constants=False)
+            ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
 
@@ -264,7 +264,6 @@ class TestUtils:
                 "Compiled model variance mismatch"
             )
 
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_acqf_compile(self, use_cuda):
         print(f"{torch._dynamo.list_backends()=}")
@@ -333,7 +332,7 @@ class TestUtils:
 
         # batch x 1 x d
         x_grid = torch.tensor(
-            pd.DataFrame(gen.vocs.random_inputs(4, include_constants=False)).to_numpy()
+            pd.DataFrame(random_inputs(gen.vocs, 4, include_constants=False)).to_numpy()
         ).unsqueeze(-2)
         x_grid = x_grid.to(device_map[use_cuda])
 
