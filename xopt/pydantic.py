@@ -210,6 +210,12 @@ class XoptBaseModel(BaseModel):
 
         return value
 
+    # Note that this function still returns a dict, NOT a string. Pydantic will handle
+    # final serialization of basic types in Rust.
+    @model_serializer(mode="plain", when_used="json")
+    def serialize_json(self, sinfo: SerializationInfo) -> dict:
+        return orjson_dumps_except_root(self)
+
     def to_json(self, **kwargs) -> str:
         return orjson_dumps(self, **kwargs)
 
