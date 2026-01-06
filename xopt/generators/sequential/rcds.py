@@ -782,7 +782,7 @@ class RCDSGenerator(SequentialGenerator):
             noise=self.noise,
         )
         _ = self._powell.propose()
-        self._powell.update_obj(self._sign * f0.item())
+        self._powell.update_obj(self._sign * f0)
 
     def _add_data(self, new_data: pd.DataFrame):
         # first update the rcds object from the last measurement
