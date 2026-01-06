@@ -21,6 +21,7 @@ from pydantic import (
     field_validator,
     PositiveInt,
     SerializeAsAny,
+    model_validator,
 )
 from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
@@ -183,8 +184,6 @@ class BayesianGenerator(Generator, ABC):
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
-        if compatible is None:
-            return [None]
 
         compatible_list: list[type[TurboController] | None] = []
         # If it's a ModelPrivateAttr, get the default value
@@ -211,6 +210,8 @@ class BayesianGenerator(Generator, ABC):
                 value = decode_torch_module(value)
             elif os.path.exists(value):
                 value = torch.load(value, weights_only=False)
+            else:
+                raise XoptError(f"cannot load torch module from {value}")
         return value
 
     @field_validator("gp_constructor", mode="before")
@@ -270,9 +271,6 @@ class BayesianGenerator(Generator, ABC):
         if value is None:
             return value
 
-        if cls._compatible_turbo_controllers is None:
-            raise ValueError("no turbo controllers are compatible with this generator")
-
         compatible_turbo_controllers = [
             turbo_controller
             for turbo_controller in cls.get_compatible_turbo_controllers()
@@ -301,6 +299,28 @@ class BayesianGenerator(Generator, ABC):
             )
 
         return value
+
+    @model_validator(mode="after")
+    def validate_model_after(self):
+        if self.turbo_controller is not None:
+            # Check that values for center_x are within trust region bounds
+            trust_region = self.turbo_controller.get_trust_region(self)
+
+            center_x = self.turbo_controller.center_x
+            if center_x is not None:
+                for key, value in center_x.items():
+                    if key in self.vocs.variable_names:
+                        idx = self.vocs.variable_names.index(key)
+                        lower_bound = trust_region[0, idx].item()
+                        upper_bound = trust_region[1, idx].item()
+                        if not (lower_bound <= value <= upper_bound):
+                            raise ValueError(
+                                f"Turbo controller center_x value for {key} : "
+                                f"{value} is outside of trust region bounds "
+                                f"[{lower_bound}, {upper_bound}]"
+                            )
+
+        return self
 
     def add_data(self, new_data: pd.DataFrame):
         """
@@ -446,6 +466,9 @@ class BayesianGenerator(Generator, ABC):
         """
         if data is None:
             data = self.get_training_data(self.data)
+            if data is None:
+                raise ValueError("no data available to build model")
+
         if data.empty:
             raise ValueError("no data available to build model")
 
@@ -749,7 +772,7 @@ class BayesianGenerator(Generator, ABC):
 
     @abstractmethod
     def _get_acquisition(self, model):
-        pass
+        pass  # pragma: no cover
 
     def _get_objective(self):
         """

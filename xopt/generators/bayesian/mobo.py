@@ -6,7 +6,7 @@ from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
 from botorch.utils import draw_sobol_samples
-from pydantic import Field
+from pydantic import Field, field_validator
 from torch import Tensor
 
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
@@ -56,21 +56,18 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
     _compatible_turbo_controllers = [SafetyTurboController]
 
+    @field_validator("custom_objective", mode="before")
+    @classmethod
+    def validate_custom_objective(cls, value):
+        if value is not None:
+            raise ValueError("custom objectives are not supported for MOBOGenerator")
+        return value
+
     def _get_objective(self) -> MCMultiOutputObjective:
         """
         Create the multi-objective Bayesian optimization objective.
         """
-        if self.custom_objective is not None:
-            if self.vocs.n_objectives:
-                raise RuntimeError(
-                    "cannot specify objectives in VOCS "
-                    "and a custom objective for the generator at the "
-                    "same time"
-                )
-
-            objective = self.custom_objective
-        else:
-            objective = create_mobo_objective(self.vocs)
+        objective = create_mobo_objective(self.vocs)
 
         return objective.to(**self.tkwargs)
 

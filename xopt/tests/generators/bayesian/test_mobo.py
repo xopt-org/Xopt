@@ -357,3 +357,18 @@ class TestMOBOGenerator:
         gen.numerical_optimizer.max_iter = 1
         gen.add_data(test_data)
         gen.generate(1)
+
+    def test_custom_objective(self):
+        def custom_objective(samples):
+            return samples[..., 0] ** 2 + samples[..., 1] ** 2
+
+        reference_point = {"y1": 10.0, "y2": 1.5}
+        vocs = deepcopy(TEST_VOCS_BASE_MO)
+
+        with pytest.raises(ValueError):
+            MOBOGenerator(
+                vocs=vocs,
+                reference_point=reference_point,
+                n_monte_carlo_samples=1,
+                custom_objective=custom_objective,
+            )

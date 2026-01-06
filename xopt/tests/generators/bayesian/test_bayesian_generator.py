@@ -1,11 +1,14 @@
 from copy import deepcopy
+import os
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationInfo
 import pytest
 import torch
+from torch.nn import Module
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
@@ -14,6 +17,7 @@ from gest_api.vocs import ContinuousVariable
 
 from xopt import VOCS
 from xopt.base import Xopt
+from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -21,6 +25,8 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
 )
+from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
+from xopt.pydantic import encode_torch_module
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import random_inputs
@@ -45,13 +51,13 @@ class DummyModelConstructor(ModelConstructor):
     name: str = "dummy"
 
     def build_model(self, *a, **k):
-        pass
+        pass  # pragma: no cover
 
     def build_model_from_vocs(self, *a, **k):
-        pass
+        pass  # pragma: no cover
 
     def build_single_task_gp(self, *a, **k):
-        pass
+        pass  # pragma: no cover
 
 
 class TestBayesianGenerator(TestCase):
@@ -59,6 +65,35 @@ class TestBayesianGenerator(TestCase):
     def test_init(self):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.model_dump()
+
+        # test with no data
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        assert gen.data is None
+        with pytest.raises(RuntimeError):
+            gen.generate(1)
+
+        with pytest.raises(ValueError):
+            gen.train_model()
+
+        with pytest.raises(ValueError):
+            gen.get_acquisition(gen.model)
+
+        # test asking for batch generation when not supported
+        gen.supports_batch_generation = False
+        with pytest.raises(NotImplementedError):
+            gen.generate(2)
+
+        # test with n_interpolate_points but mutiple candidates
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.n_interpolate_points = 5
+        gen.supports_batch_generation = True
+        with pytest.raises(RuntimeError):
+            gen.generate(2)
+
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.data = pd.DataFrame()
+        with pytest.raises(ValueError):
+            gen.train_model()
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
@@ -93,6 +128,60 @@ class TestBayesianGenerator(TestCase):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
+
+    def test_class_methods(self):
+        # test base class
+        assert BayesianGenerator.get_compatible_turbo_controllers() == [None]
+        assert BayesianGenerator.get_compatible_numerical_optimizers() == [
+            LBFGSOptimizer,
+            GridOptimizer,
+        ]
+
+        # define separate class
+        class CustomBayesianGenerator(BayesianGenerator):
+            _compatible_turbo_controllers = None
+
+        assert CustomBayesianGenerator.get_compatible_turbo_controllers() == [None]
+
+    def test_torch_module_validation(self):
+        # test validate torch modules
+        encoded_module = encode_torch_module(torch.nn.Linear(5, 2))
+        exit_val = BayesianGenerator.validate_torch_modules("base64: " + encoded_module)
+        assert isinstance(exit_val, Module)
+
+        torch.save(torch.nn.Linear(3, 1), "test_module.pt")
+        exit_val = BayesianGenerator.validate_torch_modules("test_module.pt")
+        assert isinstance(exit_val, torch.nn.Linear)
+        os.remove("test_module.pt")
+
+        with pytest.raises(XoptError):
+            BayesianGenerator.validate_torch_modules("invalid_string")
+
+    def test_numerical_optimizer_validation(self):
+        # test with None
+        exit_val = BayesianGenerator.validate_numerical_optimizer(None)
+        assert exit_val == LBFGSOptimizer()
+
+        # test with class
+        exit_val = BayesianGenerator.validate_numerical_optimizer(GridOptimizer())
+        assert exit_val == GridOptimizer()
+
+        # test with string
+        exit_val = BayesianGenerator.validate_numerical_optimizer("LBFGS")
+        assert exit_val == LBFGSOptimizer()
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer("NotAnOptimizer")
+
+        # test with dict
+        exit_val = BayesianGenerator.validate_numerical_optimizer({"name": "grid"})
+        assert exit_val == GridOptimizer()
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer({"name": "NotAnOptimizer"})
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer(5)
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model_w_conditions(self):
@@ -338,3 +427,34 @@ class TestBayesianGenerator(TestCase):
         # Invalid dict
         with pytest.raises(ValueError):
             BayesianGenerator.validate_gp_constructor({"name": "not_a_constructor"})
+
+    def test_validate_turbo_controller(self):
+        # Should return None
+        result = BayesianGenerator.validate_turbo_controller(None, {})
+        assert result is None
+
+        # Valid class instance
+        class CustomTurboController:
+            pass
+
+        custom_controller = CustomTurboController()
+        with pytest.raises(ValueError):
+            result = BayesianGenerator.validate_turbo_controller(custom_controller, {})
+
+        class CustomBayesianGenerator(BayesianGenerator):
+            _compatible_turbo_controllers = [CustomTurboController]
+
+        mock_info = MagicMock(ValidationInfo)
+        mock_info.data = {"vocs": {}}
+        result = CustomBayesianGenerator.validate_turbo_controller(
+            custom_controller, mock_info
+        )
+        assert result is custom_controller
+
+        # Invalid type
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_turbo_controller("invalid_string", {})
+
+    def test_validate_computation_time(self):
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_computation_time(10)
