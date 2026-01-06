@@ -548,7 +548,7 @@ def test_objloader_minimal():
 
     loader = ObjLoaderMinimal[Dummy]()
     assert loader.object_type == Dummy
-    
+
     # test serialize object type
     res = loader.serialize_object_type(None)
     assert res is None

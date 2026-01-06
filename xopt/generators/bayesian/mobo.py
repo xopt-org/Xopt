@@ -60,9 +60,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     @classmethod
     def validate_custom_objective(cls, value):
         if value is not None:
-            raise ValueError(
-                "custom objectives are not supported for MOBOGenerator"
-            )
+            raise ValueError("custom objectives are not supported for MOBOGenerator")
         return value
 
     def _get_objective(self) -> MCMultiOutputObjective:

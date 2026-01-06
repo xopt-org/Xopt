@@ -1,22 +1,17 @@
-from copy import deepcopy
 import json
 
 import numpy as np
 import pandas as pd
 import pytest
-from pydantic import ValidationError
 from scipy.optimize import minimize
 
 from xopt import VOCS, Xopt
 from xopt.vocs import get_variable_data, select_best
-from xopt.errors import SeqGeneratorError
-from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
     rosenbrock2_vocs as rbvocs,
 )
-from xopt.resources.testing import TEST_VOCS_BASE
 
 
 def compare(X, X2):

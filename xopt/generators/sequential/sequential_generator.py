@@ -100,13 +100,15 @@ class SequentialGenerator(Generator, StateOwner):
         """
         # TODO: make a flag for generator that support multiple data sets
         if self._data_set:
-            raise SeqGeneratorError("Data has already been initialized for this generator.")
+            raise SeqGeneratorError(
+                "Data has already been initialized for this generator."
+            )
         self._set_data(data)
         self._data_set = True
 
     @abstractmethod
     def _set_data(self, data: pd.DataFrame):
-        pass # pragma: no cover
+        pass  # pragma: no cover
 
     def generate(self, n_candidates: int = 1) -> dict:
         """
@@ -160,7 +162,7 @@ class SequentialGenerator(Generator, StateOwner):
         NotImplementedError
             If the method is not implemented by the subclass.
         """
-        pass # pragma: no cover
+        pass  # pragma: no cover
 
     def reset(self):
         """

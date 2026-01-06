@@ -389,7 +389,7 @@ def _neldermead_generator(
             2. Sequence of ``(min, max)`` pairs for each element in `x`. None is used to specify no bound.
     trace : bool, optional
         If True, print trace messages.
-            
+
     Returns
     -------
     Optional[Tuple[np.ndarray, Tuple]]

@@ -12,7 +12,6 @@ from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
-    rosenbrock2_vocs as rbvocs,
 )
 from xopt.resources.testing import TEST_VOCS_BASE
 
