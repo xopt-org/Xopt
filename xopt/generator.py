@@ -81,16 +81,16 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
-        if v.n_objectives == 1:
-            if not info.data["supports_single_objective"]:
-                raise VOCSError(
-                    "this generator does not support single objective optimization"
-                )
+        elif v.n_objectives == 0:
+            raise VOCSError("VOCS must define at least one objective.")
+        elif v.n_objectives == 1 and not info.data["supports_single_objective"]:
+            raise VOCSError(
+                "this generator does not support single objective optimization"
+            )
         elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
             raise VOCSError(
                 "this generator does not support multi-objective optimization"
             )
-
         return v
 
     @field_validator("data", mode="before")
@@ -109,6 +109,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         return v
 
     def _validate_vocs(self, vocs: VOCS):
+        # """
+        # Validate if the vocs object is compatible with the current generator. Should
+        # raise a ValueError if the vocs object is not compatible with the generator
+        # object
+        # """
+        # # Reuse the Pydantic validator logic
+        # return self.__class__.validate_vocs(vocs, ValidationInfo({'data': self.__dict__}))
         pass
 
     def __init__(self, **kwargs):
