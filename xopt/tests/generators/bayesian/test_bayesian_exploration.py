@@ -4,7 +4,6 @@ import pytest
 import torch
 
 from xopt.base import Xopt
-from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.resources.testing import (
@@ -111,5 +110,5 @@ class TestBayesianExplorationGenerator:
     def test_vocs_validation(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
-        with pytest.raises(VOCSError):
+        with pytest.raises(ValueError):
             BayesianExplorationGenerator(vocs=test_vocs)

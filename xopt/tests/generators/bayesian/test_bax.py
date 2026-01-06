@@ -11,7 +11,6 @@ from botorch.models.transforms import Normalize, Standardize
 
 
 from xopt.base import Xopt
-from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax.algorithms import (
     Algorithm,
@@ -255,7 +254,7 @@ class TestBaxGenerator:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         alg = GridOptimize()
 
-        with pytest.raises(VOCSError):
+        with pytest.raises(ValueError):
             BaxGenerator(vocs=test_vocs, algorithm=alg)
 
     def test_curvature_grid_optimize_virtual_objective(self):

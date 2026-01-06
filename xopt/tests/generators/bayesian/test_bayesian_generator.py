@@ -14,7 +14,6 @@ from gest_api.vocs import ContinuousVariable
 
 from xopt import VOCS
 from xopt.base import Xopt
-from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.base_model import ModelConstructor
@@ -304,7 +303,7 @@ class TestBayesianGenerator(TestCase):
         )
         vocs2 = vocs.model_copy()
         vocs2.objectives = {"y1": "MINIMIZE", "y2": "MAXIMIZE"}
-        with pytest.raises(VOCSError):
+        with pytest.raises(ValueError):
             gen = MultiObjectivePatchBayesianGenerator(
                 vocs=vocs, reference_point={"y1": 0.5, "y2": 0.5}
             )
@@ -313,7 +312,7 @@ class TestBayesianGenerator(TestCase):
             vocs=vocs2, reference_point={"y1": 0.5, "y2": 0.5}
         )
         assert not gen.supports_single_objective
-        with pytest.raises(VOCSError):
+        with pytest.raises(ValueError):
             gen.vocs = vocs
 
     def test_validate_gp_constructor_none(self):

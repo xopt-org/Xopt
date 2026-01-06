@@ -3,7 +3,6 @@ from copy import deepcopy
 import pandas as pd
 import pytest
 
-from xopt.errors import VOCSError
 from xopt.generator import Generator
 from xopt.generators import (
     get_generator,
@@ -42,7 +41,7 @@ class TestGenerator:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives.update({"y2": "MINIMIZE"})
 
-        with pytest.raises(VOCSError):
+        with pytest.raises(ValueError):
             PatchGenerator(vocs=test_vocs)
 
     def test_add_data(self):
@@ -98,7 +97,7 @@ class TestGenerator:
         )
 
         with pytest.raises(
-            VOCSError, match="this generator does not support constraints"
+            ValueError, match="this generator does not support constraints"
         ):
             PatchGeneratorNoConstraints(vocs=vocs_with_constraints)
 
