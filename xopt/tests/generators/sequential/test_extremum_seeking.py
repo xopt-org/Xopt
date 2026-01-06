@@ -1,5 +1,4 @@
 from copy import deepcopy
-from turtle import pd
 import numpy as np
 import pandas as pd
 import pytest
