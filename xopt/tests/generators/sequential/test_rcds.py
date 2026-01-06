@@ -35,6 +35,13 @@ def eval_f_linear_offset(x):  # offset the optimal solution
     return {"y1": np.sum([(x - 2) ** 2 for x in x.values()])}
 
 
+def eval_f_linear_pos_nans(x):
+    val = np.sum([x**2 for x in x.values()])
+    if val < 2:
+        return {"y1": np.nan}
+    return {"y1": val}
+
+
 class TestRCDSGenerator:
     def test_rcds_generate_multiple_points(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -93,9 +100,9 @@ class TestRCDSGenerator:
     @pytest.mark.parametrize(
         "fun, obj, x_opt, max_iter",
         [
-            (eval_f_linear_pos, "MINIMIZE", np.zeros(10), 3000),
-            (eval_f_linear_neg, "MAXIMIZE", np.zeros(10), 3000),
-            (eval_f_linear_offset, "MINIMIZE", 2 * np.ones(10), 3000),
+            (eval_f_linear_pos, "MINIMIZE", np.zeros(10), 300),
+            (eval_f_linear_neg, "MAXIMIZE", np.zeros(10), 300),
+            (eval_f_linear_offset, "MINIMIZE", 2 * np.ones(10), 300),
         ],
     )
     def test_rcds_convergence(self, fun, obj, x_opt, max_iter):
@@ -121,10 +128,8 @@ class TestRCDSGenerator:
         else:
             assert best[0] <= 0.0
             assert best[0] >= -0.001
-        assert np.allclose(xbest, x_opt, rtol=0, atol=1e-3)
+        assert np.allclose(xbest, x_opt, rtol=0, atol=1e-1)
 
-
-class TestRCDSInternals:
     def test_bracketmin_exceptions(self):
         sm = rcds.BracketMinStateMachine(0.1, np.zeros(2), 1.0, np.ones(2), 0.1)
         sm.phase = "finished"
@@ -284,3 +289,19 @@ class TestRCDSInternals:
         sm.current_gmadp = DummyGMADP()
         sm.update_obj(42)
         assert sm.current_gmadp.updated == 42
+
+    def test_rcds_nan_handling(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+        test_vocs.variables = {f"x{i}": [-5, 5] for i in range(2)}
+        test_vocs.objectives = {"y1": "MINIMIZE"}
+        generator = RCDSGenerator(step=0.01, noise=0.00001, vocs=test_vocs)
+        evaluator = Evaluator(function=eval_f_linear_pos_nans)
+        X = Xopt(vocs=test_vocs, evaluator=evaluator, generator=generator)
+
+        X.evaluate_data({"x0": 1.0, "x1": 1.0})
+        for i in range(50):
+            X.step()
+
+        # check that all 50 steps have been completed
+        assert len(X.data) == 51

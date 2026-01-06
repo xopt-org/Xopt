@@ -14,7 +14,7 @@ class MOProblem(Problem):
     @property
     @abstractmethod
     def ref_point(self) -> np.ndarray:
-        pass
+        pass  # pragma: no cover
 
     @property
     def ref_point_dict(self):

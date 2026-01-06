@@ -444,13 +444,12 @@ class ObjLoaderMinimal(
         return {"object_type": obj_type}
 
     @model_validator(mode="after")
-    def validate_print(cls, values):
+    def validate_print(self, values):
         print("model validator after: ", values)
         return values
 
     @field_serializer("object_type", when_used="json")
     def serialize_object_type(self, x):
-        print("object_type serializer", x)
         if x is None:
             return x
         return f"{x.__module__}.{x.__name__}"
