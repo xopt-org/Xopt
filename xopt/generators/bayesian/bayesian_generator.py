@@ -21,6 +21,7 @@ from pydantic import (
     field_validator,
     PositiveInt,
     SerializeAsAny,
+    model_validator,
 )
 from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
@@ -298,6 +299,28 @@ class BayesianGenerator(Generator, ABC):
             )
 
         return value
+
+    @model_validator(mode="after")
+    def validate_model_after(self):
+        if self.turbo_controller is not None:
+            # Check that values for center_x are within trust region bounds
+            trust_region = self.turbo_controller.get_trust_region(self)
+
+            center_x = self.turbo_controller.center_x
+            if center_x is not None:
+                for key, value in center_x.items():
+                    if key in self.vocs.variable_names:
+                        idx = self.vocs.variable_names.index(key)
+                        lower_bound = trust_region[0, idx].item()
+                        upper_bound = trust_region[1, idx].item()
+                        if not (lower_bound <= value <= upper_bound):
+                            raise ValueError(
+                                f"Turbo controller center_x value for {key} : "
+                                f"{value} is outside of trust region bounds "
+                                f"[{lower_bound}, {upper_bound}]"
+                            )
+
+        return self
 
     def add_data(self, new_data: pd.DataFrame):
         """
