@@ -109,14 +109,15 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         return v
 
     def _validate_vocs(self, vocs: VOCS):
-        # """
-        # Validate if the vocs object is compatible with the current generator. Should
-        # raise a ValueError if the vocs object is not compatible with the generator
-        # object
-        # """
-        # # Reuse the Pydantic validator logic
-        # return self.__class__.validate_vocs(vocs, ValidationInfo({'data': self.__dict__}))
-        pass
+        """
+        Validate if the vocs object is compatible with the current generator. Should
+        raise a ValueError if the vocs object is not compatible with the generator
+        object
+        """
+        # Reuse the Pydantic validator logic
+        return self.__class__.validate_vocs(
+            vocs, ValidationInfo({"data": self.__dict__})
+        )
 
     def __init__(self, **kwargs):
         """
