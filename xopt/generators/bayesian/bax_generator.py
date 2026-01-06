@@ -4,7 +4,8 @@ from copy import deepcopy
 from typing import Dict, List
 
 from botorch.models import ModelListGP, SingleTaskGP
-from pydantic import Field
+from pydantic import Field, field_validator
+from pydantic_core.core_schema import ValidationInfo
 
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm
@@ -54,6 +55,25 @@ class BaxGenerator(BayesianGenerator):
     )
     _n_calls: int = 0
     _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
+
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        # First run parent validation
+        v = BayesianGenerator.validate_vocs(v, info)
+
+        # BAX-specific validation: ensure algorithm observables are in VOCS outputs
+        algorithm = info.data.get("algorithm")
+        if algorithm is not None:
+            observable_names = algorithm.observable_names_ordered
+            vocs_outputs = set(v.output_names)
+            missing = [name for name in observable_names if name not in vocs_outputs]
+            if missing:
+                raise ValueError(
+                    f"Algorithm observables {missing} are not defined in VOCS outputs. "
+                    f"Available outputs: {list(vocs_outputs)}"
+                )
+
+        return v
 
     def generate(self, n_candidates: int) -> List[Dict]:
         """

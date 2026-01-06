@@ -1,5 +1,8 @@
 from typing import Optional
 
+from pydantic_core.core_schema import ValidationInfo
+from pydantic import field_validator
+
 from botorch.acquisition import MCAcquisitionFunction, MCAcquisitionObjective
 from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
@@ -27,12 +30,16 @@ class BayesianExplorationGenerator(BayesianGenerator):
 
     _compatible_turbo_controllers = [SafetyTurboController]
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        if self.vocs.n_observables == 0:
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_observables == 0:
             raise ValueError(
                 "BayesianExplorationGenerator requires at least one observable in the vocs (instead of specifying an objective)."
             )
+        return v
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
 
     def _get_acquisition(self, model: Model) -> MCAcquisitionFunction:
         """
