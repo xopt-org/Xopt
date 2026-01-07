@@ -70,7 +70,7 @@ class TestXopt:
             constraints:
                 c1: [GREATER_THAN, 0]
                 c2: [LESS_THAN, 0.5]
-            constants: {a: dummy_constant}
+            constants: {a: 0}
 
         """
         X = Xopt.from_yaml(YAML)

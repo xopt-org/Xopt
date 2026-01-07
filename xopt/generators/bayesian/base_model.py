@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 import warnings
 
 import pandas as pd
@@ -50,7 +50,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
     @abstractmethod
@@ -87,7 +87,7 @@ class ModelConstructor(XoptBaseModel, ABC):
             The trained botorch model.
 
         """
-        pass
+        pass  # pragma: no cover
 
     def build_model_from_vocs(
         self,
@@ -195,7 +195,7 @@ class ModelConstructor(XoptBaseModel, ABC):
 
         warnings.filterwarnings("ignore")
 
-        if X.shape[0] == 0 or Y.shape[0] == 0:
+        if X.shape[0] == 0 or Y.shape[0] == 0 or Yvar.shape[0] == 0:
             raise ValueError("no data found to train model!")
         model = XoptHeteroskedasticSingleTaskGP(X, Y, Yvar, **kwargs)
         if train:

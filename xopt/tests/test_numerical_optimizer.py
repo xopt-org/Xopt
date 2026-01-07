@@ -1,3 +1,4 @@
+import pytest
 import time
 from copy import deepcopy
 from unittest.mock import patch
@@ -47,6 +48,23 @@ class TestNumericalOptimizers:
             assert time.time() - start_time < 1.0
             assert candidates.shape == torch.Size([ncandidate, ndim])
 
+    def test_lbfgsoptimizer_max_time_none(self):
+        optimizer = LBFGSOptimizer(max_time=None)
+        bounds = torch.tensor([[0.0], [1.0]])
+        with patch("xopt.numerical_optimizer.optimize_acqf") as mock_opt:
+            mock_opt.return_value = (torch.zeros(1, 1), None)
+            candidates = optimizer.optimize(f, bounds, n_candidates=1)
+            assert candidates.shape == (1, 1)
+            # Ensure timeout_sec is None
+            assert mock_opt.call_args[1]["timeout_sec"] is None
+
+    def test_lbfgsoptimizer_bounds_shape_error(self):
+        optimizer = LBFGSOptimizer()
+        # bounds with wrong shape: should be [2, ndim], here [3, 1]
+        bad_bounds = torch.zeros(3, 1)
+        with pytest.raises(ValueError, match="bounds must have the shape"):
+            optimizer.optimize(f, bad_bounds, n_candidates=1)
+
     def test_grid_optimizer(self):
         optimizer = GridOptimizer()
         for ndim in [1, 3]:
@@ -54,6 +72,13 @@ class TestNumericalOptimizers:
             for ncandidate in [1, 3]:
                 candidates = optimizer.optimize(f, bounds, ncandidate)
                 assert candidates.shape == torch.Size([ncandidate, ndim])
+
+    def test_gridoptimizer_bounds_shape_error(self):
+        optimizer = GridOptimizer()
+        # bounds with wrong shape: should be [2, ndim], here [3, 1]
+        bad_bounds = torch.zeros(3, 1)
+        with pytest.raises(ValueError, match="bounds must have the shape"):
+            optimizer.optimize(f, bad_bounds, n_candidates=1)
 
     def test_in_xopt(self):
         vocs = deepcopy(tnk_vocs)

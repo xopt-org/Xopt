@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     name: Test Suite
     steps:
@@ -30,7 +30,8 @@ jobs:
           conda list
       - name: Run unit tests
         shell: bash -l {0}
-        run: |
-          echo -e '## Test results\n\n```' >> "$GITHUB_STEP_SUMMARY"
-          pytest xopt/tests -v 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        run: pytest --cov --cov-branch --cov-report=xml
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

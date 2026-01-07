@@ -117,8 +117,12 @@ class TestVOCS(object):
         assert isinstance(vocs.objectives["z"], MinimizeObjective)
         assert isinstance(vocs.objectives["zzz"], ExploreObjective)
         assert isinstance(vocs.constraints["c"], LessThanConstraint)
-
+        assert vocs.variables["x"].domain == [0.0, 6.283185307179586]
+        assert vocs.variables["y"].values == {0.0, 1.0, 2.0}
+        assert vocs.constraints["c"].value == 0.0
         assert vocs.n_inputs == 2
+        assert vocs.n_variables == 2
+        assert vocs.n_outputs == 3
 
     def test_random_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)

@@ -9,21 +9,23 @@ import yaml
 from pandas import DataFrame
 from pydantic import (
     Field,
-    field_validator,
-    model_validator,
     SerializeAsAny,
     ValidationInfo,
+    field_validator,
+    model_validator,
 )
 
-from .errors import DataError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
+from xopt.stopping_conditions import StoppingCondition, get_stopping_condition
 from xopt.utils import explode_all_columns, get_generator_name, has_finalize
 from xopt.vocs import validate_input_data, random_inputs, grid_inputs
 from gest_api.vocs import VOCS
+
+from .errors import DataError
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +54,6 @@ class Xopt(XoptBaseModel):
     dump_file : str, optional
         An optional file path for dumping attributes of the xopt object and the
         results of evaluations.
-    max_evaluations : int, optional
-        An optional maximum number of evaluations to perform. If set, the optimization
-        process will stop after reaching this limit.
     data : DataFrame, optional
         An optional DataFrame object for storing internal data related to the optimization
         process.
@@ -64,6 +63,9 @@ class Xopt(XoptBaseModel):
     serialize_inline : bool
         A flag indicating whether Torch models should be stored via binary string
         directly inside the main configuration file.
+    stopping_condition : StoppingCondition, optional
+        An optional stopping condition to check during optimization. If provided,
+        the optimization will stop when this condition is met.
 
     Methods
     -------
@@ -109,9 +111,6 @@ class Xopt(XoptBaseModel):
     dump_file: Optional[str] = Field(
         None, description="file to dump the results of the evaluations"
     )
-    max_evaluations: Optional[int] = Field(
-        None, description="maximum number of evaluations to perform"
-    )
     data: Optional[DataFrame] = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
         False,
@@ -122,6 +121,10 @@ class Xopt(XoptBaseModel):
         False,
         description="flag to indicate if torch models"
         " should be stored inside main config file",
+    )
+    stopping_condition: Optional[SerializeAsAny[StoppingCondition]] = Field(
+        None,
+        description="optional stopping condition to check during optimization",
     )
 
     @model_validator(mode="before")
@@ -183,6 +186,18 @@ class Xopt(XoptBaseModel):
             generator.add_data(v)
         else:
             generator.set_data(v)
+
+        return v
+
+    @field_validator("stopping_condition", mode="before")
+    @classmethod
+    def validate_stopping_condition(cls, v):
+        """Validate that stopping condition has should_stop method."""
+        # handle deserialization
+        if isinstance(v, dict):
+            name = v.pop("name")
+            sc_class = get_stopping_condition(name)
+            v = sc_class(**v)
 
         return v
 
@@ -259,26 +274,33 @@ class Xopt(XoptBaseModel):
 
     def run(self):
         """
-        Run until the maximum number of evaluations is reached or the generator is done.
+        Run until the stopping criteria are met.
 
+        Stops when any of the following conditions are met:
+        1. Stopping condition is met (if stopping_condition is set)
+        2. Generator is done
         """
-        # TODO: implement stopping criteria class
         logger.info("Running Xopt")
-        if self.max_evaluations is None:
-            raise ValueError("max_evaluations must be set to call Xopt.run()")
+
+        # Require stopping criterion
+        if self.stopping_condition is None:
+            raise ValueError("stopping_condition must be set to call Xopt.run()")
 
         while True:
-            # Stopping criteria
-            if self.max_evaluations is not None:
-                if self.n_data >= self.max_evaluations:
-                    logger.info(
-                        f"Xopt is done. Max evaluations {self.max_evaluations} reached."
-                    )
+            # Check custom stopping condition
+            if self.stopping_condition is not None:
+                if self.data is not None and self.stopping_condition.should_stop(
+                    self.data, self.vocs
+                ):
+                    logger.info("Xopt is done. Stopping condition met.")
                     break
 
             self.step()
         if has_finalize(self.generator):
             self.generator.finalize()
+
+        # at the end, call the finalize method for the generator
+        self.generator.finalize()
 
     def evaluate(self, input_dict: Dict):
         """
@@ -600,6 +622,12 @@ class Xopt(XoptBaseModel):
         dict_result["data"] = (
             json.loads(self.data.to_json()) if self.data is not None else None
         )
+
+        if "stopping_condition" in dict_result:
+            if dict_result["stopping_condition"] is not None:
+                dict_result["stopping_condition"] = {
+                    "name": self.stopping_condition.__class__.__name__
+                } | dict_result["stopping_condition"]
 
         # TODO: implement version checking
         # dict_result["xopt_version"] = __version__

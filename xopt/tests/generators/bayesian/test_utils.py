@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from botorch.acquisition import UpperConfidenceBound
 
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
@@ -16,9 +17,17 @@ from xopt.generators.bayesian.utils import (
     torch_compile_gp_model,
     torch_trace_acqf,
     torch_trace_gp_model,
+    interpolate_points,
+    validate_turbo_controller_base,
 )
 from xopt.resources.benchmarking import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
+from xopt.vocs import random_inputs, VOCS
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
+
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
@@ -87,7 +96,6 @@ class TestUtils:
         assert pf_Y.shape[1] == 3
         assert hv > 0
 
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_jit(self, use_cuda):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -125,7 +133,7 @@ class TestUtils:
 
         x_grid = torch.tensor(
             pd.DataFrame(
-                gen.vocs.random_inputs(500, include_constants=False)
+                random_inputs(gen.vocs, 500, include_constants=False)
             ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
@@ -148,7 +156,6 @@ class TestUtils:
         t = np.array(t)
         print(f"JIT posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
 
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_compile(self, use_cuda):
         # For inductor + windows any, MSVC 2022 build tools are required
@@ -209,7 +216,9 @@ class TestUtils:
         print(f"JIT trace: {t2 - t1:.4f} seconds")
 
         x_grid = torch.tensor(
-            pd.DataFrame(gen.vocs.random_inputs(20, include_constants=False)).to_numpy()
+            pd.DataFrame(
+                random_inputs(gen.vocs, 20, include_constants=False)
+            ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
 
@@ -255,7 +264,6 @@ class TestUtils:
                 "Compiled model variance mismatch"
             )
 
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_acqf_compile(self, use_cuda):
         print(f"{torch._dynamo.list_backends()=}")
@@ -324,7 +332,7 @@ class TestUtils:
 
         # batch x 1 x d
         x_grid = torch.tensor(
-            pd.DataFrame(gen.vocs.random_inputs(4, include_constants=False)).to_numpy()
+            pd.DataFrame(random_inputs(gen.vocs, 4, include_constants=False)).to_numpy()
         ).unsqueeze(-2)
         x_grid = x_grid.to(device_map[use_cuda])
 
@@ -365,3 +373,108 @@ class TestUtils:
             m3 = v3
             assert torch.allclose(m1, m2, rtol=1e-5)
             assert torch.allclose(m1, m3, rtol=1e-5)
+
+    def test_trace_gp_model_model_list_error(self):
+        from botorch.models import ModelListGP
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        model = ModelListGP()
+        with pytest.raises(ValueError):
+            torch_trace_gp_model(model, vocs, {}, posterior=True)
+
+    def test_compile_gp_model_model_list_error(self):
+        from botorch.models import ModelListGP
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        model = ModelListGP()
+        with pytest.raises(ValueError):
+            torch_compile_gp_model(model, vocs, {}, posterior=True)
+
+    def test_torch_trace_acqf(self):
+        evaluator = Evaluator(function=xtest_callable)
+        gen = UpperConfidenceBoundGenerator(
+            vocs=TEST_VOCS_BASE,
+        )
+        gen.numerical_optimizer.n_restarts = 2
+        gen.n_monte_carlo_samples = 4
+        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X.random_evaluate(100)
+        for _ in range(1):
+            X.step()
+
+        gen = X.generator
+        model = gen.train_model().models[0]
+        acq = UpperConfidenceBound(model, beta=0.1)
+        tkwargs = {"device": torch.device("cpu"), "dtype": torch.double}
+        traced_acq = torch_trace_acqf(acq, gen.vocs, tkwargs)
+        assert isinstance(traced_acq, torch.jit.ScriptModule)
+        # Check output shape matches original
+        rand_point = random_inputs(gen.vocs)[0]
+        rand_vec = torch.stack(
+            [rand_point[k] * torch.ones(1) for k in gen.vocs.variable_names], dim=1
+        ).to(**tkwargs)
+        test_x = rand_vec.unsqueeze(-2)
+        orig_out = acq(test_x)
+        traced_out = traced_acq(test_x)
+        assert torch.allclose(orig_out, traced_out, rtol=1e-6)
+
+    def test_interpolate_points_invalid_rows(self):
+        # Create a DataFrame with more than two rows
+        df_invalid = pd.DataFrame({"x": [0, 1, 2], "y": [0, 1, 2]})
+
+        # Expect a ValueError when calling interpolate_points
+        with pytest.raises(
+            ValueError, match="Input DataFrame must have exactly two rows."
+        ):
+            interpolate_points(df_invalid)
+
+    def test_validate_turbo_controller_base_all_branches(self):
+        class DummyInfo:
+            data = {
+                "vocs": VOCS(
+                    variables={"x": [0, 1]},
+                    objectives={"y": "MAXIMIZE"},
+                    constraints={},
+                    observables=["y"],
+                )
+            }
+
+        info = DummyInfo()
+        valid_types = [OptimizeTurboController, SafetyTurboController]
+
+        # String input: "optimize"
+        result = validate_turbo_controller_base("optimize", valid_types, info)
+        assert isinstance(result, OptimizeTurboController)
+
+        # String input: invalid
+        with pytest.raises(ValueError, match="not found"):
+            validate_turbo_controller_base("invalid", valid_types, info)
+
+        # Dict input: valid
+        result = validate_turbo_controller_base(
+            {"name": "OptimizeTurboController"}, valid_types, info
+        )
+        assert isinstance(result, OptimizeTurboController)
+
+        # Dict input: missing name
+        with pytest.raises(ValueError, match="needs to have a `name` attribute"):
+            validate_turbo_controller_base({}, valid_types, info)
+
+        # Dict input: invalid name
+        with pytest.raises(ValueError, match="not found"):
+            validate_turbo_controller_base(
+                {"name": "InvalidController"}, valid_types, info
+            )
+
+        # Add constraints to info
+        info.data["vocs"].constraints = {"c1": ["LESS_THAN", 0.5]}
+        # String input: "safety"
+        result = validate_turbo_controller_base("safety", valid_types, info)
+        assert isinstance(result, SafetyTurboController)
+
+        # Wrong type: not a valid controller
+        class DummyController:
+            pass
+
+        with pytest.raises(ValueError, match="not allowed for this generator"):
+            validate_turbo_controller_base(DummyController(), valid_types, info)

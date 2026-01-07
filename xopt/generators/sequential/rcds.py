@@ -768,7 +768,8 @@ class RCDSGenerator(SequentialGenerator):
         elif isinstance(direction, MaximizeObjective):
             self._sign = -1
 
-        x0, f0 = self._get_initial_point()
+        x0, _f0 = self._get_initial_point()
+        f0 = _f0.item()
 
         # RCDS assume a normalized problem
         lb, ub = np.array(self.vocs.bounds).T
@@ -781,11 +782,11 @@ class RCDSGenerator(SequentialGenerator):
             noise=self.noise,
         )
         _ = self._powell.propose()
-        self._powell.update_obj(self._sign * float(f0))
+        self._powell.update_obj(self._sign * f0)
 
     def _add_data(self, new_data: pd.DataFrame):
         # first update the rcds object from the last measurement
-        res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy())
+        res = float(new_data.iloc[-1][self.vocs.objective_names].to_numpy().item())
 
         if self._powell is not None:
             self._powell.update_obj(self._sign * res)

@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.optim import optimize_acqf
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
+from pydantic import Field, PositiveFloat, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
@@ -29,10 +29,14 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
     @abstractmethod
     def optimize(
-        self, function: AcquisitionFunction, bounds: Tensor, n_candidates=1, **kwargs
-    ):
+        self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        **kwargs: Any,
+    ) -> Tensor:
         """Optimize a function to produce a number of candidate points that minimize the function."""
-        pass
+        raise NotImplementedError
 
 
 class LBFGSOptimizer(NumericalOptimizer):
@@ -81,9 +85,13 @@ class LBFGSOptimizer(NumericalOptimizer):
         5.0, description="maximum time for optimization in seconds"
     )
 
-    model_config = ConfigDict(validate_assignment=True)
-
-    def optimize(self, function, bounds, n_candidates=1, **kwargs):
+    def optimize(
+        self,
+        function: AcquisitionFunction,
+        bounds: Tensor,
+        n_candidates: int = 1,
+        **kwargs: Any,
+    ):
         """
         Optimize the given acquisition function within the specified bounds.
 
