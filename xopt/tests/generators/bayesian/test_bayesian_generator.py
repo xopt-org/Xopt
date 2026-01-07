@@ -392,7 +392,7 @@ class TestBayesianGenerator(TestCase):
         )
         vocs2 = vocs.model_copy()
         vocs2.objectives = {"y1": "MINIMIZE", "y2": "MAXIMIZE"}
-        with pytest.raises(ValueError):
+        with pytest.raises(XoptError):
             gen = MultiObjectivePatchBayesianGenerator(
                 vocs=vocs, reference_point={"y1": 0.5, "y2": 0.5}
             )
