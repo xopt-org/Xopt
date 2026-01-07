@@ -1,6 +1,7 @@
 from libensemble.gen_classes.aposmm import APOSMM
 from xopt import Xopt
 from xopt import Evaluator
+from xopt.stopping_conditions import MaxEvaluationsCondition
 from gest_api.vocs import VOCS
 import pytest
 
@@ -26,6 +27,11 @@ def evaluator():
 
 
 @pytest.fixture
+def max_evaluations():
+    return MaxEvaluationsCondition(max_evaluations=45)
+
+
+@pytest.fixture
 def vocs():
     return VOCS(
         variables={
@@ -47,37 +53,52 @@ def mapping():
 
 
 class TestXoptPlusAPOSMM:
-    def test_init(self, vocs, evaluator, mapping):
+    def test_init(self, vocs, evaluator, max_evaluations, mapping):
         gen = APOSMM(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
             variables_mapping=mapping,
         )
-        Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        Xopt(
+            generator=gen,
+            evaluator=evaluator,
+            stopping_condition=max_evaluations,
+            vocs=vocs,
+        )
 
-    def test_run(self, vocs, evaluator, mapping):
+    def test_run(self, vocs, evaluator, max_evaluations, mapping):
         gen = APOSMM(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
             variables_mapping=mapping,
         )
-        x = Xopt(generator=gen, evaluator=evaluator, vocs=vocs, max_evaluations=45)
+        x = Xopt(
+            generator=gen,
+            evaluator=evaluator,
+            vocs=vocs,
+            stopping_condition=max_evaluations,
+        )
         x.run()
         assert x.data.shape[0] == 45
         assert all(x.data["local_pt"][-5:]), (
             "last 5 points should be local_pt, as communicated by APOSMM"
         )
 
-    def test_random_evaluate(self, vocs, evaluator, mapping):
+    def test_random_evaluate(self, vocs, evaluator, max_evaluations, mapping):
         gen = APOSMM(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
             variables_mapping=mapping,
         )
-        x = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        x = Xopt(
+            generator=gen,
+            evaluator=evaluator,
+            vocs=vocs,
+            stopping_condition=max_evaluations,
+        )
         x.random_evaluate(40)
         x.step()
         x.generator.finalize()
@@ -86,14 +107,19 @@ class TestXoptPlusAPOSMM:
             "last point should be local_pt, as communicated by APOSMM"
         )
 
-    def test_step(self, vocs, evaluator, mapping):
+    def test_step(self, vocs, evaluator, max_evaluations, mapping):
         gen = APOSMM(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
             variables_mapping=mapping,
         )
-        x = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        x = Xopt(
+            generator=gen,
+            evaluator=evaluator,
+            vocs=vocs,
+            stopping_condition=max_evaluations,
+        )
         for i in range(45):
             x.step()
         x.generator.finalize()
