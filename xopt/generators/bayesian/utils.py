@@ -12,7 +12,7 @@ from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
-from gest_api.vocs import MinimizeObjective, MaximizeObjective
+from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
 
 from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS, random_inputs
@@ -82,20 +82,16 @@ def set_botorch_weights(vocs: VOCS):
 
     weights = torch.zeros(len(output_names), dtype=torch.double)
 
-    if vocs.n_objectives > 0:
-        # if objectives exist this is an optimization problem
-        # set weights according to the index of the models -- corresponds to the
-        # ordering of output names
-        for objective_name in vocs.objective_names:
-            if isinstance(vocs.objectives[objective_name], MinimizeObjective):
-                weights[output_names.index(objective_name)] = -1.0
-            elif isinstance(vocs.objectives[objective_name], MaximizeObjective):
-                weights[output_names.index(objective_name)] = 1.0
-    if vocs.n_objectives == 0:
-        # if no objectives exist this may be an exploration problem, weight each
-        # observable by 1.0
-        for observable_name in vocs.observables:
-            weights[output_names.index(observable_name)] = 1.0
+    # if objectives exist this is an optimization problem
+    # set weights according to the index of the models -- corresponds to the
+    # ordering of output names
+    for objective_name in vocs.objective_names:
+        if isinstance(vocs.objectives[objective_name], MinimizeObjective):
+            weights[output_names.index(objective_name)] = -1.0
+        elif isinstance(vocs.objectives[objective_name], MaximizeObjective):
+            weights[output_names.index(objective_name)] = 1.0
+        elif isinstance(vocs.objectives[objective_name], ExploreObjective):
+            weights[output_names.index(objective_name)] = 1.0
 
     return weights
 

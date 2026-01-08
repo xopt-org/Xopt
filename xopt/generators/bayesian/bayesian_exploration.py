@@ -5,8 +5,11 @@ from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
+from pydantic import field_validator
 from torch import Tensor
+from gest_api.vocs import ExploreObjective
 
+from xopt.errors import VOCSError
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
@@ -22,17 +25,25 @@ class BayesianExplorationGenerator(BayesianGenerator):
     name = "bayesian_exploration"
     supports_batch_generation: bool = True
     supports_constraints: bool = True
+    supports_multi_objective: bool = True
+    supports_single_objective: bool = True
 
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 
     _compatible_turbo_controllers = [SafetyTurboController]
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        if self.vocs.n_observables == 0:
-            raise ValueError(
-                "BayesianExplorationGenerator requires at least one observable in the vocs (instead of specifying an objective)."
-            )
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info):
+        # start by using the superclass validator
+        v = super().validate_vocs(v, info)
+
+        # assert that all of the objectives are of type "ExploreObjective"
+        for obj in v.objectives.values():
+            if not isinstance(obj, ExploreObjective):
+                raise VOCSError(
+                    "BayesianExplorationGenerator only supports ExploreObjective objectives"
+                )
+        return v
 
     def _get_acquisition(self, model: Model) -> MCAcquisitionFunction:
         """
