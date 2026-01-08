@@ -67,7 +67,7 @@ class BaxGenerator(BayesianGenerator):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
 
-        # assert that the generator needs at least one objective
+        # assert that the generator had no objectives
         if not v.n_objectives == 0:
             raise VOCSError("BAX generator only supports problems with no objectives")
 

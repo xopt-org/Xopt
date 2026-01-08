@@ -93,7 +93,7 @@ class LatinHypercubeGenerator(Generator):
         for obj in v.objectives.values():
             if not isinstance(obj, ExploreObjective):
                 raise VOCSError(
-                    "BayesianExplorationGenerator only supports ExploreObjective objectives"
+                    "LatinHypercubeGenerator only supports ExploreObjective objectives"
                 )
         return v
 

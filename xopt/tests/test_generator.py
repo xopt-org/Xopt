@@ -76,7 +76,7 @@ class TestGenerator:
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
-        elif name in ["bayesian_exploration"]:
+        elif name in ["bayesian_exploration", "latin_hypercube"]:
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.objectives = {"f": "EXPLORE"}
             json.dumps(gen_config)
