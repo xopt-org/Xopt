@@ -12,7 +12,6 @@ from xopt import (
     Evaluator,
     Xopt,
 )
-from xopt.generators.scipy import LatinHypercubeGenerator
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.stopping_conditions import (
     CompositeCondition,
