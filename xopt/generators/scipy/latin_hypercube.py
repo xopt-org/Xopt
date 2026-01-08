@@ -1,10 +1,12 @@
 from typing import Optional, List, Dict
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from scipy.stats import qmc
 from typing_extensions import Annotated
 
 from xopt.generator import Generator
+from gest_api.vocs import ExploreObjective
+from xopt.errors import VOCSError
 
 
 class LatinHypercubeGenerator(Generator):
@@ -81,6 +83,19 @@ class LatinHypercubeGenerator(Generator):
     seed: Annotated[
         Optional[int], Field(None, description="Random seed. See scipy documentation.")
     ]
+
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info):
+        # start by using the superclass validator
+        v = super().validate_vocs(v, info)
+
+        # assert that all of the objectives are of type "ExploreObjective"
+        for obj in v.objectives.values():
+            if not isinstance(obj, ExploreObjective):
+                raise VOCSError(
+                    "BayesianExplorationGenerator only supports ExploreObjective objectives"
+                )
+        return v
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

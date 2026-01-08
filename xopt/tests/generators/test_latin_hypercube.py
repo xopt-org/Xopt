@@ -12,7 +12,9 @@ from xopt.resources.testing import TEST_VOCS_BASE
 class TestLatinHypercubeGenerator:
     def test_n_sample(self):
         # Create the generator and test name
-        gen = LatinHypercubeGenerator(vocs=TEST_VOCS_BASE, batch_size=128)
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.objectives = {"y": "EXPLORE"}
+        gen = LatinHypercubeGenerator(vocs=vocs, batch_size=128)
         assert gen.name == "latin_hypercube"
 
         # Try to get samples and confirm that batching works correctly
@@ -21,7 +23,7 @@ class TestLatinHypercubeGenerator:
 
     def test_yaml(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        test_vocs.objectives = {"y": "MAXIMIZE", "z": "MINIMIZE"}
+        test_vocs.objectives = {"y": "EXPLORE", "z": "EXPLORE"}
         gen = LatinHypercubeGenerator(vocs=test_vocs)
         gen.yaml()
 
@@ -35,6 +37,7 @@ class TestLatinHypercubeGenerator:
             for config in configs:
                 # Get the samples from xopt
                 test_vocs = deepcopy(TEST_VOCS_BASE)
+                test_vocs.objectives = {"y1": "EXPLORE"}
                 test_vocs.variables = {
                     f"x{i + 1}": ContinuousVariable(domain=[0, 1]) for i in range(dim)
                 }
