@@ -309,11 +309,7 @@ class TestBaxGenerator:
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
         test_vocs.observables = ["y1"]
-        gen = BaxGenerator(
-            vocs=test_vocs,
-            algorithm=alg,
-            n_monte_carlo_samples=10
-        )
+        gen = BaxGenerator(vocs=test_vocs, algorithm=alg, n_monte_carlo_samples=10)
         gen.numerical_optimizer.n_restarts = 1
 
         xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
