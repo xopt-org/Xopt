@@ -57,7 +57,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     )
     supports_single_objective: bool = Field(
         default=False,
-        description="flag that describes if this generator can solve multi-objective "
+        description="flag that describes if this generator can solve single-objective "
         "problems",
         frozen=True,
         exclude=True,

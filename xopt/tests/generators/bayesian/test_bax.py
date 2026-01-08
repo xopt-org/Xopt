@@ -312,6 +312,7 @@ class TestBaxGenerator:
         gen = BaxGenerator(
             vocs=test_vocs,
             algorithm=alg,
+            n_monte_carlo_samples=10
         )
         gen.numerical_optimizer.n_restarts = 1
 

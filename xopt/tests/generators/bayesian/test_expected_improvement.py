@@ -11,6 +11,7 @@ from gest_api.vocs import (
 )
 
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.objectives import CustomXoptObjective
@@ -93,6 +94,10 @@ class TestExpectedImprovement:
         class MyObjective(CustomXoptObjective):
             def forward(self, samples, X=None):
                 return samples[..., self.vocs.output_names.index("y1")] ** 2
+
+        # should raise an error if no custom objective is provided
+        with pytest.raises(VOCSError):
+            ExpectedImprovementGenerator(vocs=vocs)
 
         gen = ExpectedImprovementGenerator(
             vocs=vocs, custom_objective=MyObjective(vocs)

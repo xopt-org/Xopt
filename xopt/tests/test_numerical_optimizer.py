@@ -84,8 +84,7 @@ class TestNumericalOptimizers:
         vocs = deepcopy(tnk_vocs)
 
         # can only explore one objective
-        vocs.objectives = {}
-        vocs.observables = ["y1"]
+        vocs.objectives = {"Y1": "EXPLORE"}
 
         generator = BayesianExplorationGenerator(
             vocs=vocs, numerical_optimizer=GridOptimizer(n_grid_points=2)

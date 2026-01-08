@@ -247,6 +247,26 @@ def validate_turbo_controller_base(
         )
 
 
+def validate_turbo_controller_center(generator):
+    if generator.turbo_controller is not None:
+        # Check that values for center_x are within trust region bounds
+        trust_region = generator.turbo_controller.get_trust_region(generator)
+
+        center_x = generator.turbo_controller.center_x
+        if center_x is not None:
+            for key, value in center_x.items():
+                if key in generator.vocs.variable_names:
+                    idx = generator.vocs.variable_names.index(key)
+                    lower_bound = trust_region[0, idx].item()
+                    upper_bound = trust_region[1, idx].item()
+                    if not (lower_bound <= value <= upper_bound):
+                        raise ValueError(
+                            f"Turbo controller center_x value for {key} : "
+                            f"{value} is outside of trust region bounds "
+                            f"[{lower_bound}, {upper_bound}]"
+                        )
+
+
 class MeanVarModelWrapper(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
