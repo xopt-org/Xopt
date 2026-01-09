@@ -24,6 +24,10 @@ from xopt.generators.bayesian.bax.visualize import visualize_virtual_objective
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
+class PatchBAXGeneratorNoConstraints(BaxGenerator):
+    supports_constraints: bool = False
+
+
 class TestBaxGenerator:
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_init(self):
@@ -36,6 +40,15 @@ class TestBaxGenerator:
             algorithm=alg,
         )
         bax_gen.model_dump()
+
+        # test to make sure that BAX generator with constraints raises error
+        test_vocs_constraints = deepcopy(TEST_VOCS_BASE)
+        test_vocs_constraints.objectives = {}
+        test_vocs_constraints.observables = ["y1"]
+        test_vocs_constraints.constraints = {"c1": ["LESS_THAN", 0.0]}
+
+        with pytest.raises(VOCSError):
+            PatchBAXGeneratorNoConstraints(vocs=test_vocs_constraints)
 
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_base_algorithm(self):

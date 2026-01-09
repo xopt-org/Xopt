@@ -29,7 +29,7 @@ class PatchGenerator(Generator):
 
 
 class PatchGeneratorNoConstraints(Generator):
-    name = "patch_generator_no_constraints"
+    supports_constraints: bool = False
 
     def generate(self, n_candidates) -> list[dict]:
         pass
@@ -44,6 +44,12 @@ class TestGenerator:
 
         with pytest.raises(VOCSError):
             PatchGenerator(vocs=test_vocs)
+
+        # test with no objectives
+        test_vocs_no_objectives = deepcopy(TEST_VOCS_BASE)
+        test_vocs_no_objectives.objectives = {}
+        with pytest.raises(VOCSError):
+            PatchGenerator(vocs=test_vocs_no_objectives)
 
     def test_add_data(self):
         gen = PatchGenerator(vocs=TEST_VOCS_BASE)
