@@ -57,7 +57,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     )
     supports_single_objective: bool = Field(
         default=False,
-        description="flag that describes if this generator can solve multi-objective "
+        description="flag that describes if this generator can solve single-objective "
         "problems",
         frozen=True,
         exclude=True,
@@ -81,6 +81,11 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
+
+        # assert that the generator needs at least one objective
+        if v.n_objectives == 0:
+            raise VOCSError("the generator must have at least one objective")
+
         if v.n_objectives == 1:
             if not info.data["supports_single_objective"]:
                 raise VOCSError(

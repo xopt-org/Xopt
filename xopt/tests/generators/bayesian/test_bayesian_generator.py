@@ -38,9 +38,14 @@ class PatchBayesianGenerator(BayesianGenerator):
     """
 
     supports_batch_generation: bool = True
-    # supports_multi_objective: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
+
+
+class PatchNoConstraintsBayesianGenerator(BayesianGenerator):
+    supports_batch_generation: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = False
 
 
 class MultiObjectivePatchBayesianGenerator(MultiObjectiveBayesianGenerator):
@@ -62,6 +67,7 @@ class DummyModelConstructor(ModelConstructor):
 
 class TestBayesianGenerator(TestCase):
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchNoConstraintsBayesianGenerator, __abstractmethods__=set())
     def test_init(self):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.model_dump()
@@ -94,6 +100,16 @@ class TestBayesianGenerator(TestCase):
         gen.data = pd.DataFrame()
         with pytest.raises(ValueError):
             gen.train_model()
+
+        # test single objective generator with multi-objective vocs
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives.update({"y2": "MINIMIZE"})
+        with pytest.raises(VOCSError):
+            PatchBayesianGenerator(vocs=test_vocs)
+
+        # test no constraints generator with constrained vocs
+        with pytest.raises(VOCSError):
+            PatchNoConstraintsBayesianGenerator(vocs=TEST_VOCS_BASE)
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):

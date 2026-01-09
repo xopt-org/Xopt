@@ -29,7 +29,7 @@ from torch import Tensor
 
 from gest_api.vocs import MinimizeObjective, MaximizeObjective, VOCS
 
-from xopt.errors import XoptError, FeasibilityError
+from xopt.errors import VOCSError, XoptError, FeasibilityError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -53,6 +53,7 @@ from xopt.generators.bayesian.utils import (
     set_botorch_weights,
     validate_turbo_controller_base,
     compute_hypervolume_and_pf,
+    validate_turbo_controller_center,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
@@ -181,6 +182,25 @@ class BayesianGenerator(Generator, ABC):
         default=[LBFGSOptimizer, GridOptimizer]
     )
 
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+            raise VOCSError("this generator does not support constraints")
+
+        # assertion that at least one objective exists is done in model_validator below
+
+        if v.n_objectives == 1:
+            if not info.data["supports_single_objective"]:
+                raise VOCSError(
+                    "this generator does not support single objective optimization"
+                )
+        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+            raise VOCSError(
+                "this generator does not support multi-objective optimization"
+            )
+
+        return v
+
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
@@ -302,23 +322,14 @@ class BayesianGenerator(Generator, ABC):
 
     @model_validator(mode="after")
     def validate_model_after(self):
-        if self.turbo_controller is not None:
-            # Check that values for center_x are within trust region bounds
-            trust_region = self.turbo_controller.get_trust_region(self)
+        # validate turbo controller center if it exists
+        validate_turbo_controller_center(self)
 
-            center_x = self.turbo_controller.center_x
-            if center_x is not None:
-                for key, value in center_x.items():
-                    if key in self.vocs.variable_names:
-                        idx = self.vocs.variable_names.index(key)
-                        lower_bound = trust_region[0, idx].item()
-                        upper_bound = trust_region[1, idx].item()
-                        if not (lower_bound <= value <= upper_bound):
-                            raise ValueError(
-                                f"Turbo controller center_x value for {key} : "
-                                f"{value} is outside of trust region bounds "
-                                f"[{lower_bound}, {upper_bound}]"
-                            )
+        # check to make sure that either multiple objectives exist or custom objective is set
+        if self.vocs.n_objectives == 0 and self.custom_objective is None:
+            raise VOCSError(
+                "the generator must have at least one objective or a custom objective"
+            )
 
         return self
 

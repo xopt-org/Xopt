@@ -1,27 +1,49 @@
 from copy import deepcopy
 
 import numpy as np
+import pytest
 from scipy.stats import qmc
 
 from gest_api.vocs import ContinuousVariable
 
+from xopt.errors import VOCSError
 from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
 class TestLatinHypercubeGenerator:
+    def test_init(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.objectives = {"y": "EXPLORE"}
+        gen = LatinHypercubeGenerator(vocs=vocs, batch_size=128)
+        assert gen.name == "latin_hypercube"
+
+        # test to make sure that vocs with non-explore objectives raises error
+        vocs_non_explore = deepcopy(TEST_VOCS_BASE)
+        vocs_non_explore.objectives = {"y": "MINIMIZE"}
+        with pytest.raises(VOCSError):
+            LatinHypercubeGenerator(vocs=vocs_non_explore)
+
     def test_n_sample(self):
         # Create the generator and test name
-        gen = LatinHypercubeGenerator(vocs=TEST_VOCS_BASE, batch_size=128)
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.objectives = {"y": "EXPLORE"}
+        gen = LatinHypercubeGenerator(vocs=vocs, batch_size=128)
         assert gen.name == "latin_hypercube"
 
         # Try to get samples and confirm that batching works correctly
         for _ in range(32):
             assert len(gen.generate(53)) == 53
 
+        # test to make sure that vocs with non-explore objectives raises error
+        vocs_non_explore = deepcopy(TEST_VOCS_BASE)
+        vocs_non_explore.objectives = {"y": "MINIMIZE"}
+        with pytest.raises(VOCSError):
+            LatinHypercubeGenerator(vocs=vocs_non_explore)
+
     def test_yaml(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        test_vocs.objectives = {"y": "MAXIMIZE", "z": "MINIMIZE"}
+        test_vocs.objectives = {"y": "EXPLORE", "z": "EXPLORE"}
         gen = LatinHypercubeGenerator(vocs=test_vocs)
         gen.yaml()
 
@@ -35,6 +57,7 @@ class TestLatinHypercubeGenerator:
             for config in configs:
                 # Get the samples from xopt
                 test_vocs = deepcopy(TEST_VOCS_BASE)
+                test_vocs.objectives = {"y1": "EXPLORE"}
                 test_vocs.variables = {
                     f"x{i + 1}": ContinuousVariable(domain=[0, 1]) for i in range(dim)
                 }

@@ -12,7 +12,6 @@ from xopt import (
     Evaluator,
     Xopt,
 )
-from xopt.generators.scipy import LatinHypercubeGenerator
 from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.stopping_conditions import (
     CompositeCondition,
@@ -290,7 +289,7 @@ class TestStoppingConditionIntegration:
 
     def test_no_stopping_condition_raises_error(self, simple_vocs, evaluator):
         """Test that run() without stopping condition raises ValueError."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
             vocs=simple_vocs,

@@ -95,8 +95,7 @@ class TestTurbo(TestCase):
 
         # test invalid turbo controller type
         test_vocs_2 = test_vocs.model_copy()
-        test_vocs_2.objectives = {}
-        test_vocs_2.observables = ["o1"]
+        test_vocs_2.objectives = {"o1": "EXPLORE"}
         with pytest.raises(ValueError):
             gen = BayesianExplorationGenerator(
                 vocs=test_vocs_2, turbo_controller="OptimizeTurboController"

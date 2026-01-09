@@ -4,12 +4,19 @@ from copy import deepcopy
 from typing import Dict, List
 
 from botorch.models import ModelListGP, SingleTaskGP
-from pydantic import Field
+from pydantic import (
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
+from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
+from xopt.generators.bayesian.utils import validate_turbo_controller_center
 
 logger = logging.getLogger()
 
@@ -54,6 +61,24 @@ class BaxGenerator(BayesianGenerator):
     )
     _n_calls: int = 0
     _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
+
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+            raise VOCSError("this generator does not support constraints")
+
+        # assert that the generator had no objectives
+        if not v.n_objectives == 0:
+            raise VOCSError("BAX generator only supports problems with no objectives")
+
+        return v
+
+    @model_validator(mode="after")
+    def validate_model_after(self):
+        # validate turbo controller center if it exists
+        validate_turbo_controller_center(self)
+
+        return self
 
     def generate(self, n_candidates: int) -> List[Dict]:
         """

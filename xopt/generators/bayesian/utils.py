@@ -12,7 +12,7 @@ from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
-from gest_api.vocs import MinimizeObjective, MaximizeObjective
+from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
 
 from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS, random_inputs
@@ -82,20 +82,16 @@ def set_botorch_weights(vocs: VOCS):
 
     weights = torch.zeros(len(output_names), dtype=torch.double)
 
-    if vocs.n_objectives > 0:
-        # if objectives exist this is an optimization problem
-        # set weights according to the index of the models -- corresponds to the
-        # ordering of output names
-        for objective_name in vocs.objective_names:
-            if isinstance(vocs.objectives[objective_name], MinimizeObjective):
-                weights[output_names.index(objective_name)] = -1.0
-            elif isinstance(vocs.objectives[objective_name], MaximizeObjective):
-                weights[output_names.index(objective_name)] = 1.0
-    if vocs.n_objectives == 0:
-        # if no objectives exist this may be an exploration problem, weight each
-        # observable by 1.0
-        for observable_name in vocs.observables:
-            weights[output_names.index(observable_name)] = 1.0
+    # if objectives exist this is an optimization problem
+    # set weights according to the index of the models -- corresponds to the
+    # ordering of output names
+    for objective_name in vocs.objective_names:
+        if isinstance(vocs.objectives[objective_name], MinimizeObjective):
+            weights[output_names.index(objective_name)] = -1.0
+        elif isinstance(vocs.objectives[objective_name], MaximizeObjective):
+            weights[output_names.index(objective_name)] = 1.0
+        elif isinstance(vocs.objectives[objective_name], ExploreObjective):
+            weights[output_names.index(objective_name)] = 1.0
 
     return weights
 
@@ -249,6 +245,26 @@ def validate_turbo_controller_base(
         raise ValueError(
             f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
         )
+
+
+def validate_turbo_controller_center(generator):
+    if generator.turbo_controller is not None:
+        # Check that values for center_x are within trust region bounds
+        trust_region = generator.turbo_controller.get_trust_region(generator)
+
+        center_x = generator.turbo_controller.center_x
+        if center_x is not None:
+            for key, value in center_x.items():
+                if key in generator.vocs.variable_names:
+                    idx = generator.vocs.variable_names.index(key)
+                    lower_bound = trust_region[0, idx].item()
+                    upper_bound = trust_region[1, idx].item()
+                    if not (lower_bound <= value <= upper_bound):
+                        raise ValueError(
+                            f"Turbo controller center_x value for {key} : "
+                            f"{value} is outside of trust region bounds "
+                            f"[{lower_bound}, {upper_bound}]"
+                        )
 
 
 class MeanVarModelWrapper(torch.nn.Module):
