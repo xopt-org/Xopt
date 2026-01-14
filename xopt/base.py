@@ -21,7 +21,7 @@ from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.stopping_conditions import StoppingCondition, get_stopping_condition
-from xopt.utils import explode_all_columns, get_generator_name, has_finalize
+from xopt.utils import explode_all_columns, get_generator_name
 from xopt.vocs import validate_input_data, random_inputs, grid_inputs
 from gest_api.vocs import VOCS
 
@@ -296,8 +296,6 @@ class Xopt(XoptBaseModel):
                     break
 
             self.step()
-        if has_finalize(self.generator):
-            self.generator.finalize()
 
         # at the end, call the finalize method for the generator
         self.generator.finalize()

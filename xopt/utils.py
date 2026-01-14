@@ -57,10 +57,6 @@ def isotime(include_microseconds=False):
     return t.isoformat()
 
 
-def has_finalize(generator):
-    return inspect.ismethod(generator.finalize)
-
-
 def get_generator_name(generator):
     """
     Returns the name of the generator if it has one as an attribute, otherwise returns the module name.
