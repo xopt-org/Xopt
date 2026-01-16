@@ -21,7 +21,7 @@ from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.stopping_conditions import StoppingCondition, get_stopping_condition
-from xopt.utils import explode_all_columns
+from xopt.utils import explode_all_columns, get_generator_name
 from xopt.vocs import validate_input_data, random_inputs, grid_inputs
 from gest_api.vocs import VOCS
 
@@ -588,7 +588,11 @@ class Xopt(XoptBaseModel):
 
         """
         result = super().model_dump(**kwargs)
-        result["generator"] = {"name": self.generator.name} | result["generator"]
+        if not isinstance(result["generator"], dict):  # may return as module.path
+            result["generator"] = {"name": result["generator"]}
+        result["generator"] = {"name": get_generator_name(self.generator)} | result[
+            "generator"
+        ]
         return result
 
     def json(self, **kwargs) -> str:
@@ -608,9 +612,11 @@ class Xopt(XoptBaseModel):
         """
         result = super().to_json(**kwargs)
         dict_result = json.loads(result)
-        dict_result["generator"] = {"name": self.generator.name} | dict_result[
-            "generator"
-        ]
+        if not isinstance(dict_result["generator"], dict):  # may return as module.path
+            dict_result["generator"] = {"name": dict_result["generator"]}
+        dict_result["generator"] = {
+            "name": get_generator_name(self.generator)
+        } | dict_result["generator"]
         dict_result["data"] = (
             json.loads(self.data.to_json()) if self.data is not None else None
         )
