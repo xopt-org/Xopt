@@ -30,6 +30,7 @@ from xopt.utils import (
     get_function,
     get_function_defaults,
 )
+from gest_api.vocs import ContinuousVariable
 
 
 # Module-level function for get_function test
@@ -112,7 +113,10 @@ class TestUtils(TestCase):
     def test_get_local_region(self):
         class DummyVOCS:
             variable_names = ["x", "y"]
-            variables = {"x": (0.0, 10.0), "y": (1.0, 5.0)}
+            variables = {
+                "x": ContinuousVariable(domain=[0.0, 10.0]),
+                "y": ContinuousVariable(domain=[1.0, 5.0]),
+            }
 
         vocs = DummyVOCS()
         center_point = {"x": 5.0, "y": 3.0}
@@ -120,20 +124,20 @@ class TestUtils(TestCase):
         bounds = get_local_region(center_point, vocs, fraction=0.2)
         assert set(bounds.keys()) == set(["x", "y"])
         # Check bounds are within the variable limits
-        assert bounds["x"][0] >= vocs.variables["x"][0]
-        assert bounds["x"][1] <= vocs.variables["x"][1]
-        assert bounds["y"][0] >= vocs.variables["y"][0]
-        assert bounds["y"][1] <= vocs.variables["y"][1]
+        assert bounds["x"][0] >= vocs.variables["x"].domain[0]
+        assert bounds["x"][1] <= vocs.variables["x"].domain[1]
+        assert bounds["y"][0] >= vocs.variables["y"].domain[0]
+        assert bounds["y"][1] <= vocs.variables["y"].domain[1]
         # Edge case: center at lower bound
         center_point = {"x": 0.0, "y": 1.0}
         bounds = get_local_region(center_point, vocs, fraction=0.5)
-        assert bounds["x"][0] == vocs.variables["x"][0]
-        assert bounds["y"][0] == vocs.variables["y"][0]
+        assert bounds["x"][0] == vocs.variables["x"].domain[0]
+        assert bounds["y"][0] == vocs.variables["y"].domain[0]
         # Edge case: center at upper bound
         center_point = {"x": 10.0, "y": 5.0}
         bounds = get_local_region(center_point, vocs, fraction=0.5)
-        assert bounds["x"][1] == vocs.variables["x"][1]
-        assert bounds["y"][1] == vocs.variables["y"][1]
+        assert bounds["x"][1] == vocs.variables["x"].domain[1]
+        assert bounds["y"][1] == vocs.variables["y"].domain[1]
         # Error case: wrong keys
         with pytest.raises(KeyError):
             get_local_region({"x": 1.0}, vocs)
