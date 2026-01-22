@@ -32,11 +32,7 @@ def random_inputs(
     seed: int = None,
 ) -> list[dict]:
     """
-    Uniform sampling of the variables.
-
-    Returns a dict of inputs.
-
-    If include_constants, the vocs.constants are added to the dict.
+    Generates uniform random samples of the variables as specified by VOCS.
 
     Parameters
     ----------
