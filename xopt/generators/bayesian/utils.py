@@ -61,9 +61,11 @@ def get_training_data(
     input_data = input_data[non_nans]
     outcome_data = outcome_data[non_nans]
 
-    train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy(dtype="double"))
+    train_X = torch.tensor(
+        input_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
+    )
     train_Y = torch.tensor(
-        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double")
+        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
     ).unsqueeze(-1)
 
     train_Yvar = None

@@ -1,0 +1,1 @@
+::: xopt.generators.bayesian.bax.visualize

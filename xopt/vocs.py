@@ -1,3 +1,14 @@
+"""
+Variable and Objective Constraint (VOCS) Utilities
+
+This module provides utilities and helper functions for working with VOCS (Variables,
+Objectives, and Constraints) objects defined in the
+generator standard library [gest-api](https://github.com/campa-consortium/gest-api). VOCS defines
+the optimization problem's variables, objectives, and constraints,
+serving as the foundation for all optimization algorithms.
+
+"""
+
 import warnings
 from typing import Iterable
 import numpy as np
@@ -21,11 +32,7 @@ def random_inputs(
     seed: int = None,
 ) -> list[dict]:
     """
-    Uniform sampling of the variables.
-
-    Returns a dict of inputs.
-
-    If include_constants, the vocs.constants are added to the dict.
+    Generates uniform random samples of the variables as specified by VOCS.
 
     Parameters
     ----------

@@ -35,7 +35,7 @@ dynamic = [ "version" ]
 keywords = []
 name = "xopt"
 readme = {file = "README.md", content-type = "text/markdown"}
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
@@ -51,6 +51,8 @@ dev = [
   "dask",
   "mpi4py",
   "libensemble @ git+https://github.com/libensemble/libensemble@experimental/jlnav_plus_shuds_asktell",
+  "nbconvert",
+  "pre-commit",
 ]
 doc = [
   "mkdocs",

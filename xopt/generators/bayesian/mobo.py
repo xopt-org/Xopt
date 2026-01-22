@@ -22,25 +22,14 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
 
     Attributes
     ----------
-    name : str
-        The name of the generator.
-    supports_batch_generation : bool
-        Indicates if the generator supports batch candidate generation.
     use_pf_as_initial_points : bool
         Flag to specify if Pareto front points are to be used during optimization
         of the acquisition function.
 
     Methods
     -------
-    _get_objective(self) -> Callable
-        Create the multi-objective Bayesian optimization objective.
     get_acquisition(self, model: torch.nn.Module) -> FixedFeatureAcquisitionFunction
         Get the acquisition function for Bayesian Optimization.
-    _get_acquisition(self, model: torch.nn.Module) -> qLogNoisyExpectedHypervolumeImprovement
-        Create the Log Expected Hypervolume Improvement acquisition function.
-    _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]
-        Generate initial candidates for optimizing the acquisition function based on
-        the Pareto front.
     """
 
     name = "mobo"

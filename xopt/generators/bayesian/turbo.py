@@ -196,8 +196,6 @@ class TurboController(XoptBaseModel, ABC):
         given by the `length` parameter and are scaled according to the generator
         model lengthscales (if available).
 
-        Lives on CPU always.
-
         Parameters
         ----------
         generator : BayesianGenerator
@@ -208,6 +206,11 @@ class TurboController(XoptBaseModel, ABC):
         -------
         Tensor
             The trust region bounds.
+
+        Notes
+        -----
+            Always lives on CPU.
+
         """
         model = generator.model
         bounds = torch.tensor(self.vocs.bounds, dtype=torch.double).T
@@ -396,9 +399,6 @@ class OptimizeTurboController(TurboController):
         Update turbo state class using min of data points that are feasible.
         If no points in the data set are feasible raise an error.
 
-        NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
-        minimization
-
         Parameters
         ----------
         generator : BayesianGenerator
@@ -411,6 +411,7 @@ class OptimizeTurboController(TurboController):
         Returns
         -------
         None
+
         """
         data = generator.data
 
@@ -438,8 +439,7 @@ class OptimizeTurboController(TurboController):
 
         else:
             # if we had previous feasible points we need to compare with previous
-            # best values, NOTE: this is the opposite of botorch which assumes
-            # maximization, xopt assumes minimization
+            # best values,
             Y_last = recent_f_data_minform[self.vocs.objective_names[0]].min()
             best_value = self.best_value if self.minimize else -self.best_value
 
@@ -469,8 +469,6 @@ class SafetyTurboController(TurboController):
 
     Methods
     -------
-    vocs_validation(cls, info)
-        Validate the VOCS for the controller.
     update_state(self, generator, previous_batch_size: int = 1)
         Update the state of the controller.
 
@@ -506,7 +504,7 @@ class SafetyTurboController(TurboController):
         self, generator: "BayesianGenerator", previous_batch_size: int = 1
     ):
         """
-        Update the state of the controller.
+        Update the state of the controller. Overwrites method from TurboController.
 
         Parameters
         ----------
@@ -549,7 +547,7 @@ class EntropyTurboController(TurboController):
     Methods
     -------
     update_state(self, generator, previous_batch_size: int = 1) -> None
-        Update the state of the controller.
+        Update the state of the controller. Overwrites method from TurboController.
     """
 
     name: str = Field("EntropyTurboController", frozen=True)
@@ -559,7 +557,7 @@ class EntropyTurboController(TurboController):
         self, generator: "BayesianGenerator", previous_batch_size: int = 1
     ) -> None:
         """
-        Update the state of the controller.
+        Update the state of the controller. Overwrites method from TurboController.
 
         Parameters
         ----------

@@ -1,7 +1,7 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -75,7 +75,7 @@ class Xopt(XoptBaseModel):
     run()
         Runs the optimization process until the specified stopping criteria are met,
         such as reaching the maximum number of evaluations.
-    evaluate(input_dict: Dict)
+    evaluate(input_dict: dict)
         Evaluates a candidate without storing data.
     evaluate_data(input_data)
         Evaluates a set of candidates, adding the results to the internal DataFrame.
@@ -90,7 +90,7 @@ class Xopt(XoptBaseModel):
         Serializes the Xopt configuration to a YAML string.
     dump(file: str = None, **kwargs)
         Dumps the Xopt configuration to a specified file.
-    dict(**kwargs) -> Dict
+    dict(**kwargs) -> dict
         Provides a custom dictionary representation of the Xopt configuration.
     json(**kwargs) -> str
         Serializes the Xopt configuration to a JSON string.
@@ -251,13 +251,14 @@ class Xopt(XoptBaseModel):
         """
         Run one optimization cycle.
 
+        Notes
+        -----
         This method performs the following steps:
-        - Determines the number of candidates to request from the generator.
-        - Passes the candidate request to the generator.
-        - Submits candidates to the evaluator.
-        - Waits until all evaluations are finished
-        - Updates data storage and generator data storage (if applicable).
-
+        (1) Determines the number of candidates to request from the generator.
+        (2) Passes the candidate request to the generator.
+        (3) Submits candidates to the evaluator.
+        (4) Waits until all evaluations are finished
+        (5) Updates data storage and generator data storage (if applicable).
         """
         logger.info("Running Xopt step")
 
@@ -300,18 +301,18 @@ class Xopt(XoptBaseModel):
         # at the end, call the finalize method for the generator
         self.generator.finalize()
 
-    def evaluate(self, input_dict: Dict):
+    def evaluate(self, input_dict: dict) -> dict:
         """
         Evaluate a candidate without storing data.
 
         Parameters
         ----------
-        input_dict : Dict
+        input_dict : dict
             A dictionary representing the input data for candidate evaluation.
 
         Returns
         -------
-        Any
+        dict
             The result of the evaluation.
 
         """
@@ -328,9 +329,9 @@ class Xopt(XoptBaseModel):
         self,
         input_data: Union[
             pd.DataFrame,
-            List[Dict[str, float]],
-            Dict[str, List[float]],
-            Dict[str, float],
+            list[dict[str, float]],
+            dict[str, list[float]],
+            dict[str, float],
         ],
     ) -> pd.DataFrame:
         """
@@ -341,8 +342,7 @@ class Xopt(XoptBaseModel):
 
         Parameters
         ----------
-        input_data : Union[pd.DataFrame, List[Dict[str, float], Dict[str, List[float],
-                        Dict[str, float]]]
+        input_data : Union[pd.DataFrame, list[dict[str, float]], dict[str, list[float]], dict[str, float]]
             The input data for evaluation, which can be provided as a DataFrame, a list of
             dictionaries, or a single dictionary.
 
@@ -494,7 +494,7 @@ class Xopt(XoptBaseModel):
 
     def grid_evaluate(
         self,
-        n_samples: Union[int, Dict[str, int]],
+        n_samples: Union[int, dict[str, int]],
         custom_bounds: dict = None,
     ):
         """
@@ -507,7 +507,7 @@ class Xopt(XoptBaseModel):
             The number of samples along each axis to evaluate on a meshgrid.
             If an int is provided, the same number of samples is used for all axes.
         custom_bounds : dict, optional
-            Dictionary of vocs-like ranges for mesh sampling.
+            dictionary of vocs-like ranges for mesh sampling.
 
         Returns
         -------
@@ -572,7 +572,7 @@ class Xopt(XoptBaseModel):
                 f.write(self.yaml(**kwargs))
             logger.debug(f"Dumped state to YAML file: {fname}")
 
-    def dict(self, **kwargs) -> Dict:
+    def dict(self, **kwargs) -> dict:
         """
         Handle custom dictionary generation.
 
@@ -583,7 +583,7 @@ class Xopt(XoptBaseModel):
 
         Returns
         -------
-        Dict
+        dict
             A dictionary representation of the Xopt configuration.
 
         """
