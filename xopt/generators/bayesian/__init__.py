@@ -9,7 +9,17 @@ from xopt.generators.bayesian.upper_confidence_bound import (
     TDUpperConfidenceBoundGenerator,
     UpperConfidenceBoundGenerator,
 )
+from xopt.generators.bayesian.mggpo import MGGPOGenerator
+from xopt.generators.bayesian.bax_generator import BaxGenerator
+from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 
+from xopt.generators.bayesian.turbo import (
+    TurboController,
+    SafetyTurboController,
+    OptimizeTurboController,
+    EntropyTurboController,
+)
 
 __all__ = [
     "BayesianExplorationGenerator",
@@ -19,4 +29,12 @@ __all__ = [
     "MultiFidelityGenerator",
     "TDUpperConfidenceBoundGenerator",
     "TDExpectedImprovementGenerator",
+    "MGGPOGenerator",
+    "BaxGenerator",
+    "BayesianGenerator",
+    "TimeDependentBayesianGenerator",
+    "TurboController",
+    "SafetyTurboController",
+    "OptimizeTurboController",
+    "EntropyTurboController",
 ]
