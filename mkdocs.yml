@@ -172,6 +172,7 @@ plugins:
             show_bases: true
             show_source: true
             show_root_toc_entry: false
+            inherited_members: true
           rendering:
             show_source: true
             show_root_heading: true
