@@ -11,4 +11,3 @@
 
 ## CurvatureGridOptimize
 ::: xopt.generators.bayesian.bax.algorithms.CurvatureGridOptimize
-

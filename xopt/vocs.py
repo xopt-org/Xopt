@@ -15,15 +15,15 @@ from gest_api.vocs import (
 """
 Variable and Objective Constraint System (VOCS) Utilities
 
-This module provides utilities and helper functions for working with VOCS (Variable and 
-Objective Constraint System) objects defined in the 
-generator standard library https://github.com/campa-consortium/gest-api. VOCS defines 
-the optimization problem's variables, objectives, and constraints, 
+This module provides utilities and helper functions for working with VOCS (Variable and
+Objective Constraint System) objects defined in the
+generator standard library https://github.com/campa-consortium/gest-api. VOCS defines
+the optimization problem's variables, objectives, and constraints,
 serving as the foundation for all optimization algorithms.
 
 The module includes functions for:
 - Random sampling of variables within their bounds
-- Checking feasibility of points against constraints  
+- Checking feasibility of points against constraints
 - Converting between different data representations
 - Validating VOCS configurations
 

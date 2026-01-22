@@ -65,7 +65,7 @@ nav:
       - Evaluator: api/evaluator.md
       - Generators:
           - Base generator class: api/generators.md
-          - Bayesian generators: 
+          - Bayesian generators:
               - Bayesian Generator Class: api/generators/bayesian/bayesian_generator.md
               - Time-Dependent Bayesian Generators: api/generators/bayesian/time_dependent.md
               - Bayesian Exploration: api/generators/bayesian/bayesian_exploration.md
