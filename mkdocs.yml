@@ -84,6 +84,7 @@ nav:
                   - Base Model Constructor: api/generators/bayesian/models/base_model_constructor.md
                   - Standard Model Constructor: api/generators/bayesian/models/standard_model_constructor.md
                   - Time Dependent Model Constructor: api/generators/bayesian/models/time_dependent_model_constructor.md
+              - Utilities: api/generators/bayesian/utils.md
           - Genetic generators:
               - CNSGA: api/generators/ga/cnsga.md
               - NSGA-II: api/generators/ga/nsga2.md
@@ -95,7 +96,12 @@ nav:
               - RCDS: api/generators/sequential/rcds.md
               - Extremum Seeking: api/generators/sequential/extremumseeking.md
               - Nelder-Mead: api/generators/sequential/neldermead.md
+          - Random Generator: api/generators/random.md
+          - Deduplicated Base: api/generators/deduplicated.md
+          - Generator Utilities: api/generators/utils.md
       - Numerical Optimizers: api/numerical_optimizer.md
+      - Stopping Conditions: api/stopping_conditions.md
+      - Utilities: api/utils.md
 
 theme:
   icon:

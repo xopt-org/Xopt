@@ -1,3 +1,14 @@
+"""
+Variable and Objective Constraint (VOCS) Utilities
+
+This module provides utilities and helper functions for working with VOCS (Variables,
+Objectives, and Constraints) objects defined in the
+generator standard library [gest-api](https://github.com/campa-consortium/gest-api). VOCS defines
+the optimization problem's variables, objectives, and constraints,
+serving as the foundation for all optimization algorithms.
+
+"""
+
 import warnings
 from typing import Iterable
 import numpy as np
@@ -11,28 +22,6 @@ from gest_api.vocs import (
     BoundsConstraint,
     MaximizeObjective,
 )
-
-"""
-Variable and Objective Constraint System (VOCS) Utilities
-
-This module provides utilities and helper functions for working with VOCS (Variable and
-Objective Constraint System) objects defined in the
-generator standard library https://github.com/campa-consortium/gest-api. VOCS defines
-the optimization problem's variables, objectives, and constraints,
-serving as the foundation for all optimization algorithms.
-
-The module includes functions for:
-- Random sampling of variables within their bounds
-- Checking feasibility of points against constraints
-- Converting between different data representations
-- Validating VOCS configurations
-
-VOCS objects encapsulate:
-- Variables: Input parameters to optimize with their bounds and types
-- Objectives: Output quantities to optimize (minimize/maximize)
-- Constraints: Conditions that must be satisfied for valid solutions
-- Constants: Fixed parameters that don't change during optimization
-"""
 
 
 def random_inputs(
