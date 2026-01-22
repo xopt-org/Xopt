@@ -84,8 +84,17 @@ nav:
                   - Base Model Constructor: api/generators/bayesian/models/base_model_constructor.md
                   - Standard Model Constructor: api/generators/bayesian/models/standard_model_constructor.md
                   - Time Dependent Model Constructor: api/generators/bayesian/models/time_dependent_model_constructor.md
-          - Genetic generators: api/generators/genetic.md
-          - SciPy generators: api/generators/scipy.md
+          - Genetic generators:
+              - CNSGA: api/generators/ga/cnsga.md
+              - NSGA-II: api/generators/ga/nsga2.md
+              - DEAP Creator: api/generators/ga/deap_creator.md
+              - DEAP Fitness with Constraints: api/generators/ga/deap_fitness_with_constraints.md
+              - Genetic Operators: api/generators/ga/operators.md
+          - Sequential generators:
+              - Sequential Base Class: api/generators/sequential/sequential_generator.md
+              - RCDS: api/generators/sequential/rcds.md
+              - Extremum Seeking: api/generators/sequential/extremumseeking.md
+              - Nelder-Mead: api/generators/sequential/neldermead.md
       - Numerical Optimizers: api/numerical_optimizer.md
 
 theme:
