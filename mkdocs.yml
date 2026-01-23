@@ -153,9 +153,9 @@ extra_css:
 plugins:
   - search
 
-  # - mkdocs-jupyter:
-  #     include_source: False
-  #     execute: False
+  - mkdocs-jupyter:
+      include_source: False
+      execute: True
 
   - mkdocstrings:
       default_handler: python
