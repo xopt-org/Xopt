@@ -41,9 +41,6 @@ class Xopt(XoptBaseModel):
 
     Parameters
     ----------
-    vocs : VOCS
-        VOCS object for defining the problem's variables, objectives, constraints, and
-        statics.
     generator : SerializeAsAny[Generator]
         An object responsible for generating candidates for optimization.
     evaluator : SerializeAsAny[Evaluator]
@@ -96,7 +93,6 @@ class Xopt(XoptBaseModel):
         Serializes the Xopt configuration to a JSON string.
     """
 
-    vocs: VOCS = Field(description="VOCS object for Xopt")
     generator: Union[SerializeAsAny[Generator], Any] = Field(
         description="generator object for Xopt"
     )
@@ -207,6 +203,21 @@ class Xopt(XoptBaseModel):
             return 0
         else:
             return len(self.data)
+        
+    @property
+    def vocs(self) -> VOCS:
+        """
+        Get the VOCS object from the generator.
+
+        Returns
+        -------
+        VOCS
+            The VOCS object associated with the generator.
+        """
+        if self.generator is None:
+            raise ValueError("generator is not set")
+
+        return self.generator.vocs
 
     def __init__(self, *args, **kwargs):
         """
