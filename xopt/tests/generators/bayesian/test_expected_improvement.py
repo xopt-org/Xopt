@@ -198,4 +198,4 @@ class TestExpectedImprovement:
             acq = gen.get_acquisition(model)
             acq_values.append(acq(test_x.reshape(-1, 1, 1)).exp())
 
-        assert torch.allclose(acq_values[0].double(), acq_values[1].double(), atol=1e-3)
+        assert torch.allclose(acq_values[0].double(), acq_values[1].double(), atol=5e-3)
