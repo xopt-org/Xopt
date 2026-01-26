@@ -608,7 +608,9 @@ class BayesianGenerator(Generator, ABC):
         input names (variables), and the resulting tensor is configured with the data
         type and device settings from the generator.
         """
-        return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
+        return torch.tensor(
+            data[self.model_input_names].to_numpy().copy(), **self.tkwargs
+        )
 
     def get_acquisition(self, model: Module) -> AcquisitionFunction:
         """
