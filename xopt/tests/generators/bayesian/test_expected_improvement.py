@@ -171,7 +171,7 @@ class TestExpectedImprovement:
         assert torch.all(exp_acq_values > 0.0)
         assert torch.all(exp_acq_values < 1e-6)
 
-        # acquisition function should be nearly identical to unconstrained 
+        # acquisition function should be nearly identical to unconstrained
         # case if the constraint is always satisfied
         vocs_unconstrained = VOCS(
             **{

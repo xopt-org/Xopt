@@ -59,7 +59,7 @@ shift : float, default 0.0
 Notes
 -----
 Using UCB with constraints may lead to invalid values if the base acquisition function
-has negative values. The base acquisition function can be negative when objectives are 
+has negative values. The base acquisition function can be negative when objectives are
 to be minimized OR maximized with negative values. In such cases, it is recommended
 to set a positive shift value that is larger than the absolute value of the most
 negative objective value to ensure non-negative acquisition values. Otherwise, the
