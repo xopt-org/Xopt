@@ -248,6 +248,7 @@ def visualize_model(
                 n_grid=n_grid,
                 tkwargs=tkwargs,
                 interactive=interactive,
+                exponentiate=exponentiate,
             )
             ax[len(output_names), 0].set_xlabel(None)
         if show_feasibility:

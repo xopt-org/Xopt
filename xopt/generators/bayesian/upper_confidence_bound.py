@@ -7,6 +7,7 @@ from botorch.acquisition import (
 )
 from gpytorch import Module
 from pydantic import Field
+import torch
 
 from xopt.errors import GeneratorWarning
 from xopt.generators.bayesian.bayesian_generator import (
@@ -20,6 +21,16 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
+
+
+class ShiftedAcquisitionFunction(torch.nn.Module):
+    def __init__(self, base_acq, shift: float = 0.0):
+        super().__init__()
+        self.base_acq = base_acq
+        self.shift = shift
+
+    def forward(self, X):
+        return self.base_acq(X) + self.shift
 
 
 # TODO: is log necessary for numeric stability of constrained softplus case? need to benchmark
@@ -37,6 +48,10 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
 
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
+    shift: float = Field(
+        0.0,
+        description="Vertical shift applied to the UCB acquisition function for use with constraints",
+    )
     supports_batch_generation: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
@@ -49,7 +64,17 @@ Attributes
 beta : float, default 2.0
     Beta parameter for UCB optimization, controlling the trade-off between exploration
     and exploitation. Higher values of beta prioritize exploration.
+shift : float, default 0.0
+    Vertical shift applied to the UCB acquisition function for use with constraints.
 
+Notes
+-----
+Using UCB with constraints may lead to invalid values if the base acquisition function
+has negative values. The base acquisition function can be negative when objectives are
+to be minimized OR maximized with negative values. In such cases, it is recommended
+to set a positive shift value that is larger than the absolute value of the most
+negative objective value to ensure non-negative acquisition values. Otherwise, the
+acqusition function may produce uniformly zero values due to Softplus transformation.
     """ + formatted_base_docstring()
 
     def __init__(self, **kwargs):
@@ -58,7 +83,9 @@ beta : float, default 2.0
             warnings.warn(
                 "Using upper confidence bound with constraints may lead to invalid values "
                 "if the base acquisition function has negative values. Use with "
-                "caution."
+                "caution. Please make sure to set a positive shift value to avoid "
+                "non-negative values when using minimization or maximization problems "
+                "with negative objective values.",
             )
 
     def propose_candidates(self, model: Module, n_candidates: int = 1):
@@ -89,6 +116,11 @@ beta : float, default 2.0
             acq = UpperConfidenceBound(
                 model, beta=self.beta, posterior_transform=posterior_transform
             )
+
+        # if constraints are present, shift ucb to be non-negative
+        if self.vocs.n_constraints > 0:
+            acq = ShiftedAcquisitionFunction(acq, shift=self.shift)
+
         return acq.to(**self.tkwargs)
 
 

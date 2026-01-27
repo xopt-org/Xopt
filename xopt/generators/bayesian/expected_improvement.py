@@ -93,7 +93,11 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         objective = self._get_objective()
         best_f = self._get_best_f(self.data, objective)
 
-        if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
+        if (
+            self.n_candidates > 1
+            or isinstance(objective, CustomXoptObjective)
+            or self.vocs.constraint_names != []
+        ):
             # MC sampling for generating multiple candidate points
             sampler = self._get_sampler(model)
             acq = qLogExpectedImprovement(
@@ -106,7 +110,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         else:
             # analytic acquisition function for single candidate generation with
             # basic objective
-            # note that the analytic version cannot handle custom objectives
+            # note that the analytic version cannot handle custom objectives or constraints
             weights = set_botorch_weights(self.vocs).to(**self.tkwargs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
             acq = LogExpectedImprovement(
