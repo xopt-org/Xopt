@@ -13,6 +13,7 @@ from botorch.acquisition import (
     FixedFeatureAcquisitionFunction,
     qUpperConfidenceBound,
     AcquisitionFunction,
+    MCAcquisitionObjective,
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
@@ -772,7 +773,7 @@ class BayesianGenerator(Generator, ABC):
     def _get_acquisition(self, model):
         pass
 
-    def _get_objective(self):
+    def _get_objective(self) -> MCAcquisitionObjective:
         """
         Return default objective (scalar objective) determined by vocs or if
         defined in custom_objective. Module is already on target device.
