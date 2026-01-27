@@ -139,10 +139,10 @@ class ExpectedImprovementGenerator(BayesianGenerator):
                 torch.tensor(self.vocs.observable_data(data).to_numpy(), **self.tkwargs)
             ).max()
         else:
-            # analytic acquisition function for single candidate generation
-            best_f = -torch.tensor(
-                self.vocs.objective_data(data).min().values, **self.tkwargs
-            )
+            # return the best feasible objective value from the data
+            # note: this is critical for proper handling of constraints since the base EI
+            # function will be zero if an extreme value is in the constrained region
+            best_f = torch.tensor(self.vocs.select_best(data)[1].item(), **self.tkwargs)
 
         return best_f
 
