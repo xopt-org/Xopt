@@ -259,17 +259,23 @@ def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> d
 
     bounds = {}
     widths = {
-        ele: vocs.variables[ele][1] - vocs.variables[ele][0]
+        ele: vocs.variables[ele].domain[1] - vocs.variables[ele].domain[0]
         for ele in vocs.variable_names
     }
 
     for name in vocs.variable_names:
         bounds[name] = [
             np.max(
-                (center_point[name] - widths[name] * fraction, vocs.variables[name][0])
+                (
+                    center_point[name] - widths[name] * fraction,
+                    vocs.variables[name].domain[0],
+                )
             ),
             np.min(
-                (center_point[name] + widths[name] * fraction, vocs.variables[name][1])
+                (
+                    center_point[name] + widths[name] * fraction,
+                    vocs.variables[name].domain[1],
+                )
             ),
         ]
 
