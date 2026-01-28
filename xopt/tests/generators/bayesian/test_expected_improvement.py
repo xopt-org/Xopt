@@ -202,32 +202,6 @@ class TestExpectedImprovement:
 
         assert torch.allclose(acq_values[0].double(), acq_values[1].double(), atol=5e-3)
 
-    def test_fixed_features_application(self):
-        vocs = VOCS(
-            variables={"x1": [0.0, 1.0], "x2": [0.0, 1.0]},
-            objectives={"y1": "MINIMIZE"},
-        )
-
-        gen = ExpectedImprovementGenerator(vocs=vocs)
-        gen.fixed_features = {"x1": 0.5}
-
-        # Mock model
-        class MockModel:
-            def posterior(self, X):
-                return None
-
-        model = MockModel()
-
-        # Call get_acquisition and check if FixedFeatureAcquisitionFunction is applied
-        acq = gen.get_acquisition(model)
-        assert isinstance(acq, FixedFeatureAcquisitionFunction)
-        assert acq.values.detach().item() == 0.5  # Fixed value for x1
-
-    def test_get_acquisition_raises_value_error(self):
-        gen = ExpectedImprovementGenerator(vocs=TEST_VOCS_BASE)
-        with pytest.raises(ValueError, match="model cannot be None"):
-            gen.get_acquisition(None)
-
         # if no values satisfy the constraint, EI should raise an error
         vocs_never_satisfied = VOCS(
             **{
@@ -246,3 +220,38 @@ class TestExpectedImprovement:
             match="No feasible points found in the data; cannot compute expected improvement.",
         ):
             acq = gen.get_acquisition(model)
+
+    def test_fixed_features_application(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": [0.0, 1.0]},
+            objectives={"y1": "MINIMIZE"},
+        )
+
+        gen = ExpectedImprovementGenerator(vocs=vocs)
+        gen.fixed_features = {"x1": 0.5}
+        gen.add_data(
+            pd.DataFrame(
+                {
+                    "x1": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                    "x2": [0.1, 0.3, 0.5, 0.7, 0.9, 0.0],
+                    "y1": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+                }
+            )
+        )
+
+        # Mock model
+        class MockModel:
+            def posterior(self, X):
+                return None
+
+        model = MockModel()
+
+        # Call get_acquisition and check if FixedFeatureAcquisitionFunction is applied
+        acq = gen.get_acquisition(model)
+        assert isinstance(acq, FixedFeatureAcquisitionFunction)
+        assert acq.values.detach().item() == 0.5  # Fixed value for x1
+
+    def test_get_acquisition_raises_value_error(self):
+        gen = ExpectedImprovementGenerator(vocs=TEST_VOCS_BASE)
+        with pytest.raises(ValueError, match="model cannot be None"):
+            gen.get_acquisition(None)

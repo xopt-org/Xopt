@@ -6,6 +6,7 @@ from botorch.acquisition import (
     qLogExpectedImprovement,
     FixedFeatureAcquisitionFunction,
 )
+from gest_api.vocs import MinimizeObjective
 
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -18,7 +19,7 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
-from xopt.vocs import get_objective_data, get_observable_data
+from xopt.vocs import select_best, get_observable_data
 from xopt.errors import FeasibilityError
 
 
@@ -146,13 +147,15 @@ class ExpectedImprovementGenerator(BayesianGenerator):
             # return the best feasible objective value from the data
             # note: this is critical for proper handling of constraints since the base EI
             # function will be zero if an extreme value is in the constrained region
-            if self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE":
+            if isinstance(
+                self.vocs.objectives[self.vocs.objective_names[0]], MinimizeObjective
+            ):
                 multiplier = -1
             else:
                 multiplier = 1
 
             try:
-                _, value, _ = self.vocs.select_best(data)
+                _, value, _ = select_best(self.vocs, data)
             except FeasibilityError:
                 raise RuntimeError(
                     "No feasible points found in the data; cannot compute expected improvement."
