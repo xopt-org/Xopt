@@ -94,23 +94,24 @@ generator:
     population_size: 64
     population_file: test.csv
     output_path: .
+    vocs:
+      variables:
+          x1: [0, 3.14159]
+          x2: [0, 3.14159]
+      objectives:
+          y1: MINIMIZE
+          y2: MINIMIZE
+      constraints:
+          c1: [GREATER_THAN, 0]
+          c2: [LESS_THAN, 0.5]
+      constants: {a: dummy_constant}
 
 evaluator:
     function: my_function
     function_kwargs:
       my_arguments: 42
 
-vocs:
-    variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
-    objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-    constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
-    constants: {a: dummy_constant}
+
 
 stopping_condition:
     name: MaxEvaluationsCondition
@@ -139,7 +140,7 @@ def sin_function(input_dict):
 # create Xopt evaluator, generator, and Xopt objects
 evaluator = Evaluator(function=sin_function)
 generator = UpperConfidenceBoundGenerator(vocs=vocs)
-X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+X = Xopt(evaluator=evaluator, generator=generator)
 
 # call X.random_evaluate() to generate + evaluate 3 initial points
 X.random_evaluate(3)
