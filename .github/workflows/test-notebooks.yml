@@ -120,9 +120,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: notebook-results
+          name: notebook-results-group-${{ matrix.group }}
           path: results/group-${{ matrix.group }}-results.txt
-          merge-multiple: true
 
       - name: Minimize uv cache
         run: uv cache prune --ci
@@ -136,7 +135,7 @@ jobs:
       - name: Download all results
         uses: actions/download-artifact@v4
         with:
-          name: notebook-results
+          pattern: notebook-results-group-*
           merge-multiple: true
 
       - name: Generate overall summary
