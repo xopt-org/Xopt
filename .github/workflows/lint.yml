@@ -21,13 +21,15 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv pip install --system jupyter nbconvert
+        run: |
+          uv venv
+          uv pip install jupyter nbconvert
 
       - name: Run notebook clearing check first (no diff)
         env:
           RUFF_OUTPUT_FORMAT: github
         run: |
-          uvx pre-commit run jupyter-notebook-clear-output --all-files
+          uv run pre-commit run jupyter-notebook-clear-output --all-files
 
       - name: Switch to a temporary branch
         run: |
@@ -37,7 +39,7 @@ jobs:
         env:
           RUFF_OUTPUT_FORMAT: github
         run: |
-          uvx pre-commit run \
+          uv run pre-commit run \
             --show-diff-on-failure \
             --color=always \
             --all-files
