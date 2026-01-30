@@ -119,6 +119,19 @@ jobs:
 
           [ $FAILED -gt 0 ] && exit 1 || exit 0
 
+      - name: Save results for summary
+        if: always()
+        run: |
+          mkdir -p results
+          echo "${{ steps.execute.outputs.success }},${{ steps.execute.outputs.failed }},${{ steps.execute.outputs.total }}" > results/group-${{ matrix.group }}-results.txt
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-group-${{ matrix.group }}
+          path: results/group-${{ matrix.group }}-results.txt
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -126,13 +139,61 @@ jobs:
           name: notebook-logs-group-${{ matrix.group }}
           path: /tmp/*/
 
+      - name: Minimize uv cache
+        run: uv cache prune --ci
+
   summary:
     needs: test-notebooks
     runs-on: ubuntu-latest
     if: always()
     steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-group-*
+          merge-multiple: true
+
       - name: Generate overall summary
         run: |
-          echo "# Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "# 📊 Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Check individual group summaries above for detailed results." >> $GITHUB_STEP_SUMMARY
+
+          TOTAL_SUCCESS=0
+          TOTAL_FAILED=0
+          TOTAL_NOTEBOOKS=0
+
+          echo "## Results by Group" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Group | Total | Success ✅ | Failed ❌ |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          for i in 1 2 3 4; do
+            if [ -f "group-$i-results.txt" ]; then
+              IFS=',' read -r success failed total < "group-$i-results.txt"
+              echo "| $i | $total | $success | $failed |" >> $GITHUB_STEP_SUMMARY
+              TOTAL_SUCCESS=$((TOTAL_SUCCESS + success))
+              TOTAL_FAILED=$((TOTAL_FAILED + failed))
+              TOTAL_NOTEBOOKS=$((TOTAL_NOTEBOOKS + total))
+            else
+              echo "| $i | - | - | ⚠️ No results |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📈 Overall Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Notebooks**: $TOTAL_NOTEBOOKS" >> $GITHUB_STEP_SUMMARY
+          echo "- **✅ Successful**: $TOTAL_SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- **❌ Failed**: $TOTAL_FAILED" >> $GITHUB_STEP_SUMMARY
+
+          if [ $TOTAL_FAILED -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Some notebooks failed.** Check individual group summaries above for details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎉 **All notebooks executed successfully!**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Check individual group job summaries for detailed notebook-by-notebook results.*" >> $GITHUB_STEP_SUMMARY
