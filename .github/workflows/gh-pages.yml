@@ -142,13 +142,6 @@ jobs:
           name: results-group-${{ matrix.group }}
           path: results/group-${{ matrix.group }}-results.txt
 
-      - name: Upload logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: notebook-logs-group-${{ matrix.group }}
-          path: /tmp/*/
-
       - name: Minimize uv cache
         run: uv cache prune --ci
 
@@ -177,7 +170,7 @@ jobs:
           echo "| Group | Total | Success ✅ | Failed ❌ |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
 
-          for i in 1 2 3 4 5 6 7 8; do
+          for i in 1 2 3 4; do
             if [ -f "group-$i-results.txt" ]; then
               IFS=',' read -r success failed total < "group-$i-results.txt"
               echo "| $i | $total | $success | $failed |" >> $GITHUB_STEP_SUMMARY
