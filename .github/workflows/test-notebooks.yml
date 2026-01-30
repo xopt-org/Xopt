@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [1, 2, 3, 4, 5, 6, 7, 8]
+        group: [1, 2, 3, 4]
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
         shell: bash
         env:
           GROUP: ${{ matrix.group }}
-          TOTAL_GROUPS: 8
+          TOTAL_GROUPS: 4
           SMOKE_TEST: "True"
         run: |
           set +e  # Don't exit on first error
