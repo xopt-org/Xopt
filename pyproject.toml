@@ -54,9 +54,7 @@ doc = [
   "mkdocstrings-python",
 ]
 notebook = [
-  "jupyterlab>=3",
-  "jupyterlab-lsp",
-  "jupyter"
+  "nbconvert"
 ]
 
 [project.urls]
