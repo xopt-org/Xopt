@@ -60,7 +60,6 @@ jobs:
 
           # Create temp directory for tracking
           TMPDIR=$(mktemp -d)
-          echo "tmpdir=$TMPDIR" >> $GITHUB_OUTPUT
 
           SCRIPT_START=$(date +%s)
 
@@ -88,7 +87,6 @@ jobs:
           SUCCESS=0
           FAILED=0
           TOTAL_TIME=0
-          FAILED_NOTEBOOKS=""
 
           echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -105,21 +103,6 @@ jobs:
                       duration=${status#failed:}
                       TOTAL_TIME=$((TOTAL_TIME + duration))
                       echo "- ❌ \`$file\` (${duration}s)" >> $GITHUB_STEP_SUMMARY
-
-                      # Extract error snippet from log
-                      log_file="$TMPDIR/$(basename "$file").log"
-                      if [ -f "$log_file" ]; then
-                        echo "  <details>" >> $GITHUB_STEP_SUMMARY
-                        echo "  <summary>Error details (last 20 lines)</summary>" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo '  ```' >> $GITHUB_STEP_SUMMARY
-                        tail -n 20 "$log_file" >> $GITHUB_STEP_SUMMARY
-                        echo '  ```' >> $GITHUB_STEP_SUMMARY
-                        echo "  </details>" >> $GITHUB_STEP_SUMMARY
-                      fi
-
-                      # Store failed notebook name for artifact
-                      FAILED_NOTEBOOKS="${FAILED_NOTEBOOKS}${file}|"
                   else
                       SUCCESS=$((SUCCESS + 1))
                       TOTAL_TIME=$((TOTAL_TIME + status))
@@ -143,7 +126,6 @@ jobs:
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "success=$SUCCESS" >> $GITHUB_OUTPUT
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
-          echo "failed_notebooks=$FAILED_NOTEBOOKS" >> $GITHUB_OUTPUT
 
           [ $FAILED -gt 0 ] && exit 1 || exit 0
 
@@ -151,7 +133,7 @@ jobs:
         if: always()
         run: |
           mkdir -p results
-          echo "${{ steps.execute.outputs.success }},${{ steps.execute.outputs.failed }},${{ steps.execute.outputs.total }},${{ steps.execute.outputs.failed_notebooks }}" > results/group-${{ matrix.group }}-results.txt
+          echo "${{ steps.execute.outputs.success }},${{ steps.execute.outputs.failed }},${{ steps.execute.outputs.total }}" > results/group-${{ matrix.group }}-results.txt
 
       - name: Upload results artifact
         if: always()
@@ -160,23 +142,12 @@ jobs:
           name: results-group-${{ matrix.group }}
           path: results/group-${{ matrix.group }}-results.txt
 
-      - name: Upload executed notebooks
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: executed-notebooks-group-${{ matrix.group }}
-          path: |
-            **/*.ipynb
-            !.git/**
-            !.venv/**
-            !site/**
-
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: notebook-logs-group-${{ matrix.group }}
-          path: ${{ steps.execute.outputs.tmpdir }}/*.log
+          path: /tmp/*/
 
       - name: Minimize uv cache
         run: uv cache prune --ci
@@ -200,23 +171,19 @@ jobs:
           TOTAL_SUCCESS=0
           TOTAL_FAILED=0
           TOTAL_NOTEBOOKS=0
-          ANY_FAILURES=0
 
           echo "## Results by Group" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Group | Total | Success ✅ | Failed ❌ |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
 
-          for i in 1 2 3 4; do
+          for i in 1 2 3 4 5 6 7 8; do
             if [ -f "group-$i-results.txt" ]; then
-              IFS=',' read -r success failed total failed_notebooks < "group-$i-results.txt"
+              IFS=',' read -r success failed total < "group-$i-results.txt"
               echo "| $i | $total | $success | $failed |" >> $GITHUB_STEP_SUMMARY
               TOTAL_SUCCESS=$((TOTAL_SUCCESS + success))
               TOTAL_FAILED=$((TOTAL_FAILED + failed))
               TOTAL_NOTEBOOKS=$((TOTAL_NOTEBOOKS + total))
-              if [ "$failed" -gt 0 ]; then
-                ANY_FAILURES=1
-              fi
             else
               echo "| $i | - | - | ⚠️ No results |" >> $GITHUB_STEP_SUMMARY
             fi
@@ -232,8 +199,6 @@ jobs:
           if [ $TOTAL_FAILED -gt 0 ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "⚠️ **Some notebooks failed.** Check individual group summaries above for details." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "📥 **Download error logs**: Go to the workflow run artifacts section and download \`notebook-logs-group-X\` for detailed error logs." >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "🎉 **All notebooks executed successfully!**" >> $GITHUB_STEP_SUMMARY
@@ -252,12 +217,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Required for setuptools_scm version calculation
-
-      - name: Download all executed notebooks
-        uses: actions/download-artifact@v4
-        with:
-          pattern: executed-notebooks-group-*
-          merge-multiple: true
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
