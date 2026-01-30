@@ -17,9 +17,14 @@ permissions:
   actions: read
 
 jobs:
-  build:
+  test-notebooks:
     runs-on: ubuntu-latest
-    name: "Build docs and run notebooks"
+    name: "Test notebooks"
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4, 5, 6, 7, 8]
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,14 +43,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev ffmpeg
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra doc
+        run: uv sync --extra dev
 
       - name: Execute notebooks in parallel
         id: execute
         shell: bash
         env:
           GROUP: ${{ matrix.group }}
-          TOTAL_GROUPS: 4
+          TOTAL_GROUPS: 8
           SMOKE_TEST: "True"
         run: |
           set +e  # Don't exit on first error
@@ -55,38 +60,27 @@ jobs:
 
           # Create temp directory for tracking
           TMPDIR=$(mktemp -d)
-          trap "rm -rf $TMPDIR" EXIT
 
           SCRIPT_START=$(date +%s)
 
-          # Function to execute a notebook and track results
-          execute_notebook() {
-              local file=$1
-              local tmpdir=$2
+          # Execute notebooks in this group sequentially
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              file="${NOTEBOOK_ARRAY[$i]}"
 
               START_TIME=$(date +%s)
 
-              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace 2>&1 | tee "$tmpdir/$(basename $file).log"; then
+              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace 2>&1 | tee "$TMPDIR/$(basename "$file").log"; then
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
-                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "$DURATION" > "$TMPDIR/$(basename "$file").status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
               else
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
-                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "failed:$DURATION" > "$TMPDIR/$(basename "$file").status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
               fi
-          }
-
-          export -f execute_notebook
-
-          # Execute notebooks in this group in parallel (2 at a time)
-          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
-              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
           done
-
-          wait
 
           # Collect results
           TOTAL=0
@@ -100,7 +94,7 @@ jobs:
           for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
               file="${NOTEBOOK_ARRAY[$i]}"
               TOTAL=$((TOTAL + 1))
-              status_file="$TMPDIR/$(basename $file).status"
+              status_file="$TMPDIR/$(basename "$file").status"
 
               if [ -f "$status_file" ]; then
                   status=$(cat "$status_file")
@@ -142,6 +136,28 @@ jobs:
           name: notebook-logs-group-${{ matrix.group }}
           path: /tmp/*/
 
+  build:
+    needs: test-notebooks
+    runs-on: ubuntu-latest
+    name: "Build documentation"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for setuptools_scm version calculation
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra doc
+
       - name: Build docs
         run: uv run mkdocs build
 
@@ -155,20 +171,11 @@ jobs:
         with:
           path: ./site
 
-  summary:
-    needs: test-notebooks
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Generate overall summary
-        run: |
-          echo "# Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Check individual group summaries above for detailed results." >> $GITHUB_STEP_SUMMARY
 
   deploy:
     if: ${{ github.repository_owner == 'xopt-org' }}
     needs: build
+    runs-on: ubuntu-latest
     name: "Deploy to GitHub Pages"
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
@@ -181,8 +188,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    # Specify runner + deployment step
-    runs-on: ubuntu-latest
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

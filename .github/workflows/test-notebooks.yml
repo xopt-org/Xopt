@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [1, 2, 3, 4]
+        group: [1, 2, 3, 4, 5, 6, 7, 8]
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
         shell: bash
         env:
           GROUP: ${{ matrix.group }}
-          TOTAL_GROUPS: 4
+          TOTAL_GROUPS: 8
           SMOKE_TEST: "True"
         run: |
           set +e  # Don't exit on first error
@@ -50,38 +50,27 @@ jobs:
 
           # Create temp directory for tracking
           TMPDIR=$(mktemp -d)
-          trap "rm -rf $TMPDIR" EXIT
 
           SCRIPT_START=$(date +%s)
 
-          # Function to execute a notebook and track results
-          execute_notebook() {
-              local file=$1
-              local tmpdir=$2
+          # Execute notebooks in this group sequentially
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              file="${NOTEBOOK_ARRAY[$i]}"
 
               START_TIME=$(date +%s)
 
-              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace 2>&1 | tee "$tmpdir/$(basename $file).log"; then
+              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace 2>&1 | tee "$TMPDIR/$(basename "$file").log"; then
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
-                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "$DURATION" > "$TMPDIR/$(basename "$file").status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
               else
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
-                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "failed:$DURATION" > "$TMPDIR/$(basename "$file").status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
               fi
-          }
-
-          export -f execute_notebook
-
-          # Execute notebooks in this group in parallel (2 at a time)
-          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
-              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
           done
-
-          wait
 
           # Collect results
           TOTAL=0
@@ -95,7 +84,7 @@ jobs:
           for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
               file="${NOTEBOOK_ARRAY[$i]}"
               TOTAL=$((TOTAL + 1))
-              status_file="$TMPDIR/$(basename $file).status"
+              status_file="$TMPDIR/$(basename "$file").status"
 
               if [ -f "$status_file" ]; then
                   status=$(cat "$status_file")
