@@ -16,13 +16,10 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev ffmpeg
 
       - name: Install dependencies
         run: uv sync --extra dev
