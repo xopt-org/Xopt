@@ -43,6 +43,7 @@ dev = [
   "ffmpeg",
   "pytest",
   "pytest-cov",
+  "pytest-xdist",
   "jupyterlab>=3",
   "jupyterlab-lsp",
   "python-lsp-server",

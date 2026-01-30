@@ -25,6 +25,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -36,9 +37,16 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run tests
-        run: uv run pytest --cov --cov-branch --cov-report=xml
+        # skip redundant coverage on multiple Python versions
+        run: |
+          if [[ "${{ matrix.python-version }}" == "3.12" ]]; then
+            uv run pytest -n auto --cov --cov-branch --cov-report=xml
+          else
+            uv run pytest -n auto
+          fi
 
       - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
