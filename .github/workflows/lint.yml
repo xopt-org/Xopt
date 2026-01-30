@@ -21,7 +21,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv pip install jupyter nbconvert
+        run: uv pip install --system jupyter nbconvert
 
       - name: Run notebook clearing check first (no diff)
         env:
