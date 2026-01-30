@@ -33,29 +33,11 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Check for GPU availability
-        id: check-gpu
-        run: |
-          if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
-            echo "gpu_available=true" >> $GITHUB_OUTPUT
-            echo "GPU detected"
-          else
-            echo "gpu_available=false" >> $GITHUB_OUTPUT
-            echo "No GPU detected, will use CPU-only packages"
-          fi
-
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev ffmpeg
 
-      - name: Install dependencies (CPU-only PyTorch)
-        if: steps.check-gpu.outputs.gpu_available == 'false'
-        run: |
-          uv sync --extra doc --extra dev --index pytorch-cpu
-
-      - name: Install dependencies (CUDA PyTorch)
-        if: steps.check-gpu.outputs.gpu_available == 'true'
-        run: |
-          uv sync --extra doc --extra dev
+      - name: Install dependencies
+        run: uv sync --extra dev --extra doc
 
       - name: Execute notebooks
         run: |
