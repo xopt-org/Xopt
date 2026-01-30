@@ -61,7 +61,7 @@ jobs:
         # skip redundant coverage on multiple Python versions
         run: |
           if [[ "${{ matrix.python-version }}" == "3.12" ]]; then
-            uv run pytest -n auto --cov --cov-branch --cov-report=xml
+            uv run pytest --cov --cov-branch --cov-report=xml
           else
             uv run pytest -n auto
           fi
