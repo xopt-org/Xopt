@@ -30,31 +30,32 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Check for GPU availability
-        id: check-gpu
-        run: |
-          if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
-            echo "gpu_available=true" >> $GITHUB_OUTPUT
-            echo "GPU detected"
-          else
-            echo "gpu_available=false" >> $GITHUB_OUTPUT
-            echo "No GPU detected, will use CPU-only packages"
-          fi
+#      - name: Check for GPU availability
+#        id: check-gpu
+#        run: |
+#          if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+#            echo "gpu_available=true" >> $GITHUB_OUTPUT
+#            echo "GPU detected"
+#          else
+#            echo "gpu_available=false" >> $GITHUB_OUTPUT
+#            echo "No GPU detected, will use CPU-only packages"
+#          fi
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev ffmpeg
 
       - name: Install dependencies (CPU-only PyTorch)
-        if: steps.check-gpu.outputs.gpu_available == 'false'
+        #if: steps.check-gpu.outputs.gpu_available == 'false'
         run: |
-          uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+          uv venv
+          uv pip install torch --torch-backend=auto
           uv sync --extra dev --no-install-project
           uv pip install -e .
 
-      - name: Install dependencies (CUDA PyTorch)
-        if: steps.check-gpu.outputs.gpu_available == 'true'
-        run: |
-          uv sync --extra dev
+#      - name: Install dependencies (CUDA PyTorch)
+#        if: steps.check-gpu.outputs.gpu_available == 'true'
+#        run: |
+#          uv sync --extra dev
 
       - name: Run tests
         # skip redundant coverage on multiple Python versions
