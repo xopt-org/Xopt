@@ -54,6 +54,7 @@ doc = [
   "mkdocstrings-python",
 ]
 notebook = [
+  "jupyter",
   "nbconvert"
 ]
 

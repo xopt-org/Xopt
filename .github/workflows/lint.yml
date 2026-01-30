@@ -12,33 +12,31 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: ./.github/actions/conda-setup
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
-          extras: "dev"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra notebook
 
       - name: Install pre-commit
-        shell: bash -l {0}
-        run: mamba install pre-commit nbconvert
-
-      - name: List Python package versions
-        shell: bash -l {0}
-        run: conda list
+        run: uv pip install pre-commit
 
       - name: Run notebook clearing check first (no diff)
-        shell: bash -l {0}
         env:
           RUFF_OUTPUT_FORMAT: github
         run: |
           pre-commit run jupyter-notebook-clear-output --all-files
 
       - name: Switch to a temporary branch
-        shell: bash -l {0}
         run: |
           git checkout -b _ci_branch_
 
       - name: Run pre-commit on all files
-        shell: bash -l {0}
         env:
           RUFF_OUTPUT_FORMAT: github
         run: |
