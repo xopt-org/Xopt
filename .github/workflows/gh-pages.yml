@@ -19,7 +19,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: "Build and deploy docs"
+    name: "Build docs and run notebooks"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,9 +40,107 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev --extra doc
 
-      - name: Execute notebooks
+      - name: Execute notebooks in parallel
+        id: execute
+        shell: bash
+        env:
+          GROUP: ${{ matrix.group }}
+          TOTAL_GROUPS: 4
+          SMOKE_TEST: "True"
         run: |
-          scripts/execute_notebooks.bash
+          set +e  # Don't exit on first error
+
+          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' -not -path '*Xparallel*')
+          NOTEBOOK_ARRAY=($NOTEBOOKS)
+
+          # Create temp directory for tracking
+          TMPDIR=$(mktemp -d)
+          trap "rm -rf $TMPDIR" EXIT
+
+          SCRIPT_START=$(date +%s)
+
+          # Function to execute a notebook and track results
+          execute_notebook() {
+              local file=$1
+              local tmpdir=$2
+
+              START_TIME=$(date +%s)
+
+              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace 2>&1 | tee "$tmpdir/$(basename $file).log"; then
+                  END_TIME=$(date +%s)
+                  DURATION=$((END_TIME - START_TIME))
+                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "✓ Successfully executed $file (${DURATION}s)"
+              else
+                  END_TIME=$(date +%s)
+                  DURATION=$((END_TIME - START_TIME))
+                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "✗ Failed to execute $file (${DURATION}s)" >&2
+              fi
+          }
+
+          export -f execute_notebook
+
+          # Execute notebooks in this group in parallel (2 at a time)
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
+          done
+
+          wait
+
+          # Collect results
+          TOTAL=0
+          SUCCESS=0
+          FAILED=0
+          TOTAL_TIME=0
+
+          echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              file="${NOTEBOOK_ARRAY[$i]}"
+              TOTAL=$((TOTAL + 1))
+              status_file="$TMPDIR/$(basename $file).status"
+
+              if [ -f "$status_file" ]; then
+                  status=$(cat "$status_file")
+                  if [[ "$status" == failed:* ]]; then
+                      FAILED=$((FAILED + 1))
+                      duration=${status#failed:}
+                      TOTAL_TIME=$((TOTAL_TIME + duration))
+                      echo "- ❌ \`$file\` (${duration}s)" >> $GITHUB_STEP_SUMMARY
+                  else
+                      SUCCESS=$((SUCCESS + 1))
+                      TOTAL_TIME=$((TOTAL_TIME + status))
+                      echo "- ✅ \`$file\` (${status}s)" >> $GITHUB_STEP_SUMMARY
+                  fi
+              fi
+          done
+
+          SCRIPT_END=$(date +%s)
+          SCRIPT_DURATION=$((SCRIPT_END - SCRIPT_START))
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Summary for Group $GROUP:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Total: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "- Success: $SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Total execution time: ${TOTAL_TIME}s" >> $GITHUB_STEP_SUMMARY
+          echo "- Wall clock time: ${SCRIPT_DURATION}s" >> $GITHUB_STEP_SUMMARY
+
+          # Export for next step
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+          [ $FAILED -gt 0 ] && exit 1 || exit 0
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-logs-group-${{ matrix.group }}
+          path: /tmp/*/
 
       - name: Build docs
         run: uv run mkdocs build
@@ -56,6 +154,17 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
+
+  summary:
+    needs: test-notebooks
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Generate overall summary
+        run: |
+          echo "# Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check individual group summaries above for detailed results." >> $GITHUB_STEP_SUMMARY
 
   deploy:
     if: ${{ github.repository_owner == 'xopt-org' }}
