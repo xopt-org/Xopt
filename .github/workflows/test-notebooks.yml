@@ -41,9 +41,7 @@ jobs:
       - name: Install dependencies (CPU-only PyTorch)
         if: steps.check-gpu.outputs.gpu_available == 'false'
         run: |
-          uv venv
-          uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          uv sync --extra dev
+          uv sync --extra dev --index pytorch-cpu
 
       - name: Install dependencies (CUDA PyTorch)
         if: steps.check-gpu.outputs.gpu_available == 'true'
