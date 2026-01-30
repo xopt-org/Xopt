@@ -41,7 +41,7 @@ dev = [
   "pytest",
   "pytest-cov",
   "pytest-xdist",
-  "dask",
+  "dask[distributed]",
   "mpi4py",
   "jupyter",
   "nbconvert"
@@ -85,3 +85,13 @@ testpaths = ["xopt/tests"]
 
 [tool.setuptools_scm]
 version_file = "xopt/_version.py"
+
+[tool.uv]
+# Override sources for PyTorch packages when using CPU-only mode
+# This is activated via environment variable UV_TORCH_INDEX in CI
+override-dependencies = []
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
