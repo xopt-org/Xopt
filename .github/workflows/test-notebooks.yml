@@ -5,6 +5,7 @@ on:
   push:
     branches-ignore:
       - main
+      - master
 
 jobs:
   test-notebooks:
@@ -43,48 +44,46 @@ jobs:
           SMOKE_TEST: "True"
         run: |
           set +e  # Don't exit on first error
-
           NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' -not -path '*Xparallel*')
           NOTEBOOK_ARRAY=($NOTEBOOKS)
-
           # Create temp directory for tracking
           TMPDIR=$(mktemp -d)
-
+          trap "rm -rf $TMPDIR" EXIT
           SCRIPT_START=$(date +%s)
-
-          # Execute notebooks in this group sequentially
-          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
-              file="${NOTEBOOK_ARRAY[$i]}"
-
+          # Function to execute a notebook and track results
+          execute_notebook() {
+              local file=$1
+              local tmpdir=$2
               START_TIME=$(date +%s)
-
-              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace 2>&1 | tee "$TMPDIR/$(basename "$file").log"; then
+              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace; then
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
-                  echo "$DURATION" > "$TMPDIR/$(basename "$file").status"
+                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
               else
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
-                  echo "failed:$DURATION" > "$TMPDIR/$(basename "$file").status"
+                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
               fi
+          }
+          export -f execute_notebook
+          # Execute notebooks in this group in parallel (2 at a time)
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
           done
-
+          wait
           # Collect results
           TOTAL=0
           SUCCESS=0
           FAILED=0
           TOTAL_TIME=0
-
           echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
           for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
               file="${NOTEBOOK_ARRAY[$i]}"
               TOTAL=$((TOTAL + 1))
-              status_file="$TMPDIR/$(basename "$file").status"
-
+              status_file="$TMPDIR/$(basename $file).status"
               if [ -f "$status_file" ]; then
                   status=$(cat "$status_file")
                   if [[ "$status" == failed:* ]]; then
@@ -99,10 +98,8 @@ jobs:
                   fi
               fi
           done
-
           SCRIPT_END=$(date +%s)
           SCRIPT_DURATION=$((SCRIPT_END - SCRIPT_START))
-
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Summary for Group $GROUP:**" >> $GITHUB_STEP_SUMMARY
           echo "- Total: $TOTAL" >> $GITHUB_STEP_SUMMARY
@@ -110,82 +107,19 @@ jobs:
           echo "- Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
           echo "- Total execution time: ${TOTAL_TIME}s" >> $GITHUB_STEP_SUMMARY
           echo "- Wall clock time: ${SCRIPT_DURATION}s" >> $GITHUB_STEP_SUMMARY
-
           # Export for next step
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "success=$SUCCESS" >> $GITHUB_OUTPUT
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
-
           [ $FAILED -gt 0 ] && exit 1 || exit 0
-
-      - name: Save results for summary
-        if: always()
-        run: |
-          mkdir -p results
-          echo "${{ steps.execute.outputs.success }},${{ steps.execute.outputs.failed }},${{ steps.execute.outputs.total }}" > results/group-${{ matrix.group }}-results.txt
-
-      - name: Upload results artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: results-group-${{ matrix.group }}
-          path: results/group-${{ matrix.group }}-results.txt
-
-      - name: Minimize uv cache
-        run: uv cache prune --ci
 
   summary:
     needs: test-notebooks
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Download all results
-        uses: actions/download-artifact@v4
-        with:
-          pattern: results-group-*
-          merge-multiple: true
-
       - name: Generate overall summary
         run: |
-          echo "# 📊 Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "# Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          TOTAL_SUCCESS=0
-          TOTAL_FAILED=0
-          TOTAL_NOTEBOOKS=0
-
-          echo "## Results by Group" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Group | Total | Success ✅ | Failed ❌ |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
-
-          for i in 1 2 3 4; do
-            if [ -f "group-$i-results.txt" ]; then
-              IFS=',' read -r success failed total < "group-$i-results.txt"
-              echo "| $i | $total | $success | $failed |" >> $GITHUB_STEP_SUMMARY
-              TOTAL_SUCCESS=$((TOTAL_SUCCESS + success))
-              TOTAL_FAILED=$((TOTAL_FAILED + failed))
-              TOTAL_NOTEBOOKS=$((TOTAL_NOTEBOOKS + total))
-            else
-              echo "| $i | - | - | ⚠️ No results |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📈 Overall Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Total Notebooks**: $TOTAL_NOTEBOOKS" >> $GITHUB_STEP_SUMMARY
-          echo "- **✅ Successful**: $TOTAL_SUCCESS" >> $GITHUB_STEP_SUMMARY
-          echo "- **❌ Failed**: $TOTAL_FAILED" >> $GITHUB_STEP_SUMMARY
-
-          if [ $TOTAL_FAILED -gt 0 ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Some notebooks failed.** Check individual group summaries above for details." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "🎉 **All notebooks executed successfully!**" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "*Check individual group job summaries for detailed notebook-by-notebook results.*" >> $GITHUB_STEP_SUMMARY
+          echo "Check individual group summaries above for detailed results." >> $GITHUB_STEP_SUMMARY
