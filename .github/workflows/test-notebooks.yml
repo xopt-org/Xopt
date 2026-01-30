@@ -1,0 +1,32 @@
+name: Test Notebooks
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+      - master
+
+jobs:
+  test-notebooks:
+    runs-on: ubuntu-latest
+    name: "Test notebook execution"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra doc
+
+      - name: Execute notebooks
+        run: |
+          scripts/execute_notebooks.bash
