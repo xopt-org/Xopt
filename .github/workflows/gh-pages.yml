@@ -235,10 +235,12 @@ jobs:
         run: |
           # Copy executed notebooks from all groups to replace originals
           find downloaded-notebooks -name "*.ipynb" -type f | while read notebook; do
-            # Extract path after the group folder (e.g., docs/examples/...)
+            # Extract path after the group folder
             relative_path=$(echo "$notebook" | sed 's|downloaded-notebooks/notebooks-group-[0-9]*/||')
-            echo "Replacing $relative_path with executed version from $notebook"
-            cp "$notebook" "$relative_path"
+            # Prepend docs/examples/ to create the correct target path
+            target_path="docs/examples/$relative_path"
+            echo "Replacing $target_path with executed version from $notebook"
+            cp "$notebook" "$target_path"
           done
 
       - name: Build docs
