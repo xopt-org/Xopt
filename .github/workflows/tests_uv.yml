@@ -48,9 +48,9 @@ jobs:
         #if: steps.check-gpu.outputs.gpu_available == 'false'
         run: |
           uv venv
-          uv pip install torch --torch-backend=auto
-          uv sync --extra dev --no-install-project
-          uv pip install -e .
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+          uv sync --extra dev --no-install-project --no-deps torch
+          uv pip install -e . --no-deps
 
 #      - name: Install dependencies (CUDA PyTorch)
 #        if: steps.check-gpu.outputs.gpu_available == 'true'
