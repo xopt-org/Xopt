@@ -23,14 +23,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev --extra notebook
 
-      - name: Install pre-commit
-        run: uv pip install pre-commit
-
       - name: Run notebook clearing check first (no diff)
         env:
           RUFF_OUTPUT_FORMAT: github
         run: |
-          pre-commit run jupyter-notebook-clear-output --all-files
+          uvx pre-commit run jupyter-notebook-clear-output --all-files
 
       - name: Switch to a temporary branch
         run: |
@@ -40,7 +37,7 @@ jobs:
         env:
           RUFF_OUTPUT_FORMAT: github
         run: |
-          pre-commit run \
+          uvx pre-commit run \
             --show-diff-on-failure \
             --color=always \
             --all-files

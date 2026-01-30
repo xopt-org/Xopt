@@ -40,10 +40,11 @@ requires-python = ">=3.10"
 dev = [
   "pytest",
   "pytest-cov",
-  "ffmpeg",
   "pytest-xdist",
   "dask",
-  "mpi4py"
+  "mpi4py",
+  "jupyter",
+  "nbconvert"
 ]
 doc = [
   "mkdocs",
@@ -52,10 +53,6 @@ doc = [
   "mkdocs-material",
   "mkdocstrings",
   "mkdocstrings-python",
-]
-notebook = [
-  "jupyter",
-  "nbconvert"
 ]
 
 [project.urls]
