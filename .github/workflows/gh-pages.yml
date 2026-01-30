@@ -78,11 +78,21 @@ jobs:
               fi
           }
           export -f execute_notebook
+          # Create directory for executed notebooks
+          mkdir -p executed-notebooks
           # Execute notebooks in this group in parallel (2 at a time)
           for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
               execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
           done
           wait
+          # Copy executed notebooks to a separate directory for uploading
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              file="${NOTEBOOK_ARRAY[$i]}"
+              # Preserve directory structure
+              target_dir="executed-notebooks/$(dirname "$file")"
+              mkdir -p "$target_dir"
+              cp "$file" "$target_dir/"
+          done
           # Collect results
           TOTAL=0
           SUCCESS=0
@@ -142,7 +152,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: executed-notebooks-group-${{ matrix.group }}
-          path: docs/examples/**/*.ipynb
+          path: executed-notebooks/**/*.ipynb
 
       - name: Minimize uv cache
         run: uv cache prune --ci
@@ -236,12 +246,13 @@ jobs:
       - name: Replace original notebooks with executed versions
         run: |
           # Copy executed notebooks to replace originals
-          # With merge-multiple, artifacts are in a flat structure
+          # Artifacts preserve the structure from executed-notebooks/ which includes ./docs/examples/
           find downloaded-notebooks -name "*.ipynb" -type f | while read notebook; do
-            # Extract path after downloaded-notebooks/
+            # Extract path after downloaded-notebooks/ (will be like ./docs/examples/...)
             relative_path=$(echo "$notebook" | sed 's|downloaded-notebooks/||')
-            # Prepend docs/examples/ to create the correct target path
-            target_path="docs/examples/$relative_path"
+            # Clean up leading ./ if present
+            relative_path=$(echo "$relative_path" | sed 's|^\./||')
+            target_path="$relative_path"
             echo "Replacing $target_path with executed version from $notebook"
             cp "$notebook" "$target_path"
           done
