@@ -16,10 +16,27 @@ jobs:
         group: [1, 2, 3, 4]
 
     steps:
-      # ... setup steps ...
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev ffmpeg
+
+      - name: Install dependencies
+        run: uv sync --extra dev
 
       - name: Execute notebooks in parallel
         id: execute
+        shell: bash
         env:
           GROUP: ${{ matrix.group }}
           TOTAL_GROUPS: 4
