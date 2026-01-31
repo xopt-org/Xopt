@@ -40,15 +40,11 @@ requires-python = ">=3.10"
 dev = [
   "pytest",
   "pytest-cov",
-  "ffmpeg",
-  "pytest",
-  "pytest-cov",
-  "jupyterlab>=3",
-  "jupyterlab-lsp",
-  "python-lsp-server",
-  "pygments",
-  "dask",
-  "mpi4py"
+  "pytest-xdist",
+  "dask[distributed]",
+  "mpi4py",
+  "jupyter",
+  "nbconvert"
 ]
 doc = [
   "mkdocs",
