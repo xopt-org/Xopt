@@ -51,21 +51,34 @@ jobs:
           execute_notebook() {
               local file=$1
               local tmpdir=$2
-              # Add random jitter (0-2 seconds) to desynchronize parallel starts
-              sleep $(awk -v seed=$RANDOM 'BEGIN{srand(seed); printf "%.2f", rand() * 2}')
+
+              # Generate unique port range for this execution (ephemeral port range)
+              RANDOM_PORT=$((49152 + RANDOM % 10000))
+
+              # Create unique runtime directory to avoid conflicts
+              JUPYTER_RUNTIME_DIR="/tmp/jupyter-$$-$RANDOM"
+              mkdir -p "$JUPYTER_RUNTIME_DIR"
 
               START_TIME=$(date +%s)
-              if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
-                    --ExecutePreprocessor.timeout=600; then
+              if JUPYTER_RUNTIME_DIR="$JUPYTER_RUNTIME_DIR" \
+                 uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
+                 --ExecutePreprocessor.timeout=600 \
+                 --KernelManager.control_port=$RANDOM_PORT \
+                 --KernelManager.shell_port=$((RANDOM_PORT + 1)) \
+                 --KernelManager.stdin_port=$((RANDOM_PORT + 2)) \
+                 --KernelManager.hb_port=$((RANDOM_PORT + 3)) \
+                 --KernelManager.iopub_port=$((RANDOM_PORT + 4)); then
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
+                  rm -rf "$JUPYTER_RUNTIME_DIR"
               else
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
+                  rm -rf "$JUPYTER_RUNTIME_DIR"
               fi
           }
           export -f execute_notebook

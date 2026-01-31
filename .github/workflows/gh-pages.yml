@@ -64,12 +64,15 @@ jobs:
           execute_notebook() {
               local file=$1
               local tmpdir=$2
-              START_TIME=$(date +%s)
+
               # Generate unique port range for this execution (ephemeral port range)
               RANDOM_PORT=$((49152 + RANDOM % 10000))
+
               # Create unique runtime directory to avoid conflicts
               JUPYTER_RUNTIME_DIR="/tmp/jupyter-$$-$RANDOM"
               mkdir -p "$JUPYTER_RUNTIME_DIR"
+
+              START_TIME=$(date +%s)
               if JUPYTER_RUNTIME_DIR="$JUPYTER_RUNTIME_DIR" \
                  uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
                  --ExecutePreprocessor.timeout=600 \
