@@ -56,7 +56,7 @@ jobs:
 
               START_TIME=$(date +%s)
               if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
-                    --ExecutePreprocessor.timeout=600 \
+                    --ExecutePreprocessor.timeout=600; then
                   END_TIME=$(date +%s)
                   DURATION=$((END_TIME - START_TIME))
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
