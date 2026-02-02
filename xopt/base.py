@@ -20,7 +20,11 @@ from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
-from xopt.stopping_conditions import StoppingCondition, get_stopping_condition
+from xopt.stopping_conditions import (
+    MaxEvaluationsCondition,
+    StoppingCondition,
+    get_stopping_condition,
+)
 from xopt.utils import explode_all_columns
 from xopt.vocs import VOCS
 
@@ -187,6 +191,25 @@ class Xopt(XoptBaseModel):
             generator.set_data(v)
 
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def max_evaluations_legacy(cls, data: Any):
+        """
+        Handle backward compatibility: convert old max_evaluations parameter
+        to the new MaxEvaluationsCondition stopping condition.
+        """
+        if isinstance(data, dict) and "max_evaluations" in data:
+            if data.get("stopping_condition") is not None:
+                raise ValueError(
+                    "Cannot specify both 'max_evaluations' and 'stopping_condition'. "
+                    "Use 'stopping_condition' with MaxEvaluationsCondition instead."
+                )
+            max_evals = data.pop("max_evaluations")
+            data["stopping_condition"] = MaxEvaluationsCondition(
+                max_evaluations=max_evals
+            )
+        return data
 
     @field_validator("stopping_condition", mode="before")
     @classmethod
