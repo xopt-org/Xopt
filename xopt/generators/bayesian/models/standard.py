@@ -44,26 +44,26 @@ class ExpMAStoppingCriterionModel(XoptBaseModel):
 
 
 class NumericalOptimizerConfig(XoptBaseModel):
-    timeout: Optional[float] = Field(None, description="timeout in seconds")
+    timeout: float | None = Field(default=None, description="timeout in seconds")
 
 
 class LBFGSNumericalOptimizerConfig(NumericalOptimizerConfig):
     gtol: float = Field(
-        1e-5, description="projected gradient tolerance, scipy default is 1e-5"
+        default=1e-5, description="projected gradient tolerance, scipy default is 1e-5"
     )
     ftol: float = Field(
-        2.2e-9,
+        default=2.2e-9,
         description="function tolerance, scipy default is 1e7 * np.finfo(float).eps = "
         "2.2204460492503131e-09",
     )
-    maxiter: int = Field(500, description="maximum number of iterations")
+    maxiter: int = Field(default=500, description="maximum number of iterations")
 
 
 class AdamNumericalOptimizerConfig(NumericalOptimizerConfig):
     stopping_criterion: ExpMAStoppingCriterionModel = Field(
         default_factory=ExpMAStoppingCriterionModel
     )
-    lr: float = Field(0.1, description="learning rate for the Adam optimizer")
+    lr: float = Field(default=0.1, description="learning rate for the Adam optimizer")
 
 
 class StandardModelConstructor(ModelConstructor):
