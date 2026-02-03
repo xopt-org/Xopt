@@ -60,6 +60,8 @@ jobs:
           TMPDIR=$(mktemp -d)
           trap "rm -rf $TMPDIR" EXIT
           SCRIPT_START=$(date +%s)
+          # Directory to stage executed notebooks for upload
+          mkdir -p executed-notebooks
           # Function to execute a notebook and track results, with jitter + retries
           execute_notebook() {
               local file=$1
@@ -84,7 +86,9 @@ jobs:
                       SUCCESS=true
                       # On success, stream log to stdout for context if it exists
                       if [ -f "$LOG_FILE" ]; then
+                          echo "--- Begin nbconvert log for $file (SUCCESS) ---"
                           cat "$LOG_FILE"
+                          echo "--- End nbconvert log for $file (SUCCESS) ---"
                           rm -f "$LOG_FILE"
                       fi
                       break
@@ -101,16 +105,16 @@ jobs:
                           continue
                       else
                           echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)" >&2
-                          echo "--- Begin nbconvert log for $file ---" >&2
+                          echo "--- Begin nbconvert log for $file (FINAL FAILURE) ---" >&2
                           cat "$LOG_FILE" >&2
-                          echo "--- End nbconvert log for $file ---" >&2
+                          echo "--- End nbconvert log for $file (FINAL FAILURE) ---" >&2
                       fi
                   else
                       # Non-transient error: show log and do not retry
                       if [ -f "$LOG_FILE" ]; then
-                          echo "--- Begin nbconvert log for $file ---" >&2
+                          echo "--- Begin nbconvert log for $file (FAILURE) ---" >&2
                           cat "$LOG_FILE" >&2
-                          echo "--- End nbconvert log for $file ---" >&2
+                          echo "--- End nbconvert log for $file (FAILURE) ---" >&2
                       fi
                   fi
 
@@ -123,6 +127,11 @@ jobs:
               if [ "$SUCCESS" = true ]; then
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
+                  echo "Notebook $file executed successfully without errors."
+                  # Copy executed notebook to staging directory, preserving path structure
+                  target_dir="executed-notebooks/$(dirname "$file")"
+                  mkdir -p "$target_dir"
+                  cp "$file" "$target_dir/"
               else
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
@@ -292,6 +301,8 @@ jobs:
             relative_path=${notebook#downloaded-notebooks/}
             # Strip an optional leading ./
             relative_path=${relative_path#./}
+            # Strip the executed-notebooks/ prefix to get back to repo paths
+            relative_path=${relative_path#executed-notebooks/}
             target_path="$relative_path"
             echo "Replacing $target_path with executed version from $notebook"
             cp "$notebook" "$target_path"

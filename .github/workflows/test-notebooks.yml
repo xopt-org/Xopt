@@ -71,7 +71,9 @@ jobs:
                       SUCCESS=true
                       # On success, stream log to stdout for context if it exists
                       if [ -f "$LOG_FILE" ]; then
+                          echo "--- Begin nbconvert log for $file (SUCCESS) ---"
                           cat "$LOG_FILE"
+                          echo "--- End nbconvert log for $file (SUCCESS) ---"
                           rm -f "$LOG_FILE"
                       fi
                       break
@@ -88,16 +90,16 @@ jobs:
                           continue
                       else
                           echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)" >&2
-                          echo "--- Begin nbconvert log for $file ---" >&2
+                          echo "--- Begin nbconvert log for $file (FINAL FAILURE) ---" >&2
                           cat "$LOG_FILE" >&2
-                          echo "--- End nbconvert log for $file ---" >&2
+                          echo "--- End nbconvert log for $file (FINAL FAILURE) ---" >&2
                       fi
                   else
                       # Non-transient error: show log and do not retry
                       if [ -f "$LOG_FILE" ]; then
-                          echo "--- Begin nbconvert log for $file ---" >&2
+                          echo "--- Begin nbconvert log for $file (FAILURE) ---" >&2
                           cat "$LOG_FILE" >&2
-                          echo "--- End nbconvert log for $file ---" >&2
+                          echo "--- End nbconvert log for $file (FAILURE) ---" >&2
                       fi
                   fi
 
@@ -110,6 +112,7 @@ jobs:
               if [ "$SUCCESS" = true ]; then
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
+                  echo "Notebook $file executed successfully without errors."
               else
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
