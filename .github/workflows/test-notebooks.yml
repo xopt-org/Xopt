@@ -27,7 +27,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
 
       - name: Install dependencies
         run: uv sync --extra dev
@@ -41,7 +41,7 @@ jobs:
           SMOKE_TEST: "True"
         run: |
           set +e  # Don't exit on first error
-          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' -not -path '*Xparallel*')
+          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
           NOTEBOOK_ARRAY=($NOTEBOOKS)
           # Create temp directory for tracking
           TMPDIR=$(mktemp -d)
