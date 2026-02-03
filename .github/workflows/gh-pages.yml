@@ -76,16 +76,17 @@ jobs:
               START_TIME=$(date +%s)
 
               while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-                  # Capture nbconvert output for this attempt
                   local LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
 
                   if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
                         --ExecutePreprocessor.timeout=600 \
                         >"$LOG_FILE" 2>&1; then
                       SUCCESS=true
-                      # On success, stream log to stdout for context (optional)
-                      cat "$LOG_FILE"
-                      rm -f "$LOG_FILE"
+                      # On success, stream log to stdout for context if it exists
+                      if [ -f "$LOG_FILE" ]; then
+                          cat "$LOG_FILE"
+                          rm -f "$LOG_FILE"
+                      fi
                       break
                   fi
 
@@ -100,7 +101,6 @@ jobs:
                           continue
                       else
                           echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)" >&2
-                          # Print final attempt log for debugging
                           echo "--- Begin nbconvert log for $file ---" >&2
                           cat "$LOG_FILE" >&2
                           echo "--- End nbconvert log for $file ---" >&2
