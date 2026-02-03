@@ -51,34 +51,50 @@ jobs:
           execute_notebook() {
               local file=$1
               local tmpdir=$2
-
-              # Generate unique port range for this execution (ephemeral port range)
-              RANDOM_PORT=$((49152 + RANDOM % 10000))
-
-              # Create unique runtime directory to avoid conflicts
-              JUPYTER_RUNTIME_DIR="/tmp/jupyter-$$-$RANDOM"
-              mkdir -p "$JUPYTER_RUNTIME_DIR"
+              # Add random jitter (0-2 seconds) to desynchronize parallel starts
+              sleep $(awk -v seed=$RANDOM 'BEGIN{srand(seed); printf "%.2f", rand() * 2}')
 
               START_TIME=$(date +%s)
-              if JUPYTER_RUNTIME_DIR="$JUPYTER_RUNTIME_DIR" \
-                 uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
-                 --ExecutePreprocessor.timeout=600 \
-                 --KernelManager.control_port=$RANDOM_PORT \
-                 --KernelManager.shell_port=$((RANDOM_PORT + 1)) \
-                 --KernelManager.stdin_port=$((RANDOM_PORT + 2)) \
-                 --KernelManager.hb_port=$((RANDOM_PORT + 3)) \
-                 --KernelManager.iopub_port=$((RANDOM_PORT + 4)); then
-                  END_TIME=$(date +%s)
-                  DURATION=$((END_TIME - START_TIME))
+
+              # Retry logic for handling port collisions
+              MAX_RETRIES=3
+              RETRY_COUNT=0
+              SUCCESS=false
+
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                  if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
+                        --ExecutePreprocessor.timeout=600 2>&1 | tee /tmp/nbconvert_output_$$.log; then
+                      SUCCESS=true
+                      break
+                  else
+                      # Check if error is due to port collision
+                      if grep -q "Address already in use\|ZMQError\|Kernel died before replying" /tmp/nbconvert_output_$$.log; then
+                          RETRY_COUNT=$((RETRY_COUNT + 1))
+                          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                              WAIT_TIME=$((2 ** RETRY_COUNT))  # Exponential backoff: 2, 4, 8 seconds
+                              echo "⚠️  Port collision detected for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..." >&2
+                              sleep $WAIT_TIME
+                          else
+                              echo "✗ Failed to execute $file after $MAX_RETRIES attempts (port collision)" >&2
+                          fi
+                      else
+                          # Non-port-collision error, don't retry
+                          break
+                      fi
+                  fi
+              done
+
+              rm -f /tmp/nbconvert_output_$$.log
+
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+
+              if [ "$SUCCESS" = true ]; then
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
-                  rm -rf "$JUPYTER_RUNTIME_DIR"
               else
-                  END_TIME=$(date +%s)
-                  DURATION=$((END_TIME - START_TIME))
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
-                  rm -rf "$JUPYTER_RUNTIME_DIR"
               fi
           }
           export -f execute_notebook
