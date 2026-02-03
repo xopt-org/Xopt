@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required for setuptools_scm version calculation
+          fetch-depth: 1
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
