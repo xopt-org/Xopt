@@ -116,6 +116,14 @@ jobs:
               else
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)" >&2
+                  # Print the log file if it exists and wasn't already printed
+                  local FINAL_LOG_FILE="/tmp/nbconvert_output_$$.$((RETRY_COUNT > 0 ? RETRY_COUNT - 1 : 0)).log"
+                  if [ -f "$FINAL_LOG_FILE" ]; then
+                      echo "--- Begin final nbconvert log for $file (FAILED) ---" >&2
+                      cat "$FINAL_LOG_FILE" >&2
+                      echo "--- End final nbconvert log for $file (FAILED) ---" >&2
+                      rm -f "$FINAL_LOG_FILE"
+                  fi
               fi
           }
           export -f execute_notebook
