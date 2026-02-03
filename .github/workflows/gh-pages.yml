@@ -76,12 +76,15 @@ jobs:
               local MAX_RETRIES=3
               local RETRY_COUNT=0
               local SUCCESS=false
+
+              # Use a unique log file per notebook (based on filename hash) to avoid collisions
+              local FILE_HASH=$(echo "$file" | md5sum | cut -c1-8)
               local LAST_LOG_FILE=""
 
               START_TIME=$(date +%s)
 
               while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-                  LAST_LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
+                  LAST_LOG_FILE="/tmp/nbconvert_${FILE_HASH}_${RETRY_COUNT}.log"
 
                   if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
                         --ExecutePreprocessor.timeout=600 \
