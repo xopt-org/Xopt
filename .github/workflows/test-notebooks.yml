@@ -43,10 +43,12 @@ jobs:
           set +e  # Don't exit on first error
           NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
           NOTEBOOK_ARRAY=($NOTEBOOKS)
+
           # Create temp directory for tracking
           TMPDIR=$(mktemp -d)
           trap "rm -rf $TMPDIR" EXIT
           SCRIPT_START=$(date +%s)
+
           # Function to execute a notebook and track results, with jitter + retries
           execute_notebook() {
               local file=$1
@@ -59,51 +61,40 @@ jobs:
               local MAX_RETRIES=3
               local RETRY_COUNT=0
               local SUCCESS=false
+              local LAST_LOG_FILE=""
 
               START_TIME=$(date +%s)
 
               while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-                  local LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
+                  LAST_LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
 
                   if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
                         --ExecutePreprocessor.timeout=600 \
-                        >"$LOG_FILE" 2>&1; then
+                        >"$LAST_LOG_FILE" 2>&1; then
                       SUCCESS=true
                       # On success, stream log to stdout for context if it exists
-                      if [ -f "$LOG_FILE" ]; then
+                      if [ -f "$LAST_LOG_FILE" ]; then
                           echo "--- Begin nbconvert log for $file (SUCCESS) ---"
-                          cat "$LOG_FILE"
+                          cat "$LAST_LOG_FILE"
                           echo "--- End nbconvert log for $file (SUCCESS) ---"
-                          rm -f "$LOG_FILE"
+                          rm -f "$LAST_LOG_FILE"
                       fi
                       break
                   fi
 
                   # If this looks like a transient kernel/port issue, retry with backoff
-                  if [ -f "$LOG_FILE" ] && \
-                     grep -qE "Address already in use|ZMQError|Kernel died before replying" "$LOG_FILE"; then
+                  if [ -f "$LAST_LOG_FILE" ] && \
+                     grep -qE "Address already in use|ZMQError|Kernel died before replying" "$LAST_LOG_FILE"; then
                       RETRY_COUNT=$((RETRY_COUNT + 1))
                       if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
                           local WAIT_TIME=$((2 ** RETRY_COUNT))  # 2,4,8s
                           echo "Port/kernel issue for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
                           sleep "$WAIT_TIME"
                           continue
-                      else
-                          echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)"
-                          echo "--- Begin nbconvert log for $file (FINAL FAILURE) ---"
-                          cat "$LOG_FILE"
-                          echo "--- End nbconvert log for $file (FINAL FAILURE) ---"
-                      fi
-                  else
-                      # Non-transient error: show log and do not retry
-                      if [ -f "$LOG_FILE" ]; then
-                          echo "--- Begin nbconvert log for $file (FAILURE) ---"
-                          cat "$LOG_FILE"
-                          echo "--- End nbconvert log for $file (FAILURE) ---"
-                          rm -f "$LOG_FILE"
                       fi
                   fi
 
+                  # Non-retryable error or max retries reached - exit loop
                   break
               done
 
@@ -117,6 +108,15 @@ jobs:
               else
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)"
+                  # Always print the log file for failed notebooks
+                  if [ -f "$LAST_LOG_FILE" ]; then
+                      echo "--- Begin nbconvert log for $file (FAILURE) ---"
+                      cat "$LAST_LOG_FILE"
+                      echo "--- End nbconvert log for $file (FAILURE) ---"
+                      rm -f "$LAST_LOG_FILE"
+                  else
+                      echo "No log file found for $file"
+                  fi
               fi
           }
           export -f execute_notebook
@@ -130,14 +130,20 @@ jobs:
           SUCCESS=0
           FAILED=0
           TOTAL_TIME=0
+
+          # Write group summary header
           echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Collect status for each notebook in this group
           for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
               file="${NOTEBOOK_ARRAY[$i]}"
               TOTAL=$((TOTAL + 1))
               status_file="$TMPDIR/$(basename $file).status"
+
               if [ -f "$status_file" ]; then
                   status=$(cat "$status_file")
+
                   if [[ "$status" == failed:* ]]; then
                       FAILED=$((FAILED + 1))
                       duration=${status#failed:}
@@ -150,8 +156,12 @@ jobs:
                   fi
               fi
           done
+
+          # Calculate wall clock time
           SCRIPT_END=$(date +%s)
           SCRIPT_DURATION=$((SCRIPT_END - SCRIPT_START))
+
+          # Write summary totals
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Summary for Group $GROUP:**" >> $GITHUB_STEP_SUMMARY
           echo "- Total: $TOTAL" >> $GITHUB_STEP_SUMMARY
@@ -159,10 +169,13 @@ jobs:
           echo "- Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
           echo "- Total execution time: ${TOTAL_TIME}s" >> $GITHUB_STEP_SUMMARY
           echo "- Wall clock time: ${SCRIPT_DURATION}s" >> $GITHUB_STEP_SUMMARY
-          # Export for next step
+
+          # Export outputs for next step
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "success=$SUCCESS" >> $GITHUB_OUTPUT
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+          # Exit with error if any notebooks failed
           [ $FAILED -gt 0 ] && exit 1 || exit 0
 
       - name: Save results for summary
