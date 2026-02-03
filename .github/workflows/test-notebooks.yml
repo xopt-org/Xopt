@@ -40,23 +40,126 @@ jobs:
           TOTAL_GROUPS: 4
           SMOKE_TEST: "True"
         run: |
-          # Use shared script to execute notebooks for this group
-          bash scripts/run_notebooks.sh "$GROUP" "$TOTAL_GROUPS" "Group $GROUP" > group-$GROUP-summary.md
+          set +e  # Don't exit on first error
+          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' -not -path '*Xparallel*')
+          NOTEBOOK_ARRAY=($NOTEBOOKS)
+          # Create temp directory for tracking
+          TMPDIR=$(mktemp -d)
+          trap "rm -rf $TMPDIR" EXIT
+          SCRIPT_START=$(date +%s)
+          # Function to execute a notebook and track results, with jitter + retries
+          execute_notebook() {
+              local file=$1
+              local tmpdir=$2
 
-          # Parse summary counts from the markdown written by the script
-          TOTAL=$(grep "^- Total:" group-$GROUP-summary.md | awk '{print $3}')
-          SUCCESS=$(grep "^- Success:" group-$GROUP-summary.md | awk '{print $3}')
-          FAILED=$(grep "^- Failed:" group-$GROUP-summary.md | awk '{print $3}')
+              # Add small random jitter (0–2s) to desynchronize parallel starts
+              sleep "$(awk -v seed="$RANDOM" 'BEGIN{srand(seed); printf "%.2f", rand() * 2}')"
 
-          # Append group summary markdown to GitHub step summary
-          cat group-$GROUP-summary.md >> "$GITHUB_STEP_SUMMARY"
+              local START_TIME END_TIME DURATION
+              local MAX_RETRIES=3
+              local RETRY_COUNT=0
+              local SUCCESS=false
 
+              START_TIME=$(date +%s)
+
+              while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+                  # Capture nbconvert output for this attempt
+                  local LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
+
+                  if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
+                        --ExecutePreprocessor.timeout=600 \
+                        >"$LOG_FILE" 2>&1; then
+                      SUCCESS=true
+                      # On success, stream log to stdout for context (optional)
+                      cat "$LOG_FILE"
+                      rm -f "$LOG_FILE"
+                      break
+                  fi
+
+                  # If this looks like a transient kernel/port issue, retry with backoff
+                  if [ -f "$LOG_FILE" ] && \
+                     grep -qE "Address already in use|ZMQError|Kernel died before replying" "$LOG_FILE"; then
+                      RETRY_COUNT=$((RETRY_COUNT + 1))
+                      if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                          local WAIT_TIME=$((2 ** RETRY_COUNT))  # 2,4,8s
+                          echo "Port/kernel issue for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..." >&2
+                          sleep "$WAIT_TIME"
+                          continue
+                      else
+                          echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)" >&2
+                          # Print final attempt log for debugging
+                          echo "--- Begin nbconvert log for $file ---" >&2
+                          cat "$LOG_FILE" >&2
+                          echo "--- End nbconvert log for $file ---" >&2
+                      fi
+                  else
+                      # Non-transient error: show log and do not retry
+                      if [ -f "$LOG_FILE" ]; then
+                          echo "--- Begin nbconvert log for $file ---" >&2
+                          cat "$LOG_FILE" >&2
+                          echo "--- End nbconvert log for $file ---" >&2
+                      fi
+                  fi
+
+                  break
+              done
+
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+
+              if [ "$SUCCESS" = true ]; then
+                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "✓ Successfully executed $file (${DURATION}s)"
+              else
+                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "✗ Failed to execute $file (${DURATION}s)" >&2
+              fi
+          }
+          export -f execute_notebook
+          # Execute notebooks in this group in parallel (all notebooks in this group)
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
+          done
+          wait
+          # Collect results
+          TOTAL=0
+          SUCCESS=0
+          FAILED=0
+          TOTAL_TIME=0
+          echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              file="${NOTEBOOK_ARRAY[$i]}"
+              TOTAL=$((TOTAL + 1))
+              status_file="$TMPDIR/$(basename $file).status"
+              if [ -f "$status_file" ]; then
+                  status=$(cat "$status_file")
+                  if [[ "$status" == failed:* ]]; then
+                      FAILED=$((FAILED + 1))
+                      duration=${status#failed:}
+                      TOTAL_TIME=$((TOTAL_TIME + duration))
+                      echo "- ❌ \`$file\` (${duration}s)" >> $GITHUB_STEP_SUMMARY
+                  else
+                      SUCCESS=$((SUCCESS + 1))
+                      TOTAL_TIME=$((TOTAL_TIME + status))
+                      echo "- ✅ \`$file\` (${status}s)" >> $GITHUB_STEP_SUMMARY
+                  fi
+              fi
+          done
+          SCRIPT_END=$(date +%s)
+          SCRIPT_DURATION=$((SCRIPT_END - SCRIPT_START))
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Summary for Group $GROUP:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Total: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "- Success: $SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Total execution time: ${TOTAL_TIME}s" >> $GITHUB_STEP_SUMMARY
+          echo "- Wall clock time: ${SCRIPT_DURATION}s" >> $GITHUB_STEP_SUMMARY
           # Export for next step
-          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
-          echo "success=$SUCCESS" >> "$GITHUB_OUTPUT"
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-
-          [ "$FAILED" -gt 0 ] && exit 1 || exit 0
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          [ $FAILED -gt 0 ] && exit 1 || exit 0
 
       - name: Save results for summary
         if: always()
