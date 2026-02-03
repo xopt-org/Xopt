@@ -85,21 +85,22 @@ jobs:
                       RETRY_COUNT=$((RETRY_COUNT + 1))
                       if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
                           local WAIT_TIME=$((2 ** RETRY_COUNT))  # 2,4,8s
-                          echo "Port/kernel issue for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..." >&2
+                          echo "Port/kernel issue for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
                           sleep "$WAIT_TIME"
                           continue
                       else
-                          echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)" >&2
-                          echo "--- Begin nbconvert log for $file (FINAL FAILURE) ---" >&2
-                          cat "$LOG_FILE" >&2
-                          echo "--- End nbconvert log for $file (FINAL FAILURE) ---" >&2
+                          echo "Failed to execute $file after $MAX_RETRIES attempts (kernel/port-related failure)"
+                          echo "--- Begin nbconvert log for $file (FINAL FAILURE) ---"
+                          cat "$LOG_FILE"
+                          echo "--- End nbconvert log for $file (FINAL FAILURE) ---"
                       fi
                   else
                       # Non-transient error: show log and do not retry
                       if [ -f "$LOG_FILE" ]; then
-                          echo "--- Begin nbconvert log for $file (FAILURE) ---" >&2
-                          cat "$LOG_FILE" >&2
-                          echo "--- End nbconvert log for $file (FAILURE) ---" >&2
+                          echo "--- Begin nbconvert log for $file (FAILURE) ---"
+                          cat "$LOG_FILE"
+                          echo "--- End nbconvert log for $file (FAILURE) ---"
+                          rm -f "$LOG_FILE"
                       fi
                   fi
 
@@ -115,15 +116,7 @@ jobs:
                   echo "Notebook $file executed successfully without errors."
               else
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
-                  echo "✗ Failed to execute $file (${DURATION}s)" >&2
-                  # Print the log file if it exists and wasn't already printed
-                  local FINAL_LOG_FILE="/tmp/nbconvert_output_$$.$((RETRY_COUNT > 0 ? RETRY_COUNT - 1 : 0)).log"
-                  if [ -f "$FINAL_LOG_FILE" ]; then
-                      echo "--- Begin final nbconvert log for $file (FAILED) ---" >&2
-                      cat "$FINAL_LOG_FILE" >&2
-                      echo "--- End final nbconvert log for $file (FAILED) ---" >&2
-                      rm -f "$FINAL_LOG_FILE"
-                  fi
+                  echo "✗ Failed to execute $file (${DURATION}s)"
               fi
           }
           export -f execute_notebook
