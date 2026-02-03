@@ -53,119 +53,23 @@ jobs:
           TOTAL_GROUPS: 4
           SMOKE_TEST: "True"
         run: |
-          set +e  # Don't exit on first error
-          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' -not -path '*Xparallel*')
-          NOTEBOOK_ARRAY=($NOTEBOOKS)
-          # Create temp directory for tracking
-          TMPDIR=$(mktemp -d)
-          trap "rm -rf $TMPDIR" EXIT
-          SCRIPT_START=$(date +%s)
-          # Function to execute a notebook and track results
-          execute_notebook() {
-              local file=$1
-              local tmpdir=$2
-              # Add random jitter (0-2 seconds) to desynchronize parallel starts
-              sleep $(awk -v seed=$RANDOM 'BEGIN{srand(seed); printf "%.2f", rand() * 2}')
+          # Use shared script to execute notebooks for this group
+          bash scripts/run_notebooks.sh "$GROUP" "$TOTAL_GROUPS" "Group $GROUP" > group-$GROUP-summary.md
 
-              START_TIME=$(date +%s)
+          # Parse summary counts from the markdown written by the script
+          TOTAL=$(grep "^- Total:" group-$GROUP-summary.md | awk '{print $3}')
+          SUCCESS=$(grep "^- Success:" group-$GROUP-summary.md | awk '{print $3}')
+          FAILED=$(grep "^- Failed:" group-$GROUP-summary.md | awk '{print $3}')
 
-              # Retry logic for handling port collisions
-              MAX_RETRIES=3
-              RETRY_COUNT=0
-              SUCCESS=false
+          # Append group summary markdown to GitHub step summary
+          cat group-$GROUP-summary.md >> "$GITHUB_STEP_SUMMARY"
 
-              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-                  if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
-                        --ExecutePreprocessor.timeout=600 2>&1 | tee /tmp/nbconvert_output_$$.log; then
-                      SUCCESS=true
-                      break
-                  else
-                      # Check if error is due to port collision
-                      if grep -q "Address already in use\|ZMQError\|Kernel died before replying" /tmp/nbconvert_output_$$.log; then
-                          RETRY_COUNT=$((RETRY_COUNT + 1))
-                          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                              WAIT_TIME=$((2 ** RETRY_COUNT))  # Exponential backoff: 2, 4, 8 seconds
-                              echo "⚠️  Port collision detected for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..." >&2
-                              sleep $WAIT_TIME
-                          else
-                              echo "✗ Failed to execute $file after $MAX_RETRIES attempts (port collision)" >&2
-                          fi
-                      else
-                          # Non-port-collision error, don't retry
-                          break
-                      fi
-                  fi
-              done
-
-              rm -f /tmp/nbconvert_output_$$.log
-
-              END_TIME=$(date +%s)
-              DURATION=$((END_TIME - START_TIME))
-
-              if [ "$SUCCESS" = true ]; then
-                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
-                  echo "✓ Successfully executed $file (${DURATION}s)"
-              else
-                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
-                  echo "✗ Failed to execute $file (${DURATION}s)" >&2
-              fi
-          }
-          export -f execute_notebook
-          # Create directory for executed notebooks
-          mkdir -p executed-notebooks
-          # Execute notebooks in this group in parallel (2 at a time)
-          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
-              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
-          done
-          wait
-          # Copy executed notebooks to a separate directory for uploading
-          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
-              file="${NOTEBOOK_ARRAY[$i]}"
-              # Preserve directory structure
-              target_dir="executed-notebooks/$(dirname "$file")"
-              mkdir -p "$target_dir"
-              cp "$file" "$target_dir/"
-          done
-          # Collect results
-          TOTAL=0
-          SUCCESS=0
-          FAILED=0
-          TOTAL_TIME=0
-          echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
-              file="${NOTEBOOK_ARRAY[$i]}"
-              TOTAL=$((TOTAL + 1))
-              status_file="$TMPDIR/$(basename $file).status"
-              if [ -f "$status_file" ]; then
-                  status=$(cat "$status_file")
-                  if [[ "$status" == failed:* ]]; then
-                      FAILED=$((FAILED + 1))
-                      duration=${status#failed:}
-                      TOTAL_TIME=$((TOTAL_TIME + duration))
-                      echo "- ❌ \`$file\` (${duration}s)" >> $GITHUB_STEP_SUMMARY
-                  else
-                      SUCCESS=$((SUCCESS + 1))
-                      TOTAL_TIME=$((TOTAL_TIME + status))
-                      echo "- ✅ \`$file\` (${status}s)" >> $GITHUB_STEP_SUMMARY
-                  fi
-              fi
-          done
-          SCRIPT_END=$(date +%s)
-          SCRIPT_DURATION=$((SCRIPT_END - SCRIPT_START))
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Summary for Group $GROUP:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Total: $TOTAL" >> $GITHUB_STEP_SUMMARY
-          echo "- Success: $SUCCESS" >> $GITHUB_STEP_SUMMARY
-          echo "- Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
-          echo "- Total execution time: ${TOTAL_TIME}s" >> $GITHUB_STEP_SUMMARY
-          echo "- Wall clock time: ${SCRIPT_DURATION}s" >> $GITHUB_STEP_SUMMARY
           # Export for next step
-          echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
-          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "success=$SUCCESS" >> "$GITHUB_OUTPUT"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
 
-          [ $FAILED -gt 0 ] && exit 1 || exit 0
+          [ "$FAILED" -gt 0 ] && exit 1 || exit 0
 
       - name: Save results for summary
         if: always()
@@ -281,10 +185,10 @@ jobs:
           # Copy executed notebooks to replace originals
           # Artifacts preserve the structure from executed-notebooks/ which includes ./docs/examples/
           find downloaded-notebooks -name "*.ipynb" -type f | while read notebook; do
-            # Extract path after downloaded-notebooks/ (will be like ./docs/examples/...)
-            relative_path=$(echo "$notebook" | sed 's|downloaded-notebooks/||')
-            # Clean up leading ./ if present
-            relative_path=$(echo "$relative_path" | sed 's|^\./||')
+            # Strip the downloaded-notebooks/ prefix
+            relative_path=${notebook#downloaded-notebooks/}
+            # Strip an optional leading ./
+            relative_path=${relative_path#./}
             target_path="$relative_path"
             echo "Replacing $target_path with executed version from $notebook"
             cp "$notebook" "$target_path"
