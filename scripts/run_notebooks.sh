@@ -39,12 +39,14 @@ execute_notebook() {
     local MAX_RETRIES=3
     local RETRY_COUNT=0
     local SUCCESS=false
-    local LOG_FILE="/tmp/nbconvert_output_$$.log"
+    # Per-notebook log will be used for final error reporting
+    local FINAL_LOG
 
     START_TIME=$(date +%s)
 
     while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-        LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
+        local LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
+        FINAL_LOG="$LOG_FILE"
         if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
               --ExecutePreprocessor.timeout=600 \
               >"$LOG_FILE" 2>&1; then
@@ -69,18 +71,27 @@ execute_notebook() {
         break
     done
 
-    rm -f "$LOG_FILE"
-
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
 
     local status_file="$tmpdir/$(basename "$file").status"
+    local log_copy="$tmpdir/$(basename "$file").log"
+
     if [ "$SUCCESS" = true ]; then
         echo "$DURATION" >"$status_file"
         echo "✓ Successfully executed $file (${DURATION}s)"
+        # For successful notebooks, log is not strictly necessary; if present, we can drop it
+        [ -n "${FINAL_LOG:-}" ] && rm -f "$FINAL_LOG"
     else
         echo "failed:$DURATION" >"$status_file"
         echo "✗ Failed to execute $file (${DURATION}s)" >&2
+        # Preserve the last attempt's log alongside the status so it can be shown in summaries
+        if [ -n "${FINAL_LOG:-}" ] && [ -f "$FINAL_LOG" ]; then
+            cp "$FINAL_LOG" "$log_copy"
+            echo "--- Begin nbconvert log for $file ---" >&2
+            cat "$FINAL_LOG" >&2
+            echo "--- End nbconvert log for $file ---" >&2
+        fi
     fi
 }
 
@@ -104,17 +115,28 @@ for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
     file="${NOTEBOOK_ARRAY[$i]}"
     TOTAL=$((TOTAL + 1))
     status_file="$TMPDIR/$(basename "$file").status"
+    log_file="$TMPDIR/$(basename "$file").log"
     if [ -f "$status_file" ]; then
         status=$(cat "$status_file")
         if [[ "$status" == failed:* ]]; then
             FAILED=$((FAILED + 1))
             duration=${status#failed:}
             TOTAL_TIME=$((TOTAL_TIME + duration))
-            echo "- ❌ \"`$file`\" (${duration}s)"
+            echo "- ❌ \`$file\` (${duration}s)"
+            # If we have a preserved log for this notebook, include a collapsible block
+            if [ -f "$log_file" ]; then
+                echo "  <details>"
+                echo "  <summary>View error log</summary>"
+                echo ""
+                echo '\```text'
+                cat "$log_file"
+                echo '\```'
+                echo "  </details>"
+            fi
         else
             SUCCESS=$((SUCCESS + 1))
             TOTAL_TIME=$((TOTAL_TIME + status))
-            echo "- ✅ \"`$file`\" (${status}s)"
+            echo "- ✅ \`$file\` (${status}s)"
         fi
     fi
 done
@@ -130,7 +152,6 @@ echo "- Failed: $FAILED"
 echo "- Total execution time: ${TOTAL_TIME}s"
 echo "- Wall clock time: ${SCRIPT_DURATION}s"
 
-# Export summary numbers for caller via stdout (callers can parse or ignore)
 # Exit code: non-zero if any notebook failed
 if [ "$FAILED" -gt 0 ]; then
   exit 1
