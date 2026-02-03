@@ -44,6 +44,7 @@ execute_notebook() {
     START_TIME=$(date +%s)
 
     while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+        LOG_FILE="/tmp/nbconvert_output_$$.$RETRY_COUNT.log"
         if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
               --ExecutePreprocessor.timeout=600 \
               >"$LOG_FILE" 2>&1; then
@@ -52,7 +53,7 @@ execute_notebook() {
         fi
 
         # Check if error is due to transient kernel/port issues
-        if grep -qE "Address already in use|ZMQError|Kernel died before replying" "$LOG_FILE"; then
+        if [ -f "$LOG_FILE" ] && grep -qE "Address already in use|ZMQError|Kernel died before replying" "$LOG_FILE"; then
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
                 local WAIT_TIME=$((2 ** RETRY_COUNT))  # 2, 4, 8 seconds
