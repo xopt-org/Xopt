@@ -122,7 +122,6 @@ jobs:
               if [ "$SUCCESS" = true ]; then
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
-                  echo "Notebook $file executed successfully without errors."
                   # Copy executed notebook to staging directory, preserving path structure
                   target_dir="executed-notebooks/$(dirname "$file")"
                   mkdir -p "$target_dir"
