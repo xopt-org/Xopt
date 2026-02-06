@@ -14,6 +14,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+import warnings
 
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
@@ -200,6 +201,12 @@ class Xopt(XoptBaseModel):
         to the new MaxEvaluationsCondition stopping condition.
         """
         if isinstance(data, dict) and "max_evaluations" in data:
+            warnings.warn(
+                "The attribute `max_evaluations` in `Xopt` is deprecated and will be removed in later versions of the Xopt "
+                "library. Please use `stopping_condition` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             if data.get("stopping_condition") is not None:
                 raise ValueError(
                     "Cannot specify both 'max_evaluations' and 'stopping_condition'. "
