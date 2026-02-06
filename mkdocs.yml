@@ -154,8 +154,8 @@ plugins:
   - search
 
   - mkdocs-jupyter:
-      include_source: False
-      execute: True
+      include_source: True
+      execute: False
 
   - mkdocstrings:
       default_handler: python
