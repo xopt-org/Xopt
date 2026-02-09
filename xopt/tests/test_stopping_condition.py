@@ -490,7 +490,7 @@ class TestStoppingConditionIntegration:
         self, simple_vocs, evaluator
     ):
         """Test backward compatibility: max_evaluations creates MaxEvaluationsCondition."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         # Initialize Xopt with old max_evaluations parameter
         X = Xopt(
@@ -515,7 +515,7 @@ vocs:
         x1: [0.0, 1.0]
         x2: [0.0, 1.0]
     objectives:
-        f1: MINIMIZE
+        f1: EXPLORE
 generator:
     name: latin_hypercube
 evaluator:
@@ -537,7 +537,7 @@ max_evaluations: 3
         self, simple_vocs, evaluator
     ):
         """Test that specifying both max_evaluations and stopping_condition raises an error."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         with pytest.raises(ValueError, match="Cannot specify both"):
             Xopt(
