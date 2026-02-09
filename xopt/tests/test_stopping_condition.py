@@ -6,6 +6,7 @@ import json
 
 import pandas as pd
 import pytest
+import yaml
 
 from xopt import (
     VOCS,
@@ -484,3 +485,65 @@ class TestStoppingConditionIntegration:
         data = pd.DataFrame({"x1": [0.1], "x2": [0.2], "f1": [0.5]})
         for condition in conditions[1:]:  # Skip MaxEvaluationsCondition
             assert not condition.should_stop(data, bad_vocs)
+
+    def test_max_evaluations_backward_compatibility_python(
+        self, simple_vocs, evaluator
+    ):
+        """Test backward compatibility: max_evaluations creates MaxEvaluationsCondition."""
+        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+
+        # Initialize Xopt with old max_evaluations parameter
+        X = Xopt(
+            vocs=simple_vocs,
+            evaluator=evaluator,
+            generator=generator,
+            max_evaluations=5,
+        )
+
+        # Verify it creates the correct stopping condition
+        assert X.stopping_condition is not None
+        assert isinstance(X.stopping_condition, MaxEvaluationsCondition)
+        assert X.stopping_condition.max_evaluations == 5
+
+    def test_max_evaluations_backward_compatibility_yaml(
+        self, simple_vocs, test_function
+    ):
+        """Test backward compatibility: max_evaluations from YAML creates MaxEvaluationsCondition."""
+        yaml_config = """
+vocs:
+    variables:
+        x1: [0.0, 1.0]
+        x2: [0.0, 1.0]
+    objectives:
+        f1: MINIMIZE
+generator:
+    name: latin_hypercube
+evaluator:
+    function: __test_function__
+max_evaluations: 3
+"""
+        # Parse the YAML and inject the test function
+        config = yaml.safe_load(yaml_config)
+        config["evaluator"] = Evaluator(function=test_function)
+
+        X = Xopt(**config)
+
+        # Verify it creates the correct stopping condition
+        assert X.stopping_condition is not None
+        assert isinstance(X.stopping_condition, MaxEvaluationsCondition)
+        assert X.stopping_condition.max_evaluations == 3
+
+    def test_max_evaluations_and_stopping_condition_raises_error(
+        self, simple_vocs, evaluator
+    ):
+        """Test that specifying both max_evaluations and stopping_condition raises an error."""
+        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            Xopt(
+                vocs=simple_vocs,
+                evaluator=evaluator,
+                generator=generator,
+                max_evaluations=10,
+                stopping_condition=MaxEvaluationsCondition(max_evaluations=2),
+            )
