@@ -139,6 +139,12 @@ class Xopt(XoptBaseModel):
             # make a copy of the generator / vocs objects to avoid modifying the original
             data["generator"] = deepcopy(data["generator"])
 
+            # raise a more verbose vocs error for Xopt 3.0
+            if "vocs" in data.keys():
+                raise ValueError(
+                    "As of Xopt 3.0, VOCS is no longer passed to the Xopt object, it is only specified in the generator."
+                )
+
         return data
 
     @field_validator("evaluator", mode="before")
