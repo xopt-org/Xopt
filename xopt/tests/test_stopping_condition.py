@@ -492,7 +492,6 @@ class TestStoppingConditionIntegration:
 
         # Initialize Xopt with old max_evaluations parameter
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             max_evaluations=5,
@@ -508,14 +507,15 @@ class TestStoppingConditionIntegration:
     ):
         """Test backward compatibility: max_evaluations from YAML creates MaxEvaluationsCondition."""
         yaml_config = """
-vocs:
-    variables:
-        x1: [0.0, 1.0]
-        x2: [0.0, 1.0]
-    objectives:
-        f1: EXPLORE
+
 generator:
     name: latin_hypercube
+    vocs:
+        variables:
+            x1: [0.0, 1.0]
+            x2: [0.0, 1.0]
+        objectives:
+            f1: EXPLORE
 evaluator:
     function: __test_function__
 max_evaluations: 3
@@ -539,7 +539,6 @@ max_evaluations: 3
 
         with pytest.raises(ValueError, match="Cannot specify both"):
             Xopt(
-                vocs=simple_vocs,
                 evaluator=evaluator,
                 generator=generator,
                 max_evaluations=10,
