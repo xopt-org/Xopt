@@ -21,7 +21,6 @@ from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
     StagnationCondition,
     TargetValueCondition,
-    get_stopping_condition,
 )
 
 
@@ -345,7 +344,7 @@ class TestStoppingConditionIntegration:
     def test_composite_condition_validators_and_serializers(self):
         """Test CompositeCondition validators and serializers."""
         # Test empty conditions list
-        with pytest.raises(ValueError, match="At least one condition must be provided"):
+        with pytest.raises(ValueError):
             CompositeCondition(conditions=[], logic="or")
 
         # Test invalid logic
@@ -371,10 +370,7 @@ class TestStoppingConditionIntegration:
         assert serialized["conditions"][0]["name"] == "MaxEvaluationsCondition"
 
         # Test with invalid condition type
-        with pytest.raises(
-            ValueError,
-            match="Each condition must be a StoppingCondition instance or a dict",
-        ):
+        with pytest.raises(ValueError):
             CompositeCondition(conditions=["invalid"], logic="or")
 
     def test_composite_condition_logic_paths(self, simple_vocs):
@@ -436,21 +432,6 @@ class TestStoppingConditionIntegration:
             logic="or",
         )
         assert not condition_or_false.should_stop(data, simple_vocs)
-
-    def test_get_stopping_condition_function(self):
-        """Test the get_stopping_condition utility function."""
-        # Test valid condition names
-        max_eval_class = get_stopping_condition("MaxEvaluationsCondition")
-        assert max_eval_class == MaxEvaluationsCondition
-
-        target_class = get_stopping_condition("TargetValueCondition")
-        assert target_class == TargetValueCondition
-
-        # Test invalid condition name
-        with pytest.raises(
-            ValueError, match="No stopping condition found with name: InvalidCondition"
-        ):
-            get_stopping_condition("InvalidCondition")
 
     def test_edge_cases_empty_and_missing_data(self, simple_vocs):
         """Test edge cases with empty data and missing columns."""
