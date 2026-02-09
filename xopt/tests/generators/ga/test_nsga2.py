@@ -327,7 +327,7 @@ def test_nsga2_checkpoint_reload_yaml(nsga2_optimization_with_checkpoint):
 
             constants:
                 a: dummy_constant
-    
+
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 

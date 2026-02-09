@@ -84,7 +84,7 @@ class TestMGGPO:
         gen = MGGPOGenerator(vocs=vocs, reference_point=reference_point)
 
         X = Xopt(evaluator=evaluator, generator=gen)
-        X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]})))
+        X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
 
         for _ in [0, 1]:
             X.step()

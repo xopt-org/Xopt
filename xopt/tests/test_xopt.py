@@ -201,7 +201,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
 
         out = xopt.evaluate({"x1": 0.4, "x2": 0.3})
@@ -229,7 +230,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
 
         # test evaluating data w/o constants specified
@@ -257,7 +259,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
 
         # fixed seed for deterministic results
@@ -404,7 +407,8 @@ class TestXopt:
         evaluator = Evaluator(function=bad_function_sometimes)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
         X = AsynchronousXopt(
-            generator=gen, evaluator=evaluator,
+            generator=gen,
+            evaluator=evaluator,
         )
         X.strict = False
 
@@ -421,7 +425,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
         X.dump_file = "test_checkpointing.yaml"
 
@@ -453,7 +458,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
         X.dump_file = "test_checkpointing.yaml"
 
@@ -475,7 +481,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
 
         # fixed seed for deterministic results
@@ -489,10 +496,12 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
         X2 = Xopt(
-            generator=generator, evaluator=evaluator,
+            generator=generator,
+            evaluator=evaluator,
         )
 
         assert X.generator is not X2.generator
