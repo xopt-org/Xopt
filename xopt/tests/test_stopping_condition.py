@@ -514,6 +514,45 @@ max_evaluations: 3
         assert isinstance(X.stopping_condition, MaxEvaluationsCondition)
         assert X.stopping_condition.max_evaluations == 3
 
+    def test_stopping_condition_yaml_deserialization(self, simple_vocs, test_function):
+        """Test that a stopping condition is correctly instantiated from YAML."""
+        yaml_config = """
+vocs:
+    variables:
+        x1: [0.0, 1.0]
+        x2: [0.0, 1.0]
+    objectives:
+        f1: MINIMIZE
+generator:
+    name: latin_hypercube
+evaluator:
+    function: __test_function__
+stopping_condition:
+    name: CompositeCondition
+    logic: or
+    conditions:
+        - name: MaxEvaluationsCondition
+          max_evaluations: 10
+        - name: TargetValueCondition
+          objective_name: f1
+          target_value: 0.01
+          tolerance: 0.001
+"""
+        config = yaml.safe_load(yaml_config)
+        config["evaluator"] = Evaluator(function=test_function)
+
+        X = Xopt(**config)
+
+        assert isinstance(X.stopping_condition, CompositeCondition)
+        assert X.stopping_condition.logic == "or"
+        assert len(X.stopping_condition.conditions) == 2
+        assert isinstance(X.stopping_condition.conditions[0], MaxEvaluationsCondition)
+        assert X.stopping_condition.conditions[0].max_evaluations == 10
+        assert isinstance(X.stopping_condition.conditions[1], TargetValueCondition)
+        assert X.stopping_condition.conditions[1].objective_name == "f1"
+        assert X.stopping_condition.conditions[1].target_value == 0.01
+        assert X.stopping_condition.conditions[1].tolerance == 0.001
+
     def test_max_evaluations_and_stopping_condition_raises_error(
         self, simple_vocs, evaluator
     ):
