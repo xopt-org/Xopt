@@ -77,11 +77,11 @@ class TestMPI:
                     c2: [LESS_THAN, 0.5]
                 constants: {a: dummy_constant}
 
-            evaluator:
-                function: xopt.resources.test_functions.tnk.evaluate_TNK
-                function_kwargs:
-                    sleep: 0
-                    random_sleep: 0.1
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                sleep: 0
+                random_sleep: 0.1
 
         """
 
