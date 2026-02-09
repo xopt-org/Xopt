@@ -64,7 +64,6 @@ class TestXoptPlusAPOSMM:
             generator=gen,
             evaluator=evaluator,
             stopping_condition=max_evaluations,
-            vocs=vocs,
         )
 
     def test_run(self, vocs, evaluator, max_evaluations, mapping):
@@ -77,7 +76,6 @@ class TestXoptPlusAPOSMM:
         x = Xopt(
             generator=gen,
             evaluator=evaluator,
-            vocs=vocs,
             stopping_condition=max_evaluations,
         )
         x.run()
@@ -96,7 +94,6 @@ class TestXoptPlusAPOSMM:
         x = Xopt(
             generator=gen,
             evaluator=evaluator,
-            vocs=vocs,
             stopping_condition=max_evaluations,
         )
         x.random_evaluate(40)
@@ -117,7 +114,6 @@ class TestXoptPlusAPOSMM:
         x = Xopt(
             generator=gen,
             evaluator=evaluator,
-            vocs=vocs,
             stopping_condition=max_evaluations,
         )
         for i in range(45):

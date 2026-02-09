@@ -230,7 +230,7 @@ class TestBaxGenerator:
         )
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
+        xopt = Xopt(generator=gen, evaluator=evaluator)
 
         # initialize with single initial candidate
         xopt.random_evaluate(3)
@@ -246,7 +246,7 @@ class TestBaxGenerator:
         gen = BaxGenerator(vocs=test_vocs, algorithm=alg, algorithm_results_file="test")
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
+        xopt = Xopt(generator=gen, evaluator=evaluator)
 
         # initialize with single initial candidate
         xopt.random_evaluate(3)
@@ -325,7 +325,7 @@ class TestBaxGenerator:
         gen = BaxGenerator(vocs=test_vocs, algorithm=alg, n_monte_carlo_samples=10)
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
+        xopt = Xopt(generator=gen, evaluator=evaluator)
 
         # initialize with single initial candidate
         xopt.random_evaluate(3)

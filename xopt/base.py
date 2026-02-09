@@ -130,26 +130,13 @@ class Xopt(XoptBaseModel):
         Validate the Xopt model by checking the generator and evaluator.
         """
         if isinstance(data, dict):
-            # validate vocs
-            if isinstance(data["vocs"], dict):
-                data["vocs"] = VOCS(**data["vocs"])
-
             # validate generator
             if isinstance(data["generator"], dict):
                 name = data["generator"].pop("name")
                 generator_class = get_generator(name)
-                data["generator"] = generator_class.model_validate(
-                    {**data["generator"], "vocs": data["vocs"]}
-                )
-            elif isinstance(data["generator"], str):
-                generator_class = get_generator(data["generator"])
-
-                data["generator"] = generator_class.model_validate(
-                    {"vocs": data["vocs"]}
-                )
+                data["generator"] = generator_class.model_validate(data["generator"])
 
             # make a copy of the generator / vocs objects to avoid modifying the original
-            data["vocs"] = deepcopy(data["vocs"])
             data["generator"] = deepcopy(data["generator"])
 
         return data
@@ -203,7 +190,7 @@ class Xopt(XoptBaseModel):
             return 0
         else:
             return len(self.data)
-        
+
     @property
     def vocs(self) -> VOCS:
         """

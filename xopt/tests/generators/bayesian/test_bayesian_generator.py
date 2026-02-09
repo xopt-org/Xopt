@@ -260,7 +260,7 @@ class TestBayesianGenerator(TestCase):
     def test_transforms(self):
         gen = PatchBayesianGenerator(vocs=sinusoid_vocs)
         evaluator = Evaluator(function=evaluate_sinusoid)
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
 
         # generate some data samples
         import numpy as np

@@ -310,20 +310,19 @@ TEST_VOCS_DATA_MO = pd.DataFrame(
 TEST_YAML = """
 generator:
     name: random
+    vocs:
+        variables:
+            x1: [0, 3.14159]
+            x2: [0, 3.14159]
+        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+        constraints:
+            c1: [GREATER_THAN, 0]
+            c2: ['LESS_THAN', 0.5]
+        constants:
+            constant1: 1
 
 evaluator:
     function: xopt.resources.testing.xtest_callable
     function_kwargs:
         a: 5
-
-vocs:
-    variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
-    objectives: {y1: MINIMIZE, y2: MINIMIZE}
-    constraints:
-        c1: [GREATER_THAN, 0]
-        c2: ['LESS_THAN', 0.5]
-    constants:
-        constant1: 1
 """

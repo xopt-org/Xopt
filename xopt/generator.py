@@ -70,7 +70,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         exclude=True,
     )
 
-    vocs: VOCS = Field(description="generator VOCS", exclude=True)
+    vocs: VOCS = Field(description="generator VOCS")
     data: Optional[pd.DataFrame] = Field(
         None, description="generator data", exclude=True
     )

@@ -270,7 +270,6 @@ class TestStoppingConditionIntegration:
         generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             stopping_condition=condition,
@@ -292,7 +291,6 @@ class TestStoppingConditionIntegration:
         generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             # No stopping_condition

@@ -28,7 +28,7 @@ class TestVisualizeBax:
 
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
+        xopt = Xopt(generator=gen, evaluator=evaluator)
 
         xopt.random_evaluate(3)
         xopt.step()
@@ -78,7 +78,7 @@ class TestVisualizeBax:
 
         gen.numerical_optimizer.n_restarts = 1
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=test_vocs)
+        xopt = Xopt(generator=gen, evaluator=evaluator)
 
         # initialize with single initial candidate
         xopt.random_evaluate(3)

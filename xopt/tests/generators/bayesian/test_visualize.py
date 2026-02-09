@@ -272,7 +272,7 @@ def test_in_generator():
     generator.numerical_optimizer.max_iter = 1
     generator.gp_constructor.use_low_noise_prior = True
 
-    X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+    X = Xopt(generator=generator, evaluator=evaluator)
 
     with pytest.raises(ValueError):
         X.generator.visualize_model()

@@ -21,7 +21,6 @@ def test_cnsga():
     X = Xopt(
         generator=CNSGAGenerator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
-        vocs=tnk_vocs,
         stopping_condition=MaxEvaluationsCondition(max_evaluations=10),
     )
     X.run()
@@ -34,7 +33,6 @@ def test_cnsga_single_objective():
     X = Xopt(
         generator=CNSGAGenerator(vocs=modified_tnk_vocs),
         evaluator=Evaluator(function=evaluate_modified_TNK),
-        vocs=modified_tnk_vocs,
         stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
     )
     X.run()
@@ -49,7 +47,6 @@ def test_cnsga_baddf():
     X = Xopt(
         generator=CNSGAGenerator(vocs=tnk_vocs, population_size=32),
         evaluator=Evaluator(function=eval_f),
-        vocs=tnk_vocs,
         strict=False,
     )
 
@@ -92,6 +89,15 @@ def test_cnsga_from_yaml():
         name: cnsga
         population_size: 8
         population_file: null
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: dummy_constant}
 
     evaluator:
         function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -99,15 +105,7 @@ def test_cnsga_from_yaml():
             sleep: 0
             random_sleep: 0.1
 
-    vocs:
-        variables:
-            x1: [0, 3.14159]
-            x2: [0, 3.14159]
-        objectives: {y1: MINIMIZE, y2: MINIMIZE}
-        constraints:
-            c1: [GREATER_THAN, 0]
-            c2: [LESS_THAN, 0.5]
-        constants: {a: dummy_constant}
+
     """
 
     X = Xopt(YAML)
@@ -128,6 +126,13 @@ def test_cnsga_no_constraints():
         name: cnsga
         population_size: 8
         population_file: null
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints: {}
+            constants: {a: dummy_constant}
 
     evaluator:
         function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -135,13 +140,7 @@ def test_cnsga_no_constraints():
             sleep: 0
             random_sleep: 0.1
 
-    vocs:
-        variables:
-            x1: [0, 3.14159]
-            x2: [0, 3.14159]
-        objectives: {y1: MINIMIZE, y2: MINIMIZE}
-        constraints: {}
-        constants: {a: dummy_constant}
+
     """
 
     X = Xopt(YAML)

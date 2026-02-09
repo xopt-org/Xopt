@@ -413,7 +413,7 @@ class TestTurbo(TestCase):
         generator = UpperConfidenceBoundGenerator(
             vocs=vocs, turbo_controller="optimize"
         )
-        X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=generator)
 
         X.evaluate_data(pd.DataFrame({"x": [3.0, 1.75, 2.0]}))
 
@@ -489,7 +489,6 @@ class TestTurbo(TestCase):
             X = Xopt(
                 evaluator=evaluator,
                 generator=generator,
-                vocs=vocs,
                 dump_file="dump.yml",
             )
 
@@ -534,7 +533,7 @@ class TestTurbo(TestCase):
         evaluator = Evaluator(function=basic_sin_function)
 
         # construct Xopt optimizer
-        X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=generator)
 
         X.random_evaluate(3)
 
