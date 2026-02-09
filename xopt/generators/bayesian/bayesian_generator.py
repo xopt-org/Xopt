@@ -12,6 +12,7 @@ from botorch.acquisition import (
     FixedFeatureAcquisitionFunction,
     qUpperConfidenceBound,
     AcquisitionFunction,
+    MCAcquisitionObjective,
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
@@ -623,7 +624,9 @@ class BayesianGenerator(Generator, ABC):
         input names (variables), and the resulting tensor is configured with the data
         type and device settings from the generator.
         """
-        return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
+        return torch.tensor(
+            data[self.model_input_names].to_numpy().copy(), **self.tkwargs
+        )
 
     def get_acquisition(self, model: Module) -> AcquisitionFunction:
         """
@@ -785,7 +788,7 @@ class BayesianGenerator(Generator, ABC):
     def _get_acquisition(self, model):
         pass  # pragma: no cover
 
-    def _get_objective(self):
+    def _get_objective(self) -> MCAcquisitionObjective:
         """
         Return default objective (scalar objective) determined by vocs or if
         defined in custom_objective. Module is already on target device.

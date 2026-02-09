@@ -72,7 +72,7 @@ def get_training_data(
     if f"{outcome_name}_var" in data:
         variance_data = data[f"{outcome_name}_var"][non_nans]
         train_Yvar = torch.tensor(
-            variance_data[~outcome_data.isnull()].to_numpy(dtype="double")
+            variance_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
         ).unsqueeze(-1)
 
     return train_X, train_Y, train_Yvar
