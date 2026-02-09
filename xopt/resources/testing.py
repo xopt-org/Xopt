@@ -223,7 +223,7 @@ def check_dict_allclose(dict1, dict2, excluded_keys=None, rtol=1e-5, atol=1e-8):
 def reload_gen_from_json(gen):
     assert isinstance(gen, Generator)
     gen_class = gen.__class__
-    gen_new = gen_class(vocs=gen.vocs, **json.loads(gen.json()))
+    gen_new = gen_class(**json.loads(gen.json()))
     gen_new.add_data(gen.data.copy())
     return gen_new
 
@@ -231,7 +231,7 @@ def reload_gen_from_json(gen):
 def reload_gen_from_yaml(gen):
     assert isinstance(gen, Generator)
     gen_class = gen.__class__
-    gen_new = gen_class(vocs=gen.vocs, **remove_none_values(yaml.safe_load(gen.yaml())))
+    gen_new = gen_class(**remove_none_values(yaml.safe_load(gen.yaml())))
     gen_new.add_data(gen.data.copy())
     return gen_new
 

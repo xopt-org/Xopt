@@ -122,7 +122,7 @@ class TestMOBOGenerator:
 
         for ele in [gen]:
             dump = ele.model_dump()
-            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
+            generator = MOBOGenerator(**dump)
             X = Xopt(generator=generator, evaluator=evaluator)
             X.random_evaluate(3)
             X.step()
@@ -324,7 +324,7 @@ class TestMOBOGenerator:
 
         for ele in [gen]:
             dump = ele.model_dump()
-            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
+            generator = MOBOGenerator(**dump)
             X = Xopt(generator=generator, evaluator=evaluator)
             X.generator.numerical_optimizer.max_iter = 1
             X.random_evaluate(3)
