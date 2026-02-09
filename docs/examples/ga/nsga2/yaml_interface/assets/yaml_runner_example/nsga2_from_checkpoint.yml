@@ -69,4 +69,3 @@ evaluator:
   # to the population size so that a full generation is evaluated at once.
   vectorized: true
   max_workers: 50
-
