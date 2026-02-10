@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks.git
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: no-commit-to-branch
       - id: trailing-whitespace
@@ -17,7 +17,7 @@ repos:
         exclude: "^(python/versioneer.py|python/xopt/_version.py)$"
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.2
+    rev: v0.15.0
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -34,3 +34,8 @@ repos:
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
         exclude: "^.*(TODO|TODO2).ipynb$"
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        args: [--strict, --ignore-missing-imports]
