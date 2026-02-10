@@ -1,7 +1,6 @@
 import math
 import os
 from abc import ABC
-from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
 import numpy as np
@@ -13,7 +12,6 @@ from pydantic import ValidationError
 from gest_api.vocs import ContinuousVariable
 
 from xopt import from_file
-from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
@@ -353,8 +351,6 @@ class TestXopt:
         X.remove_data([0])
         assert X.data.equals(new_data)
 
-
-
     def test_strict(self):
         def bad_function(inval):
             raise ValueError
@@ -374,8 +370,6 @@ class TestXopt:
         # should run fine
         X2.step()
         assert "xopt_error_str" in X2.data.columns
-
-
 
     def test_dump_w_exploded_cols(self):
         evaluator = Evaluator(function=xtest_callable)

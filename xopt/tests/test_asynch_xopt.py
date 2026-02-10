@@ -406,7 +406,6 @@ class TestAsynchXopt:
 
     def test_process_futures_with_exception_handling(self):
         """Test process_futures with exception handling in strict mode"""
-        import concurrent.futures
 
         def failing_function(inval):
             raise ValueError("Test exception")
@@ -473,7 +472,7 @@ class TestAsynchXopt:
 
         def vector_function(inputs):
             # Mock vectorized function that processes multiple inputs
-            return {"y1": [1.0]*len(inputs), "c1": [0.5]*len(inputs)}
+            return {"y1": [1.0] * len(inputs), "c1": [0.5] * len(inputs)}
 
         evaluator = Evaluator(function=vector_function, vectorized=True)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
