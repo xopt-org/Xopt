@@ -50,8 +50,7 @@ jobs:
         shell: bash
         env:
           GROUP: ${{ matrix.group }}
-          TOTAL_GROUPS: 4
-          SMOKE_TEST: "False"
+          TOTAL_GROUPS: 4 # Make sure to NOT set SMOKE_TEST to a value here
         run: |
           set +e  # Don't exit on first error
           NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
