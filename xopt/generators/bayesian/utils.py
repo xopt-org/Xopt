@@ -59,16 +59,18 @@ def get_training_data(
     input_data = input_data[non_nans]
     outcome_data = outcome_data[non_nans]
 
-    train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy(dtype="double"))
+    train_X = torch.tensor(
+        input_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
+    )
     train_Y = torch.tensor(
-        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double")
+        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
     ).unsqueeze(-1)
 
     train_Yvar = None
     if f"{outcome_name}_var" in data:
         variance_data = data[f"{outcome_name}_var"][non_nans]
         train_Yvar = torch.tensor(
-            variance_data[~outcome_data.isnull()].to_numpy(dtype="double")
+            variance_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
         ).unsqueeze(-1)
 
     return train_X, train_Y, train_Yvar
@@ -203,7 +205,9 @@ def validate_turbo_controller_base(
         controller.__name__: controller for controller in valid_controller_types
     }
 
-    vocs = info.data.get("vocs", VOCS())
+    vocs = info.data.get("vocs", None)
+    if vocs is None:
+        raise ValueError("vocs must be provided to validate turbo controller")
 
     if isinstance(value, str):
         # handle old string input

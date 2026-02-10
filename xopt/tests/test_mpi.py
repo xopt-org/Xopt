@@ -20,7 +20,9 @@ class TestMPI:
         from xopt.mpi.run import run_mpi
 
         YAML = """
-                max_evaluations: 5
+                stopping_condition:
+                    name: MaxEvaluationsCondition
+                    max_evaluations: 10
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
                     function_kwargs:
@@ -59,7 +61,10 @@ class TestMPI:
         from xopt.mpi.run import run_mpi
 
         YAML = """
-        max_evaluations: 10
+        stopping_condition:
+            name: MaxEvaluationsCondition
+            max_evaluations: 10
+
         generator:
             name: cnsga
             population_size: 64

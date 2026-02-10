@@ -74,6 +74,13 @@ class Generator(XoptBaseModel, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
+    def __init__(self, **kwargs: Any):
+        """
+        Initialize the generator.
+        """
+        super().__init__(**kwargs)
+        logger.info(f"Initialized generator {self.name}")
+
     @field_validator("vocs", mode="after")
     @classmethod
     def validate_vocs(cls, value: VOCS, info: ValidationInfo):
@@ -100,14 +107,6 @@ class Generator(XoptBaseModel, ABC):
             except IndexError:
                 value = pd.DataFrame(value, index=[0])
         return value
-
-    def __init__(self, **kwargs: Any):
-        """
-        Initialize the generator.
-
-        """
-        super().__init__(**kwargs)
-        logger.info(f"Initialized generator {self.name}")
 
     @abstractmethod
     def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:

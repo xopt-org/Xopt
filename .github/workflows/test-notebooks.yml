@@ -1,25 +1,14 @@
-name: Deploy Documentation
+name: Test Notebooks
 
 on:
+  pull_request:
   push:
-    branches:
+    branches-ignore:
       - main
-    tags:
-      - '*'
-  release:
-    types:
-      - published
-
-permissions:
-  id-token: write
-  contents: write
-  pages: write
-  actions: read
 
 jobs:
   test-notebooks:
     runs-on: ubuntu-latest
-    name: "Test Notebooks"
     strategy:
       fail-fast: false
       matrix:
@@ -27,8 +16,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -62,8 +49,6 @@ jobs:
           trap "rm -rf $TMPDIR" EXIT
           SCRIPT_START=$(date +%s)
 
-          # Directory to stage executed notebooks for upload
-          mkdir -p executed-notebooks
           # Function to execute a notebook and track results, with jitter + retries
           execute_notebook() {
               local file=$1
@@ -122,10 +107,6 @@ jobs:
               if [ "$SUCCESS" = true ]; then
                   echo "$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✓ Successfully executed $file (${DURATION}s)"
-                  # Copy executed notebook to staging directory, preserving path structure
-                  target_dir="executed-notebooks/$(dirname "$file")"
-                  mkdir -p "$target_dir"
-                  cp "$file" "$target_dir/"
               else
                   echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
                   echo "✗ Failed to execute $file (${DURATION}s)"
@@ -209,15 +190,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: notebook-results-group-${{ matrix.group }}
+          name: results-group-${{ matrix.group }}
           path: results/group-${{ matrix.group }}-results.txt
-
-      - name: Upload executed notebooks
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: executed-notebooks-group-${{ matrix.group }}
-          path: executed-notebooks/**/*.ipynb
 
       - name: Minimize uv cache
         run: uv cache prune --ci
@@ -231,7 +205,7 @@ jobs:
       - name: Download all results
         uses: actions/download-artifact@v4
         with:
-          pattern: notebook-results-group-*
+          pattern: results-group-*
           merge-multiple: true
 
       - name: Generate overall summary
@@ -278,85 +252,3 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*Check individual group job summaries for detailed notebook-by-notebook results.*" >> $GITHUB_STEP_SUMMARY
-
-  build:
-    needs: [test-notebooks, summary]
-    runs-on: ubuntu-latest
-    name: "Build Documentation"
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Required for setuptools_scm version calculation
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync --extra doc
-
-      - name: Download executed notebooks
-        uses: actions/download-artifact@v4
-        with:
-          pattern: executed-notebooks-group-*
-          path: downloaded-notebooks
-          merge-multiple: true
-
-      - name: Replace original notebooks with executed versions
-        run: |
-          # Copy executed notebooks to replace originals
-          # Artifacts preserve the structure from executed-notebooks/ which includes ./docs/examples/
-          find downloaded-notebooks -name "*.ipynb" -type f | while read notebook; do
-            # Strip the downloaded-notebooks/ prefix
-            relative_path=${notebook#downloaded-notebooks/}
-            # Strip an optional leading ./
-            relative_path=${relative_path#./}
-            # Strip the executed-notebooks/ prefix to get back to repo paths
-            relative_path=${relative_path#executed-notebooks/}
-            target_path="$relative_path"
-            echo "Replacing $target_path with executed version from $notebook"
-            cp "$notebook" "$target_path"
-          done
-
-      - name: Build docs
-        run: uv run mkdocs build
-
-      - name: Extract examples
-        run: |
-          zip -r xopt-examples.zip docs/examples/
-          mv xopt-examples.zip ./site/assets/
-
-      - name: Upload docs artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./site
-
-      - name: Minimize uv cache
-        run: uv cache prune --ci
-
-  deploy:
-    if: ${{ github.repository_owner == 'xopt-org' }}
-    needs: build
-    runs-on: ubuntu-latest
-    name: "Deploy to GitHub Pages"
-
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
-    permissions:
-      pages: write      # to deploy to Pages
-      id-token: write   # to verify the deployment originates from an appropriate source
-
-    # Deploy to the github-pages environment
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

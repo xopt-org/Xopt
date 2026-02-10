@@ -85,24 +85,13 @@ class LBFGSOptimizer(NumericalOptimizer):
         5.0, description="maximum time for optimization in seconds"
     )
 
-    def __init__(
-        self,
-        **kwargs: Any,
-    ):
-        """
-        Initialize the LBFGS optimizer.
-
-        """
-
-        super().__init__(**kwargs)
-
     def optimize(
         self,
         function: AcquisitionFunction,
         bounds: Tensor,
         n_candidates: int = 1,
         **kwargs: Any,
-    ) -> Tensor:
+    ):
         """
         Optimize the given acquisition function within the specified bounds.
 

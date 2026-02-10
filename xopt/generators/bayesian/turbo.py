@@ -1,7 +1,7 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import pandas as pd
 import torch
@@ -104,20 +104,20 @@ class TurboController(XoptBaseModel, ABC):
     )
 
     failure_tolerance: PositiveInt = Field(
-        0,
+        0,  # default will be set based on dim and batch_size within validator if not provided
         description="number of failures to trigger a trust region contraction",
         ge=1,
         validate_default=True,
     )
 
     success_tolerance: PositiveInt = Field(
-        0,
+        0,  # default will be set based on dim and batch_size within validator if not provided
         description="number of successes to trigger a trust region expansion",
         ge=1,
         validate_default=True,
     )
 
-    center_x: Optional[Dict[str, float]] = Field(
+    center_x: Optional[dict[str, float]] = Field(
         None, description="center point of trust region"
     )
     scale_factor: float = Field(
@@ -163,6 +163,28 @@ class TurboController(XoptBaseModel, ABC):
                 return _value
         else:
             raise ValueError("Tolerance must be a positive integer")
+        return value
+
+    @field_validator("center_x", mode="after")
+    @classmethod
+    def validate_center_x_variables(
+        cls, value: Optional[dict[str, float]], info: ValidationInfo
+    ):
+        if value is None:
+            return value
+
+        vocs: VOCS | None = info.data.get("vocs", None)
+        if vocs is None:
+            raise ValueError("vocs must be set before validating center_x")
+
+        center_x_keys = set(value.keys())
+        vocs_variable_names = set(vocs.variable_names)
+        difference = vocs_variable_names ^ center_x_keys
+        if difference:
+            raise ValueError(
+                f"center_x must contain all variable names in vocs or be None. Missing variables: {difference}"
+            )
+
         return value
 
     def get_trust_region(self, generator: "BayesianGenerator") -> Tensor:
@@ -290,7 +312,6 @@ class TurboController(XoptBaseModel, ABC):
         for name, val in self._initial_state.items():
             if name not in excluded_attrs:
                 self.__setattr__(name, val)
-
         # reset private attributes
         self._failure_counter = 0
         self._success_counter = 0
@@ -327,9 +348,6 @@ class OptimizeTurboController(TurboController):
     best_value: Optional[float] = Field(
         None, description="best objective value found so far"
     )
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
 
     @field_validator("vocs", mode="after")
     def vocs_validation(cls, value: VOCS):

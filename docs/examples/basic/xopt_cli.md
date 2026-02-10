@@ -5,7 +5,6 @@ You may use `xopt-run` if your optimization satisfies the following requirements
 
 - You are using one of Xopt's built in `Generator` classes.
 - You plan to run the evaluation function in serial (vectorized or non-vectorized), or use `ProcessPoolExecutor` or `ThreadPoolExecutor` for parallelism.
-- The parameter `Xopt.max_evaluations` is sufficient to define your stopping condition.
 
 ## Usage
 

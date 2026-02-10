@@ -1,5 +1,5 @@
 from copy import deepcopy
-
+import numpy as np
 import pandas as pd
 import pytest
 import torch
@@ -70,8 +70,9 @@ class TestExpectedImprovement:
 
         xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
 
-        # initialize with single initial candidate
-        xopt.random_evaluate(3)
+        # initialize with initial candidates
+        np.random.seed(42)
+        xopt.random_evaluate(10)
 
         # now use bayes opt
         for _ in range(3):
@@ -106,7 +107,10 @@ class TestExpectedImprovement:
     def test_acquisition_accuracy(self):
         train_x = torch.tensor([0.01, 0.3, 0.6, 0.99]).double()
         train_y = torch.sin(2 * torch.pi * train_x)
-        train_data = pd.DataFrame({"x1": train_x.numpy(), "y1": train_y.numpy()})
+        train_c = torch.cos(2 * torch.pi * train_x)
+        train_data = pd.DataFrame(
+            {"x1": train_x.numpy(), "y1": train_y.numpy(), "c1": train_c.numpy()}
+        )
         test_x = torch.linspace(0.0, 1.0, 1000)
 
         for objective in ObjectiveEnum:
@@ -115,11 +119,16 @@ class TestExpectedImprovement:
             )
             gen = ExpectedImprovementGenerator(vocs=vocs)
             set_options(gen)
+            gen.n_monte_carlo_samples = 512
             gen.add_data(train_data)
             model = gen.train_model().models[0]
 
             # xopt acquisition function - this is currently LogEI
             acq = gen.get_acquisition(model)
+
+            # analytical EI acquisition function for no constraints
+            # note that this cannot handle constraints or custom objectives
+            assert acq.__class__.__name__ == "LogExpectedImprovement"
 
             # analytical acquisition function
             if objective == "MAXIMIZE":
@@ -129,12 +138,77 @@ class TestExpectedImprovement:
                     model, best_f=train_y.min(), maximize=False
                 )
 
-            # compare candidates (maximum in test data)
+            # compare acquisition values
             with torch.no_grad():
-                acq_v = acq(test_x.reshape(-1, 1, 1))
-                candidate = test_x[torch.argmax(acq_v)]
+                acq_v = acq(test_x.reshape(-1, 1, 1)).exp()
                 an_acq_v = an_acq(test_x.reshape(-1, 1, 1))
-                an_candidate = test_x[torch.argmax(an_acq_v)]
 
             # difference should be small
-            assert torch.abs(an_candidate - candidate) < 1e-6
+            assert torch.allclose(acq_v.double(), an_acq_v.double(), atol=1e-4)
+
+        # test with constraints
+        vocs = VOCS(
+            **{
+                "variables": {"x1": [0.0, 1.0]},
+                "objectives": {"y1": "MAXIMIZE"},
+                "constraints": {"c1": ["GREATER_THAN", 0.0]},
+            }
+        )
+        gen = ExpectedImprovementGenerator(vocs=vocs)
+        set_options(gen)
+        gen.add_data(train_data)
+
+        model = gen.train_model()
+
+        # acquisition function computed by the EI generator should be qLogExpectedImprovement
+        acq = gen.get_acquisition(model)
+        assert acq.__class__.__name__ == "qLogExpectedImprovement"
+        assert acq._constraints is not None
+
+        # acquisition function should be nearly identical to unconstrained
+        # case if the constraint is always satisfied
+        vocs_unconstrained = VOCS(
+            **{
+                "variables": {"x1": [0.0, 1.0]},
+                "objectives": {"y1": "MAXIMIZE"},
+            }
+        )
+        vocs_always_satisfied = VOCS(
+            **{
+                "variables": {"x1": [0.0, 1.0]},
+                "objectives": {"y1": "MAXIMIZE"},
+                "constraints": {"c1": ["LESS_THAN", 100]},
+            }
+        )
+        acq_values = []
+        for v in [vocs_unconstrained, vocs_always_satisfied]:
+            gen = ExpectedImprovementGenerator(vocs=v)
+            set_options(gen)
+            gen.add_data(train_data)
+            gen.n_monte_carlo_samples = 512
+
+            model = gen.train_model()
+
+            acq = gen.get_acquisition(model)
+            acq_values.append(acq(test_x.reshape(-1, 1, 1)).exp())
+
+        assert torch.allclose(acq_values[0].double(), acq_values[1].double(), atol=5e-3)
+
+        # if no values satisfy the constraint, EI should raise an error
+        vocs_never_satisfied = VOCS(
+            **{
+                "variables": {"x1": [0.0, 1.0]},
+                "objectives": {"y1": "MAXIMIZE"},
+                "constraints": {"c1": ["GREATER_THAN", 2.0]},
+            }
+        )
+        gen = ExpectedImprovementGenerator(vocs=vocs_never_satisfied)
+        set_options(gen)
+        gen.add_data(train_data)
+
+        model = gen.train_model()
+        with pytest.raises(
+            RuntimeError,
+            match="No feasible points found in the data; cannot compute expected improvement.",
+        ):
+            acq = gen.get_acquisition(model)

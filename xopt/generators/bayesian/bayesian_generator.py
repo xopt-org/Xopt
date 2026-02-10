@@ -13,6 +13,7 @@ from botorch.acquisition import (
     FixedFeatureAcquisitionFunction,
     qUpperConfidenceBound,
     AcquisitionFunction,
+    MCAcquisitionObjective,
 )
 from botorch.models.model import Model
 from botorch.sampling import get_sampler
@@ -21,6 +22,7 @@ from pydantic import (
     field_validator,
     PositiveInt,
     SerializeAsAny,
+    model_validator,
 )
 from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
@@ -54,6 +56,7 @@ from xopt.generators.bayesian.utils import (
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
+from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 
@@ -297,6 +300,28 @@ class BayesianGenerator(Generator, ABC):
             )
 
         return value
+
+    @model_validator(mode="after")
+    def validate_model_after(self):
+        if self.turbo_controller is not None:
+            # Check that values for center_x are within trust region bounds
+            trust_region = self.turbo_controller.get_trust_region(self)
+
+            center_x = self.turbo_controller.center_x
+            if center_x is not None:
+                for key, value in center_x.items():
+                    if key in self.vocs.variable_names:
+                        idx = self.vocs.variable_names.index(key)
+                        lower_bound = trust_region[0, idx].item()
+                        upper_bound = trust_region[1, idx].item()
+                        if not (lower_bound <= value <= upper_bound):
+                            raise ValueError(
+                                f"Turbo controller center_x value for {key} : "
+                                f"{value} is outside of trust region bounds "
+                                f"[{lower_bound}, {upper_bound}]"
+                            )
+
+        return self
 
     def add_data(self, new_data: pd.DataFrame):
         """
@@ -587,7 +612,9 @@ class BayesianGenerator(Generator, ABC):
         input names (variables), and the resulting tensor is configured with the data
         type and device settings from the generator.
         """
-        return torch.tensor(data[self.model_input_names].to_numpy(), **self.tkwargs)
+        return torch.tensor(
+            data[self.model_input_names].to_numpy().copy(), **self.tkwargs
+        )
 
     def get_acquisition(self, model: Model) -> AcquisitionFunction:
         """
@@ -753,7 +780,7 @@ class BayesianGenerator(Generator, ABC):
     def _get_acquisition(self, model: Model) -> AcquisitionFunction:
         raise NotImplementedError
 
-    def _get_objective(self):
+    def _get_objective(self) -> MCAcquisitionObjective:
         """
         Return default objective (scalar objective) determined by vocs or if
         defined in custom_objective. Module is already on target device.
@@ -956,6 +983,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     reference_point: dict[str, float] = Field(
         {},
         description="dict specifying reference point for multi-objective optimization",
+        # validate_default=True,
     )
     pareto_front_history: Optional[pd.DataFrame] = Field(
         None,
@@ -974,7 +1002,8 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     @classmethod
     def validate_reference_point(cls, value: dict[str, float], info: ValidationInfo):
         # set default reference point if not specified
-        objective_names: list[str] = info.data["vocs"].objective_names
+        _vocs: VOCS | None = info.data.get("vocs", None)
+        objective_names = _vocs.objective_names if _vocs is not None else []
 
         if set(value.keys()) != set(objective_names):
             raise XoptError("reference point must contain all objective names in vocs")

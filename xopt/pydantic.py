@@ -465,7 +465,7 @@ class ObjLoaderMinimal(
         return {"object_type": obj_type}
 
     @model_validator(mode="after")
-    def validate_print(cls, values):
+    def validate_print(self, values):
         print("model validator after: ", values)
         return values
 
