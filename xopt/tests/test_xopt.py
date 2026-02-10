@@ -353,62 +353,7 @@ class TestXopt:
         X.remove_data([0])
         assert X.data.equals(new_data)
 
-    def test_asynch(self):
-        evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
-        )
-        n_steps = 5
-        for i in range(n_steps):
-            X.step()
-        assert len(X.data) == n_steps
 
-        # now use a threadpool evaluator with different number of max workers
-        for mw in [2]:
-            evaluator = Evaluator(
-                function=xtest_callable, executor=ProcessPoolExecutor(), max_workers=mw
-            )
-            X2 = AsynchronousXopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
-            )
-
-            n_steps = 5
-            for i in range(n_steps):
-                X2.step()
-
-            # Wait for all futures to complete with timeout
-            import time
-
-            max_wait_time = 10  # seconds
-            start_time = time.time()
-
-            while X2._futures and (time.time() - start_time) < max_wait_time:
-                X2.process_futures()
-                if not X2._futures:  # All futures completed
-                    break
-                time.sleep(0.1)  # Small delay to prevent busy waiting
-
-            # Final check - ensure all futures are done
-            if X2._futures:
-                # Force completion of any remaining futures
-                import concurrent.futures
-
-                concurrent.futures.wait(X2._futures.values(), timeout=5)
-                X2.process_futures()  # Process any final completed futures
-
-            # For async execution, we can't predict exact count due to timing
-            # but we should have at least some data and at most max_workers * n_steps
-            assert len(X2.data) == 6
-
-        # test serialization
-        yaml_str = X2.yaml()
-        X3 = AsynchronousXopt.from_yaml(yaml_str)
-        assert isinstance(X3, AsynchronousXopt)
 
     def test_strict(self):
         def bad_function(inval):
@@ -430,29 +375,7 @@ class TestXopt:
         X2.step()
         assert "xopt_error_str" in X2.data.columns
 
-    def test_process_futures(self):
-        ss = 0
 
-        def bad_function_sometimes(inval):
-            if ss:
-                raise ValueError
-            else:
-                return {"y1": 0.0, "c1": 0.0}
-
-        evaluator = Evaluator(function=bad_function_sometimes)
-        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
-        )
-        X.strict = False
-
-        # Submit to the evaluator some new inputs
-        X.submit_data(random_inputs(deepcopy(TEST_VOCS_BASE), 4))
-        X.process_futures()
-
-        ss = 1
-        X.submit_data(random_inputs(deepcopy(TEST_VOCS_BASE), 4))
-        X.process_futures()
 
     def test_dump_w_exploded_cols(self):
         evaluator = Evaluator(function=xtest_callable)

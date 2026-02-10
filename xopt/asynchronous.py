@@ -133,7 +133,11 @@ class AsynchronousXopt(Xopt):
             if self.strict:
                 if future.exception() is not None:
                     raise future.exception()
-                validate_outputs(pd.DataFrame(outputs, index=[1]))
+
+                try:
+                    validate_outputs(pd.DataFrame(outputs))
+                except ValueError:  # handle case where outputs is a dict of lists instead of list of dicts
+                    validate_outputs(pd.DataFrame(outputs, index=[1]))
             output_data.append(outputs)
 
         # Special handling of a vectorized futures.
@@ -179,7 +183,7 @@ class AsynchronousXopt(Xopt):
             if self.data is not None:
                 new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
 
-                # Use global counter to ensure absolutely unique indices
+                # Use global counter to ensure unique indices
                 start_idx = self._global_index_counter
                 new_data.index = np.arange(start_idx, start_idx + len(new_data))
                 self._global_index_counter += len(new_data)
