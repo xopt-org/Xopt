@@ -51,7 +51,7 @@ jobs:
         env:
           GROUP: ${{ matrix.group }}
           TOTAL_GROUPS: 4
-          SMOKE_TEST: "True"
+          SMOKE_TEST: "False"
         run: |
           set +e  # Don't exit on first error
           NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
