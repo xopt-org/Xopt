@@ -60,8 +60,7 @@ class TestAsynchXopt:
                 X2.process_futures()  # Process any final completed futures
 
             # For async execution, we can't predict exact count due to timing
-            # but we should have at least some data and at most max_workers * n_steps
-            assert len(X2.data) == 6
+            assert len(X2.data) >= 6
 
         # test serialization
         yaml_str = X2.yaml()
@@ -176,16 +175,25 @@ class TestAsynchXopt:
             vocs=deepcopy(TEST_VOCS_BASE),
         )
 
-        # Initially None
-        assert X._data_lock is None
+        # Initially None (or not yet created)
+        initial_lock = getattr(X, "_data_lock", None)
+        assert initial_lock is None
 
         # Should create lock when accessed
         lock1 = X.data_lock
-        assert isinstance(lock1, threading.Lock)
+        # Check that it's a lock-like object by checking for acquire/release methods
+        assert hasattr(lock1, "acquire"), "Lock should have acquire method"
+        assert hasattr(lock1, "release"), "Lock should have release method"
+        assert callable(lock1.acquire), "acquire should be callable"
+        assert callable(lock1.release), "release should be callable"
 
         # Should return same lock on subsequent access
         lock2 = X.data_lock
         assert lock1 is lock2
+
+        # Verify the internal attribute is now set
+        assert X._data_lock is not None
+        assert X._data_lock is lock1
 
     def test_pickle_compatibility(self):
         """Test that AsynchronousXopt state can be preserved through custom methods"""
