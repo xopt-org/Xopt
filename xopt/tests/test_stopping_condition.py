@@ -522,7 +522,7 @@ vocs:
         x1: [0.0, 1.0]
         x2: [0.0, 1.0]
     objectives:
-        f1: MINIMIZE
+        f1: EXPLORE
 generator:
     name: latin_hypercube
 evaluator:
