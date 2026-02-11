@@ -50,8 +50,7 @@ jobs:
         shell: bash
         env:
           GROUP: ${{ matrix.group }}
-          TOTAL_GROUPS: 4
-          SMOKE_TEST: "True"
+          TOTAL_GROUPS: 4 # Make sure to NOT set SMOKE_TEST to a value here
         run: |
           set +e  # Don't exit on first error
           NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
@@ -337,19 +336,11 @@ jobs:
         with:
           path: ./site
 
-      - name: Minimize uv cache
-        run: uv cache prune --ci
-
   deploy:
     if: ${{ github.repository_owner == 'xopt-org' }}
     needs: build
     runs-on: ubuntu-latest
     name: "Deploy to GitHub Pages"
-
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
-    permissions:
-      pages: write      # to deploy to Pages
-      id-token: write   # to verify the deployment originates from an appropriate source
 
     # Deploy to the github-pages environment
     environment:

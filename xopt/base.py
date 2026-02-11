@@ -26,8 +26,7 @@ from xopt.vocs import validate_input_data, random_inputs, grid_inputs
 from gest_api.vocs import VOCS
 from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
-    StoppingCondition,
-    get_stopping_condition,
+    StoppingConditionUnion,
 )
 
 
@@ -128,7 +127,7 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if torch models"
         " should be stored inside main config file",
     )
-    stopping_condition: Optional[SerializeAsAny[StoppingCondition]] = Field(
+    stopping_condition: Optional[StoppingConditionUnion] = Field(
         None,
         description="optional stopping condition to check during optimization",
     )
@@ -219,18 +218,6 @@ class Xopt(XoptBaseModel):
                 max_evaluations=max_evals
             )
         return data
-
-    @field_validator("stopping_condition", mode="before")
-    @classmethod
-    def validate_stopping_condition(cls, v):
-        """Validate that stopping condition has should_stop method."""
-        # handle deserialization
-        if isinstance(v, dict):
-            name = v.pop("name")
-            sc_class = get_stopping_condition(name)
-            v = sc_class(**v)
-
-        return v
 
     @property
     def n_data(self) -> int:
