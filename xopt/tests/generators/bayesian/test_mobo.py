@@ -10,7 +10,7 @@ from botorch.acquisition.multi_objective.logei import (
 )
 
 from xopt.base import Xopt
-from xopt.errors import XoptError
+from xopt.errors import XoptError, VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.numerical_optimizer import GridOptimizer
@@ -45,6 +45,13 @@ class TestMOBOGenerator:
         # test bad reference point
         with pytest.raises(XoptError):
             MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point={})
+
+        # test bad vocs
+        bad_vocs = deepcopy(TEST_VOCS_BASE_MO)
+        bad_vocs.objectives = {}
+        with pytest.raises(VOCSError):
+            MOBOGenerator(vocs=bad_vocs, reference_point=TEST_VOCS_REF_POINT)
+
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_generate(self, use_cuda):
