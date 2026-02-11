@@ -437,7 +437,6 @@ class TestAsynchXopt:
         try:
             while X._futures:
                 X.process_futures()
-                time.sleep(0.1)
         except Exception:
             pass  # Expected in this case
 
@@ -525,7 +524,6 @@ class TestAsynchXopt:
         try:
             while X._futures:
                 X.process_futures()
-                time.sleep(0.1)
         except Exception:
             pass  # Should not raise due to non-strict mode
 
@@ -535,6 +533,5 @@ class TestAsynchXopt:
         try:
             while X._futures:
                 X.process_futures()
-                time.sleep(0.1)
         except ValueError as e:
             assert str(e) == "Ingest error"
