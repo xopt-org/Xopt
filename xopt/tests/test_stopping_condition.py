@@ -515,14 +515,14 @@ max_evaluations: 3
     def test_stopping_condition_yaml_deserialization(self, simple_vocs, test_function):
         """Test that a stopping condition is correctly instantiated from YAML."""
         yaml_config = """
-vocs:
-    variables:
-        x1: [0.0, 1.0]
-        x2: [0.0, 1.0]
-    objectives:
-        f1: EXPLORE
 generator:
     name: latin_hypercube
+    vocs:
+        variables:
+            x1: [0.0, 1.0]
+            x2: [0.0, 1.0]
+        objectives:
+            f1: EXPLORE
 evaluator:
     function: __test_function__
 stopping_condition:
