@@ -52,7 +52,6 @@ class TestMOBOGenerator:
         with pytest.raises(VOCSError):
             MOBOGenerator(vocs=bad_vocs, reference_point=TEST_VOCS_REF_POINT)
 
-
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_generate(self, use_cuda):
         gen = MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)

@@ -17,7 +17,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
         n_steps = 5
         for i in range(n_steps):
@@ -32,7 +31,6 @@ class TestAsynchXopt:
             X2 = AsynchronousXopt(
                 generator=generator,
                 evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
             )
 
             n_steps = 5
@@ -78,9 +76,7 @@ class TestAsynchXopt:
 
         evaluator = Evaluator(function=bad_function_sometimes)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
-        )
+        X = AsynchronousXopt(generator=gen, evaluator=evaluator)
         X.strict = False
 
         # Submit to the evaluator some new inputs
@@ -100,7 +96,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Run multiple steps to create potential race conditions
@@ -123,7 +118,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Test with DataFrame (within bounds: x1 [0,1], x2 [0,10])
@@ -153,7 +147,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Test basic input preparation
@@ -172,7 +165,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Initially None (or not yet created)
@@ -202,7 +194,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Add some data
@@ -213,7 +204,6 @@ class TestAsynchXopt:
         X_new = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
         X_new.__setstate__(state)
 
@@ -228,7 +218,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Function to add data from multiple threads
@@ -271,7 +260,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # First step should generate max_workers candidates
@@ -287,7 +275,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         X.is_done = True
@@ -311,7 +298,6 @@ class TestAsynchXopt:
         X_strict = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
             strict=True,
         )
 
@@ -319,7 +305,6 @@ class TestAsynchXopt:
         X_non_strict = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
             strict=False,
         )
 
@@ -340,7 +325,6 @@ class TestAsynchXopt:
             X = AsynchronousXopt(
                 generator=generator,
                 evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
             )
 
             # Run several steps
@@ -374,7 +358,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Submit multiple data points
@@ -391,7 +374,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Add some initial data
@@ -425,7 +407,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
             strict=True,
         )
 
@@ -447,7 +428,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Manually create a DataFrame with duplicate indices to test cleanup
@@ -486,7 +466,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
 
         # Submit multiple data points
@@ -513,7 +492,6 @@ class TestAsynchXopt:
         X = AsynchronousXopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
             strict=False,  # Non-strict to allow error handling
         )
 
