@@ -486,7 +486,7 @@ def test_xoptbasemodel_to_json_yaml(tmp_path):
 
     # test torch load in XoptBaseModel
     torch.save(torch.nn.Linear(2, 2), tmp_path / "model.pt")
-    M.validate_files(str(tmp_path / "model.pt"), None)
+    M.validate_files(yaml.safe_load(str(tmp_path / "model.pt")))
 
 
 def test_remove_none_values():
