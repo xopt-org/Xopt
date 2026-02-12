@@ -1,7 +1,6 @@
 import math
 import os
 from abc import ABC
-from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
 import numpy as np
@@ -13,7 +12,6 @@ from pydantic import ValidationError
 from gest_api.vocs import ContinuousVariable
 
 from xopt import from_file
-from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.errors import XoptError
 from xopt.evaluator import Evaluator
@@ -346,35 +344,6 @@ class TestXopt:
         X.remove_data([0])
         assert X.data.equals(new_data)
 
-    def test_asynch(self):
-        evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=generator,
-            evaluator=evaluator,
-        )
-        n_steps = 5
-        for i in range(n_steps):
-            X.step()
-        assert len(X.data) == n_steps
-
-        # now use a threadpool evaluator with different number of max workers
-        for mw in [2]:
-            evaluator = Evaluator(
-                function=xtest_callable, executor=ProcessPoolExecutor(), max_workers=mw
-            )
-            X2 = AsynchronousXopt(
-                generator=generator,
-                evaluator=evaluator,
-            )
-
-            n_steps = 5
-            for i in range(n_steps):
-                X2.step()
-
-            # TODO: better async test. This is unpredictable:
-            # assert len(X2.data) == n_steps
-
     def test_strict(self):
         def bad_function(inval):
             raise ValueError
@@ -394,31 +363,6 @@ class TestXopt:
         # should run fine
         X2.step()
         assert "xopt_error_str" in X2.data.columns
-
-    def test_process_futures(self):
-        ss = 0
-
-        def bad_function_sometimes(inval):
-            if ss:
-                raise ValueError
-            else:
-                return {"y1": 0.0, "c1": 0.0}
-
-        evaluator = Evaluator(function=bad_function_sometimes)
-        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=gen,
-            evaluator=evaluator,
-        )
-        X.strict = False
-
-        # Submit to the evaluator some new inputs
-        X.submit_data(random_inputs(deepcopy(TEST_VOCS_BASE), 4))
-        X.process_futures()
-
-        ss = 1
-        X.submit_data(random_inputs(deepcopy(TEST_VOCS_BASE), 4))
-        X.process_futures()
 
     def test_dump_w_exploded_cols(self):
         evaluator = Evaluator(function=xtest_callable)

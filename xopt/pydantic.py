@@ -200,15 +200,21 @@ def decode_torch_module(modulestr: str):
 class XoptBaseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    @field_validator("*", mode="before")
-    def validate_files(cls, value: Any, info: ValidationInfo):
-        if isinstance(value, str):
-            if os.path.exists(value):
-                extension = value.split(".")[-1]
-                if extension == "pt":
-                    value = torch.load(value, weights_only=False)
-
-        return value
+    @model_validator(mode="before")
+    @classmethod
+    def validate_files(cls, data: Any):
+        if not isinstance(data, dict):
+            return data
+        for key, value in data.items():
+            # Exclude field `name`` from before validator for use in discriminated fields
+            if key == "name":
+                continue
+            if isinstance(value, str):
+                if os.path.exists(value):
+                    extension = value.split(".")[-1]
+                    if extension == "pt":
+                        data[key] = torch.load(value, weights_only=False)
+        return data
 
     # Note that this function still returns a dict, NOT a string. Pydantic will handle
     # final serialization of basic types in Rust.

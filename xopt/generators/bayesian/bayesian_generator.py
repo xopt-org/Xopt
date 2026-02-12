@@ -1006,17 +1006,15 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def validate_pareto_front_history(cls, value: Any):
         return pd.DataFrame(value) if value is not None else None
 
-    @field_validator("reference_point", mode="after")
-    @classmethod
-    def validate_reference_point(cls, value: dict[str, float], info: ValidationInfo):
-        # set default reference point if not specified
-        _vocs: VOCS | None = info.data.get("vocs", None)
+    @model_validator(mode="after")
+    def validate_reference_point(self):
+        _vocs = self.vocs
         objective_names = _vocs.objective_names if _vocs is not None else []
 
-        if set(value.keys()) != set(objective_names):
+        if set(self.reference_point.keys()) != set(objective_names):
             raise XoptError("reference point must contain all objective names in vocs")
 
-        return value
+        return self
 
     @property
     def torch_reference_point(self):

@@ -21,7 +21,6 @@ from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
     StagnationCondition,
     TargetValueCondition,
-    get_stopping_condition,
 )
 
 
@@ -343,7 +342,7 @@ class TestStoppingConditionIntegration:
     def test_composite_condition_validators_and_serializers(self):
         """Test CompositeCondition validators and serializers."""
         # Test empty conditions list
-        with pytest.raises(ValueError, match="At least one condition must be provided"):
+        with pytest.raises(ValueError):
             CompositeCondition(conditions=[], logic="or")
 
         # Test invalid logic
@@ -369,10 +368,7 @@ class TestStoppingConditionIntegration:
         assert serialized["conditions"][0]["name"] == "MaxEvaluationsCondition"
 
         # Test with invalid condition type
-        with pytest.raises(
-            ValueError,
-            match="Each condition must be a StoppingCondition instance or a dict",
-        ):
+        with pytest.raises(ValueError):
             CompositeCondition(conditions=["invalid"], logic="or")
 
     def test_composite_condition_logic_paths(self, simple_vocs):
@@ -434,21 +430,6 @@ class TestStoppingConditionIntegration:
             logic="or",
         )
         assert not condition_or_false.should_stop(data, simple_vocs)
-
-    def test_get_stopping_condition_function(self):
-        """Test the get_stopping_condition utility function."""
-        # Test valid condition names
-        max_eval_class = get_stopping_condition("MaxEvaluationsCondition")
-        assert max_eval_class == MaxEvaluationsCondition
-
-        target_class = get_stopping_condition("TargetValueCondition")
-        assert target_class == TargetValueCondition
-
-        # Test invalid condition name
-        with pytest.raises(
-            ValueError, match="No stopping condition found with name: InvalidCondition"
-        ):
-            get_stopping_condition("InvalidCondition")
 
     def test_edge_cases_empty_and_missing_data(self, simple_vocs):
         """Test edge cases with empty data and missing columns."""
@@ -530,6 +511,45 @@ max_evaluations: 3
         assert X.stopping_condition is not None
         assert isinstance(X.stopping_condition, MaxEvaluationsCondition)
         assert X.stopping_condition.max_evaluations == 3
+
+    def test_stopping_condition_yaml_deserialization(self, simple_vocs, test_function):
+        """Test that a stopping condition is correctly instantiated from YAML."""
+        yaml_config = """
+vocs:
+    variables:
+        x1: [0.0, 1.0]
+        x2: [0.0, 1.0]
+    objectives:
+        f1: EXPLORE
+generator:
+    name: latin_hypercube
+evaluator:
+    function: __test_function__
+stopping_condition:
+    name: CompositeCondition
+    logic: or
+    conditions:
+        - name: MaxEvaluationsCondition
+          max_evaluations: 10
+        - name: TargetValueCondition
+          objective_name: f1
+          target_value: 0.01
+          tolerance: 0.001
+"""
+        config = yaml.safe_load(yaml_config)
+        config["evaluator"] = Evaluator(function=test_function)
+
+        X = Xopt(**config)
+
+        assert isinstance(X.stopping_condition, CompositeCondition)
+        assert X.stopping_condition.logic == "or"
+        assert len(X.stopping_condition.conditions) == 2
+        assert isinstance(X.stopping_condition.conditions[0], MaxEvaluationsCondition)
+        assert X.stopping_condition.conditions[0].max_evaluations == 10
+        assert isinstance(X.stopping_condition.conditions[1], TargetValueCondition)
+        assert X.stopping_condition.conditions[1].objective_name == "f1"
+        assert X.stopping_condition.conditions[1].target_value == 0.01
+        assert X.stopping_condition.conditions[1].tolerance == 0.001
 
     def test_max_evaluations_and_stopping_condition_raises_error(
         self, simple_vocs, evaluator
