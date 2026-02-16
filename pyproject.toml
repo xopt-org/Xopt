@@ -43,7 +43,7 @@ dev = [
   "pytest-xdist",
   "dask[distributed]",
   "jupyter",
-  "nbconvert"
+  "nbconvert",
   "pytest-benchmark",
   "ruff",
   "py-spy",
