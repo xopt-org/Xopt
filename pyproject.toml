@@ -44,6 +44,7 @@ dev = [
   "dask[distributed]",
   "mpi4py",
   "jupyter",
+  "nbconvert"
 ]
 doc = [
   "mkdocs",
