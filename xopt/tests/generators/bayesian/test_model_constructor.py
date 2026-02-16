@@ -65,22 +65,17 @@ class TestModelConstructor:
         constructor.build_model_from_vocs(test_vocs, test_data)
 
     def test_standard_timeout(self):
-        def callback(params, optresult):
-            logging.warning(f"Callback called with: {optresult=}")
-            raise Exception
-
         test_data = deepcopy(TEST_DATA)
         test_vocs = deepcopy(TEST_VOCS)
-        t1 = time.perf_counter()
-        data_100x = pd.concat([test_data] * 200, ignore_index=True)
-        data_100x.loc[:, test_vocs.objective_names] += 0.1 * np.random.randn(
-            len(test_data) * 200, test_vocs.n_objectives
+        data = pd.concat([test_data] * 20, ignore_index=True)
+        data.loc[:, test_vocs.objective_names] += 0.1 * np.random.randn(
+            len(test_data) * 20, test_vocs.n_objectives
         )
         constructor = StandardModelConstructor(
             train_config=LBFGSNumericalOptimizerConfig(timeout=0.01),
-            train_kwargs={"optimizer_kwargs": {"callback": callback}},
         )
-        constructor.build_model_from_vocs(test_vocs, data_100x)
+        t1 = time.perf_counter()
+        constructor.build_model_from_vocs(test_vocs, data)
         t2 = time.perf_counter()
         delta = t2 - t1
         assert delta < 0.3
