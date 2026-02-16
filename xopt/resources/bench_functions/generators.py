@@ -1,16 +1,12 @@
 import logging
 import time
 
-import gpytorch
-import numpy as np
 import torch
 
 from xopt.generators.bayesian import ExpectedImprovementGenerator
-from xopt.generators.bayesian.utils import get_training_data_batched
 from xopt.resources.benchmarking import BenchDispatcher, generate_data, generate_vocs
 from xopt.generators.bayesian.models.standard import (
     BatchedModelConstructor,
-    StandardModelConstructor,
 )
 import threadpoolctl
 

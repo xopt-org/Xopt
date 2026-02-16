@@ -162,7 +162,7 @@ class StandardModelConstructor(ModelConstructor):
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
-    
+
     @field_validator("train_kwargs")
     def validate_train_kwargs(cls, train_kwargs, info: ValidationInfo):
         if train_kwargs is None:
