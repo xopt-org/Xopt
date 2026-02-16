@@ -2,7 +2,7 @@ import os.path
 import warnings
 from copy import deepcopy
 from functools import partial
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union, cast
 
 import botorch.settings
 import pandas as pd
