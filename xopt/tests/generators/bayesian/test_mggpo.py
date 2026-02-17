@@ -67,7 +67,7 @@ class TestMGGPO:
         vocs = deepcopy(tnk_vocs)
         reference_point = {"y1": 3.14, "y2": 3.14}
         gen = MGGPOGenerator(vocs=vocs, reference_point=reference_point)
-        X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=gen)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
         samples = X.generator.generate(10)
         assert pd.DataFrame(samples).to_numpy().shape == (10, 2)
@@ -83,7 +83,7 @@ class TestMGGPO:
         reference_point = {"y1": 3.14, "y2": 3.14}
         gen = MGGPOGenerator(vocs=vocs, reference_point=reference_point)
 
-        X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=gen)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
 
         for _ in [0, 1]:

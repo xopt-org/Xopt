@@ -49,18 +49,17 @@ class TestHighLevel:
             numerical_optimizer:
                 name: LBFGS
                 n_restarts: 1
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
 
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
-
-        vocs:
-            variables:
-                x1: [0, 3.14159]
-                x2: [0, 3.14159]
-            objectives: {y1: MINIMIZE, y2: MINIMIZE}
-            constraints:
-                c1: [GREATER_THAN, 0]
-                c2: [LESS_THAN, 0.5]
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
@@ -76,14 +75,14 @@ class TestHighLevel:
                 numerical_optimizer:
                     name: LBFGS
                     n_restarts: 2
+                vocs:
+                    variables:
+                        x1: [0, 3.14159]
+                        x2: [0, 3.14159]
+                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                    constraints: {}
             evaluator:
                 function: xopt.resources.test_functions.tnk.evaluate_TNK
-            vocs:
-                variables:
-                    x1: [0, 3.14159]
-                    x2: [0, 3.14159]
-                objectives: {y1: MINIMIZE, y2: MINIMIZE}
-                constraints: {}
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)  # generates random data
@@ -101,14 +100,14 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
+                    vocs:
+                        variables:
+                            x1: [0, 3.14159]
+                            x2: [0, 3.14159]
+                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                        constraints: {}
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
-                vocs:
-                    variables:
-                        x1: [0, 3.14159]
-                        x2: [0, 3.14159]
-                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
-                    constraints: {}
                 """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
@@ -146,14 +145,14 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
+                    vocs:
+                        variables:
+                            x1: [0, 3.14159]
+                            x2: [0, 3.14159]
+                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                        constraints: {}
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
-                vocs:
-                    variables:
-                        x1: [0, 3.14159]
-                        x2: [0, 3.14159]
-                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
-                    constraints: {}
                 """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)
@@ -187,16 +186,15 @@ class TestHighLevel:
                     numerical_optimizer:
                         name: LBFGS
                         n_restarts: 1
+                    vocs:
+                        variables:
+                            x1: [0, 3.14159]
+                            x2: [0, 3.14159]
+                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                        constraints: {}
 
                 evaluator:
                     function: xopt.resources.test_functions.tnk.evaluate_TNK
-
-                vocs:
-                    variables:
-                        x1: [0, 3.14159]
-                        x2: [0, 3.14159]
-                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
-                    constraints: {}
                 """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(3)

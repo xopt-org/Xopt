@@ -162,7 +162,7 @@ class TestEvaluator:
             evaluator = Evaluator(function=func)
             generator = RandomGenerator(vocs=vocs)
 
-            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+            X = Xopt(evaluator=evaluator, generator=generator)
 
             X.random_evaluate(5)
 

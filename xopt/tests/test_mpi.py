@@ -31,16 +31,15 @@ class TestMPI:
 
                 generator:
                     name: random
-
-                vocs:
-                    variables:
-                        x1: [0, 3.14159]
-                        x2: [0, 3.14159]
-                    objectives: {y1: MINIMIZE, y2: MINIMIZE}
-                    constraints:
-                        c1: [GREATER_THAN, 0]
-                        c2: [LESS_THAN, 0.5]
-                    constants: {a: dummy_constant}
+                    vocs:
+                        variables:
+                            x1: [0, 3.14159]
+                            x2: [0, 3.14159]
+                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                        constraints:
+                            c1: [GREATER_THAN, 0]
+                            c2: [LESS_THAN, 0.5]
+                        constants: {a: dummy_constant}
 
                 """
 
@@ -68,6 +67,15 @@ class TestMPI:
         generator:
             name: cnsga
             population_size: 64
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: dummy_constant}
 
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -75,15 +83,6 @@ class TestMPI:
                 sleep: 0
                 random_sleep: 0.1
 
-        vocs:
-            variables:
-                x1: [0, 3.14159]
-                x2: [0, 3.14159]
-            objectives: {y1: MINIMIZE, y2: MINIMIZE}
-            constraints:
-                c1: [GREATER_THAN, 0]
-                c2: [LESS_THAN, 0.5]
-            constants: {a: dummy_constant}
         """
 
         # run batched mode

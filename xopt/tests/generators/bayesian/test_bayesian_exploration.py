@@ -74,7 +74,7 @@ class TestBayesianExplorationGenerator:
         gen.n_monte_carlo_samples = 1
         gen.data = TEST_VOCS_DATA_MO
 
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
 
         # now use bayes opt
         X.step()
@@ -92,7 +92,7 @@ class TestBayesianExplorationGenerator:
         )
         set_options(gen, use_cuda, add_data=True)
 
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
 
         # now use bayes opt
         X.step()
@@ -109,7 +109,7 @@ class TestBayesianExplorationGenerator:
         set_options(gen, use_cuda)
         gen.n_interpolate_points = 5
 
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.add_data(TEST_VOCS_DATA_MO)
 
         # now use bayes opt

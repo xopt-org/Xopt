@@ -75,14 +75,15 @@ class TestRCDSGenerator:
             init_mat: null
             noise: 0.00001
             step: 0.01
+            vocs:
+                variables:
+                    x1: [0, 1]
+                    x2: [0, 1]
+                objectives:
+                    y1: MINIMIZE
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
-        vocs:
-            variables:
-                x1: [0, 1]
-                x2: [0, 1]
-            objectives:
-                y1: MINIMIZE
+
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(1)
@@ -111,7 +112,7 @@ class TestRCDSGenerator:
         vocs = VOCS(variables=variables, objectives=objectives)
         generator = RCDSGenerator(step=0.01, noise=0.00001, vocs=vocs)
         evaluator = Evaluator(function=fun)
-        X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+        X = Xopt(evaluator=evaluator, generator=generator)
 
         if x_opt.sum():  # if the optimal solution is not 0
             X.evaluate_data({f"x{i}": 1.2 for i in range(len(x_opt))})
@@ -297,7 +298,7 @@ class TestRCDSGenerator:
         test_vocs.objectives = {"y1": "MINIMIZE"}
         generator = RCDSGenerator(step=0.01, noise=0.00001, vocs=test_vocs)
         evaluator = Evaluator(function=eval_f_linear_pos_nans)
-        X = Xopt(vocs=test_vocs, evaluator=evaluator, generator=generator)
+        X = Xopt(evaluator=evaluator, generator=generator)
 
         X.evaluate_data({"x0": 1.0, "x1": 1.0})
         for i in range(50):

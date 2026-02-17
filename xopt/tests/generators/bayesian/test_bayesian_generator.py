@@ -141,7 +141,7 @@ class TestBayesianGenerator(TestCase):
         gen = deepcopy(gen)
         gen.gp_constructor.covar_modules = {"y1": PeriodicKernel()}
 
-        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
+        gen = PatchBayesianGenerator(**gen.model_dump())
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
 
@@ -260,7 +260,7 @@ class TestBayesianGenerator(TestCase):
     def test_transforms(self):
         gen = PatchBayesianGenerator(vocs=sinusoid_vocs)
         evaluator = Evaluator(function=evaluate_sinusoid)
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
 
         # generate some data samples
         import numpy as np

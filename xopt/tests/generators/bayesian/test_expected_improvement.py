@@ -72,7 +72,7 @@ class TestExpectedImprovement:
         )
         set_options(gen)
 
-        xopt = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        xopt = Xopt(generator=gen, evaluator=evaluator)
 
         # initialize with initial candidates
         np.random.seed(42)

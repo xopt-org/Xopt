@@ -267,7 +267,7 @@ class TestExtremumSeekingGenerator:
 
         evaluator = Evaluator(function=f_ES_minimize)
         generator = ExtremumSeekingGenerator(vocs=vocs)
-        X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+        X = Xopt(evaluator=evaluator, generator=generator)
         X.evaluate_data({name: val for name, val in zip(vocs.variable_names, pES[0])})
 
         for i in range(ES_steps):
@@ -288,7 +288,7 @@ class TestExtremumSeekingGenerator:
         evaluator = Evaluator(function=eval_f)
         generator = ExtremumSeekingGenerator(vocs=vocs)
         for ele in [-1.0, 1.0]:
-            X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+            X = Xopt(evaluator=evaluator, generator=generator)
 
             X.evaluate_data(
                 {name: val for name, val in zip(vocs.variable_names, ele * np.ones(3))}

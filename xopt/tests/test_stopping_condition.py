@@ -270,7 +270,6 @@ class TestStoppingConditionIntegration:
         generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             stopping_condition=condition,
@@ -292,7 +291,6 @@ class TestStoppingConditionIntegration:
         generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             # No stopping_condition
@@ -475,7 +473,6 @@ class TestStoppingConditionIntegration:
 
         # Initialize Xopt with old max_evaluations parameter
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             max_evaluations=5,
@@ -491,14 +488,15 @@ class TestStoppingConditionIntegration:
     ):
         """Test backward compatibility: max_evaluations from YAML creates MaxEvaluationsCondition."""
         yaml_config = """
-vocs:
-    variables:
-        x1: [0.0, 1.0]
-        x2: [0.0, 1.0]
-    objectives:
-        f1: EXPLORE
+
 generator:
     name: latin_hypercube
+    vocs:
+        variables:
+            x1: [0.0, 1.0]
+            x2: [0.0, 1.0]
+        objectives:
+            f1: EXPLORE
 evaluator:
     function: __test_function__
 max_evaluations: 3
@@ -517,14 +515,14 @@ max_evaluations: 3
     def test_stopping_condition_yaml_deserialization(self, simple_vocs, test_function):
         """Test that a stopping condition is correctly instantiated from YAML."""
         yaml_config = """
-vocs:
-    variables:
-        x1: [0.0, 1.0]
-        x2: [0.0, 1.0]
-    objectives:
-        f1: EXPLORE
 generator:
     name: latin_hypercube
+    vocs:
+        variables:
+            x1: [0.0, 1.0]
+            x2: [0.0, 1.0]
+        objectives:
+            f1: EXPLORE
 evaluator:
     function: __test_function__
 stopping_condition:
@@ -561,7 +559,6 @@ stopping_condition:
 
         with pytest.raises(ValueError, match="Cannot specify both"):
             Xopt(
-                vocs=simple_vocs,
                 evaluator=evaluator,
                 generator=generator,
                 max_evaluations=10,

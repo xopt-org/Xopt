@@ -33,7 +33,6 @@ def test_nsga2():
     X = Xopt(
         generator=NSGA2Generator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
-        vocs=tnk_vocs,
         stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
     )
     X.run()
@@ -46,7 +45,6 @@ def test_nsga2_single_objective():
     X = Xopt(
         generator=NSGA2Generator(vocs=modified_tnk_vocs),
         evaluator=Evaluator(function=evaluate_modified_TNK),
-        vocs=modified_tnk_vocs,
         stopping_condition=MaxEvaluationsCondition(max_evaluations=5),
     )
 
@@ -69,7 +67,6 @@ def test_nsga2_output_data():
         X = Xopt(
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
-            vocs=tnk_vocs,
             stopping_condition=MaxEvaluationsCondition(
                 max_evaluations=30
             ),  # Run for 3 generations
@@ -234,7 +231,6 @@ def nsga2_optimization_with_checkpoint():
         X = Xopt(
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
-            vocs=vocs,
             stopping_condition=MaxEvaluationsCondition(
                 max_evaluations=20
             ),  # Run for 2 generations
@@ -283,7 +279,6 @@ def test_nsga2_checkpoint_reload_python(nsga2_optimization_with_checkpoint):
     X_restored = Xopt(
         generator=restored_generator,
         evaluator=Evaluator(function=evaluate_TNK),
-        vocs=tnk_vocs,
         stopping_condition=MaxEvaluationsCondition(
             max_evaluations=10
         ),  # Run for 1 more generation
@@ -315,27 +310,28 @@ def test_nsga2_checkpoint_reload_yaml(nsga2_optimization_with_checkpoint):
       max_evaluations: 20
 
     generator:
-      name: nsga2
-      checkpoint_file: {latest_checkpoint}
+        name: nsga2
+        checkpoint_file: {latest_checkpoint}
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+
+            constants:
+                a: dummy_constant
 
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
-
-      constants:
-        a: dummy_constant
     """.replace("\n    ", "\n")
 
     # Reload from YAML, grab generator
@@ -391,24 +387,25 @@ def test_nsga2_checkpoint_reload_vocs_var_bounds_expand(
     my_xopt = Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [-10.0, 10.0]
+                x2: [-10.0, 10.0]
+
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
 
     evaluator:
-      function: xopt.resources.test_functions.tnk.evaluate_TNK
+        function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [-10.0, 10.0]
-        x2: [-10.0, 10.0]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
 
@@ -427,24 +424,25 @@ def test_nsga2_checkpoint_reload_vocs_var_bounds_shrink(
     my_xopt = Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [-10.0, -5.0]
+                x2: [-10.0, -5.0]
+
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
 
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [-10.0, -5.0]
-        x2: [-10.0, -5.0]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
 
@@ -457,24 +455,24 @@ def test_nsga2_checkpoint_reload_vocs_obj_dir(nsga2_optimization_with_checkpoint
     Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
 
+            objectives:
+                y1: MAXIMIZE
+                y2: MAXIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
 
-      objectives:
-        y1: MAXIMIZE
-        y2: MAXIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
 
@@ -485,24 +483,24 @@ def test_nsga2_checkpoint_reload_vocs_constraint_conf(
     Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
 
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+
+            constraints:
+                c1: [LESS_THAN, 0.123]
+                c2: [GREATER_THAN, 0.321]
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-
-      constraints:
-        c1: [LESS_THAN, 0.123]
-        c2: [GREATER_THAN, 0.321]
     """.replace("\n    ", "\n")
     )
 
@@ -511,25 +509,25 @@ def test_nsga2_checkpoint_reload_vocs_new_var(nsga2_optimization_with_checkpoint
     Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+                my_const1: [0.0, 1.0]
 
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
-        my_const1: [0.0, 1.0]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
 
@@ -538,25 +536,25 @@ def test_nsga2_checkpoint_reload_vocs_new_obj(nsga2_optimization_with_checkpoint
     Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
 
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+                my_const1: MINIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-        my_const1: MINIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
 
@@ -565,25 +563,25 @@ def test_nsga2_checkpoint_reload_vocs_new_const(nsga2_optimization_with_checkpoi
     Xopt.from_yaml(
         f"""
     generator:
-      name: nsga2
-      checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        name: nsga2
+        checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
 
+            objectives:
+                y1: MINIMIZE
+                y2: MINIMIZE
+
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+                my_const1: [LESS_THAN, 0.5]
     evaluator:
       function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-    vocs:
-      variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
 
-      objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-
-      constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
-        my_const1: [LESS_THAN, 0.5]
     """.replace("\n    ", "\n")
     )
 
@@ -593,25 +591,25 @@ def test_nsga2_checkpoint_reload_vocs_bad_var(nsga2_optimization_with_checkpoint
         Xopt.from_yaml(
             f"""
         generator:
-          name: nsga2
-          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+            name: nsga2
+            checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                    does_not_exist: [0.0, 1.0]
 
+                objectives:
+                    y1: MINIMIZE
+                    y2: MINIMIZE
+
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
         evaluator:
           function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-        vocs:
-          variables:
-            x1: [0, 3.14159]
-            x2: [0, 3.14159]
-            does_not_exist: [0.0, 1.0]
 
-          objectives:
-            y1: MINIMIZE
-            y2: MINIMIZE
-
-          constraints:
-            c1: [GREATER_THAN, 0]
-            c2: [LESS_THAN, 0.5]
         """.replace("\n        ", "\n")
         )
 
@@ -621,25 +619,25 @@ def test_nsga2_checkpoint_reload_vocs_bad_obj(nsga2_optimization_with_checkpoint
         Xopt.from_yaml(
             f"""
         generator:
-          name: nsga2
-          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+            name: nsga2
+            checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
 
+                objectives:
+                    y1: MINIMIZE
+                    y2: MINIMIZE
+                    does_not_exist: MINIMIZE
+
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
         evaluator:
           function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-        vocs:
-          variables:
-            x1: [0, 3.14159]
-            x2: [0, 3.14159]
 
-          objectives:
-            y1: MINIMIZE
-            y2: MINIMIZE
-            does_not_exist: MINIMIZE
-
-          constraints:
-            c1: [GREATER_THAN, 0]
-            c2: [LESS_THAN, 0.5]
         """.replace("\n        ", "\n")
         )
 
@@ -649,25 +647,25 @@ def test_nsga2_checkpoint_reload_vocs_bad_const(nsga2_optimization_with_checkpoi
         Xopt.from_yaml(
             f"""
         generator:
-          name: nsga2
-          checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+            name: nsga2
+            checkpoint_file: {nsga2_optimization_with_checkpoint[1]}
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
 
+                objectives:
+                    y1: MINIMIZE
+                    y2: MINIMIZE
+
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                    does_not_exist: [LESS_THAN, 0.5]
         evaluator:
           function: xopt.resources.test_functions.tnk.evaluate_TNK
 
-        vocs:
-          variables:
-            x1: [0, 3.14159]
-            x2: [0, 3.14159]
 
-          objectives:
-            y1: MINIMIZE
-            y2: MINIMIZE
-
-          constraints:
-            c1: [GREATER_THAN, 0]
-            c2: [LESS_THAN, 0.5]
-            does_not_exist: [LESS_THAN, 0.5]
         """.replace("\n        ", "\n")
         )
 
@@ -688,7 +686,6 @@ def test_nsga2_all_individuals_in_data():
         X = Xopt(
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK, max_workers=1),
-            vocs=tnk_vocs,
         )
         for _ in range(30):
             X.step()
@@ -762,7 +759,6 @@ def test_resume_consistency(pop_size=5, n_steps=128, check_step=10):
             population_size=pop_size,
         ),
         evaluator=Evaluator(function=problem_func),
-        vocs=problem_vocs,
     )
 
     # Run the first step to initialize
@@ -905,7 +901,6 @@ def test_nsga2_output_inhomogenous_data():
         X = Xopt(
             generator=generator,
             evaluator=Evaluator(function=evaluate_TNK),
-            vocs=tnk_vocs,
             stopping_condition=MaxEvaluationsCondition(
                 max_evaluations=30
             ),  # Run for 3 generations
@@ -961,7 +956,6 @@ def test_nsga2_vocs_not_present_in_add_data():
     X = Xopt(
         generator=NSGA2Generator(vocs=tnk_vocs),
         evaluator=Evaluator(function=evaluate_TNK),
-        vocs=tnk_vocs,
         stopping_condition=MaxEvaluationsCondition(max_evaluations=10),
     )
     X.run()

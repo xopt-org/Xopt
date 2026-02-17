@@ -54,14 +54,15 @@ class TestNelderMeadGenerator:
         generator:
             name: neldermead
             adaptive: true
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                    x2: [-5, 5]
+                objectives: {y: MINIMIZE}
         evaluator:
             function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
-        vocs:
-            variables:
-                x0: [-5, 5]
-                x1: [-5, 5]
-                x2: [-5, 5]
-            objectives: {y: MINIMIZE}
+
         """
         X = Xopt.from_yaml(YAML)
         X.random_evaluate(1)
@@ -106,13 +107,14 @@ class TestNelderMeadGenerator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
             adaptive: true
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                objectives: {y: MINIMIZE}
         evaluator:
             function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
-        vocs:
-            variables:
-                x0: [-5, 5]
-                x1: [-5, 5]
-            objectives: {y: MINIMIZE}
+
         """
 
         # test where we first random evaluate a point before starting simplex -- simplex will still start with the initial point
@@ -203,13 +205,14 @@ class TestNelderMeadGenerator:
             name: neldermead
             initial_point: {x0: -1, x1: -1}
             adaptive: true
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                objectives: {y: MINIMIZE}
         evaluator:
             function: xopt.resources.test_functions.rosenbrock.evaluate_rosenbrock
-        vocs:
-            variables:
-                x0: [-5, 5]
-                x1: [-5, 5]
-            objectives: {y: MINIMIZE}
+
         """
         X = Xopt.from_yaml(YAML)
         X.run()

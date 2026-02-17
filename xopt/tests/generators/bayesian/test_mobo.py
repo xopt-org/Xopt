@@ -52,7 +52,6 @@ class TestMOBOGenerator:
         with pytest.raises(VOCSError):
             MOBOGenerator(vocs=bad_vocs, reference_point=TEST_VOCS_REF_POINT)
 
-
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_generate(self, use_cuda):
         gen = MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)
@@ -129,8 +128,8 @@ class TestMOBOGenerator:
 
         for ele in [gen]:
             dump = ele.model_dump()
-            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
-            X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+            generator = MOBOGenerator(**dump)
+            X = Xopt(generator=generator, evaluator=evaluator)
             X.random_evaluate(3)
             X.step()
 
@@ -331,8 +330,8 @@ class TestMOBOGenerator:
 
         for ele in [gen]:
             dump = ele.model_dump()
-            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
-            X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+            generator = MOBOGenerator(**dump)
+            X = Xopt(generator=generator, evaluator=evaluator)
             X.generator.numerical_optimizer.max_iter = 1
             X.random_evaluate(3)
             X.step()

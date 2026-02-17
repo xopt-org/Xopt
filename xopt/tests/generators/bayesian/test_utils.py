@@ -105,7 +105,7 @@ class TestUtils:
             vocs=vocs,
         )
         gen.use_cuda = use_cuda
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
         gen = X.generator
         X.random_evaluate(200)
         gen.train_model()
@@ -173,7 +173,7 @@ class TestUtils:
         gen.use_cuda = use_cuda
         gen.numerical_optimizer.n_restarts = 2
         gen.n_monte_carlo_samples = 4
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(100)
         for _ in range(1):
             X.step()
@@ -283,7 +283,7 @@ class TestUtils:
         gen.use_cuda = use_cuda
         gen.numerical_optimizer.n_restarts = 3
         gen.n_monte_carlo_samples = 4
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(200)
         for _ in range(1):
             X.step()
@@ -397,7 +397,7 @@ class TestUtils:
         )
         gen.numerical_optimizer.n_restarts = 2
         gen.n_monte_carlo_samples = 4
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(100)
         for _ in range(1):
             X.step()
