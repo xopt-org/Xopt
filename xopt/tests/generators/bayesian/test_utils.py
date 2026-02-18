@@ -17,7 +17,7 @@ from xopt.generators.bayesian.utils import (
     torch_trace_acqf,
     torch_trace_gp_model,
 )
-from xopt.resources.benchmarking import time_call
+from xopt.resources.bench_framework import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]

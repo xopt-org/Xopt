@@ -4,7 +4,7 @@ import time
 import torch
 
 from xopt.generators.bayesian import ExpectedImprovementGenerator
-from xopt.resources.benchmarking import BenchDispatcher, generate_data, generate_vocs
+from xopt.resources.bench_framework import BenchDispatcher, generate_data, generate_vocs
 from xopt.generators.bayesian.models.standard import (
     BatchedModelConstructor,
 )

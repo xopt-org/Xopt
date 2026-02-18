@@ -1,6 +1,6 @@
 import argparse
 
-from xopt.resources.benchmarking import BenchDispatcher, BenchFunction
+from xopt.resources.bench_framework import BenchDispatcher, BenchSuite
 import xopt.resources.bench_functions  # noqa: F401
 
 
@@ -29,7 +29,7 @@ def run_benchmark():
             device = "cuda:0"
         dev_kwargs["device"] = device
 
-    runner = BenchFunction()
+    runner = BenchSuite()
     for benchmark in args.benchmarks:
         try:
             pre, func = BenchDispatcher.get(benchmark)

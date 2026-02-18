@@ -127,7 +127,7 @@ class BenchMOBO:
         return outputs
 
 
-class BenchFunction:
+class BenchSuite:
     def __init__(self):
         self.configs = []
 
