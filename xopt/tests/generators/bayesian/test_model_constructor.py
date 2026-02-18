@@ -398,194 +398,6 @@ class TestModelConstructor:
             #    constructed_prediction, benchmark_prediction, rtol=1e-3
             # )
 
-    def test_train_model_batch(self):
-        # tests to make sure that models created by BatchedModelConstructor class
-        # generate correct shapes
-        test_vocs = deepcopy(TEST_VOCS)
-        test_data = deepcopy(TEST_DATA)
-
-        gp_constructor = BatchedModelConstructor()
-
-        train_X, train_Y, train_Yvar = get_training_data_batched(
-            input_names=test_vocs.variable_names,
-            outcome_names=test_vocs.output_names,
-            data=test_data,
-            batch_mode=False,
-        )
-        assert train_X.shape == torch.Size([10, test_vocs.n_variables])
-        assert train_X[0, 0] == test_data.loc[0, "x1"]
-        assert train_Y.shape == torch.Size([10, test_vocs.n_outputs])
-        assert train_Y[0, 0] == test_data.loc[0, "y1"]
-        assert train_Y[0, 1] == test_data.loc[0, "c1"]
-
-        train_X, train_Y, train_Yvar = get_training_data_batched(
-            input_names=test_vocs.variable_names,
-            outcome_names=test_vocs.output_names,
-            data=test_data,
-            batch_mode=True,
-        )
-        assert train_X.shape == torch.Size(
-            [test_vocs.n_outputs, 10, test_vocs.n_variables]
-        )
-        assert train_X[0, 0, 0] == train_X[1, 0, 0] == test_data.loc[0, "x1"]
-        assert train_Y.shape == torch.Size([test_vocs.n_outputs, 10, 1])
-        assert train_Y[0, 0, 0] == test_data.loc[0, "y1"]
-        assert train_Y[1, 0, 0] == test_data.loc[0, "c1"]
-
-        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
-
-        assert isinstance(model, SingleTaskGP)
-        assert model._aug_batch_shape == torch.Size([2])
-        assert model.covar_module.raw_lengthscale.shape == torch.Size([2, 1, 3])
-
-    def test_train_model_batch_compare(self):
-        # test to verify that BatchedModelConstructor produces same results as
-        # StandardModelConstructor with multiple SingleTaskGP models
-        test_vocs = deepcopy(TEST_VOCS)
-        test_data = deepcopy(TEST_DATA)
-        verbose = False
-
-        torch.manual_seed(42)
-        gp_constructor = BatchedModelConstructor(train_model=False)
-        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
-        ls = model_single.covar_module.raw_lengthscale.shape
-        if test_vocs.n_outputs > 1:
-            assert ls == torch.Size([test_vocs.n_outputs, 1, test_vocs.n_variables])
-        else:
-            assert ls == torch.Size([1, test_vocs.n_variables])
-
-        constructor = StandardModelConstructor(train_model=False)
-        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
-        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
-            [1, test_vocs.n_variables]
-        )
-
-        list_ls = [
-            model_list.models[i].covar_module.raw_lengthscale
-            for i in range(test_vocs.n_outputs)
-        ]
-        batch_ls = model_single.covar_module.raw_lengthscale
-        for i in range(test_vocs.n_outputs):
-            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
-        if verbose:
-            print([(p, p.shape) for p in model_list.parameters()])
-            print("------------------------------")
-            print([(p, p.shape) for p in model_single.parameters()])
-
-        mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
-        # breakpoint()
-
-        isingle = 0
-        single_losses = np.zeros(1)
-
-        def cb_single(parameters, result):
-            nonlocal isingle
-            if verbose:
-                print(f"SINGLE{isingle} {result} ")
-                for k, v in parameters.items():
-                    print(f"  {k}: {super(type(v), v).__repr__()}")
-            isingle += 1
-            single_losses[0] = result.fval
-
-        fit_gpytorch_mll(mll, optimizer_kwargs={"callback": cb_single})
-
-        list_losses = np.zeros(len(model_list.models))
-        for i, ml in enumerate(model_list.models):
-            ilist = 0
-
-            def cb_list(parameters, result):
-                nonlocal ilist
-                if verbose:
-                    print(f"LIST{ilist} {result} ")
-                    for k, v in parameters.items():
-                        print(f"  {k}: {super(type(v), v).__repr__()}")
-                ilist += 1
-                list_losses[i] = result.fval
-
-            mll = ExactMarginalLogLikelihood(ml.likelihood, ml)
-            fit_gpytorch_mll(mll, optimizer_kwargs={"callback": cb_list})
-
-        if verbose:
-            print(f"Single losses: {single_losses}")
-            print(f"List losses: {list_losses}, sum {list_losses.sum()}")
-        assert np.isclose(list_losses.sum(), single_losses.sum(), rtol=0.0, atol=1e-4)
-
-        list_ls = [
-            model_list.models[i].covar_module.raw_lengthscale
-            for i in range(test_vocs.n_outputs)
-        ]
-        batch_ls = model_single.covar_module.raw_lengthscale
-        with pytest.raises(AssertionError):
-            # Hyperparameters do not match after training (they are close-ish)
-            # This is because L-BFGS-B terminates at different places for individual models,
-            # but the loss is summed for single model so we run until shared stopping criterion
-            for i in range(test_vocs.n_outputs):
-                assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
-
-    def test_train_model_batch_compare_adam(self):
-        test_vocs = deepcopy(TEST_VOCS)
-        test_data = deepcopy(TEST_DATA)
-
-        gp_constructor = BatchedModelConstructor(train_model=False)
-        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
-        ls = model_single.covar_module.raw_lengthscale.shape
-        if test_vocs.n_outputs > 1:
-            assert ls == torch.Size([test_vocs.n_outputs, 1, test_vocs.n_variables])
-        else:
-            assert ls == torch.Size([1, test_vocs.n_variables])
-
-        constructor = StandardModelConstructor(train_model=False)
-        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
-        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
-            [1, test_vocs.n_variables]
-        )
-
-        list_ls = [
-            model_list.models[i].covar_module.raw_lengthscale
-            for i in range(test_vocs.n_outputs)
-        ]
-        batch_ls = model_single.covar_module.raw_lengthscale
-        for i in range(test_vocs.n_outputs):
-            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
-        print([(p, p.shape) for p in model_list.parameters()])
-        print("------------------------------")
-        print([(p, p.shape) for p in model_single.parameters()])
-
-        optimizer_single = torch.optim.Adam(model_single.parameters(), lr=0.1)
-        mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
-        optimizer_list = []
-        mll_list = []
-        for ml in model_list.models:
-            optimizer_list.append(torch.optim.Adam(ml.parameters(), lr=0.1))
-            mll_list.append(ExactMarginalLogLikelihood(ml.likelihood, ml))
-
-        for i in range(10):
-            optimizer_single.zero_grad()
-            output = model_single(model_single.train_inputs[0])
-            loss = -mll(output, model_single.train_targets).sum()
-            loss.backward()
-            optimizer_single.step()
-            single_loss = float(loss.item())
-            print(f"Single: {loss.item()}")
-            total_list_loss = 0.0
-            for j, ml in enumerate(model_list.models):
-                optimizer_list[j].zero_grad()
-                output = ml(ml.train_inputs[0])
-                loss = -mll_list[j](output, ml.train_targets)
-                loss.backward()
-                optimizer_list[j].step()
-                print(f"List {j}: {loss.item()}")
-                total_list_loss += loss.item()
-            print(f"List total: {total_list_loss}")
-            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-8)
-        list_ls = [
-            model_list.models[i].covar_module.raw_lengthscale
-            for i in range(test_vocs.n_outputs)
-        ]
-        batch_ls = model_single.covar_module.raw_lengthscale
-        for i in range(test_vocs.n_outputs):
-            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
-
     def test_train_from_scratch(self):
         # test to verify that GP modules are trained from scratch everytime
         # avoids training pitfalls due to local minima in likelihoods due to smaller
@@ -824,3 +636,367 @@ class TestModelConstructor:
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
+
+
+class TestBatchedModelConstructor:
+    def test_train_model_batch(self):
+        # tests to make sure that models created by BatchedModelConstructor class
+        # generate correct shapes
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        gp_constructor = BatchedModelConstructor()
+
+        train_X, train_Y, train_Yvar = get_training_data_batched(
+            input_names=test_vocs.variable_names,
+            outcome_names=test_vocs.output_names,
+            data=test_data,
+            batch_mode=False,
+        )
+        assert train_X.shape == torch.Size([10, test_vocs.n_variables])
+        assert train_X[0, 0] == test_data.loc[0, "x1"]
+        assert train_Y.shape == torch.Size([10, test_vocs.n_outputs])
+        assert train_Y[0, 0] == test_data.loc[0, "y1"]
+        assert train_Y[0, 1] == test_data.loc[0, "c1"]
+
+        train_X, train_Y, train_Yvar = get_training_data_batched(
+            input_names=test_vocs.variable_names,
+            outcome_names=test_vocs.output_names,
+            data=test_data,
+            batch_mode=True,
+        )
+        assert train_X.shape == torch.Size(
+            [test_vocs.n_outputs, 10, test_vocs.n_variables]
+        )
+        assert train_X[0, 0, 0] == train_X[1, 0, 0] == test_data.loc[0, "x1"]
+        assert train_Y.shape == torch.Size([test_vocs.n_outputs, 10, 1])
+        assert train_Y[0, 0, 0] == test_data.loc[0, "y1"]
+        assert train_Y[1, 0, 0] == test_data.loc[0, "c1"]
+
+        model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+
+        assert isinstance(model, SingleTaskGP)
+        assert model._aug_batch_shape == torch.Size([2])
+        assert model.covar_module.raw_lengthscale.shape == torch.Size([2, 1, 3])
+
+    def test_train_model_batch_compare(self):
+        # test to verify that BatchedModelConstructor produces same results as
+        # StandardModelConstructor with multiple SingleTaskGP models
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+        verbose = False
+
+        torch.manual_seed(42)
+        gp_constructor = BatchedModelConstructor(train_model=False)
+        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+        ls = model_single.covar_module.raw_lengthscale.shape
+        if test_vocs.n_outputs > 1:
+            assert ls == torch.Size([test_vocs.n_outputs, 1, test_vocs.n_variables])
+        else:
+            assert ls == torch.Size([1, test_vocs.n_variables])
+
+        constructor = StandardModelConstructor(train_model=False)
+        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
+            [1, test_vocs.n_variables]
+        )
+
+        list_ls = [
+            model_list.models[i].covar_module.raw_lengthscale
+            for i in range(test_vocs.n_outputs)
+        ]
+        batch_ls = model_single.covar_module.raw_lengthscale
+        for i in range(test_vocs.n_outputs):
+            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+        if verbose:
+            print([(p, p.shape) for p in model_list.parameters()])
+            print("------------------------------")
+            print([(p, p.shape) for p in model_single.parameters()])
+
+        mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
+
+        isingle = 0
+        single_losses = np.zeros(1)
+
+        def cb_single(parameters, result):
+            nonlocal isingle
+            if verbose:
+                print(f"SINGLE{isingle} {result} ")
+                for k, v in parameters.items():
+                    print(f"  {k}: {super(type(v), v).__repr__()}")
+            isingle += 1
+            single_losses[0] = result.fval
+
+        fit_gpytorch_mll(mll, optimizer_kwargs={"callback": cb_single})
+
+        list_losses = np.zeros(len(model_list.models))
+        for i, ml in enumerate(model_list.models):
+            ilist = 0
+
+            def cb_list(parameters, result):
+                nonlocal ilist
+                if verbose:
+                    print(f"LIST{ilist} {result} ")
+                    for k, v in parameters.items():
+                        print(f"  {k}: {super(type(v), v).__repr__()}")
+                ilist += 1
+                list_losses[i] = result.fval
+
+            mll = ExactMarginalLogLikelihood(ml.likelihood, ml)
+            fit_gpytorch_mll(mll, optimizer_kwargs={"callback": cb_list})
+
+        if verbose:
+            print(f"Single losses: {single_losses}")
+            print(f"List losses: {list_losses}, sum {list_losses.sum()}")
+        assert np.isclose(list_losses.sum(), single_losses.sum(), rtol=0.0, atol=1e-4)
+
+        list_ls = [
+            model_list.models[i].covar_module.raw_lengthscale
+            for i in range(test_vocs.n_outputs)
+        ]
+        batch_ls = model_single.covar_module.raw_lengthscale
+        with pytest.raises(AssertionError):
+            # Hyperparameters do not match after training (they are close-ish)
+            # This is because L-BFGS-B terminates at different places for individual
+            # models, but the loss is summed for single model so we run until shared
+            # stopping criterion
+            for i in range(test_vocs.n_outputs):
+                assert torch.allclose(
+                    list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3
+                )
+
+    def test_train_model_batch_compare_adam(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        gp_constructor = BatchedModelConstructor(train_model=False)
+        model_single = gp_constructor.build_model_from_vocs(test_vocs, test_data)
+        ls = model_single.covar_module.raw_lengthscale.shape
+        if test_vocs.n_outputs > 1:
+            assert ls == torch.Size([test_vocs.n_outputs, 1, test_vocs.n_variables])
+        else:
+            assert ls == torch.Size([1, test_vocs.n_variables])
+
+        constructor = StandardModelConstructor(train_model=False)
+        model_list = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert model_list.models[0].covar_module.raw_lengthscale.shape == torch.Size(
+            [1, test_vocs.n_variables]
+        )
+
+        list_ls = [
+            model_list.models[i].covar_module.raw_lengthscale
+            for i in range(test_vocs.n_outputs)
+        ]
+        batch_ls = model_single.covar_module.raw_lengthscale
+        for i in range(test_vocs.n_outputs):
+            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+        print([(p, p.shape) for p in model_list.parameters()])
+        print("------------------------------")
+        print([(p, p.shape) for p in model_single.parameters()])
+
+        optimizer_single = torch.optim.Adam(model_single.parameters(), lr=0.1)
+        mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
+        optimizer_list = []
+        mll_list = []
+        for ml in model_list.models:
+            optimizer_list.append(torch.optim.Adam(ml.parameters(), lr=0.1))
+            mll_list.append(ExactMarginalLogLikelihood(ml.likelihood, ml))
+
+        for i in range(10):
+            optimizer_single.zero_grad()
+            output = model_single(model_single.train_inputs[0])
+            loss = -mll(output, model_single.train_targets).sum()
+            loss.backward()
+            optimizer_single.step()
+            single_loss = float(loss.item())
+            print(f"Single: {loss.item()}")
+            total_list_loss = 0.0
+            for j, ml in enumerate(model_list.models):
+                optimizer_list[j].zero_grad()
+                output = ml(ml.train_inputs[0])
+                loss = -mll_list[j](output, ml.train_targets)
+                loss.backward()
+                optimizer_list[j].step()
+                print(f"List {j}: {loss.item()}")
+                total_list_loss += loss.item()
+            print(f"List total: {total_list_loss}")
+            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-8)
+        list_ls = [
+            model_list.models[i].covar_module.raw_lengthscale
+            for i in range(test_vocs.n_outputs)
+        ]
+        batch_ls = model_single.covar_module.raw_lengthscale
+        for i in range(test_vocs.n_outputs):
+            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_batched_basic(self, use_cuda):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+        constructor = BatchedModelConstructor()
+
+        model = constructor.build_model_from_vocs(
+            test_vocs, test_data, device=device_map[use_cuda]
+        )
+        assert isinstance(model, SingleTaskGP)
+        verify_state_device(model, device=device_map[use_cuda])
+
+    def test_batched_transform_inputs_false(self):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+
+        constructor = BatchedModelConstructor(transform_inputs=False)
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert not hasattr(model, "input_transform")
+
+    def test_batched_transform_inputs_dict_raises(self):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+
+        constructor = BatchedModelConstructor(transform_inputs={"c1": False})
+        with pytest.raises(AttributeError):
+            constructor.build_model_from_vocs(test_vocs, test_data)
+
+    def test_batched_model_w_nans(self):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+
+        # add nans to outputs -- batched drops rows with any NaN across all outputs
+        test_data.loc[5, "y1"] = np.nan
+        test_data.loc[6, "c1"] = np.nan
+        test_data.loc[7, "c1"] = np.nan
+
+        constructor = BatchedModelConstructor()
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        # rows 5, 6, 7 dropped -> 7 remaining
+        # SingleTaskGP unrolls to (n_outputs, n_samples, n_vars)
+        n_out = test_vocs.n_outputs
+        assert model.train_inputs[0].shape == torch.Size(
+            [n_out, 7, test_vocs.n_variables]
+        )
+
+        # add nans to inputs
+        test_data2 = deepcopy(TEST_DATA)
+        test_data2.loc[5, "x1"] = np.nan
+
+        model2 = constructor.build_model_from_vocs(test_vocs, test_data2)
+        assert model2.train_inputs[0].shape == torch.Size(
+            [n_out, 9, test_vocs.n_variables]
+        )
+
+    def test_batched_model_caching(self):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+
+        constructor = BatchedModelConstructor()
+        constructor.build_model_from_vocs(test_vocs, test_data)
+
+        old_model = constructor.build_model_from_vocs(test_vocs, test_data)
+        state = deepcopy(constructor._hyperparameter_store)
+        assert torch.equal(
+            old_model.covar_module.raw_lengthscale,
+            state["covar_module.raw_lengthscale"],
+        )
+
+        # add data and use cached hyperparameters
+        constructor.use_cached_hyperparameters = True
+        extra = pd.DataFrame(
+            {
+                **{
+                    f"x{i + 1}": [0.2, 0.1]
+                    for i in range(test_vocs.n_variables)
+                },
+                **{
+                    f"y{i + 1}": [0.1, 0.2]
+                    for i in range(test_vocs.n_objectives)
+                },
+            }
+        )
+        test_data_extended = pd.concat((test_data, extra))
+
+        def compare_dicts_with_tensors(dict1, dict2):
+            if dict1.keys() != dict2.keys():
+                return False
+            for key in dict1:
+                val1, val2 = dict1[key], dict2[key]
+                if isinstance(val1, torch.Tensor) and isinstance(val2, torch.Tensor):
+                    if not torch.equal(val1, val2):
+                        return False
+                elif val1 != val2:
+                    return False
+            return True
+
+        constructor.train_model = False
+        new_model = constructor.build_model_from_vocs(test_vocs, test_data_extended)
+        assert compare_dicts_with_tensors(
+            new_model.state_dict(), old_model.state_dict()
+        )
+
+        constructor.train_model = True
+        new_model = constructor.build_model_from_vocs(test_vocs, test_data_extended)
+        with pytest.raises(AssertionError):
+            assert compare_dicts_with_tensors(
+                new_model.state_dict(), old_model.state_dict()
+            )
+
+        # empty hyperparameter store should raise
+        constructor = BatchedModelConstructor()
+        constructor.use_cached_hyperparameters = True
+        with pytest.raises(RuntimeWarning):
+            constructor.build_model_from_vocs(test_vocs, test_data)
+
+    def test_batched_covar_modules_multiple_raises(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = BatchedModelConstructor(
+            covar_modules={
+                "y1": ScaleKernel(PeriodicKernel()),
+                "c1": ScaleKernel(PeriodicKernel()),
+            }
+        )
+        with pytest.raises(ValueError, match="cannot be specified individually"):
+            constructor.build_model_from_vocs(test_vocs, test_data)
+
+    def test_batched_mean_modules_multiple_raises(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = BatchedModelConstructor(
+            mean_modules={"y1": ConstantMean(), "c1": ConstantMean()}
+        )
+        with pytest.raises(ValueError, match="cannot be specified individually"):
+            constructor.build_model_from_vocs(test_vocs, test_data)
+
+    def test_batched_single_covar_module(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = BatchedModelConstructor(
+            covar_modules={"all": ScaleKernel(PeriodicKernel())}
+        )
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model, SingleTaskGP)
+        assert isinstance(model.covar_module.base_kernel, PeriodicKernel)
+
+    def test_batched_single_mean_module(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = BatchedModelConstructor(
+            mean_modules={"all": ConstantMean()}
+        )
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model, SingleTaskGP)
+        assert isinstance(model.mean_module, ConstantMean)
+
+    def test_batched_empty_data(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        # create empty dataframe with correct columns
+        empty_data = pd.DataFrame(
+            columns=["x1", "x2", "x3", "y1", "c1", "constant1"]
+        )
+
+        constructor = BatchedModelConstructor()
+        with pytest.raises(ValueError, match="no data found"):
+            constructor.build_model_from_vocs(test_vocs, empty_data)

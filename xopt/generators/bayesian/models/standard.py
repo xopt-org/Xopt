@@ -146,7 +146,7 @@ class StandardModelConstructor(ModelConstructor):
         description="flag to specify if the model should be trained (fitted to data)",
     )
     train_config: (
-        AdamNumericalOptimizerConfig | LBFGSNumericalOptimizerConfig | None
+        NumericalOptimizerConfig | None
     ) = Field(
         None,
         description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy"
@@ -398,28 +398,28 @@ class StandardModelConstructor(ModelConstructor):
             if self.train_config is not None and self.train_config.timeout is not None:
                 tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
             if self.train_method == "adam":
-                cfg: AdamNumericalOptimizerConfig = (
+                cfg_adam: AdamNumericalOptimizerConfig = (
                     self.train_config or AdamNumericalOptimizerConfig()
                 )
                 sc = ExpMAStoppingCriterion(
-                    maxiter=cfg.stopping_criterion.maxiter,
-                    n_window=cfg.stopping_criterion.n_window,
-                    eta=cfg.stopping_criterion.eta,
-                    rel_tol=cfg.stopping_criterion.rel_tol,
+                    maxiter=cfg_adam.stopping_criterion.maxiter,
+                    n_window=cfg_adam.stopping_criterion.n_window,
+                    eta=cfg_adam.stopping_criterion.eta,
+                    rel_tol=cfg_adam.stopping_criterion.rel_tol,
                 )
-                opt = partial(Adam, lr=cfg.lr)
+                opt = partial(Adam, lr=cfg_adam.lr)
                 tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
                 tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
                 optimizer = fit_gpytorch_mll_torch
             else:
-                cfg: LBFGSNumericalOptimizerConfig = (
+                cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
                     self.train_config or LBFGSNumericalOptimizerConfig()
                 )
                 if "options" not in tr_kwargs["optimizer_kwargs"]:
                     tr_kwargs["optimizer_kwargs"]["options"] = {}
-                tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg.maxiter
-                tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg.gtol
-                tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg.ftol
+                tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
+                tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
+                tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
                 optimizer = fit_gpytorch_mll_scipy
 
             fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)

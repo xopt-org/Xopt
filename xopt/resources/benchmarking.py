@@ -32,7 +32,7 @@ class BenchMOBO:
     Benchmark class for running various configurations either directly or through the pytest interface
     """
 
-    KEYS = ["quad", "linear", "dtlz2_d3", "dtlz2_d20"]
+    KEYS = ["quad", "linear", "dtlz2_d3", "dtlz2_d20", "tnk"]
     FUNCTIONS = {
         "dtlz2_d3": dtlz2_3d.evaluate_dict,
         "dtlz2_d20": dtlz2_20d.evaluate_dict,
@@ -86,7 +86,7 @@ class BenchMOBO:
         return X
 
     @classmethod
-    def crate_parameter_table(cls):
+    def create_parameter_table(cls):
         """Create a table of generator parameters to benchmark"""
         rows = []
         for k in cls.KEYS:
@@ -118,9 +118,10 @@ class BenchMOBO:
             **self.df.loc[row, "opts"],
         }
         outputs["t"] = X.data.gen_time.sum()
-        outputs["hv25"] = X.data.loc[1 * self.N_STEPS // 4, "hv"]
-        outputs["hv50"] = X.data.loc[2 * self.N_STEPS // 4, "hv"]
-        outputs["hv75"] = X.data.loc[3 * self.N_STEPS // 4, "hv"]
+        n_init = 2  # rows from random_evaluate
+        outputs["hv25"] = X.data.loc[n_init + 1 * self.N_STEPS // 4, "hv"]
+        outputs["hv50"] = X.data.loc[n_init + 2 * self.N_STEPS // 4, "hv"]
+        outputs["hv75"] = X.data.loc[n_init + 3 * self.N_STEPS // 4, "hv"]
         outputs["hvf"] = X.generator.get_pareto_front_and_hypervolume()[-1]
 
         return outputs
@@ -163,7 +164,10 @@ class BenchFunction:
                 t1 = time.perf_counter()
                 tfun = f(*args, **kwargs)
                 t2 = time.perf_counter()
-                t, results = t2 - t1 if tfun is None else tfun
+                if tfun is None:
+                    t, results = t2 - t1, None
+                else:
+                    t, results = tfun
                 times.append(t)
                 total_time += t
                 n += 1
@@ -255,6 +259,8 @@ class BenchDispatcher:
                 print(f"Generating args {arg_names} for function {name} from {v}")
             if callable(v):
                 v = v()
+            if isinstance(v, dict):
+                v = v.values()
             for k2, v2 in zip(arg_names, v):
                 if k2 in kwargs:
                     raise ValueError(f"Argument {k2} already set for function {name}")
@@ -291,9 +297,10 @@ def profile_function(func, dump_stats: bool = False):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        # Use an environment variable to turn profiling on/off
         profiler = cProfile.Profile()
-        result = profiler.runctx("func(*args, **kwargs)", globals(), locals())
+        profiler.enable()
+        result = func(*args, **kwargs)
+        profiler.disable()
         if dump_stats:
             stats_file = f"{func.__name__}.prof"
             profiler.dump_stats(stats_file)
