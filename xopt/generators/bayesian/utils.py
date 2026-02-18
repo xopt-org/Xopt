@@ -84,7 +84,7 @@ def get_training_data_batched(
     batch_mode: bool = False,
 ) -> (torch.Tensor, torch.Tensor, torch.Tensor):
     """
-    Get data for multiple outcomes.
+    Get data for multiple outcomes. Valid points have no NaNs for all inputs and outcomes.
 
     Parameters
     ----------

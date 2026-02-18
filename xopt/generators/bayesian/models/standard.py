@@ -515,6 +515,20 @@ class StandardModelConstructor(ModelConstructor):
 
 
 class BatchedModelConstructor(StandardModelConstructor):
+    """
+    BatchedModelConstructor treats outputs as an additional dimension instead of looping over them.
+    It is useful when multiple outputs are being modelled and their settings are similar.
+
+    Batch shares training points (i.e. all not-nan inputs) and kernel. It uses a single pytorch
+    graph (i.e. 1 sum loss), which changes convergence criteria. Resulting parameters are expected
+    to differ slightly from individual fitting.
+
+    Batch modelling is faster on GPUs, especially in the intermediate (<~1000) problem sizes where GPU
+    call overhead is significant and all models converge in roughly equal number of steps.
+    On CPU, the performance gains are minimal. See benchmarking docs on how to run tests
+    for your specific hardware.
+    """
+
     def _get_input_transform(
         self,
         outcome_names: list[str],
