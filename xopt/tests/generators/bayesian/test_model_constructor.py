@@ -94,12 +94,16 @@ class TestModelConstructor:
             called = True
             return fit_gpytorch_mll_torch(*args, **kwargs)
 
+        original = st.fit_gpytorch_mll_torch
         st.fit_gpytorch_mll_torch = torch_monkeypatch
-        model = constructor.build_model_from_vocs(
-            test_vocs, test_data, device=device_map[use_cuda]
-        )
-        verify_state_device(model, device=device_map[use_cuda])
-        assert called
+        try:
+            model = constructor.build_model_from_vocs(
+                test_vocs, test_data, device=device_map[use_cuda]
+            )
+            verify_state_device(model, device=device_map[use_cuda])
+            assert called
+        finally:
+            st.fit_gpytorch_mll_torch = original
 
     def test_transform_inputs(self):
         test_data = deepcopy(TEST_DATA)
