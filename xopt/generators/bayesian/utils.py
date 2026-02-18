@@ -116,7 +116,9 @@ def get_training_data_batched(
     yvar_names = [f"{outcome}_var" for outcome in outcome_names]
     have_yvar = [x in data for x in yvar_names]
     if all(have_yvar):
-        train_Yvar = torch.tensor(outcome_data[yvar_names].to_numpy(dtype="double"))
+        train_Yvar = torch.tensor(
+            data.loc[non_nans_all, yvar_names].to_numpy(dtype="double")
+        )
     elif not any(have_yvar):
         # no var
         pass

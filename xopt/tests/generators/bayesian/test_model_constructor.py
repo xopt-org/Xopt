@@ -761,9 +761,7 @@ class TestBatchedModelConstructor:
             # models, but the loss is summed for single model so we run until shared
             # stopping criterion
             for i in range(test_vocs.n_outputs):
-                assert torch.allclose(
-                    list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3
-                )
+                assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
 
     def test_train_model_batch_compare_adam(self):
         test_vocs = deepcopy(TEST_VOCS)
@@ -902,14 +900,8 @@ class TestBatchedModelConstructor:
         constructor.use_cached_hyperparameters = True
         extra = pd.DataFrame(
             {
-                **{
-                    f"x{i + 1}": [0.2, 0.1]
-                    for i in range(test_vocs.n_variables)
-                },
-                **{
-                    f"y{i + 1}": [0.1, 0.2]
-                    for i in range(test_vocs.n_objectives)
-                },
+                **{f"x{i + 1}": [0.2, 0.1] for i in range(test_vocs.n_variables)},
+                **{f"y{i + 1}": [0.1, 0.2] for i in range(test_vocs.n_objectives)},
             }
         )
         test_data_extended = pd.concat((test_data, extra))
@@ -983,19 +975,40 @@ class TestBatchedModelConstructor:
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
 
-        constructor = BatchedModelConstructor(
-            mean_modules={"all": ConstantMean()}
-        )
+        constructor = BatchedModelConstructor(mean_modules={"all": ConstantMean()})
         model = constructor.build_model_from_vocs(test_vocs, test_data)
         assert isinstance(model, SingleTaskGP)
         assert isinstance(model.mean_module, ConstantMean)
 
+    def test_batched_heteroskedastic(self):
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+
+        constructor = BatchedModelConstructor()
+
+        # partial variance columns — not allowed
+        test_data_partial = deepcopy(TEST_DATA)
+        test_data_partial["y1_var"] = test_data_partial["y1"].abs() * 0.1
+        with pytest.raises(ValueError, match="all or none"):
+            constructor.build_model_from_vocs(test_vocs, test_data_partial)
+
+        # without variance — uses custom GaussianLikelihood from get_likelihood()
+        model_no_var = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model_no_var, SingleTaskGP)
+        assert isinstance(model_no_var.likelihood, GaussianLikelihood)
+
+        # all variance columns — uses FixedNoiseGaussianLikelihood
+        test_data_full = deepcopy(TEST_DATA)
+        test_data_full["y1_var"] = test_data_full["y1"].abs() * 0.1
+        test_data_full["c1_var"] = test_data_full["c1"].abs() * 0.1
+        model_with_var = constructor.build_model_from_vocs(test_vocs, test_data_full)
+        assert isinstance(model_with_var, SingleTaskGP)
+        assert not isinstance(model_with_var.likelihood, GaussianLikelihood)
+
     def test_batched_empty_data(self):
         test_vocs = deepcopy(TEST_VOCS)
         # create empty dataframe with correct columns
-        empty_data = pd.DataFrame(
-            columns=["x1", "x2", "x3", "y1", "c1", "constant1"]
-        )
+        empty_data = pd.DataFrame(columns=["x1", "x2", "x3", "y1", "c1", "constant1"])
 
         constructor = BatchedModelConstructor()
         with pytest.raises(ValueError, match="no data found"):

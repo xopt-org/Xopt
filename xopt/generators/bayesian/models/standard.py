@@ -17,6 +17,7 @@ from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood, Likelihood
+from gpytorch.likelihoods.gaussian_likelihood import FixedNoiseGaussianLikelihood
 from gpytorch.priors import GammaPrior, Prior
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
@@ -145,9 +146,7 @@ class StandardModelConstructor(ModelConstructor):
         True,
         description="flag to specify if the model should be trained (fitted to data)",
     )
-    train_config: (
-        NumericalOptimizerConfig | None
-    ) = Field(
+    train_config: NumericalOptimizerConfig | None = Field(
         None,
         description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy"
         " and fit_gpytorch_mll_torch",
@@ -607,7 +606,6 @@ class BatchedModelConstructor(StandardModelConstructor):
         elif len(self.mean_modules) == 1:
             mean_module = list(self.mean_modules.values())[0]
 
-        likelihood = self.get_likelihood(batch_shape=_aug_batch_shape)
         # input and output transforms are applied BEFORE tensors are unrolled
         input_transform = self._get_input_transform(
             outcome_names,
@@ -625,7 +623,15 @@ class BatchedModelConstructor(StandardModelConstructor):
             "mean_module": mean_module,
         }
 
-        full_model = SingleTaskGP(train_X, train_Y, likelihood=likelihood, **kwargs)
+        if train_Yvar is None:
+            likelihood = self.get_likelihood(batch_shape=_aug_batch_shape)
+        else:
+            likelihood = FixedNoiseGaussianLikelihood(
+                noise=train_Yvar, batch_shape=_aug_batch_shape
+            )
+        full_model = SingleTaskGP(
+            train_X, train_Y, train_Yvar=train_Yvar, likelihood=likelihood, **kwargs
+        )
         full_model.to(**tkwargs)
 
         if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
