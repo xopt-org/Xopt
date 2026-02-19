@@ -107,7 +107,7 @@ class BayesianGenerator(Generator, ABC):
     computation_time : Optional[pd.DataFrame]
         A data frame tracking computation time in seconds.
 
-    n_interpolate_samples: Optional[PositiveInt]
+    n_interpolate_points: Optional[PositiveInt]
         Number of interpolation points to generate between last observation and next
         observation, requires n_candidates to be 1.
 
