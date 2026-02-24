@@ -1,0 +1,3 @@
+ignore:
+  - "xopt/resources/bench_framework.py"
+  - "xopt/resources/bench_profiler.py"

@@ -1,6 +1,6 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import Any, List, Union
+from typing import Any, List, Union, cast
 
 import gpytorch
 import numpy as np
@@ -10,6 +10,7 @@ import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
+from botorch.models.utils import multioutput_to_batch_mode_transform
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
 from xopt.generators.bayesian.turbo import TurboController
@@ -63,10 +64,10 @@ def get_training_data(
     outcome_data = outcome_data[non_nans]
 
     train_X = torch.tensor(
-        input_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double")
+        input_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double").copy()
     )
     train_Y = torch.tensor(
-        outcome_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double")
+        outcome_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double").copy()
     )
     if train_Y.ndim < 2:
         train_Y = train_Y.unsqueeze(-1)
@@ -76,9 +77,70 @@ def get_training_data(
     if len(var_names) > 0:
         variance_data = data[var_names][non_nans]
         train_Yvar = torch.tensor(
-            variance_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double")
+            variance_data[~outcome_data.isnull().T.any()]
+            .to_numpy(dtype="double")
+            .copy()
         )
 
+    return train_X, train_Y, train_Yvar
+
+
+def get_training_data_batched(
+    input_names: List[str],
+    outcome_names: List[str],
+    data: pd.DataFrame,
+    batch_mode: bool = False,
+) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    """
+    Get data for multiple outcomes. Valid points have no NaNs for all inputs and outcomes.
+
+    Parameters
+    ----------
+    batch_mode: bool
+        If false, not unrolled - will be done by SingleTaskGP. If true, unrolls the data
+        so that each outcome is treated as a separate task in a batch mode model.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        train_X `n x d` or `m x n x d`
+        train_Y `n x m` or `m x n x 1`
+        train_Yvar `n x m` or `m x n x 1`
+    """
+    input_data = data[input_names]
+    outcome_data = data[outcome_names]
+
+    non_nans_input = ~input_data.isnull().T.any()
+    non_nans_output = ~outcome_data.isnull().T.any()
+    non_nans_all = non_nans_input & non_nans_output
+    input_data = input_data[non_nans_all]
+    outcome_data = outcome_data[non_nans_all]
+
+    train_X = torch.tensor(input_data.to_numpy(dtype="double"))
+
+    train_Y = torch.tensor(outcome_data[outcome_names].to_numpy(dtype="double"))
+
+    train_Yvar = None
+    yvar_names = [f"{outcome}_var" for outcome in outcome_names]
+    have_yvar = [x in data for x in yvar_names]
+    if all(have_yvar):
+        train_Yvar = torch.tensor(
+            data.loc[non_nans_all, yvar_names].to_numpy(dtype="double")
+        )
+    elif not any(have_yvar):
+        # no var
+        pass
+    else:
+        # partial - not allowed
+        raise ValueError("either all or none of the outcomes must have variance data")
+
+    if batch_mode:
+        train_X, train_Y, train_Yvar = multioutput_to_batch_mode_transform(
+            train_X, train_Y, len(outcome_names), train_Yvar
+        )
+        train_Y = train_Y.unsqueeze(-1)
+        if train_Yvar is not None:
+            train_Yvar = train_Yvar.unsqueeze(-1)
     return train_X, train_Y, train_Yvar
 
 
@@ -211,6 +273,10 @@ def validate_turbo_controller_base(
         controller.__name__: controller for controller in valid_controller_types
     }
 
+    vocs = info.data.get("vocs", None)
+    if vocs is None:
+        raise ValueError("vocs must be provided to validate turbo controller")
+
     if isinstance(value, str):
         # handle old string input
         if value == "optimize":
@@ -220,12 +286,13 @@ def validate_turbo_controller_base(
 
         # create turbo controller from string input
         if value in controller_types:
-            value = controller_types[value](info.data["vocs"])
+            value = controller_types[value](vocs=vocs)
         else:
             raise ValueError(
                 f"{value} not found, available values are {controller_types.keys()}"
             )
     elif isinstance(value, dict):
+        value = cast(dict[str, Any], value)
         value_copy = deepcopy(value)
         # create turbo controller from dict input
         if "name" not in value:
@@ -233,10 +300,10 @@ def validate_turbo_controller_base(
         name = value_copy.pop("name")
         if name in controller_types:
             # pop unnecessary elements
-            for ele in ["dim"]:
+            for ele in ["dim", "vocs"]:
                 value_copy.pop(ele, None)
 
-            value = controller_types[name](vocs=info.data["vocs"], **value_copy)
+            value = controller_types[name](vocs=vocs, **value_copy)
         else:
             raise ValueError(
                 f"{value} not found, available values are {controller_types.keys()}"

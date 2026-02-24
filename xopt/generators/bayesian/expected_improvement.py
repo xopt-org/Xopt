@@ -18,6 +18,7 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
+from xopt.errors import FeasibilityError
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
@@ -92,7 +93,11 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         objective = self._get_objective()
         best_f = self._get_best_f(self.data, objective)
 
-        if self.n_candidates > 1 or isinstance(objective, CustomXoptObjective):
+        if (
+            self.n_candidates > 1
+            or isinstance(objective, CustomXoptObjective)
+            or self.vocs.constraint_names != []
+        ):
             # MC sampling for generating multiple candidate points
             sampler = self._get_sampler(model)
             acq = qLogExpectedImprovement(
@@ -105,7 +110,7 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         else:
             # analytic acquisition function for single candidate generation with
             # basic objective
-            # note that the analytic version cannot handle custom objectives
+            # note that the analytic version cannot handle custom objectives or constraints
             weights = set_botorch_weights(self.vocs).to(**self.tkwargs)
             posterior_transform = ScalarizedPosteriorTransform(weights)
             acq = LogExpectedImprovement(
@@ -135,10 +140,21 @@ class ExpectedImprovementGenerator(BayesianGenerator):
                 torch.tensor(self.vocs.observable_data(data).to_numpy(), **self.tkwargs)
             ).max()
         else:
-            # analytic acquisition function for single candidate generation
-            best_f = -torch.tensor(
-                self.vocs.objective_data(data).min().values, **self.tkwargs
-            )
+            # return the best feasible objective value from the data
+            # note: this is critical for proper handling of constraints since the base EI
+            # function will be zero if an extreme value is in the constrained region
+            if self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE":
+                multiplier = -1
+            else:
+                multiplier = 1
+
+            try:
+                _, value, _ = self.vocs.select_best(data)
+            except FeasibilityError:
+                raise RuntimeError(
+                    "No feasible points found in the data; cannot compute expected improvement."
+                )
+            best_f = torch.tensor(value.item(), **self.tkwargs) * multiplier
 
         return best_f
 

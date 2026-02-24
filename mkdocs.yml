@@ -14,9 +14,11 @@ nav:
             - examples/basic/xopt_vocs.ipynb
             - examples/basic/xopt_evaluator.ipynb
             - examples/basic/xopt_generator.ipynb
+            - examples/basic/xopt_stopping_condition.ipynb
         - Bayesian:
             - Gaussian Process Model Creation:
                 - Basic example: examples/gp_model_creation/model_creation.ipynb
+                - Batched models: examples/gp_model_creation/batched_model.ipynb
             - Bayesian Exploration:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
@@ -59,6 +61,8 @@ nav:
             - RCDS: examples/sequential/rcds.ipynb
         - Other:
             - Latin Hypercube: examples/scipy/latin_hypercube.ipynb
+        - Developer:
+            - Benchmarking & Profiling: examples/developer/benchmarking.md
 
     - API:
       - Xopt: api/xopt.md
@@ -122,7 +126,7 @@ plugins:
 
   - mkdocs-jupyter:
       include_source: True
-      execute: True
+      execute: False
 
   - mkdocstrings:
       default_handler: python

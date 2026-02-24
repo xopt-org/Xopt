@@ -9,7 +9,17 @@ from concurrent.futures import Future
 from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
-from typing import Any, Callable, Generic, Iterable, List, Optional, TextIO, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    TextIO,
+    TypeVar,
+    cast,
+)
 
 import numpy as np
 import orjson
@@ -188,15 +198,21 @@ def decode_torch_module(modulestr: str):
 class XoptBaseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    @field_validator("*", mode="before")
-    def validate_files(cls, value, info: ValidationInfo):
-        if isinstance(value, str):
-            if os.path.exists(value):
-                extension = value.split(".")[-1]
-                if extension == "pt":
-                    value = torch.load(value, weights_only=False)
-
-        return value
+    @model_validator(mode="before")
+    @classmethod
+    def validate_files(cls, data: Any):
+        if not isinstance(data, dict):
+            return data
+        for key, value in data.items():
+            # Exclude field `name`` from before validator for use in discriminated fields
+            if key == "name":
+                continue
+            if isinstance(value, str):
+                if os.path.exists(value):
+                    extension = value.split(".")[-1]
+                    if extension == "pt":
+                        data[key] = torch.load(value, weights_only=False)
+        return data
 
     # Note that this function still returns a dict, NOT a string. Pydantic will handle
     # final serialization of basic types in Rust.
@@ -236,11 +252,13 @@ class XoptBaseModel(BaseModel):
         return cls.model_validate(remove_none_values(config))
 
 
-def remove_none_values(d):
+def remove_none_values(d: Any) -> Any:
     if isinstance(d, dict):
+        d = cast(dict[str, Any], d)
         # Create a copy of the dictionary to avoid modifying the original while iterating
         d = {k: remove_none_values(v) for k, v in d.items() if v is not None}
     elif isinstance(d, list):
+        d = cast(list[Any], d)
         # If it's a list, recursively process each item in the list
         d = [remove_none_values(item) for item in d]
     return d
@@ -249,7 +267,7 @@ def remove_none_values(d):
 def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
-    description_dict = {}
+    description_dict: dict[str, Any] = {}
     for name, val in model.model_fields.items():
         try:
             if issubclass(getattr(model, name), XoptBaseModel):
@@ -432,7 +450,7 @@ class ObjLoaderMinimal(
         return {"object_type": obj_type}
 
     @model_validator(mode="after")
-    def validate_print(cls, values):
+    def validate_print(self, values):
         print("model validator after: ", values)
         return values
 
