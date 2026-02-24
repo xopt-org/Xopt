@@ -1,6 +1,6 @@
 from contextlib import nullcontext
 from copy import deepcopy
-from typing import Any, List, cast
+from typing import Any, List, Union, cast
 
 import gpytorch
 import numpy as np
@@ -18,7 +18,7 @@ from xopt.vocs import VOCS
 
 
 def get_training_data(
-    input_names: List[str], outcome_name: str, data: pd.DataFrame
+    input_names: List[str], outcome_names: Union[str, List[str]], data: pd.DataFrame
 ) -> (torch.Tensor, torch.Tensor):
     """
     Creates training data from input data frame.
@@ -52,8 +52,11 @@ def get_training_data(
 
     """
 
+    if type(outcome_names) is not list:
+        outcome_names = [outcome_names]
+
     input_data = data[input_names]
-    outcome_data = data[outcome_name]
+    outcome_data = data[outcome_names]
 
     # cannot use any rows where any variable values are nans
     non_nans = ~input_data.isnull().T.any()
@@ -61,18 +64,23 @@ def get_training_data(
     outcome_data = outcome_data[non_nans]
 
     train_X = torch.tensor(
-        input_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
+        input_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double").copy()
     )
     train_Y = torch.tensor(
-        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
-    ).unsqueeze(-1)
+        outcome_data[~outcome_data.isnull().T.any()].to_numpy(dtype="double").copy()
+    )
+    if train_Y.ndim < 2:
+        train_Y = train_Y.unsqueeze(-1)
 
     train_Yvar = None
-    if f"{outcome_name}_var" in data:
-        variance_data = data[f"{outcome_name}_var"][non_nans]
+    var_names = [f"{name}_var" for name in outcome_names if f"{name}_var" in data]
+    if len(var_names) > 0:
+        variance_data = data[var_names][non_nans]
         train_Yvar = torch.tensor(
-            variance_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
-        ).unsqueeze(-1)
+            variance_data[~outcome_data.isnull().T.any()]
+            .to_numpy(dtype="double")
+            .copy()
+        )
 
     return train_X, train_Y, train_Yvar
 
