@@ -164,6 +164,13 @@ class Xopt(XoptBaseModel):
                     )
                     data.pop("vocs")
 
+                # Probably shouldn't end up here, but error out if `vocs` exists and `generator` isn't
+                # a dict or a `Generator`.
+                else:
+                    raise VOCSError(
+                        "Defining VOCS in the base Xopt object is deprecated. Please define in generator object only."
+                    )
+
             # validate generator
             if isinstance(data["generator"], dict):
                 name = data["generator"].pop("name")
