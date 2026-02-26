@@ -20,7 +20,7 @@ from xopt.generators.bayesian.utils import (
     interpolate_points,
     validate_turbo_controller_base,
 )
-from xopt.resources.benchmarking import time_call
+from xopt.resources.bench_framework import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.vocs import random_inputs, VOCS
 from xopt.generators.bayesian.turbo import (

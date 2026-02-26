@@ -9,9 +9,12 @@ requires = [
 authors = [
   {name="Christopher Mayes"},
   {name="Ryan Roussel"},
+  {name="Nikita Kuklev"},
+  {name="Christopher Pierce"},
+  {name="Sara Miskovich"},
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 6 - Mature",
   "Natural Language :: English",
   "Programming Language :: Python :: 3",
   "Topic :: Scientific/Engineering",
@@ -88,9 +91,13 @@ file = "LICENSE"
 
 [tool.pytest.ini_options]
 addopts = "--cov=xopt/"
+tmp_path_retention_policy = "none"
 log_cli_level = "info"
 log_level = "debug"
 testpaths = ["xopt/tests"]
+
+[tool.coverage.run]
+data_file = "/tmp/.coverage"
 
 [tool.setuptools_scm]
 version_file = "xopt/_version.py"
