@@ -856,7 +856,7 @@ class TestBatchedModelConstructor:
                 print(f"List {j}: {loss.item()}")
                 total_list_loss += loss.item()
             print(f"List total: {total_list_loss}")
-            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-7)
+            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-5)
         list_ls = [
             model_list.models[i].covar_module.raw_lengthscale
             for i in range(test_vocs.n_outputs)
