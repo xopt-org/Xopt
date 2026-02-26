@@ -557,16 +557,6 @@ class TestXopt:
 
         assert X.generator is not X2.generator
 
-    def test_vocs_error(self):
-        evaluator = Evaluator(function=xtest_callable)
-
-        with pytest.raises(ValueError):
-            Xopt(
-                generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
-                evaluator=evaluator,
-                vocs=TEST_VOCS_BASE,
-            )
-
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
         yield

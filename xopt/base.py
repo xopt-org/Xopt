@@ -138,23 +138,31 @@ class Xopt(XoptBaseModel):
         if isinstance(data, dict):
             # Handle Xopt 2.x style VOCS definition
             if "vocs" in data.keys():
-                if isinstance(data["generator"], dict):
-                    if "vocs" in data["generator"]:
+                generator = data["generator"]
+
+                # Move 2.x VOCS definition into generator dict definition if able
+                if isinstance(generator, dict):
+                    if "vocs" in generator:
                         raise VOCSError(
                             "Duplicate VOCS definitions. Please only define under `generator`."
                         )
                     else:
-                        # Copy the vocs definition into generator for validation
                         warnings.warn(
                             "Defining VOCS in the base Xopt object is deprecated and support will be removed from Xopt in an upcoming release. Please define it in the generator object instead.",
                             DeprecationWarning,
                             stacklevel=2,
                         )
-                        data["generator"]["vocs"] = data.pop("vocs")
-                else:  # Generator is not a dict
-                    raise ValueError(
-                        "Defining VOCS in the base Xopt object is deprecated. Please pass to the generator object instead."
+                        generator["vocs"] = data.pop("vocs")
+
+                # Drop VOCS definition in base if user is creating object via 2.x python API. Note: this replicates the behavior
+                # from Xopt 2.x where the VOCS object in `generator` is the one which takes precedence.
+                elif isinstance(generator, Generator):
+                    warnings.warn(
+                        "Defining VOCS in the base Xopt object is deprecated and support will be removed from Xopt in an upcoming release. Please remove the definition from `Xopt` and pass to generator object only.",
+                        DeprecationWarning,
+                        stacklevel=2,
                     )
+                    data.pop("vocs")
 
             # validate generator
             if isinstance(data["generator"], dict):
