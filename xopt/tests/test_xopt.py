@@ -97,19 +97,10 @@ class TestXopt:
                 "x2": ContinuousVariable(domain=[0, 3.14159]),
             }
 
-    def test_legcay_vocs_yaml(self):
+    def test_legacy_vocs_yaml(self):
         """
         Confirm that Xopt loads with V2.x location of VOCS
         """
-
-        # init with generator and evaluator
-        def dummy(x):
-            pass
-
-        evaluator = Evaluator(function=dummy)
-        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        Xopt(generator=gen, evaluator=evaluator)
-
         # init with yaml
         YAML = """
         dump_file: null
@@ -142,19 +133,10 @@ class TestXopt:
             "x2": ContinuousVariable(domain=[0, 3.14159]),
         }
 
-    def test_legcay_vocs_duplicate_yaml(self):
+    def test_legacy_vocs_duplicate_yaml(self):
         """
         Confirm that we error out if user supplies multiple vocs in old + new location
         """
-
-        # init with generator and evaluator
-        def dummy(x):
-            pass
-
-        evaluator = Evaluator(function=dummy)
-        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        Xopt(generator=gen, evaluator=evaluator)
-
         # init with yaml
         YAML = """
         dump_file: null
