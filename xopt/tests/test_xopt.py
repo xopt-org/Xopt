@@ -97,7 +97,7 @@ class TestXopt:
                 "x2": ContinuousVariable(domain=[0, 3.14159]),
             }
 
-    def test_legcay_vocs_init(self):
+    def test_legcay_vocs_yaml(self):
         """
         Confirm that Xopt loads with V2.x location of VOCS
         """
@@ -130,19 +130,19 @@ class TestXopt:
         generator:
             name: random
         """
-        X = Xopt.from_yaml(YAML)
-        assert X.vocs.variables == {
+        xx = Xopt.from_yaml(YAML)
+        assert xx.vocs.variables == {
             "x1": ContinuousVariable(domain=[0, 3.14159]),
             "x2": ContinuousVariable(domain=[0, 3.14159]),
         }
 
-        X = Xopt(YAML)
-        assert X.vocs.variables == {
+        xx = Xopt(YAML)
+        assert xx.vocs.variables == {
             "x1": ContinuousVariable(domain=[0, 3.14159]),
             "x2": ContinuousVariable(domain=[0, 3.14159]),
         }
 
-    def test_legcay_vocs_duplicate_init(self):
+    def test_legcay_vocs_duplicate_yaml(self):
         """
         Confirm that we error out if user supplies multiple vocs in old + new location
         """
@@ -188,6 +188,21 @@ class TestXopt:
             Xopt.from_yaml(YAML)
         with pytest.raises(VOCSError):
             Xopt(YAML)
+
+    def test_legacy_vocs_python(self):
+        """
+        Confirm we can instantiate Xopt with 2.x VOCS definition (ie in both generator and base).
+        """
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xx = Xopt(
+            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+        )
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 1.0]),
+            "x2": ContinuousVariable(domain=[0, 10.0]),
+        }
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)
