@@ -99,7 +99,7 @@ class TestXopt:
 
     def test_legcay_vocs_init(self):
         """
-        Confirm that Xopt loads with V2.x location of VOCs
+        Confirm that Xopt loads with V2.x location of VOCS
         """
 
         # init with generator and evaluator

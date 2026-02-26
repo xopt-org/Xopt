@@ -136,7 +136,7 @@ class Xopt(XoptBaseModel):
         Validate the Xopt model by checking the generator and evaluator.
         """
         if isinstance(data, dict):
-            # Handle Xopt 2.x style VOCs definition
+            # Handle Xopt 2.x style VOCS definition
             if "vocs" in data.keys():
                 if isinstance(data["generator"], dict):
                     if "vocs" in data["generator"]:
@@ -497,7 +497,7 @@ class Xopt(XoptBaseModel):
         custom_bounds: dict = None,
     ):
         """
-        Convenience method to generate random inputs using VOCs and evaluate them.
+        Convenience method to generate random inputs using VOCS and evaluate them.
 
         This method generates random inputs using the Variables, Objectives,
         Constraints, and Statics (VOCS) and evaluates them, adding the data to the
