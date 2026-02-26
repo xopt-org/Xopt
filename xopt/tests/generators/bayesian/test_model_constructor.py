@@ -26,6 +26,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import (
+    AdamNumericalOptimizerConfig,
     BatchedModelConstructor,
     LBFGSNumericalOptimizerConfig,
     StandardModelConstructor,
@@ -107,6 +108,60 @@ class TestModelConstructor:
             assert called
         finally:
             st.fit_gpytorch_mll_torch = original
+
+    def test_train_kwargs_valid(self):
+        """Test that valid train_kwargs are accepted."""
+        constructor = StandardModelConstructor(
+            train_kwargs={"max_attempts": 5, "pick_best_of_all_attempts": True}
+        )
+        assert constructor.train_kwargs == {
+            "max_attempts": 5,
+            "pick_best_of_all_attempts": True,
+        }
+
+    def test_train_kwargs_invalid_keys(self):
+        """Test that invalid keys in train_kwargs raise ValidationError."""
+        with pytest.raises(ValidationError, match="train_kwargs can only contain"):
+            StandardModelConstructor(train_kwargs={"bad_key": 1})
+
+    def test_train_kwargs_none(self):
+        """Test that explicitly passing train_kwargs=None is accepted."""
+        constructor = StandardModelConstructor(train_kwargs=None)
+        assert constructor.train_kwargs is None
+
+    def test_train_config_wrong_type_for_adam(self):
+        """Test that passing LBFGS config with adam method raises ValidationError."""
+        with pytest.raises(
+            ValidationError, match="AdamOptimizerConfig when method is 'adam'"
+        ):
+            StandardModelConstructor(
+                train_method="adam",
+                train_config=LBFGSNumericalOptimizerConfig(),
+            )
+
+    def test_train_config_wrong_type_for_lbfgs(self):
+        """Test that passing Adam config with lbfgs method raises ValidationError."""
+        with pytest.raises(
+            ValidationError, match="LBFGSOptimizerConfig when method is 'lbfgs'"
+        ):
+            StandardModelConstructor(
+                train_method="lbfgs",
+                train_config=AdamNumericalOptimizerConfig(),
+            )
+
+    def test_train_config_correct_types(self):
+        """Test that matching config types are accepted."""
+        c1 = StandardModelConstructor(
+            train_method="adam",
+            train_config=AdamNumericalOptimizerConfig(),
+        )
+        assert isinstance(c1.train_config, AdamNumericalOptimizerConfig)
+
+        c2 = StandardModelConstructor(
+            train_method="lbfgs",
+            train_config=LBFGSNumericalOptimizerConfig(),
+        )
+        assert isinstance(c2.train_config, LBFGSNumericalOptimizerConfig)
 
     def test_transform_inputs(self):
         test_data = deepcopy(TEST_DATA)
