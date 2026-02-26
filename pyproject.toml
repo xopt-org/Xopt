@@ -9,9 +9,12 @@ requires = [
 authors = [
   {name="Christopher Mayes"},
   {name="Ryan Roussel"},
+  {name="Nikita Kuklev"},
+  {name="Christopher Pierce"},
+  {name="Sara Miskovich"},
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 6 - Mature",
   "Natural Language :: English",
   "Programming Language :: Python :: 3",
   "Topic :: Scientific/Engineering",

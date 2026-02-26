@@ -10,6 +10,7 @@ import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
+from botorch.models.utils import multioutput_to_batch_mode_transform
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
 from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
@@ -75,6 +76,65 @@ def get_training_data(
             variance_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
         ).unsqueeze(-1)
 
+    return train_X, train_Y, train_Yvar
+
+
+def get_training_data_batched(
+    input_names: List[str],
+    outcome_names: List[str],
+    data: pd.DataFrame,
+    batch_mode: bool = False,
+) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    """
+    Get data for multiple outcomes. Valid points have no NaNs for all inputs and outcomes.
+
+    Parameters
+    ----------
+    batch_mode: bool
+        If false, not unrolled - will be done by SingleTaskGP. If true, unrolls the data
+        so that each outcome is treated as a separate task in a batch mode model.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        train_X `n x d` or `m x n x d`
+        train_Y `n x m` or `m x n x 1`
+        train_Yvar `n x m` or `m x n x 1`
+    """
+    input_data = data[input_names]
+    outcome_data = data[outcome_names]
+
+    non_nans_input = ~input_data.isnull().T.any()
+    non_nans_output = ~outcome_data.isnull().T.any()
+    non_nans_all = non_nans_input & non_nans_output
+    input_data = input_data[non_nans_all]
+    outcome_data = outcome_data[non_nans_all]
+
+    train_X = torch.tensor(input_data.to_numpy(dtype="double"))
+
+    train_Y = torch.tensor(outcome_data[outcome_names].to_numpy(dtype="double"))
+
+    train_Yvar = None
+    yvar_names = [f"{outcome}_var" for outcome in outcome_names]
+    have_yvar = [x in data for x in yvar_names]
+    if all(have_yvar):
+        train_Yvar = torch.tensor(
+            data.loc[non_nans_all, yvar_names].to_numpy(dtype="double")
+        )
+    elif not any(have_yvar):
+        # no var
+        pass
+    else:
+        # partial - not allowed
+        raise ValueError("either all or none of the outcomes must have variance data")
+
+    if batch_mode:
+        train_X, train_Y, train_Yvar = multioutput_to_batch_mode_transform(
+            train_X, train_Y, len(outcome_names), train_Yvar
+        )
+        train_Y = train_Y.unsqueeze(-1)
+        if train_Yvar is not None:
+            train_Yvar = train_Yvar.unsqueeze(-1)
     return train_X, train_Y, train_Yvar
 
 

@@ -13,6 +13,10 @@ from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
+import torch
+
+# set default precision
+torch.set_default_dtype(torch.double)
 
 from xopt.generators.bayesian.turbo import (
     TurboController,
