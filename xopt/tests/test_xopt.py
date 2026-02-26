@@ -121,13 +121,21 @@ class TestXopt:
         generator:
             name: random
         """
-        xx = Xopt.from_yaml(YAML)
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt.from_yaml(YAML)
         assert xx.vocs.variables == {
             "x1": ContinuousVariable(domain=[0, 3.14159]),
             "x2": ContinuousVariable(domain=[0, 3.14159]),
         }
 
-        xx = Xopt(YAML)
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt(YAML)
         assert xx.vocs.variables == {
             "x1": ContinuousVariable(domain=[0, 3.14159]),
             "x2": ContinuousVariable(domain=[0, 3.14159]),
@@ -178,9 +186,13 @@ class TestXopt:
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
-        xx = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
-        )
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt(
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            )
         assert xx.vocs.variables == {
             "x1": ContinuousVariable(domain=[0, 1.0]),
             "x2": ContinuousVariable(domain=[0, 10.0]),
