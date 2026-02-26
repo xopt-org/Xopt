@@ -13,7 +13,7 @@ from gest_api.vocs import ContinuousVariable
 
 from xopt import from_file
 from xopt.base import Xopt
-from xopt.errors import XoptError
+from xopt.errors import XoptError, VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators import try_load_all_generators
@@ -96,6 +96,98 @@ class TestXopt:
                 "x1": ContinuousVariable(domain=[0, 3.14159]),
                 "x2": ContinuousVariable(domain=[0, 3.14159]),
             }
+
+    def test_legcay_vocs_init(self):
+        """
+        Confirm that Xopt loads with V2.x location of VOCs
+        """
+
+        # init with generator and evaluator
+        def dummy(x):
+            pass
+
+        evaluator = Evaluator(function=dummy)
+        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+        Xopt(generator=gen, evaluator=evaluator)
+
+        # init with yaml
+        YAML = """
+        dump_file: null
+        data: null
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: 0}
+        generator:
+            name: random
+        """
+        X = Xopt.from_yaml(YAML)
+        assert X.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
+
+        X = Xopt(YAML)
+        assert X.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
+
+    def test_legcay_vocs_duplicate_init(self):
+        """
+        Confirm that we error out if user supplies multiple vocs in old + new location
+        """
+
+        # init with generator and evaluator
+        def dummy(x):
+            pass
+
+        evaluator = Evaluator(function=dummy)
+        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+        Xopt(generator=gen, evaluator=evaluator)
+
+        # init with yaml
+        YAML = """
+        dump_file: null
+        data: null
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: 0}
+        generator:
+            name: random
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: 0}
+        """
+        with pytest.raises(VOCSError):
+            Xopt.from_yaml(YAML)
+        with pytest.raises(VOCSError):
+            Xopt(YAML)
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)
