@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union
 import warnings
 
+from botorch.exceptions import ModelFittingError
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_mll
@@ -190,15 +191,24 @@ class ModelConstructor(XoptBaseModel, ABC):
             "Heteroskedastic modeling has been removed from botorch due "
             "to numerical stability issues. A copy of the implementation "
             "is included in Xopt, however it may be unstable / buggy. "
-            "Your results may vary."
+            "Your results may vary and keep an eye on warnings."
         )
-
-        warnings.filterwarnings("ignore")
 
         if X.shape[0] == 0 or Y.shape[0] == 0 or Yvar.shape[0] == 0:
             raise ValueError("no data found to train model!")
-        model = XoptHeteroskedasticSingleTaskGP(X, Y, Yvar, **kwargs)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            model = XoptHeteroskedasticSingleTaskGP(X, Y, Yvar, **kwargs)
+
         if train:
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            fit_gpytorch_mll(mll)
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore")
+                    mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                    fit_gpytorch_mll(mll)
+            except ModelFittingError:
+                warnings.warn(
+                    "Model fitting failed for heteroskedastic GP. Returning untrained model."
+                )
         return model
