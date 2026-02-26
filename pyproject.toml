@@ -92,12 +92,12 @@ file = "LICENSE"
 [tool.pytest.ini_options]
 addopts = "--cov=xopt/"
 tmp_path_retention_policy = "none"
-
-[tool.coverage.run]
-data_file = "/tmp/.coverage"
 log_cli_level = "info"
 log_level = "debug"
 testpaths = ["xopt/tests"]
+
+[tool.coverage.run]
+data_file = "/tmp/.coverage"
 
 [tool.setuptools_scm]
 version_file = "xopt/_version.py"

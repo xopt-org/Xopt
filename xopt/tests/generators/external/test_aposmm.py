@@ -1,3 +1,4 @@
+import numpy as np
 from libensemble.gen_classes.aposmm import APOSMM
 from xopt import Xopt
 from xopt import Evaluator
@@ -96,7 +97,16 @@ class TestXoptPlusAPOSMM:
             evaluator=evaluator,
             stopping_condition=max_evaluations,
         )
-        x.random_evaluate(40)
+        # Generate proper x/x_on_cube pairs (cube = normalized to [0,1])
+        rng = np.random.default_rng(seed=42)
+        n = 40
+        x0 = rng.uniform(-2.0, 2.0, n)
+        x1 = rng.uniform(-1.0, 1.0, n)
+        x0_on_cube = (x0 - (-2.0)) / (2.0 - (-2.0))
+        x1_on_cube = (x1 - (-1.0)) / (1.0 - (-1.0))
+        x.evaluate_data(
+            {"x0": x0, "x1": x1, "x0_on_cube": x0_on_cube, "x1_on_cube": x1_on_cube}
+        )
         x.step()
         x.generator.finalize()
         assert x.data.shape[0] == 41
