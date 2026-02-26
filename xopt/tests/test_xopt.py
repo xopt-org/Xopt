@@ -13,7 +13,7 @@ from gest_api.vocs import ContinuousVariable
 
 from xopt import from_file
 from xopt.base import Xopt
-from xopt.errors import XoptError
+from xopt.errors import XoptError, VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators import try_load_all_generators
@@ -96,6 +96,122 @@ class TestXopt:
                 "x1": ContinuousVariable(domain=[0, 3.14159]),
                 "x2": ContinuousVariable(domain=[0, 3.14159]),
             }
+
+    def test_legacy_vocs_yaml(self):
+        """
+        Confirm that Xopt loads with V2.x location of VOCS
+        """
+        # init with yaml
+        YAML = """
+        dump_file: null
+        data: null
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: 0}
+        generator:
+            name: random
+        """
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt.from_yaml(YAML)
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt(YAML)
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
+
+    def test_legacy_vocs_duplicate_yaml(self):
+        """
+        Confirm that we error out if user supplies multiple vocs in old + new location
+        """
+        # init with yaml
+        YAML = """
+        dump_file: null
+        data: null
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: 0}
+        generator:
+            name: random
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: 0}
+        """
+        with pytest.raises(VOCSError):
+            Xopt.from_yaml(YAML)
+        with pytest.raises(VOCSError):
+            Xopt(YAML)
+
+    def test_legacy_vocs_bad_generator_type(self):
+        """
+        Confirm that we error out if vocs is supplied at the base level but generator
+        is neither a dict nor a Generator instance.
+        """
+        evaluator = Evaluator(function=xtest_callable)
+        vocs = deepcopy(TEST_VOCS_BASE)
+
+        with pytest.raises(VOCSError):
+            Xopt(
+                generator="not_a_generator",
+                evaluator=evaluator,
+                vocs=vocs,
+            )
+
+    def test_legacy_vocs_python(self):
+        """
+        Confirm we can instantiate Xopt with 2.x VOCS definition (ie in both generator and base).
+        """
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt(
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            )
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 1.0]),
+            "x2": ContinuousVariable(domain=[0, 10.0]),
+        }
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -449,16 +565,6 @@ class TestXopt:
         )
 
         assert X.generator is not X2.generator
-
-    def test_vocs_error(self):
-        evaluator = Evaluator(function=xtest_callable)
-
-        with pytest.raises(ValueError):
-            Xopt(
-                generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
-                evaluator=evaluator,
-                vocs=TEST_VOCS_BASE,
-            )
 
     @pytest.fixture(scope="module", autouse=True)
     def clean_up(self):
