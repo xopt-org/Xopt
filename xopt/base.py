@@ -16,6 +16,7 @@ from pydantic import (
 )
 import warnings
 
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
@@ -130,11 +131,31 @@ class Xopt(XoptBaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_model(cls, data: Any):
+    def validate_generator_and_legacy_vocs(cls, data: Any):
         """
         Validate the Xopt model by checking the generator and evaluator.
         """
         if isinstance(data, dict):
+            # Handle Xopt 2.x style VOCs definition
+            if "vocs" in data.keys():
+                if isinstance(data["generator"], dict):
+                    if "vocs" in data["generator"]:
+                        raise VOCSError(
+                            "Duplicate VOCS definitions. Please only define under `generator`."
+                        )
+                    else:
+                        # Copy the vocs definition into generator for validation
+                        warnings.warn(
+                            "Defining VOCS in the base Xopt object is deprecated and support will be removed from Xopt in an upcoming release. Please define it in the generator object instead.",
+                            DeprecationWarning,
+                            stacklevel=2,
+                        )
+                        data["generator"]["vocs"] = data.pop("vocs")
+                else:  # Generator is not a dict
+                    raise ValueError(
+                        "Defining VOCS in the base Xopt object is deprecated. Please pass to the generator object instead."
+                    )
+
             # validate generator
             if isinstance(data["generator"], dict):
                 name = data["generator"].pop("name")
@@ -143,12 +164,6 @@ class Xopt(XoptBaseModel):
 
             # make a copy of the generator / vocs objects to avoid modifying the original
             data["generator"] = deepcopy(data["generator"])
-
-            # raise a more verbose vocs error for Xopt 3.0
-            if "vocs" in data.keys():
-                raise ValueError(
-                    "As of Xopt 3.0, VOCS is no longer passed to the Xopt object, it is only specified in the generator."
-                )
 
         return data
 
