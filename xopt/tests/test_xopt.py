@@ -179,6 +179,21 @@ class TestXopt:
         with pytest.raises(VOCSError):
             Xopt(YAML)
 
+    def test_legacy_vocs_bad_generator_type(self):
+        """
+        Confirm that we error out if vocs is supplied at the base level but generator
+        is neither a dict nor a Generator instance.
+        """
+        evaluator = Evaluator(function=xtest_callable)
+        vocs = deepcopy(TEST_VOCS_BASE)
+
+        with pytest.raises(VOCSError):
+            Xopt(
+                generator="not_a_generator",
+                evaluator=evaluator,
+                vocs=vocs,
+            )
+
     def test_legacy_vocs_python(self):
         """
         Confirm we can instantiate Xopt with 2.x VOCS definition (ie in both generator and base).
