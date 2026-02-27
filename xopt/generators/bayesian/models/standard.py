@@ -4,6 +4,7 @@ from copy import deepcopy
 from functools import partial
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 
+from botorch.exceptions import ModelFittingError
 import botorch.settings
 import pandas as pd
 import torch
@@ -421,7 +422,10 @@ class StandardModelConstructor(ModelConstructor):
                 tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
                 optimizer = fit_gpytorch_mll_scipy
 
-            fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+            try:
+                fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+            except ModelFittingError:
+                warnings.warn("Model fitting failed. Returning untrained model.")
         return model
 
     def build_mean_module(
