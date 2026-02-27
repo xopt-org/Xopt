@@ -9,6 +9,7 @@ import pytest
 import torch
 import yaml
 from botorch import fit_gpytorch_mll
+from botorch.exceptions import ModelFittingError
 from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
@@ -162,6 +163,47 @@ class TestModelConstructor:
             train_config=LBFGSNumericalOptimizerConfig(),
         )
         assert isinstance(c2.train_config, LBFGSNumericalOptimizerConfig)
+
+    def test_fit_gpytorch_mll_failure(self):
+        """Test that ModelFittingError is handled gracefully in _train_model."""
+        import warnings
+        from unittest.mock import patch
+
+        test_data = deepcopy(TEST_DATA)
+        test_vocs = deepcopy(TEST_VOCS)
+        # Set train_model=False to build model without training
+        constructor = StandardModelConstructor(train_model=False)
+
+        # Build a model without training
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
+
+        # Mock fit_gpytorch_mll to raise ModelFittingError
+        with patch(
+            "xopt.generators.bayesian.models.standard.fit_gpytorch_mll"
+        ) as mock_fit:
+            mock_fit.side_effect = ModelFittingError("Mock fitting error")
+
+            # Capture warnings
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+
+                # Call _train_model which should handle the exception gracefully
+                trained_model = constructor._train_model(model)
+
+                # Verify warnings were issued (one for each output: y1 and c1)
+                assert len(w) == 2
+                assert all(
+                    "Model fitting failed" in str(warning.message) for warning in w
+                )
+                assert all(
+                    "Returning untrained model" in str(warning.message) for warning in w
+                )
+
+                # Verify model is returned (even though training failed)
+                assert trained_model is not None
+                assert trained_model == model
 
     def test_transform_inputs(self):
         test_data = deepcopy(TEST_DATA)
