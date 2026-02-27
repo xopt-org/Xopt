@@ -194,8 +194,12 @@ class TestModelConstructor:
 
                 # Verify warnings were issued (one for each output: y1 and c1)
                 assert len(w) == 2
-                assert all("Model fitting failed" in str(warning.message) for warning in w)
-                assert all("Returning untrained model" in str(warning.message) for warning in w)
+                assert all(
+                    "Model fitting failed" in str(warning.message) for warning in w
+                )
+                assert all(
+                    "Returning untrained model" in str(warning.message) for warning in w
+                )
 
                 # Verify model is returned (even though training failed)
                 assert trained_model is not None
