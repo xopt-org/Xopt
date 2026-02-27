@@ -13,9 +13,9 @@ Xopt
 |----------------------------------------------------------------------------------------------------------------------------------|
 | [![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://xopt-org.github.io/Xopt/index.html) |
 
-| Name | Downloads | Version | Platforms |
-| --- | --- | --- | --- |
-| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) |
+| Name | Downloads | Version | Platforms | Codecov |
+| --- | --- | --- | --- | -- |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![codecov](https://codecov.io/gh/xopt-org/Xopt/graph/badge.svg?token=GCBUQSFBFD)](https://codecov.io/gh/xopt-org/Xopt) |
 
 
 
@@ -65,6 +65,11 @@ Xopt does **not** provide:
 
 Installing Xopt
 ===============
+`xopt` can be installed using pip
+
+```shell
+pip install xopt
+```
 
 Installing `xopt` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
 
