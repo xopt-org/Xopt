@@ -94,6 +94,8 @@ def recursive_serialize(
             v[key] = str(v[key])
         elif isinstance(v[key], pd.DataFrame):
             v[key] = json.loads(v[key].to_json())
+        elif isinstance(v[key], set):
+            v[key] = list(v[key])
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(v[key], _type):
@@ -260,7 +262,7 @@ def remove_none_values(d: Any) -> Any:
     elif isinstance(d, list):
         d = cast(list[Any], d)
         # If it's a list, recursively process each item in the list
-        d = [remove_none_values(item) for item in d]
+        d = [remove_none_values(item) for item in d if item is not None]
     return d
 
 
@@ -269,18 +271,16 @@ def get_descriptions_defaults(model: XoptBaseModel):
 
     description_dict: dict[str, Any] = {}
     for name, val in model.model_fields.items():
-        try:
-            if issubclass(getattr(model, name), XoptBaseModel):
-                description_dict[name] = get_descriptions_defaults(getattr(model, name))
-            else:
-                description_dict[name] = [
-                    val.description,
-                    val.default,
-                ]
-
-        except TypeError:
-            # if the val is an object or callable type
-            description_dict[name] = val.description
+        value = getattr(model, name)
+        # Check if the value is a subclass of XoptBaseModel
+        if isinstance(value, XoptBaseModel):
+            description_dict[name] = get_descriptions_defaults(value)
+        else:
+            try:
+                description_dict[name] = [val.description, val.default]
+            except TypeError:
+                # if the val is an object or callable type
+                description_dict[name] = val.description
 
     return description_dict
 
@@ -423,7 +423,7 @@ class ObjLoader(
     def load(self, store: bool = False):
         # store object reference on loader
         if store:
-            self.object = self.loader.call()
+            self.object = self.loader()
             return self.object
 
         # return loaded object w/o storing
@@ -456,7 +456,6 @@ class ObjLoaderMinimal(
 
     @field_serializer("object_type", when_used="json")
     def serialize_object_type(self, x):
-        print("object_type serializer", x)
         if x is None:
             return x
         return f"{x.__module__}.{x.__name__}"
@@ -549,8 +548,10 @@ class BaseExecutor(
         # Compose loader utility
         if values.get("loader") is not None:
             loader_values = values.get("loader")
-            loader = ObjLoader[executor_type](**loader_values)
-
+            if isinstance(loader_values, ObjLoader):
+                loader = loader_values
+            else:
+                loader = ObjLoader[executor_type](**loader_values)
         else:
             # maintain reference to original object
             loader_values = copy.copy(values)
@@ -558,7 +559,6 @@ class BaseExecutor(
             # if executor in values, need to remove
             if "executor" in loader_values:
                 loader_values.pop("executor")
-
             loader = ObjLoader[executor_type](**loader_values)
 
         # update encoders
@@ -724,7 +724,7 @@ class SignatureModel(BaseModel):
         n_pos_only = len(stored_args)
         positional_kwargs = []
         if len(args) < n_pos_only:
-            stored_args[:n_pos_only] = args
+            stored_args[: len(args)] = args
 
         else:
             stored_args = args[:n_pos_only]

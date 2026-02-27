@@ -314,7 +314,7 @@ class StandardModelConstructor(ModelConstructor):
         mean_modules = deepcopy(self.mean_modules)
         for outcome_name in outcome_names:
             input_transform = self._get_input_transform(
-                outcome_name, input_names, input_bounds
+                outcome_name, input_names, input_bounds, tkwargs
             )
             outcome_transform = Standardize(1)
             covar_module = self._get_module(covar_modules, outcome_name)
@@ -480,17 +480,28 @@ class StandardModelConstructor(ModelConstructor):
         else:
             return None
 
-    def _get_input_transform(self, outcome_name, input_names, input_bounds):
-        """get input transform based on the supplied bounds and attributes"""
+    def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
+        """
+        Get input transform based on the supplied bounds and attributes
+
+        Parameters
+        ----------
+        outcome_name : str
+            The name of the outcome variable.
+        input_names : list[str]
+            The names of the input variables.
+        input_bounds : dict[str, tuple[float, float]]
+            The bounds for the input variables.
+        tkwargs : dict
+            Additional keyword arguments for tensor creation.
+
+        """
         # get input bounds
         if input_bounds is None:
             bounds = None
         else:
             bounds = torch.vstack(
-                [
-                    torch.tensor(input_bounds[name], dtype=torch.double)
-                    for name in input_names
-                ]
+                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
             ).T
 
         # create transform

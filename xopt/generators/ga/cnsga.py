@@ -12,7 +12,14 @@ import xopt.utils
 from xopt.generator import Generator
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
-from xopt.vocs import VOCS
+from xopt.vocs import (
+    VOCS,
+    convert_dataframe_to_inputs,
+    get_constraint_data,
+    get_objective_data,
+    get_variable_data,
+    random_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +121,7 @@ class CNSGAGenerator(Generator):
         if self.population is None:
             # Special case when pop is loaded from file
             if self._loaded_population is None:
-                return self.vocs.random_inputs(self.n_pop, include_constants=False)
+                return random_inputs(self.vocs, self.n_pop, include_constants=False)
             else:
                 pop = self._loaded_population
         else:
@@ -228,8 +235,8 @@ class CNSGAGenerator(Generator):
         pop = pd.read_csv(filename, index_col="xopt_index")
         self._loaded_population = pop
         # This is a list of dicts
-        self._children = self.vocs.convert_dataframe_to_inputs(
-            pop[self.vocs.variable_names], include_constants=False
+        self._children = convert_dataframe_to_inputs(
+            self.vocs, pop[self.vocs.variable_names], include_constants=False
         ).to_dict(orient="records")
         logger.info(f"Loaded population of len {len(pop)} from file: {filename}")
 
@@ -300,7 +307,7 @@ def cnsga_toolbox(vocs: VOCS, selection: str = "auto") -> deap_base.Toolbox:
     var_labels = vocs.variable_names
     obj_labels = vocs.objective_names
 
-    bound_low, bound_up = vocs.bounds
+    bound_low, bound_up = list(map(list, zip(*vocs.bounds)))  # transpose list of bounds
     # DEAP does not like arrays, needs tuples.
     bound_low = tuple(bound_low)
     bound_up = tuple(bound_up)
@@ -407,9 +414,9 @@ def pop_from_data(data: pd.DataFrame, vocs: VOCS) -> List:
     List[deap_creator.Individual]
         A list of DEAP individuals.
     """
-    v = vocs.variable_data(data).to_numpy()
-    o = vocs.objective_data(data).to_numpy()
-    c = vocs.constraint_data(data).to_numpy()
+    v = get_variable_data(vocs, data).to_numpy()
+    o = get_objective_data(vocs, data).to_numpy()
+    c = get_constraint_data(vocs, data).to_numpy()
 
     pop = list(map(deap_creator.Individual, v))
     for i, ind in enumerate(pop):
@@ -487,7 +494,7 @@ def cnsga_variation(
     ----
     https://deap.readthedocs.io/en/master/api/algo.html#deap.algorithms.varAnd
     """
-    v = vocs.variable_data(data).to_numpy()
+    v = get_variable_data(vocs, data).to_numpy()
     pop = list(map(deap_creator.Individual, v))
 
     children = deap_algorithms.varAnd(
@@ -495,6 +502,6 @@ def cnsga_variation(
     )
     vecs = [[float(x) for x in child] for child in children]
 
-    return vocs.convert_dataframe_to_inputs(
-        pd.DataFrame(vecs, columns=vocs.variable_names), include_constants=False
+    return convert_dataframe_to_inputs(
+        vocs, pd.DataFrame(vecs, columns=vocs.variable_names), include_constants=False
     )

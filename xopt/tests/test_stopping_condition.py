@@ -13,7 +13,7 @@ from xopt import (
     Evaluator,
     Xopt,
 )
-from xopt.generators.scipy import LatinHypercubeGenerator
+from xopt.generators.sequential.neldermead import NelderMeadGenerator
 from xopt.stopping_conditions import (
     CompositeCondition,
     ConvergenceCondition,
@@ -267,15 +267,14 @@ class TestStoppingConditionIntegration:
     )
     def test_conditions_in_xopt(self, simple_vocs, evaluator, condition):
         """Test each stopping condition individually."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             stopping_condition=condition,
         )
-
+        X.random_evaluate(1)
         X.run()
 
         # Basic assertions depending on condition type
@@ -289,10 +288,9 @@ class TestStoppingConditionIntegration:
 
     def test_no_stopping_condition_raises_error(self, simple_vocs, evaluator):
         """Test that run() without stopping condition raises ValueError."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             # No stopping_condition
@@ -471,11 +469,10 @@ class TestStoppingConditionIntegration:
         self, simple_vocs, evaluator
     ):
         """Test backward compatibility: max_evaluations creates MaxEvaluationsCondition."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         # Initialize Xopt with old max_evaluations parameter
         X = Xopt(
-            vocs=simple_vocs,
             evaluator=evaluator,
             generator=generator,
             max_evaluations=5,
@@ -491,14 +488,15 @@ class TestStoppingConditionIntegration:
     ):
         """Test backward compatibility: max_evaluations from YAML creates MaxEvaluationsCondition."""
         yaml_config = """
-vocs:
-    variables:
-        x1: [0.0, 1.0]
-        x2: [0.0, 1.0]
-    objectives:
-        f1: MINIMIZE
+
 generator:
     name: latin_hypercube
+    vocs:
+        variables:
+            x1: [0.0, 1.0]
+            x2: [0.0, 1.0]
+        objectives:
+            f1: EXPLORE
 evaluator:
     function: __test_function__
 max_evaluations: 3
@@ -517,14 +515,14 @@ max_evaluations: 3
     def test_stopping_condition_yaml_deserialization(self, simple_vocs, test_function):
         """Test that a stopping condition is correctly instantiated from YAML."""
         yaml_config = """
-vocs:
-    variables:
-        x1: [0.0, 1.0]
-        x2: [0.0, 1.0]
-    objectives:
-        f1: MINIMIZE
 generator:
     name: latin_hypercube
+    vocs:
+        variables:
+            x1: [0.0, 1.0]
+            x2: [0.0, 1.0]
+        objectives:
+            f1: EXPLORE
 evaluator:
     function: __test_function__
 stopping_condition:
@@ -557,11 +555,10 @@ stopping_condition:
         self, simple_vocs, evaluator
     ):
         """Test that specifying both max_evaluations and stopping_condition raises an error."""
-        generator = LatinHypercubeGenerator(vocs=simple_vocs)
+        generator = NelderMeadGenerator(vocs=simple_vocs)
 
         with pytest.raises(ValueError, match="Cannot specify both"):
             Xopt(
-                vocs=simple_vocs,
                 evaluator=evaluator,
                 generator=generator,
                 max_evaluations=10,

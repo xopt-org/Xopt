@@ -13,8 +13,10 @@ from botorch.models.model import Model
 from botorch.models.utils import multioutput_to_batch_mode_transform
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
+from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
+
 from xopt.generators.bayesian.turbo import TurboController
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 def get_training_data(
@@ -142,20 +144,16 @@ def set_botorch_weights(vocs: VOCS):
 
     weights = torch.zeros(len(output_names), dtype=torch.double)
 
-    if vocs.n_objectives > 0:
-        # if objectives exist this is an optimization problem
-        # set weights according to the index of the models -- corresponds to the
-        # ordering of output names
-        for objective_name in vocs.objective_names:
-            if vocs.objectives[objective_name] == "MINIMIZE":
-                weights[output_names.index(objective_name)] = -1.0
-            elif vocs.objectives[objective_name] == "MAXIMIZE":
-                weights[output_names.index(objective_name)] = 1.0
-    if vocs.n_objectives == 0:
-        # if no objectives exist this may be an exploration problem, weight each
-        # observable by 1.0
-        for observable_name in vocs.observables:
-            weights[output_names.index(observable_name)] = 1.0
+    # if objectives exist this is an optimization problem
+    # set weights according to the index of the models -- corresponds to the
+    # ordering of output names
+    for objective_name in vocs.objective_names:
+        if isinstance(vocs.objectives[objective_name], MinimizeObjective):
+            weights[output_names.index(objective_name)] = -1.0
+        elif isinstance(vocs.objectives[objective_name], MaximizeObjective):
+            weights[output_names.index(objective_name)] = 1.0
+        elif isinstance(vocs.objectives[objective_name], ExploreObjective):
+            weights[output_names.index(objective_name)] = 1.0
 
     return weights
 
@@ -311,6 +309,26 @@ def validate_turbo_controller_base(
         )
 
 
+def validate_turbo_controller_center(generator):
+    if generator.turbo_controller is not None:
+        # Check that values for center_x are within trust region bounds
+        trust_region = generator.turbo_controller.get_trust_region(generator)
+
+        center_x = generator.turbo_controller.center_x
+        if center_x is not None:
+            for key, value in center_x.items():
+                if key in generator.vocs.variable_names:
+                    idx = generator.vocs.variable_names.index(key)
+                    lower_bound = trust_region[0, idx].item()
+                    upper_bound = trust_region[1, idx].item()
+                    if not (lower_bound <= value <= upper_bound):
+                        raise ValueError(
+                            f"Turbo controller center_x value for {key} : "
+                            f"{value} is outside of trust region bounds "
+                            f"[{lower_bound}, {upper_bound}]"
+                        )
+
+
 class MeanVarModelWrapper(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -365,7 +383,7 @@ def torch_trace_gp_model(
         raise ValueError(
             "ModelListGP is not supported for JIT tracing - use individual models"
         )
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
     )
@@ -430,7 +448,7 @@ def torch_compile_gp_model(
     """
     if isinstance(model, ModelListGP):
         raise ValueError("ModelListGP is not supported - use individual models")
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
@@ -479,7 +497,7 @@ def torch_trace_acqf(
         The keyword arguments for the torch tensor.
     """
     # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
@@ -530,7 +548,7 @@ def torch_compile_acqf(
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
         if verify:
-            rand_point = vocs.random_inputs()[0]
+            rand_point = random_inputs(vocs)[0]
             rand_vec = torch.stack(
                 [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
             )

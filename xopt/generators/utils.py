@@ -109,19 +109,3 @@ def fast_dominated_argsort(
     """
     dom = get_domination(pop_f, pop_g)
     return fast_dominated_argsort_internal(dom)
-
-
-# def get_generator(name) -> Type[Generator]:
-#     if name == "random":
-#         from xopt.generators.random import RandomGenerator
-#         return RandomGenerator
-#     elif name == "upper_confidence_bound":
-#         from xopt.generators.bayesian.upper_confidence_bound import \
-#             UpperConfidenceBoundGenerator
-#         return UpperConfidenceBoundGenerator
-#     elif name == "mobo":
-#         from xopt.generators.bayesian.mobo import MOBOGenerator
-#         return MOBOGenerator
-#     else:
-#         raise ValueError(f"generator name {name} not found")
-#

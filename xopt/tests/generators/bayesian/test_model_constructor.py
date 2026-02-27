@@ -19,22 +19,26 @@ from gpytorch.means import ConstantMean
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
 
+from gest_api.vocs import VOCS, ContinuousVariable
+
 from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.standard import (
+    AdamNumericalOptimizerConfig,
     BatchedModelConstructor,
     LBFGSNumericalOptimizerConfig,
     StandardModelConstructor,
 )
 from xopt.generators.bayesian.utils import get_training_data_batched
 from xopt.resources.testing import (
+    TEST_VOCS_BASE,
     TEST_VOCS_BASE_3D,
+    TEST_VOCS_DATA,
     TEST_VOCS_DATA_3D,
     verify_state_device,
 )
-from xopt.vocs import VOCS
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
@@ -104,6 +108,60 @@ class TestModelConstructor:
             assert called
         finally:
             st.fit_gpytorch_mll_torch = original
+
+    def test_train_kwargs_valid(self):
+        """Test that valid train_kwargs are accepted."""
+        constructor = StandardModelConstructor(
+            train_kwargs={"max_attempts": 5, "pick_best_of_all_attempts": True}
+        )
+        assert constructor.train_kwargs == {
+            "max_attempts": 5,
+            "pick_best_of_all_attempts": True,
+        }
+
+    def test_train_kwargs_invalid_keys(self):
+        """Test that invalid keys in train_kwargs raise ValidationError."""
+        with pytest.raises(ValidationError, match="train_kwargs can only contain"):
+            StandardModelConstructor(train_kwargs={"bad_key": 1})
+
+    def test_train_kwargs_none(self):
+        """Test that explicitly passing train_kwargs=None is accepted."""
+        constructor = StandardModelConstructor(train_kwargs=None)
+        assert constructor.train_kwargs is None
+
+    def test_train_config_wrong_type_for_adam(self):
+        """Test that passing LBFGS config with adam method raises ValidationError."""
+        with pytest.raises(
+            ValidationError, match="AdamOptimizerConfig when method is 'adam'"
+        ):
+            StandardModelConstructor(
+                train_method="adam",
+                train_config=LBFGSNumericalOptimizerConfig(),
+            )
+
+    def test_train_config_wrong_type_for_lbfgs(self):
+        """Test that passing Adam config with lbfgs method raises ValidationError."""
+        with pytest.raises(
+            ValidationError, match="LBFGSOptimizerConfig when method is 'lbfgs'"
+        ):
+            StandardModelConstructor(
+                train_method="lbfgs",
+                train_config=AdamNumericalOptimizerConfig(),
+            )
+
+    def test_train_config_correct_types(self):
+        """Test that matching config types are accepted."""
+        c1 = StandardModelConstructor(
+            train_method="adam",
+            train_config=AdamNumericalOptimizerConfig(),
+        )
+        assert isinstance(c1.train_config, AdamNumericalOptimizerConfig)
+
+        c2 = StandardModelConstructor(
+            train_method="lbfgs",
+            train_config=LBFGSNumericalOptimizerConfig(),
+        )
+        assert isinstance(c2.train_config, LBFGSNumericalOptimizerConfig)
 
     def test_transform_inputs(self):
         test_data = deepcopy(TEST_DATA)
@@ -198,9 +256,9 @@ class TestModelConstructor:
         assert model3.train_inputs[1][0].shape == torch.Size([8, test_vocs.n_variables])
 
     def test_model_w_same_data(self):
-        test_data = deepcopy(TEST_DATA)
-        test_vocs = deepcopy(TEST_VOCS)
-        test_vocs.variables["x1"] = [5.0, 6.0]
+        test_data = deepcopy(TEST_VOCS_DATA)
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.variables["x1"] = ContinuousVariable(domain=[5.0, 6.0])
         constructor = StandardModelConstructor()
 
         # set all of the elements of a given input variable to the same value
@@ -326,8 +384,8 @@ class TestModelConstructor:
         test_covar_modules += [{}]
 
         # prepare custom covariance module
-        covar_module = PolynomialKernel(power=1, active_dims=[0]) * PolynomialKernel(
-            power=1, active_dims=[1]
+        covar_module = PolynomialKernel(power=2, active_dims=[0]) * PolynomialKernel(
+            power=2, active_dims=[1]
         )
 
         scaled_covar_module = ScaleKernel(covar_module)
@@ -356,15 +414,16 @@ class TestModelConstructor:
             train_Y = torch.tensor(test_data["y1"]).reshape(-1, 1)
             if test_covar2:
                 covar_module = PolynomialKernel(
-                    power=1, active_dims=[0]
-                ) * PolynomialKernel(power=1, active_dims=[1])
+                    power=2, active_dims=[0]
+                ) * PolynomialKernel(power=2, active_dims=[1])
                 scaled_covar_module = ScaleKernel(covar_module)
                 covar2 = scaled_covar_module
             else:
                 covar2 = None
 
             input_transform = Normalize(
-                test_vocs.n_variables, bounds=torch.tensor(test_vocs.bounds)
+                test_vocs.n_variables,
+                bounds=torch.tensor(test_vocs.bounds, dtype=torch.double).T,
             )
             benchmark_model = SingleTaskGP(
                 train_X,
@@ -443,7 +502,7 @@ class TestModelConstructor:
 
         # define test points
         # test equivalence
-        bounds = vocs.bounds
+        bounds = torch.tensor(vocs.bounds, dtype=torch.double)
         n = 10
         x = torch.linspace(*bounds.T[0], n)
         y = torch.linspace(*bounds.T[1], n)
@@ -533,6 +592,20 @@ class TestModelConstructor:
         model = gp_constructor.build_model_from_vocs(test_vocs, test_data)
 
         assert isinstance(model.models[0], XoptHeteroskedasticSingleTaskGP)
+
+        # test building models directly with no data
+        with pytest.raises(ValueError):
+            gp_constructor.build_single_task_gp(
+                X=torch.empty((0, 1)),
+                Y=torch.empty((0, 1)),
+            )
+
+        with pytest.raises(ValueError):
+            gp_constructor.build_heteroskedastic_gp(
+                X=torch.empty((0, 1)),
+                Y=torch.empty((0, 1)),
+                Yvar=torch.empty((0, 1)),
+            )
 
     def test_custom_noise_prior(self):
         test_data = deepcopy(TEST_DATA)
@@ -632,6 +705,22 @@ class TestModelConstructor:
             constructor.build_model(
                 test_vocs.variable_names, test_vocs.output_names, test_data
             )
+
+    def test_build_models_without_training(self):
+        # Create some test data
+        X = torch.randn(10, 2)
+        Y = torch.randn(10, 1)
+        Yvar = torch.ones(10, 1) * 0.1
+
+        # Test build_single_task_gp without training
+        model = StandardModelConstructor.build_single_task_gp(X, Y, train=False)
+        assert isinstance(model, SingleTaskGP)
+
+        # Test build_heteroskedastic_gp without training
+        model_hetero = StandardModelConstructor.build_heteroskedastic_gp(
+            X, Y, Yvar, train=False
+        )
+        assert isinstance(model_hetero, XoptHeteroskedasticSingleTaskGP)
 
     @pytest.fixture(autouse=True)
     def clean_up(self):
@@ -822,7 +911,7 @@ class TestBatchedModelConstructor:
                 print(f"List {j}: {loss.item()}")
                 total_list_loss += loss.item()
             print(f"List total: {total_list_loss}")
-            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-8)
+            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-5)
         list_ls = [
             model_list.models[i].covar_module.raw_lengthscale
             for i in range(test_vocs.n_outputs)

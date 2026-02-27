@@ -1,7 +1,7 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -16,17 +16,20 @@ from pydantic import (
 )
 import warnings
 
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
+from xopt.utils import explode_all_columns, get_generator_name
+from xopt.vocs import validate_input_data, random_inputs, grid_inputs
+from gest_api.vocs import VOCS
 from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
     StoppingConditionUnion,
 )
-from xopt.utils import explode_all_columns
-from xopt.vocs import VOCS
+
 
 from .errors import DataError
 
@@ -44,9 +47,6 @@ class Xopt(XoptBaseModel):
 
     Parameters
     ----------
-    vocs : VOCS
-        VOCS object for defining the problem's variables, objectives, constraints, and
-        statics.
     generator : SerializeAsAny[Generator]
         An object responsible for generating candidates for optimization.
     evaluator : SerializeAsAny[Evaluator]
@@ -78,7 +78,7 @@ class Xopt(XoptBaseModel):
     run()
         Runs the optimization process until the specified stopping criteria are met,
         such as reaching the maximum number of evaluations.
-    evaluate(input_dict: Dict)
+    evaluate(input_dict: dict)
         Evaluates a candidate without storing data.
     evaluate_data(input_data)
         Evaluates a set of candidates, adding the results to the internal DataFrame.
@@ -93,14 +93,13 @@ class Xopt(XoptBaseModel):
         Serializes the Xopt configuration to a YAML string.
     dump(file: str = None, **kwargs)
         Dumps the Xopt configuration to a specified file.
-    dict(**kwargs) -> Dict
+    dict(**kwargs) -> dict
         Provides a custom dictionary representation of the Xopt configuration.
     json(**kwargs) -> str
         Serializes the Xopt configuration to a JSON string.
     """
 
-    vocs: VOCS = Field(description="VOCS object for Xopt")
-    generator: SerializeAsAny[Generator] = Field(
+    generator: Union[SerializeAsAny[Generator], Any] = Field(
         description="generator object for Xopt"
     )
     evaluator: SerializeAsAny[Evaluator] = Field(
@@ -132,31 +131,53 @@ class Xopt(XoptBaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_model(cls, data: Any):
+    def validate_generator_and_legacy_vocs(cls, data: Any):
         """
         Validate the Xopt model by checking the generator and evaluator.
         """
         if isinstance(data, dict):
-            # validate vocs
-            if isinstance(data["vocs"], dict):
-                data["vocs"] = VOCS(**data["vocs"])
+            # Handle Xopt 2.x style VOCS definition
+            if "vocs" in data.keys():
+                generator = data["generator"]
+
+                # Move 2.x VOCS definition into generator dict definition if able
+                if isinstance(generator, dict):
+                    if "vocs" in generator:
+                        raise VOCSError(
+                            "Duplicate VOCS definitions. Please only define under `generator`."
+                        )
+                    else:
+                        warnings.warn(
+                            "Defining VOCS in the base Xopt object is deprecated and support will be removed from Xopt in an upcoming release. Please define it in the generator object instead.",
+                            DeprecationWarning,
+                            stacklevel=2,
+                        )
+                        generator["vocs"] = data.pop("vocs")
+
+                # Drop VOCS definition in base if user is creating object via 2.x python API. Note: this replicates the behavior
+                # from Xopt 2.x where the VOCS object in `generator` is the one which takes precedence.
+                elif isinstance(generator, Generator):
+                    warnings.warn(
+                        "Defining VOCS in the base Xopt object is deprecated and support will be removed from Xopt in an upcoming release. Please remove the definition from `Xopt` and pass to generator object only.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    data.pop("vocs")
+
+                # Probably shouldn't end up here, but error out if `vocs` exists and `generator` isn't
+                # a dict or a `Generator`.
+                else:
+                    raise VOCSError(
+                        "Defining VOCS in the base Xopt object is deprecated. Please define in generator object only."
+                    )
 
             # validate generator
             if isinstance(data["generator"], dict):
                 name = data["generator"].pop("name")
                 generator_class = get_generator(name)
-                data["generator"] = generator_class.model_validate(
-                    {**data["generator"], "vocs": data["vocs"]}
-                )
-            elif isinstance(data["generator"], str):
-                generator_class = get_generator(data["generator"])
-
-                data["generator"] = generator_class.model_validate(
-                    {"vocs": data["vocs"]}
-                )
+                data["generator"] = generator_class.model_validate(data["generator"])
 
             # make a copy of the generator / vocs objects to avoid modifying the original
-            data["vocs"] = deepcopy(data["vocs"])
             data["generator"] = deepcopy(data["generator"])
 
         return data
@@ -224,6 +245,21 @@ class Xopt(XoptBaseModel):
         else:
             return len(self.data)
 
+    @property
+    def vocs(self) -> VOCS:
+        """
+        Get the VOCS object from the generator.
+
+        Returns
+        -------
+        VOCS
+            The VOCS object associated with the generator.
+        """
+        if self.generator is None:
+            raise ValueError("generator is not set")
+
+        return self.generator.vocs
+
     def __init__(self, *args, **kwargs):
         """
         Initialize Xopt.
@@ -267,13 +303,14 @@ class Xopt(XoptBaseModel):
         """
         Run one optimization cycle.
 
+        Notes
+        -----
         This method performs the following steps:
-        - Determines the number of candidates to request from the generator.
-        - Passes the candidate request to the generator.
-        - Submits candidates to the evaluator.
-        - Waits until all evaluations are finished
-        - Updates data storage and generator data storage (if applicable).
-
+        (1) Determines the number of candidates to request from the generator.
+        (2) Passes the candidate request to the generator.
+        (3) Submits candidates to the evaluator.
+        (4) Waits until all evaluations are finished
+        (5) Updates data storage and generator data storage (if applicable).
         """
         logger.info("Running Xopt step")
 
@@ -282,7 +319,7 @@ class Xopt(XoptBaseModel):
 
         # generate samples and submit to evaluator
         logger.debug(f"Generating {n_generate} candidates")
-        new_samples = self.generator.generate(n_generate)
+        new_samples = self.generator.suggest(n_generate)
 
         if new_samples is not None:
             # Evaluate data
@@ -313,37 +350,40 @@ class Xopt(XoptBaseModel):
 
             self.step()
 
-    def evaluate(self, input_dict: Dict):
+        # at the end, call the finalize method for the generator
+        self.generator.finalize()
+
+    def evaluate(self, input_dict: dict) -> dict:
         """
         Evaluate a candidate without storing data.
 
         Parameters
         ----------
-        input_dict : Dict
+        input_dict : dict
             A dictionary representing the input data for candidate evaluation.
 
         Returns
         -------
-        Any
+        dict
             The result of the evaluation.
 
         """
         inputs = deepcopy(input_dict)
 
         # add constants to input data
-        for name, value in self.vocs.constants.items():
-            inputs[name] = value
+        for name, ele in self.vocs.constants.items():
+            inputs[name] = ele.value
 
-        self.vocs.validate_input_data(DataFrame(inputs, index=[0]))
+        validate_input_data(self.vocs, DataFrame(inputs, index=[0]))
         return self.evaluator.evaluate(input_dict)
 
     def evaluate_data(
         self,
         input_data: Union[
             pd.DataFrame,
-            List[Dict[str, float]],
-            Dict[str, List[float]],
-            Dict[str, float],
+            list[dict[str, float]],
+            dict[str, list[float]],
+            dict[str, float],
         ],
     ) -> pd.DataFrame:
         """
@@ -354,8 +394,7 @@ class Xopt(XoptBaseModel):
 
         Parameters
         ----------
-        input_data : Union[pd.DataFrame, List[Dict[str, float], Dict[str, List[float],
-                        Dict[str, float]]]
+        input_data : Union[pd.DataFrame, list[dict[str, float]], dict[str, list[float]], dict[str, float]]
             The input data for evaluation, which can be provided as a DataFrame, a list of
             dictionaries, or a single dictionary.
 
@@ -373,11 +412,11 @@ class Xopt(XoptBaseModel):
                 input_data = DataFrame(deepcopy(input_data), index=[0])
 
         logger.debug(f"Evaluating {len(input_data)} inputs")
-        self.vocs.validate_input_data(input_data)
+        validate_input_data(self.vocs, input_data)
 
         # add constants to input data
-        for name, value in self.vocs.constants.items():
-            input_data[name] = value
+        for name, const in self.vocs.constants.items():
+            input_data[name] = const.value
 
         # if we are using a sequential generator that is active, make sure that the evaluated data matches the last candidate
         if isinstance(self.generator, SequentialGenerator):
@@ -422,10 +461,9 @@ class Xopt(XoptBaseModel):
             if new_data.index.dtype != np.int64:
                 new_data.index = new_data.index.astype(np.int64)
             self.data = new_data
-
         # Pass data to generator, continue in case of invalid data when strict=False
         try:
-            self.generator.add_data(new_data)
+            self.generator.ingest(new_data.to_dict(orient="records"))
         except DataError as exc:
             if self.strict:
                 raise exc
@@ -474,7 +512,7 @@ class Xopt(XoptBaseModel):
         custom_bounds: dict = None,
     ):
         """
-        Convenience method to generate random inputs using VOCs and evaluate them.
+        Convenience method to generate random inputs using VOCS and evaluate them.
 
         This method generates random inputs using the Variables, Objectives,
         Constraints, and Statics (VOCS) and evaluates them, adding the data to the
@@ -496,15 +534,19 @@ class Xopt(XoptBaseModel):
             The results of the evaluations added to the internal DataFrame.
 
         """
-        random_inputs = self.vocs.random_inputs(
-            n_samples, seed=seed, custom_bounds=custom_bounds, include_constants=True
+        ri = random_inputs(
+            self.vocs,
+            n_samples,
+            seed=seed,
+            custom_bounds=custom_bounds,
+            include_constants=True,
         )
-        result = self.evaluate_data(random_inputs)
+        result = self.evaluate_data(ri)
         return result
 
     def grid_evaluate(
         self,
-        n_samples: Union[int, Dict[str, int]],
+        n_samples: Union[int, dict[str, int]],
         custom_bounds: dict = None,
     ):
         """
@@ -517,15 +559,17 @@ class Xopt(XoptBaseModel):
             The number of samples along each axis to evaluate on a meshgrid.
             If an int is provided, the same number of samples is used for all axes.
         custom_bounds : dict, optional
-            Dictionary of vocs-like ranges for mesh sampling.
+            dictionary of vocs-like ranges for mesh sampling.
 
         Returns
         -------
         pd.DataFrame
             The results of the evaluations added to the internal DataFrame.
         """
-        grid_inputs = self.vocs.grid_inputs(n_samples, custom_bounds=custom_bounds)
-        result = self.evaluate_data(grid_inputs)
+        gi = grid_inputs(
+            self.vocs, n_samples, custom_bounds=custom_bounds, include_constants=True
+        )
+        result = self.evaluate_data(gi)
         return result
 
     def yaml(self, **kwargs):
@@ -580,7 +624,7 @@ class Xopt(XoptBaseModel):
                 f.write(self.yaml(**kwargs))
             logger.debug(f"Dumped state to YAML file: {fname}")
 
-    def dict(self, **kwargs) -> Dict:
+    def dict(self, **kwargs) -> dict:
         """
         Handle custom dictionary generation.
 
@@ -591,12 +635,16 @@ class Xopt(XoptBaseModel):
 
         Returns
         -------
-        Dict
+        dict
             A dictionary representation of the Xopt configuration.
 
         """
         result = super().model_dump(**kwargs)
-        result["generator"] = {"name": self.generator.name} | result["generator"]
+        if not isinstance(result["generator"], dict):  # may return as module.path
+            result["generator"] = {"name": result["generator"]}
+        result["generator"] = {"name": get_generator_name(self.generator)} | result[
+            "generator"
+        ]
         return result
 
     def json(self, **kwargs) -> str:
@@ -616,9 +664,11 @@ class Xopt(XoptBaseModel):
         """
         result = super().to_json(**kwargs)
         dict_result = json.loads(result)
-        dict_result["generator"] = {"name": self.generator.name} | dict_result[
-            "generator"
-        ]
+        if not isinstance(dict_result["generator"], dict):  # may return as module.path
+            dict_result["generator"] = {"name": dict_result["generator"]}
+        dict_result["generator"] = {
+            "name": get_generator_name(self.generator)
+        } | dict_result["generator"]
         dict_result["data"] = (
             json.loads(self.data.to_json()) if self.data is not None else None
         )

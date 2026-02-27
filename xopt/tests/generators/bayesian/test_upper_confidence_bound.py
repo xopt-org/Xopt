@@ -115,7 +115,7 @@ class TestUpperConfidenceBoundGenerator:
         )
         set_options(gen, use_cuda=False, add_data=True)
         evaluator = Evaluator(function=xtest_callable)
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(10)
         for _ in range(1):
             X.step()
@@ -139,7 +139,7 @@ class TestUpperConfidenceBoundGenerator:
         )
         set_options(gen)
 
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(5)
         for _ in range(2):
             X.step()
@@ -183,22 +183,22 @@ class TestUpperConfidenceBoundGenerator:
         X = Xopt.from_yaml(
             """
             generator:
-              name: upper_confidence_bound
-
+                name: upper_confidence_bound
+                vocs:
+                    variables:
+                        x1: [0, 6.28]
+                    constraints:
+                        c1: [LESS_THAN, 0.0]
+                    objectives:
+                        y1: 'MAXIMIZE'
             evaluator:
               function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
 
-            vocs:
-              variables:
-                x1: [0, 6.28]
-              constraints:
-                c1: [LESS_THAN, 0.0]
-              objectives:
-                y1: 'MAXIMIZE'
+
             """
         )
         _ = X.random_evaluate(10, seed=0)
-        test_x = torch.linspace(*X.vocs.variables["x1"], 10, dtype=torch.float64)
+        test_x = torch.linspace(*X.vocs.variables["x1"].domain, 10, dtype=torch.float64)
         model = X.generator.train_model(X.data)
         acq = X.generator.get_acquisition(model)
         with pytest.warns(UserWarning):

@@ -35,6 +35,17 @@ class ShiftedAcquisitionFunction(torch.nn.Module):
 
 # TODO: is log necessary for numeric stability of constrained softplus case? need to benchmark
 class UpperConfidenceBoundGenerator(BayesianGenerator):
+    """
+    Bayesian optimization generator using Log Expected Improvement.
+
+    Attributes
+    ----------
+    beta : float
+        Beta parameter for UCB optimization, controlling the trade-off between exploration
+        and exploitation. Higher values of beta prioritize exploration.
+
+    """
+
     name = "upper_confidence_bound"
     beta: float = Field(2.0, description="Beta parameter for UCB optimization")
     shift: float = Field(

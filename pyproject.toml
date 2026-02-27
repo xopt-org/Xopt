@@ -21,33 +21,42 @@ classifiers = [
 ]
 dependencies = [
   "deap",
-  "numpy",
-  "pydantic>=2.3",
+  "numpy>=2.3",
+  "pydantic>=2.12",
   "pyyaml",
-  "botorch>=0.12.0",
+  "botorch>=0.17.0",
   "scipy>=1.10.1",
   "pandas",
   "ipywidgets",
   "tqdm",
   "orjson",
-  "matplotlib"
+  "matplotlib",
+  "gest-api"
 ]
 description = "Flexible optimization of arbitrary problems in Python."
 dynamic = [ "version" ]
 keywords = []
 name = "xopt"
 readme = {file = "README.md", content-type = "text/markdown"}
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
   "pytest",
   "pytest-cov",
+  "ffmpeg",
+  "pytest",
+  "pytest-cov",
   "pytest-xdist",
+  "jupyterlab>=3",
+  "jupyterlab-lsp",
+  "python-lsp-server",
+  "pygments",
   "dask[distributed]",
   "mpi4py",
-  "jupyter",
-  "nbconvert"
+  "libensemble @ git+https://github.com/libensemble/libensemble@experimental/jlnav_plus_shuds_asktell",
+  "nbconvert",
+  "pre-commit",
 ]
 doc = [
   "mkdocs",
@@ -82,9 +91,13 @@ file = "LICENSE"
 
 [tool.pytest.ini_options]
 addopts = "--cov=xopt/"
+tmp_path_retention_policy = "none"
 log_cli_level = "info"
 log_level = "debug"
 testpaths = ["xopt/tests"]
+
+[tool.coverage.run]
+data_file = "/tmp/.coverage"
 
 [tool.setuptools_scm]
 version_file = "xopt/_version.py"

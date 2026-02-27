@@ -16,7 +16,8 @@ from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.mobo import MOBOGenerator
-from xopt.vocs import ObjectiveEnum, VOCS
+from gest_api.vocs import VOCS, ContinuousVariable, MaximizeObjective, MinimizeObjective
+from xopt.vocs import convert_dataframe_to_inputs
 
 logger = logging.getLogger()
 
@@ -73,6 +74,7 @@ class MultiFidelityGenerator(MOBOGenerator):
     reference_point: Optional[Dict[str, float]] = None
     supports_multi_objective: bool = True
     supports_batch_generation: bool = True
+    supports_constraints: bool = True
 
     __doc__ = """Implements Multi-fidelity Bayesian optimization
         Assumes a fidelity parameter [0,1]
@@ -98,12 +100,8 @@ class MultiFidelityGenerator(MOBOGenerator):
         ValueError
             If constraints are present in the VOCS.
         """
-        v.variables["s"] = [0, 1]
-        v.objectives["s"] = ObjectiveEnum("MAXIMIZE")
-        if len(v.constraints):
-            raise ValueError(
-                "constraints are not currently supported in multi-fidelity BO"
-            )
+        v.variables["s"] = ContinuousVariable(domain=[0, 1])
+        v.objectives["s"] = MaximizeObjective()
 
         return v
 
@@ -115,10 +113,14 @@ class MultiFidelityGenerator(MOBOGenerator):
             reference_point = {}
             for name, val in vocs.objectives.items():
                 if name != "s":
-                    if val == "MAXIMIZE":
+                    if isinstance(val, MaximizeObjective):
                         reference_point.update({name: -100.0})
-                    else:
+                    elif isinstance(val, MinimizeObjective):
                         reference_point.update({name: 100.0})
+                    else:
+                        raise ValueError(
+                            f"objective {name} must be MaximizeObjective or MinimizeObjective"
+                        )
 
         reference_point.update({"s": 0.0})
 
@@ -278,9 +280,9 @@ class MultiFidelityGenerator(MOBOGenerator):
         # define single objective based on vocs
         weights = torch.zeros(self.vocs.n_outputs, **self.tkwargs)
         for idx, ele in enumerate(self.vocs.objective_names):
-            if self.vocs.objectives[ele] == "MINIMIZE":
+            if isinstance(self.vocs.objectives[ele], MinimizeObjective):
                 weights[idx] = -1.0
-            elif self.vocs.objectives[ele] == "MAXIMIZE":
+            elif isinstance(self.vocs.objectives[ele], MaximizeObjective):
                 weights[idx] = 1.0
 
         def obj_callable(
@@ -320,4 +322,4 @@ class MultiFidelityGenerator(MOBOGenerator):
         df = pd.DataFrame(result.detach().cpu().numpy(), columns=vnames)
         df[self.fidelity_parameter] = 1.0
 
-        return self.vocs.convert_dataframe_to_inputs(df)
+        return convert_dataframe_to_inputs(self.vocs, df)

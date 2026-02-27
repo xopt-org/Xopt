@@ -3,7 +3,6 @@ import os
 import time
 import warnings
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
@@ -29,7 +28,9 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from xopt.errors import XoptError, FeasibilityError
+from gest_api.vocs import MinimizeObjective, MaximizeObjective
+
+from xopt.errors import VOCSError, XoptError, FeasibilityError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -53,11 +54,13 @@ from xopt.generators.bayesian.utils import (
     set_botorch_weights,
     validate_turbo_controller_base,
     compute_hypervolume_and_pf,
+    validate_turbo_controller_center,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
-from xopt.vocs import VOCS
+from xopt.vocs import convert_numpy_to_inputs, extract_data
+
 
 logger = logging.getLogger()
 
@@ -180,11 +183,28 @@ class BayesianGenerator(Generator, ABC):
         default=[LBFGSOptimizer, GridOptimizer]
     )
 
+    @field_validator("vocs", mode="after")
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+            raise VOCSError("this generator does not support constraints")
+
+        # assertion that at least one objective exists is done in model_validator below
+
+        if v.n_objectives == 1:
+            if not info.data["supports_single_objective"]:
+                raise VOCSError(
+                    "this generator does not support single objective optimization"
+                )
+        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+            raise VOCSError(
+                "this generator does not support multi-objective optimization"
+            )
+
+        return v
+
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
-        if compatible is None:
-            return [None]
 
         compatible_list: list[type[TurboController] | None] = []
         # If it's a ModelPrivateAttr, get the default value
@@ -211,6 +231,8 @@ class BayesianGenerator(Generator, ABC):
                 value = decode_torch_module(value)
             elif os.path.exists(value):
                 value = torch.load(value, weights_only=False)
+            else:
+                raise XoptError(f"cannot load torch module from {value}")
         return value
 
     @field_validator("gp_constructor", mode="before")
@@ -270,9 +292,6 @@ class BayesianGenerator(Generator, ABC):
         if value is None:
             return value
 
-        if cls._compatible_turbo_controllers is None:
-            raise ValueError("no turbo controllers are compatible with this generator")
-
         compatible_turbo_controllers = [
             turbo_controller
             for turbo_controller in cls.get_compatible_turbo_controllers()
@@ -304,23 +323,14 @@ class BayesianGenerator(Generator, ABC):
 
     @model_validator(mode="after")
     def validate_model_after(self):
-        if self.turbo_controller is not None:
-            # Check that values for center_x are within trust region bounds
-            trust_region = self.turbo_controller.get_trust_region(self)
+        # validate turbo controller center if it exists
+        validate_turbo_controller_center(self)
 
-            center_x = self.turbo_controller.center_x
-            if center_x is not None:
-                for key, value in center_x.items():
-                    if key in self.vocs.variable_names:
-                        idx = self.vocs.variable_names.index(key)
-                        lower_bound = trust_region[0, idx].item()
-                        upper_bound = trust_region[1, idx].item()
-                        if not (lower_bound <= value <= upper_bound):
-                            raise ValueError(
-                                f"Turbo controller center_x value for {key} : "
-                                f"{value} is outside of trust region bounds "
-                                f"[{lower_bound}, {upper_bound}]"
-                            )
+        # check to make sure that either multiple objectives exist or custom objective is set
+        if self.vocs.n_objectives == 0 and self.custom_objective is None:
+            raise VOCSError(
+                "the generator must have at least one objective or a custom objective"
+            )
 
         return self
 
@@ -337,7 +347,7 @@ class BayesianGenerator(Generator, ABC):
         -----
         This method appends the new data to the existing data in the generator.
         """
-        self.data = pd.concat([self.data, new_data], axis=0)
+        self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
 
     def generate(self, n_candidates: int):
         """
@@ -468,11 +478,16 @@ class BayesianGenerator(Generator, ABC):
         """
         if data is None:
             data = self.get_training_data(self.data)
+            if data is None:
+                raise ValueError("no data available to build model")
+
         if data.empty:
             raise ValueError("no data available to build model")
 
         # get input bounds
-        variable_bounds = deepcopy(self.vocs.variables)
+        variable_bounds = {
+            name: ele.domain for name, ele in self.vocs.variables.items()
+        }
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -755,8 +770,8 @@ class BayesianGenerator(Generator, ABC):
                 results[name] = val
 
         else:
-            results = self.vocs.convert_numpy_to_inputs(
-                candidates.detach().cpu().numpy(), include_constants=False
+            results = convert_numpy_to_inputs(
+                self.vocs, candidates.detach().cpu().numpy(), include_constants=False
             )
 
         return results
@@ -771,7 +786,7 @@ class BayesianGenerator(Generator, ABC):
 
     @abstractmethod
     def _get_acquisition(self, model):
-        pass
+        pass  # pragma: no cover
 
     def _get_objective(self) -> MCAcquisitionObjective:
         """
@@ -860,7 +875,7 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds)
+        return torch.tensor(self.vocs.bounds, dtype=torch.double).T
 
     def _get_optimization_bounds(self):
         """
@@ -958,7 +973,7 @@ class BayesianGenerator(Generator, ABC):
         last_point = self.data[self.vocs.variable_names].iloc[-1].to_numpy()
 
         # bound lengths based on vocs for normalization
-        vocs_bounds = self.vocs.bounds
+        vocs_bounds = np.array(self.vocs.bounds).T
         lengths = vocs_bounds[1, :] - vocs_bounds[0, :]
 
         # get maximum travel distances
@@ -991,17 +1006,15 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def validate_pareto_front_history(cls, value: Any):
         return pd.DataFrame(value) if value is not None else None
 
-    @field_validator("reference_point", mode="after")
-    @classmethod
-    def validate_reference_point(cls, value: dict[str, float], info: ValidationInfo):
-        # set default reference point if not specified
-        _vocs: VOCS | None = info.data.get("vocs", None)
+    @model_validator(mode="after")
+    def validate_reference_point(self):
+        _vocs = self.vocs
         objective_names = _vocs.objective_names if _vocs is not None else []
 
-        if set(value.keys()) != set(objective_names):
+        if set(self.reference_point.keys()) != set(objective_names):
             raise XoptError("reference point must contain all objective names in vocs")
 
-        return value
+        return self
 
     @property
     def torch_reference_point(self):
@@ -1014,9 +1027,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     "need to specify reference point for the following "
                     f"objective {name}"
                 )
-            if self.vocs.objectives[name] == "MINIMIZE":
+            if isinstance(self.vocs.objectives[name], MinimizeObjective):
                 pt += [-ref_val]
-            elif self.vocs.objectives[name] == "MAXIMIZE":
+            elif isinstance(self.vocs.objectives[name], MaximizeObjective):
                 pt += [ref_val]
             else:
                 raise ValueError(
@@ -1127,8 +1140,8 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         maximization for each objective"""
 
         # get raw data
-        var_df, obj_df, _, _ = self.vocs.extract_data(
-            data, return_raw=True, return_valid=True
+        var_df, obj_df, _, _ = extract_data(
+            self.vocs, data, return_raw=True, return_valid=True
         )
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())

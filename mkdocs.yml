@@ -27,7 +27,6 @@ nav:
                 - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
-                - Trust region: examples/single_objective_bayes_opt/turbo_tutorial.ipynb
                 - Interpolated optimization: examples/single_objective_bayes_opt/interpolate_tutorial.ipynb
                 - Multi-Fidelity: examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb
                 - Time dependent upper confidence bound: examples/single_objective_bayes_opt/time_dependent_bo.ipynb
@@ -70,9 +69,43 @@ nav:
       - Evaluator: api/evaluator.md
       - Generators:
           - Base generator class: api/generators.md
-          - Bayesian generators: api/generators/bayesian.md
-          - Genetic generators: api/generators/genetic.md
-          - SciPy generators: api/generators/scipy.md
+          - Bayesian generators:
+              - Bayesian Generator Class: api/generators/bayesian/bayesian_generator.md
+              - Time-Dependent Bayesian Generators: api/generators/bayesian/time_dependent.md
+              - Bayesian Exploration: api/generators/bayesian/bayesian_exploration.md
+              - Expected Improvement: api/generators/bayesian/expected_improvement.md
+              - Multi-Objective BO: api/generators/bayesian/mobo.md
+              - Multi-Generation Gaussian Process Optimization: api/generators/bayesian/mggpo.md
+              - Multi-Fidelity: api/generators/bayesian/multi_fidelity.md
+              - Upper Confidence Bound: api/generators/bayesian/upper_confidence_bound.md
+              - TurBO Controllers: api/generators/bayesian/turbo.md
+              - Bayesian Algorithm Execution (BAX):
+                  - BAX Generator: api/generators/bayesian/bax/bax_generator.md
+                  - Acquisition Functions: api/generators/bayesian/bax/acquisition_functions.md
+                  - Algorithms: api/generators/bayesian/bax/algorithms.md
+                  - Visualization: api/generators/bayesian/bax/visualize.md
+              - Model Constructors:
+                  - Base Model Constructor: api/generators/bayesian/models/base_model_constructor.md
+                  - Standard Model Constructor: api/generators/bayesian/models/standard_model_constructor.md
+                  - Time Dependent Model Constructor: api/generators/bayesian/models/time_dependent_model_constructor.md
+              - Utilities: api/generators/bayesian/utils.md
+          - Genetic generators:
+              - CNSGA: api/generators/ga/cnsga.md
+              - NSGA-II: api/generators/ga/nsga2.md
+              - DEAP Creator: api/generators/ga/deap_creator.md
+              - DEAP Fitness with Constraints: api/generators/ga/deap_fitness_with_constraints.md
+              - Genetic Operators: api/generators/ga/operators.md
+          - Sequential generators:
+              - Sequential Base Class: api/generators/sequential/sequential_generator.md
+              - RCDS: api/generators/sequential/rcds.md
+              - Extremum Seeking: api/generators/sequential/extremumseeking.md
+              - Nelder-Mead: api/generators/sequential/neldermead.md
+          - Random Generator: api/generators/random.md
+          - Deduplicated Base: api/generators/deduplicated.md
+          - Generator Utilities: api/generators/utils.md
+      - Numerical Optimizers: api/numerical_optimizer.md
+      - Stopping Conditions: api/stopping_conditions.md
+      - Utilities: api/utils.md
 
 theme:
   icon:
@@ -140,29 +173,10 @@ plugins:
             docstring_options:
               ignore_init_summary: false
             heading_level: 3
-            show_root_heading: true
-            show_root_toc_entry: true
-            show_root_full_path: true
-            show_root_members_full_path: false
-            show_object_full_path: true
-            show_category_heading: true
-            show_if_no_docstring: false
-            show_signature: true
-            signature_crossrefs: true
-            show_signature_annotations: false
-            separate_signature: true
-            line_length: 100
-            merge_init_into_class: true
-            show_source: true
             show_bases: true
-            show_submodules: false
-            group_by_category: true
-            unwrap_annotated: true
-            import:
-              - https://docs.python.org/3/objects.inv
-              - https://docs.h5py.org/en/stable/objects.inv
-              - https://slaclab.github.io/lume-base/objects.inv
-              - https://lark-parser.readthedocs.io/en/latest/objects.inv
+            show_source: true
+            show_root_toc_entry: false
+            inherited_members: true
           rendering:
             show_source: true
             show_root_heading: true

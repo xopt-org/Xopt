@@ -22,7 +22,8 @@ from pydantic import (
 
 
 from xopt.pydantic import XoptBaseModel
-from xopt.vocs import VOCS
+from xopt.vocs import get_feasibility_data
+from gest_api.vocs import MinimizeObjective, VOCS
 
 
 class StoppingCondition(XoptBaseModel, ABC):
@@ -136,7 +137,7 @@ class TargetValueCondition(StoppingCondition):
         if len(objective_values) == 0:
             return False
 
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             best_value = objective_values.min()
             return best_value <= self.target_value + self.tolerance
         else:  # MAXIMIZE
@@ -189,7 +190,7 @@ class ConvergenceCondition(StoppingCondition):
         # Check improvement over the last 'patience' evaluations
         recent_values = objective_values.iloc[-(self.patience + 1) :]
 
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             best_recent = recent_values.min()
             baseline = recent_values.iloc[0]
             improvement = baseline - best_recent
@@ -242,7 +243,7 @@ class StagnationCondition(StoppingCondition):
         objective_values = data[self.objective_name].dropna()
 
         # Track the best value seen so far
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             cumulative_best = objective_values.cummin()
         else:  # MAXIMIZE
             cumulative_best = objective_values.cummax()
@@ -250,7 +251,7 @@ class StagnationCondition(StoppingCondition):
         recent_best = cumulative_best.iloc[-1]
         past_best = cumulative_best.iloc[-(self.patience + 1)]
 
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             improvement = past_best - recent_best
         else:  # MAXIMIZE
             improvement = recent_best - past_best
@@ -279,7 +280,7 @@ class FeasibilityCondition(StoppingCondition):
             return False
 
         # Use VOCS to determine feasibility
-        feasibility_data = vocs.feasibility_data(data)
+        feasibility_data = get_feasibility_data(vocs, data)
 
         if self.require_all_constraints:
             # Stop if any point is fully feasible

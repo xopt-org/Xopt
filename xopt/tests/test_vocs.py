@@ -5,21 +5,43 @@ import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
+import yaml
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
-from xopt.vocs import ObjectiveEnum, VOCS
+from xopt.vocs import (
+    convert_dataframe_to_inputs,
+    cumulative_optimum,
+    denormalize_inputs,
+    get_variable_data,
+    normalize_inputs,
+    random_inputs,
+    select_best,
+    grid_inputs,
+    get_objective_data,
+    validate_input_data,
+    extract_data,
+)
+from gest_api.vocs import (
+    VOCS,
+    ContinuousVariable,
+    DiscreteVariable,
+    MinimizeObjective,
+    ExploreObjective,
+    LessThanConstraint,
+)
 
 
 class TestVOCS(object):
     def test_init(self):
-        from xopt.vocs import VOCS
-
         # test various configurations
         vocs = VOCS(
-            variables={"x": [0, 1]},
+            variables={
+                "x": [0, 1],
+                "y": {0, 1, 2},
+            },
             objectives={"f": "MINIMIZE"},
         )
-        assert vocs.n_inputs == 1
+        assert vocs.n_inputs == 2
         assert vocs.n_outputs == 1
         assert vocs.n_constraints == 0
 
@@ -66,52 +88,59 @@ class TestVOCS(object):
 
     def test_from_yaml(self):
         Y = """
-        variables:
-          a: [0, 1e3] # Note that 1e3 usually parses as a str with YAML.
-          b: [-1, 1]
-        objectives:
-          c: maximize
-          d: minimize
+        constants: {}
         constraints:
-          e: ['Less_than', 2]
-          f: ['greater_than', 0]
-        constants:
-          g: 1234
+            c:
+              type: LessThanConstraint
+              value: 0.0
+        objectives:
+            z: MINIMIZE
+            zzz: EXPLORE
+        variables:
+            x:
+              type: ContinuousVariable
+              domain:
+              - 0.0
+              - 6.283185307179586
+            y:
+              type: DiscreteVariable
+              values:
+                - 0.0
+                - 1.0
+                - 2.0
 
         """
-
-        vocs = VOCS.from_yaml(Y)
-        assert vocs.constraint_names == ["e", "f"]
-        assert vocs.variables == {"a": (0, 1e3), "b": (-1, 1)}
-        assert vocs.objectives == {"c": "MAXIMIZE", "d": "MINIMIZE"}
-        assert vocs.constants == {"g": 1234}
-
-        assert vocs.objectives["c"] == ObjectiveEnum.MAXIMIZE
-        assert vocs.objectives["d"] == ObjectiveEnum.MINIMIZE
-
-        assert vocs.constraints["e"] == ("LESS_THAN", 2.0)
-        assert vocs.constraints["f"] == ("GREATER_THAN", 0.0)
-
-        assert vocs.n_inputs == 3
-        assert vocs.n_outputs == 4
+        vocs = VOCS(**yaml.safe_load(Y))
+        assert vocs.constraint_names == ["c"]
+        assert isinstance(vocs.variables["x"], ContinuousVariable)
+        assert isinstance(vocs.variables["y"], DiscreteVariable)
+        assert isinstance(vocs.objectives["z"], MinimizeObjective)
+        assert isinstance(vocs.objectives["zzz"], ExploreObjective)
+        assert isinstance(vocs.constraints["c"], LessThanConstraint)
+        assert vocs.variables["x"].domain == [0.0, 6.283185307179586]
+        assert vocs.variables["y"].values == {0.0, 1.0, 2.0}
+        assert vocs.constraints["c"].value == 0.0
+        assert vocs.n_inputs == 2
+        assert vocs.n_variables == 2
+        assert vocs.n_outputs == 3
 
     def test_random_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         n_samples = 10
-        data = pd.DataFrame(vocs.random_inputs(n_samples))
+        data = pd.DataFrame(random_inputs(vocs, n_samples))
         assert data.shape == (n_samples, vocs.n_inputs)
 
-        test_inputs = TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+        test_inputs = random_inputs(vocs, 5, include_constants=False)
         assert len(test_inputs) == 5
 
-        test_inputs = TEST_VOCS_BASE.random_inputs()
+        test_inputs = random_inputs(TEST_VOCS_BASE)
         assert isinstance(test_inputs[0]["x1"], float)
 
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.model_dump_json()
 
-        vocs.variables["a"] = np.array([1, 2])
+        vocs.variables["a"] = ContinuousVariable(domain=[0.0, 1.0])
         vocs.model_dump_json()
 
     def test_properties(self):
@@ -144,7 +173,7 @@ class TestVOCS(object):
 
         # Test with default parameters
         n = 5
-        grid = vocs.grid_inputs(n=n)
+        grid = grid_inputs(vocs, n=n)
         assert isinstance(grid, pd.DataFrame)
         assert grid.shape == (n**2, 3)  # 2 variables + 1 constant
         assert "x1" in grid.columns
@@ -154,7 +183,7 @@ class TestVOCS(object):
 
         # Test with custom bounds
         custom_bounds = {"x1": [0.2, 0.8], "x2": [0.1, 0.9]}
-        grid = vocs.grid_inputs(n=n, custom_bounds=custom_bounds)
+        grid = grid_inputs(vocs, n=n, custom_bounds=custom_bounds)
         assert isinstance(grid, pd.DataFrame)
         assert grid.shape == (n**2, 3)  # 2 variables + 1 constant
         assert "x1" in grid.columns
@@ -170,10 +199,10 @@ class TestVOCS(object):
             "x2": [0.1, 0.9],
         }
         with pytest.raises(ValueError):
-            vocs.grid_inputs(n=n, custom_bounds=invalid_custom_bounds)
+            grid_inputs(vocs, n=n, custom_bounds=invalid_custom_bounds)
 
         # Test with include_constants=False
-        grid = vocs.grid_inputs(n=n, include_constants=False)
+        grid = grid_inputs(vocs, n=n, include_constants=False)
         assert isinstance(grid, pd.DataFrame)
         assert grid.shape == (n**2, 2)  # 2 variables
         assert "x1" in grid.columns
@@ -182,7 +211,7 @@ class TestVOCS(object):
 
         # Test with different number of points for each variable
         n_dict = {"x1": 3, "x2": 4}
-        grid = vocs.grid_inputs(n=n_dict)
+        grid = grid_inputs(vocs, n=n_dict)
         assert isinstance(grid, pd.DataFrame)
         assert grid.shape == (3 * 4, 3)  # 2 variables + 1 constant
         assert "x1" in grid.columns
@@ -196,7 +225,7 @@ class TestVOCS(object):
         custom_bounds = {"x1": [0.5, 0.75], "x2": [7.5, 15.0]}
 
         with pytest.warns(RuntimeWarning):
-            random_input_data = vocs.random_inputs(100, custom_bounds=custom_bounds)
+            random_input_data = random_inputs(vocs, 100, custom_bounds=custom_bounds)
 
         random_input_data = pd.DataFrame(random_input_data)
         assert all(random_input_data["x1"] < 0.75)
@@ -208,7 +237,11 @@ class TestVOCS(object):
         in_domain_custom_bounds = {"x1": [0.5, 0.75], "x2": [0.5, 0.75]}
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            vocs.random_inputs(100, custom_bounds=in_domain_custom_bounds)
+            random_inputs(vocs, 100, custom_bounds=in_domain_custom_bounds)
+
+        # test wrong type
+        with pytest.raises(TypeError):
+            random_inputs(vocs, 100, custom_bounds=1)
 
         # test custom bounds entirely outside the vocs domain or specified incorrectly
         bad_custom_bounds = [
@@ -217,20 +250,22 @@ class TestVOCS(object):
         ]
         for ele in bad_custom_bounds:
             with pytest.raises(ValueError):
-                vocs.random_inputs(100, custom_bounds=ele)
+                random_inputs(vocs, 100, custom_bounds=ele)
 
         custom_bounds = {
-            k: [v[0] + 0.01, v[1] - 0.01] for k, v in TEST_VOCS_BASE.variables.items()
+            k: [v.domain[0] + 0.01, v.domain[1] - 0.01]
+            for k, v in TEST_VOCS_BASE.variables.items()
         }
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            vocs.random_inputs(3, custom_bounds=custom_bounds)
+            random_inputs(vocs, 3, custom_bounds=custom_bounds)
 
         custom_bounds = {
-            k: [v[0] - 0.01, v[1] - 0.01] for k, v in TEST_VOCS_BASE.variables.items()
+            k: [v.domain[0] - 0.01, v.domain[1] - 0.01]
+            for k, v in TEST_VOCS_BASE.variables.items()
         }
         with pytest.warns(RuntimeWarning):
-            vocs.random_inputs(3, custom_bounds=custom_bounds)
+            random_inputs(vocs, 3, custom_bounds=custom_bounds)
 
     def test_duplicate_outputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -239,14 +274,14 @@ class TestVOCS(object):
         vocs.objectives = {"y1": "MAXIMIZE", "d1": "MINIMIZE"}
         vocs.observables = ["y1", "c1"]
 
-        assert vocs.output_names == ["d1", "y1", "c1"]
+        assert vocs.output_names == ["y1", "d1", "c1"]
         assert vocs.n_outputs == 3
 
     def test_variable_data(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = TEST_VOCS_DATA
 
-        res = vocs.variable_data(test_data)
+        res = get_variable_data(vocs, test_data)
         assert np.array_equal(res.to_numpy(), test_data.loc[:, ["x1", "x2"]].to_numpy())
 
     def test_objective_data(self):
@@ -254,18 +289,18 @@ class TestVOCS(object):
         test_data = TEST_VOCS_DATA
         test_data["y2"] = 1.0
 
-        res = vocs.objective_data(test_data)
+        res = get_objective_data(vocs, test_data)
         assert np.array_equal(res.to_numpy(), test_data.loc[:, ["y1"]].to_numpy())
 
         vocs.objectives.update({"y2": "MAXIMIZE"})
-        res = vocs.objective_data(test_data)
+        res = get_objective_data(vocs, test_data)
         assert np.array_equal(
             res.to_numpy(),
             test_data.loc[:, ["y1", "y2"]].to_numpy() * np.array([1, -1]),
         )
 
         test_data2 = test_data.drop(columns=["y1"])
-        res = vocs.objective_data(test_data2)
+        res = get_objective_data(vocs, test_data2)
         assert np.array_equal(
             res.to_numpy(),
             test_data.loc[:, ["y1", "y2"]].to_numpy() * np.array([np.inf, -1]),
@@ -273,33 +308,33 @@ class TestVOCS(object):
 
         # test using object type inside test data
         test_data["y2"] = test_data["y2"].astype(np.dtype(object))
-        vocs.objective_data(test_data)
+        get_objective_data(vocs, test_data)
 
     def test_convert_dataframe_to_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = TEST_VOCS_DATA
 
         with pytest.raises(ValueError):
-            vocs.convert_dataframe_to_inputs(test_data)
+            convert_dataframe_to_inputs(vocs, test_data)
 
-        res = vocs.convert_dataframe_to_inputs(test_data[vocs.variable_names])
+        res = convert_dataframe_to_inputs(vocs, test_data[vocs.variable_names])
         assert "constant1" in res
 
     def test_validate_input_data(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
 
         # test good data
-        test_vocs.validate_input_data(pd.DataFrame({"x1": 0.5, "x2": 1.0}, index=[0]))
+        validate_input_data(test_vocs, pd.DataFrame({"x1": 0.5, "x2": 1.0}, index=[0]))
 
         # test bad data
         with pytest.raises(ValueError):
-            test_vocs.validate_input_data(
-                pd.DataFrame({"x1": 0.5, "x2": 11.0}, index=[0])
+            validate_input_data(
+                test_vocs, pd.DataFrame({"x1": 0.5, "x2": 11.0}, index=[0])
             )
 
         with pytest.raises(ValueError):
-            test_vocs.validate_input_data(
-                pd.DataFrame({"x1": [-0.5, 2.5], "x2": [1.0, 11.0]})
+            validate_input_data(
+                test_vocs, pd.DataFrame({"x1": [-0.5, 2.5], "x2": [1.0, 11.0]})
             )
 
     def test_select_best(self):
@@ -319,39 +354,39 @@ class TestVOCS(object):
             vocs = deepcopy(TEST_VOCS_BASE)
 
             vocs.objectives[vocs.objective_names[0]] = "MAXIMIZE"
-            idx, val, _ = vocs.select_best(ele)
+            idx, val, _ = select_best(vocs, ele)
             assert idx == [2]
             assert val == [1.0]
 
             vocs.constraints = {}
-            idx, val, _ = vocs.select_best(ele)
+            idx, val, _ = select_best(vocs, ele)
             assert idx == [3]
             assert val == [1.5]
 
             # test returning multiple best values -- sorted by best value
-            idx, val, _ = vocs.select_best(ele, 2)
+            idx, val, _ = select_best(vocs, ele, 2)
             assert np.allclose(idx, np.array([3, 2]))
             assert np.allclose(val, np.array([1.5, 1.0]))
 
             # test minimization
             vocs.objectives[vocs.objective_names[0]] = "MINIMIZE"
             vocs.constraints = {"c1": ["GREATER_THAN", 0.5]}
-            idx, val, _ = vocs.select_best(ele)
+            idx, val, _ = select_best(vocs, ele)
             assert idx == [0]
             assert val == [0.5]
 
             vocs.constraints = {}
-            idx, val, _ = vocs.select_best(ele)
+            idx, val, _ = select_best(vocs, ele)
             assert idx == 1
             assert val == 0.1
 
             # test error handling
             with pytest.raises(RuntimeError):
-                vocs.select_best(pd.DataFrame())
+                select_best(vocs, pd.DataFrame())
 
             vocs.constraints = {"c1": ["GREATER_THAN", 10.5]}
             with pytest.raises(RuntimeError):
-                vocs.select_best(pd.DataFrame())
+                select_best(vocs, pd.DataFrame())
 
     @pytest.mark.filterwarnings("ignore: All-NaN axis encountered")
     def test_cumulative_optimum(self):
@@ -365,17 +400,20 @@ class TestVOCS(object):
         )
         vocs.objectives = {}
         with pytest.raises(RuntimeError):
-            _ = vocs.cumulative_optimum(test_data)
+            _ = cumulative_optimum(vocs, test_data)
+
         vocs.objectives = {obj_name: "MINIMIZE"}
-        assert vocs.cumulative_optimum(pd.DataFrame()).empty
-        cumulative_minimum = vocs.cumulative_optimum(test_data)
+        assert cumulative_optimum(vocs, pd.DataFrame()).empty
+
+        cumulative_minimum = cumulative_optimum(vocs, test_data)
         assert np.array_equal(
             cumulative_minimum[f"best_{obj_name}"].values,
             np.array([np.nan, np.nan, -0.4, -0.4, -0.4, -0.7]),
             equal_nan=True,
         )
+
         vocs.objectives[obj_name] = "MAXIMIZE"
-        cumulative_maximum = vocs.cumulative_optimum(test_data)
+        cumulative_maximum = cumulative_optimum(vocs, test_data)
         assert np.array_equal(
             cumulative_maximum[f"best_{obj_name}"].values,
             np.array([np.nan, np.nan, -0.4, 0.6, 0.6, 0.6]),
@@ -385,40 +423,40 @@ class TestVOCS(object):
     def test_normalize_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75]})
-        normed_data = vocs.normalize_inputs(test_data)
+        normed_data = normalize_inputs(vocs, test_data)
         assert normed_data["x1"].to_list() == [0.5, 0.2]
         assert normed_data["x2"].to_list() == [0.05, 0.075]
 
         assert np.equal(
-            vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
+            denormalize_inputs(vocs, normed_data)[vocs.variable_names].to_numpy(),
             test_data[vocs.variable_names].to_numpy(),
         ).all()
 
         test_data.pop("x1")
-        normed_data = vocs.normalize_inputs(test_data)
+        normed_data = normalize_inputs(vocs, test_data)
         assert normed_data["x2"].to_list() == [0.05, 0.075]
 
         assert np.equal(
-            vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
+            denormalize_inputs(vocs, normed_data)[test_data.columns].to_numpy(),
             test_data[test_data.columns].to_numpy(),
         ).all()
 
         test_data = pd.DataFrame({"x1": 0.5}, index=[0])
-        normed_data = vocs.normalize_inputs(test_data)
+        normed_data = normalize_inputs(vocs, test_data)
         assert normed_data["x1"].to_list() == [0.5]
 
         assert np.equal(
-            vocs.denormalize_inputs(normed_data)[test_data.columns].to_numpy(),
+            denormalize_inputs(vocs, normed_data)[test_data.columns].to_numpy(),
             test_data[test_data.columns].to_numpy(),
         ).all()
 
         # test with extra data
         test_data = pd.DataFrame({"x1": [0.5, 0.2], "x2": [0.5, 0.75], "a": [1, 1]})
-        normed_data = vocs.normalize_inputs(test_data)
+        normed_data = normalize_inputs(vocs, test_data)
         assert {"x1", "x2"} == set(normed_data.columns)
 
         assert np.equal(
-            vocs.denormalize_inputs(normed_data)[vocs.variable_names].to_numpy(),
+            denormalize_inputs(vocs, normed_data)[vocs.variable_names].to_numpy(),
             test_data[vocs.variable_names].to_numpy(),
         ).all()
 
@@ -434,7 +472,7 @@ class TestVOCS(object):
         )
 
         # test default functionality
-        data = vocs.extract_data(test_data)
+        data = extract_data(vocs, test_data)
         assert set(data[0].keys()) == {"x1", "x2"}
         assert set(data[1].keys()) == {"y1"}
         assert set(data[2].keys()) == {"c1"}
@@ -442,7 +480,7 @@ class TestVOCS(object):
             assert len(ele) == 4
 
         # test return_valid functionality
-        data = vocs.extract_data(test_data, return_valid=True)
+        data = extract_data(vocs, test_data, return_valid=True)
         assert data[0]["x1"].to_list() == [0.1, 0.4]
         assert data[1]["y1"].to_list() == [0.5, 1.0]
 
@@ -452,6 +490,6 @@ class TestVOCS(object):
         # test w/o constraints
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
-        data = vocs.extract_data(test_data)
+        data = extract_data(vocs, test_data)
         assert len(data[0]) == 4
         assert data[2].empty
