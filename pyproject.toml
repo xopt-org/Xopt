@@ -25,7 +25,7 @@ dependencies = [
   "pydantic>=2.12",
   "pyyaml",
   "botorch>=0.17.0",
-  "gpytorch=0.15.1",
+  "gpytorch<=0.15.1",
   "scipy>=1.10.1",
   "pandas",
   "ipywidgets",
