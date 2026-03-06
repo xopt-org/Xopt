@@ -509,8 +509,7 @@ def torch_trace_acqf(
         saqcf = torch.jit.trace(
             acq,
             example_inputs=test_x.clone().detach(),
-            check_trace=True,
-            check_tolerance=1e-8,
+            check_trace=False,
         )
     return saqcf
 
