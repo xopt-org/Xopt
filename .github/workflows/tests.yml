@@ -13,11 +13,15 @@ concurrency:
 
 jobs:
   delete-cancelled-runs:
+    permissions:
+      actions: write
     runs-on: 'ubuntu-latest'
     steps:
-      - uses: 'MercuryTechnologies/delete-cancelled-runs@v1.0.0'
+      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
         with:
-          workflow-file: 'tests.yml'
+          workflow-file: 'lint.yml'
+          max-deletions: 3
+
   test:
     runs-on: ubuntu-latest
     strategy:
