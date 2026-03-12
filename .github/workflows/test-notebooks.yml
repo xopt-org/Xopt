@@ -11,15 +11,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  delete-cancelled-runs:
-    permissions:
-      actions: write
-    runs-on: 'ubuntu-latest'
-    steps:
-      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
-        with:
-          workflow-file: 'test-notebooks.yml'
-          max-deletions: 4
+#  delete-cancelled-runs:
+#    permissions:
+#      actions: write
+#    runs-on: 'ubuntu-latest'
+#    steps:
+#      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
+#        with:
+#          workflow-file: 'test-notebooks.yml'
+#          max-deletions: 4
 
   test-notebooks:
     runs-on: ubuntu-latest
@@ -29,6 +29,11 @@ jobs:
         group: [1, 2, 3, 4]
 
     steps:
+      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
+        with:
+          workflow-file: 'test-notebooks.yml'
+          max-deletions: 4
+
       - uses: actions/checkout@v4
 
       - name: Set up uv

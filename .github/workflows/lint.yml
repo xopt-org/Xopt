@@ -9,18 +9,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  delete-cancelled-runs:
-    permissions:
-      actions: write
-    runs-on: 'ubuntu-latest'
+#  delete-cancelled-runs:
+#    permissions:
+#      actions: write
+#    runs-on: 'ubuntu-latest'
+#    steps:
+#      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
+#        with:
+#          workflow-file: 'lint.yml'
+#          max-deletions: 1
+  lint:
+    runs-on: ubuntu-latest
     steps:
       - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
         with:
           workflow-file: 'lint.yml'
           max-deletions: 1
-  lint:
-    runs-on: ubuntu-latest
-    steps:
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
