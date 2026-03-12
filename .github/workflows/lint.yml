@@ -9,9 +9,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  delete-cancelled-runs:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'MercuryTechnologies/delete-cancelled-runs@latest'
+        with:
+          workflow-file: 'lint.yml'
   lint:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
