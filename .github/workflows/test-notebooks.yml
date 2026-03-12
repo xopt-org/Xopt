@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
         with:
-          workflow-file: 'test_notebooks.yml'
+          workflow-file: 'test-notebooks.yml'
           max-deletions: 4
 
   test-notebooks:
