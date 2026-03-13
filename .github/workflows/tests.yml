@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
         with:
-          workflow-file: 'lint.yml'
+          workflow-file: 'tests.yml'
           max-deletions: 3
 
   test:
