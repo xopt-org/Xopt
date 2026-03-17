@@ -10,7 +10,7 @@ import torch
 import yaml
 from botorch import fit_gpytorch_mll
 from botorch.exceptions import ModelFittingError
-from botorch.models import SingleTaskGP
+from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch import ExactMarginalLogLikelihood
@@ -32,6 +32,7 @@ from xopt.generators.bayesian.models.standard import (
     LBFGSNumericalOptimizerConfig,
     StandardModelConstructor,
 )
+from xopt.generators.bayesian.models import SaasModelConstructor
 from xopt.generators.bayesian.utils import get_training_data_batched
 from xopt.resources.testing import (
     TEST_VOCS_BASE,
@@ -1148,3 +1149,11 @@ class TestBatchedModelConstructor:
         constructor = BatchedModelConstructor()
         with pytest.raises(ValueError, match="no data found"):
             constructor.build_model_from_vocs(test_vocs, empty_data)
+
+    def test_saas_model_constructor(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = SaasModelConstructor(warmup_steps=2, num_samples=4, thinning=2)
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model, ModelListGP)

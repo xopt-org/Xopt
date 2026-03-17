@@ -8,7 +8,7 @@ from botorch.exceptions import ModelFittingError
 import botorch.settings
 import pandas as pd
 import torch
-from botorch import fit_gpytorch_mll
+from botorch import fit_fully_bayesian_model_nuts, fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
@@ -33,44 +33,10 @@ from xopt.pydantic import XoptBaseModel, decode_torch_module
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
-# TODO: make custom stopping criterion that checks lengthscales
 
-
-class ExpMAStoppingCriterionModel(XoptBaseModel):
-    maxiter: int = Field(500, description="maximum number of iterations")
-    n_window: int = Field(
-        5, description="size of the exponential moving average window"
-    )
-    eta: float = Field(1.0, description="exponential decay factor in the weights")
-    rel_tol: float = Field(5e-4, description="relative tolerance for termination")
-
-
-class NumericalOptimizerConfig(XoptBaseModel):
-    timeout: float | None = Field(default=None, description="timeout in seconds")
-
-
-class LBFGSNumericalOptimizerConfig(NumericalOptimizerConfig):
-    gtol: float = Field(
-        default=1e-5, description="projected gradient tolerance, scipy default is 1e-5"
-    )
-    ftol: float = Field(
-        default=2.2e-9,
-        description="function tolerance, scipy default is 1e7 * np.finfo(float).eps = "
-        "2.2204460492503131e-09",
-    )
-    maxiter: int = Field(default=500, description="maximum number of iterations")
-
-
-class AdamNumericalOptimizerConfig(NumericalOptimizerConfig):
-    stopping_criterion: ExpMAStoppingCriterionModel = Field(
-        default_factory=ExpMAStoppingCriterionModel
-    )
-    lr: float = Field(default=0.1, description="learning rate for the Adam optimizer")
-
-
-class StandardModelConstructor(ModelConstructor):
+class SaasModelConstructor(ModelConstructor):
     """
-    A class for constructing independent models for each objective and constraint.
+    A class for constructing Sparse Axis-Aligned Subspace (SAAS) models.
 
     Attributes
     ----------
@@ -79,12 +45,6 @@ class StandardModelConstructor(ModelConstructor):
 
     use_low_noise_prior : bool
         Specify if the model should assume a low noise environment.
-
-    covar_modules : Dict[str, Kernel]
-        Covariance modules for GP models.
-
-    mean_modules : Dict[str, Module]
-        Prior mean modules for GP models.
 
     trainable_mean_keys : List[str]
         List of prior mean modules that can be trained.
@@ -112,15 +72,9 @@ class StandardModelConstructor(ModelConstructor):
 
     """
 
-    name: str = Field("standard", frozen=True)
+    name: str = Field("saas", frozen=True)
     use_low_noise_prior: bool = Field(
         False, description="specify if model should assume a low noise environment"
-    )
-    covar_modules: Dict[str, Kernel] = Field(
-        {}, description="covariance modules for GP models"
-    )
-    mean_modules: Dict[str, Module] = Field(
-        {}, description="prior mean modules for GP models"
     )
     trainable_mean_keys: List[str] = Field(
         [], description="list of prior mean modules that can be trained"
@@ -129,9 +83,6 @@ class StandardModelConstructor(ModelConstructor):
         True,
         description="specify if inputs should be transformed inside the gp "
         "model, can optionally specify a dict of specifications",
-    )
-    saas_outputs: List[str] = Field(
-        [], description="list of output names to apply SAAS priors to"
     )
     custom_noise_prior: Optional[Prior] = Field(
         None,
@@ -143,22 +94,21 @@ class StandardModelConstructor(ModelConstructor):
         description="flag to specify if cached hyperparameters should be used in "
         "model creation. Training will still occur unless train_model is False.",
     )
-    train_method: Literal["lbfgs", "adam"] = Field(
-        "lbfgs", description="numerical optimization algorithm to use"
-    )
     train_model: bool = Field(
         True,
         description="flag to specify if the model should be trained (fitted to data)",
     )
-    train_config: NumericalOptimizerConfig | None = Field(
-        None,
-        description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy"
-        " and fit_gpytorch_mll_torch",
+    warmup_steps: int = Field(
+        512, description="number of warmup steps to use if training with MCMC"
     )
-    train_kwargs: Optional[Dict[str, Any]] = Field(
-        None,
-        description="additional keyword arguments passed to the training optimizer",
+    num_samples: int = Field(
+        256, description="number of samples to use if training with MCMC"
     )
+    thinning: int = Field(
+        16,
+        description="thinning factor to use if training with MCMC, only every nth sample is kept",
+    )
+
     _hyperparameter_store: Optional[Dict] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
@@ -166,71 +116,8 @@ class StandardModelConstructor(ModelConstructor):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-    @field_validator("train_kwargs")
-    def validate_train_kwargs(cls, train_kwargs, info: ValidationInfo):
-        if train_kwargs is None:
-            return train_kwargs
-        # keys are from _fit_fallback in botorch/fit.py - we don't use other dispatchers
-        allowed_keys = [
-            "pick_best_of_all_attempts",
-            "max_attempts",
-            "warning_handler",
-            "optimizer_kwargs",
-        ]
-        allowed_subkeys = {}
-        if not isinstance(train_kwargs, dict):
-            raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
-        invalid_keys = set(train_kwargs.keys()) - set(allowed_keys)
-        if invalid_keys:
-            raise ValueError(
-                f"train_kwargs can only contain the keys {allowed_keys}, have {invalid_keys}"
-            )
-        for k, v in train_kwargs.items():
-            if k in allowed_subkeys and isinstance(v, dict):
-                allowed = allowed_subkeys.get(k, [])
-                if set(v.keys()) - set(allowed):
-                    raise ValueError(
-                        f"train_kwargs['{k}'] can only contain the keys {allowed}"
-                    )
-        return train_kwargs
-
-    @field_validator("train_config")
-    def validate_train_config(cls, v, info: ValidationInfo):
-        if v is None:
-            return v
-        if info.data["train_method"] == "adam":
-            if not isinstance(v, AdamNumericalOptimizerConfig):
-                raise ValueError(
-                    "train_config must be of type AdamOptimizerConfig when method is 'adam'"
-                )
-        elif info.data["train_method"] == "lbfgs":
-            if not isinstance(v, LBFGSNumericalOptimizerConfig):
-                raise ValueError(
-                    "train_config must be of type LBFGSOptimizerConfig when method is 'lbfgs'"
-                )
-        else:
-            raise ValueError("method must be either 'adam' or 'lbfgs'")
-        return v
-
-    @field_validator("covar_modules", "mean_modules", mode="before")
-    def validate_torch_modules(cls, value: Any):
-        if not isinstance(value, dict):
-            raise ValueError("must be dict")
-        else:
-            value = cast(dict[str, Any], value)
-            for key, val in value.items():
-                if isinstance(val, str):
-                    if val.startswith("base64:"):
-                        value[key] = decode_torch_module(val)
-                    elif os.path.exists(val):
-                        value[key] = torch.load(val, weights_only=False)
-
-        return value
-
     @field_validator("trainable_mean_keys")
     def validate_trainable_mean_keys(cls, value: Any, info: ValidationInfo):
-        for name in value:
-            assert name in info.data["mean_modules"]
         return value
 
     def get_likelihood(
@@ -314,17 +201,11 @@ class StandardModelConstructor(ModelConstructor):
                     "training GP model hyperparameters instead"
                 )
 
-        covar_modules = deepcopy(self.covar_modules)
-        mean_modules = deepcopy(self.mean_modules)
         for outcome_name in outcome_names:
             input_transform = self._get_input_transform(
                 outcome_name, input_names, input_bounds, tkwargs
             )
             outcome_transform = Standardize(1)
-            covar_module = self._get_module(covar_modules, outcome_name)
-            mean_module = self.build_mean_module(
-                outcome_name, mean_modules, input_transform, outcome_transform
-            )
 
             # get training data
             train_X, train_Y, train_Yvar = get_training_data(
@@ -334,68 +215,17 @@ class StandardModelConstructor(ModelConstructor):
             kwargs = {
                 "input_transform": input_transform,
                 "outcome_transform": outcome_transform,
-                "covar_module": covar_module,
-                "mean_module": mean_module,
             }
 
-            # handle saas model construction
-            if outcome_name in self.saas_outputs:
-                if kwargs.pop("covar_module", None) is not None:
-                    warnings.warn(
-                        f"Covariance module specified for output {outcome_name} will be overwritten by SAAS model construction."
-                    )
-                if kwargs.pop("mean_module", None) is not None:
-                    warnings.warn(
-                        f"Mean module specified for output {outcome_name} will be overwritten by SAAS model construction."
-                    )
-                models.append(
-                    self.build_map_saas_gp(
-                        train_X.to(**tkwargs),
-                        train_Y.to(**tkwargs),
-                        train_Yvar.to(**tkwargs) if train_Yvar is not None else None,
-                        train=False,
-                        **kwargs,
-                    )
+            # train SAAS single-task-gp
+            models.append(
+                self.build_saas_gp(
+                    train_X.to(**tkwargs),
+                    train_Y.to(**tkwargs),
+                    train_Yvar.to(**tkwargs) if train_Yvar is not None else None,
+                    train=False,
+                    **kwargs,
                 )
-
-                # add in likelihood if needed
-                # if models[-1].likelihood is None:
-                #    models[-1].likelihood = self.get_likelihood()
-                continue
-
-            if train_Yvar is None:
-                # train basic single-task-gp model
-                models.append(
-                    self.build_single_task_gp(
-                        train_X.to(**tkwargs),
-                        train_Y.to(**tkwargs),
-                        likelihood=self.get_likelihood(),
-                        train=False,
-                        **kwargs,
-                    )
-                )
-            else:
-                # train heteroskedastic single-task-gp model
-                # turn off warnings
-                models.append(
-                    self.build_heteroskedastic_gp(
-                        train_X.to(**tkwargs),
-                        train_Y.to(**tkwargs),
-                        train_Yvar.to(**tkwargs),
-                        train=False,
-                        **kwargs,
-                    )
-                )
-        # check all specified modules were added to the model
-        if covar_modules:
-            warnings.warn(
-                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
-                f"could not be added to the model."
-            )
-        if mean_modules:
-            warnings.warn(
-                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
-                f"could not be added to the model."
             )
 
         full_model = ModelListGP(*models)
@@ -418,74 +248,19 @@ class StandardModelConstructor(ModelConstructor):
 
     def _train_model(self, model):
         models = model.models if isinstance(model, ModelListGP) else [model]
-        for m in models:
-            mll = ExactMarginalLogLikelihood(m.likelihood, m)
-            tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
-            if "optimizer_kwargs" not in tr_kwargs:
-                tr_kwargs["optimizer_kwargs"] = {}
-            if self.train_config is not None and self.train_config.timeout is not None:
-                tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
-            if self.train_method == "adam":
-                cfg_adam: AdamNumericalOptimizerConfig = (
-                    self.train_config or AdamNumericalOptimizerConfig()
-                )
-                sc = ExpMAStoppingCriterion(
-                    maxiter=cfg_adam.stopping_criterion.maxiter,
-                    n_window=cfg_adam.stopping_criterion.n_window,
-                    eta=cfg_adam.stopping_criterion.eta,
-                    rel_tol=cfg_adam.stopping_criterion.rel_tol,
-                )
-                opt = partial(Adam, lr=cfg_adam.lr)
-                tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
-                tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
-                optimizer = fit_gpytorch_mll_torch
-            else:
-                cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
-                    self.train_config or LBFGSNumericalOptimizerConfig()
-                )
-                if "options" not in tr_kwargs["optimizer_kwargs"]:
-                    tr_kwargs["optimizer_kwargs"]["options"] = {}
-                tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
-                tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
-                tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
-                optimizer = fit_gpytorch_mll_scipy
 
+        for m in models:
             try:
-                fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+                fit_fully_bayesian_model_nuts(
+                    m,
+                    warmup_steps=self.warmup_steps,
+                    num_samples=self.num_samples,
+                    thinning=self.thinning,
+                    disable_progbar=True,
+                )
             except ModelFittingError:
                 warnings.warn("Model fitting failed. Returning untrained model.")
         return model
-
-    def build_mean_module(
-        self, name, mean_modules, input_transform, outcome_transform
-    ) -> Optional[CustomMean]:
-        """
-        Build the mean module for the output specified by name.
-
-        Parameters
-        ----------
-        name : str
-            The name of the output.
-        mean_modules: dict
-            The dictionary of mean modules.
-        input_transform : InputTransform
-            Transform for input variables.
-        outcome_transform : OutcomeTransform
-            Transform for outcome variables.
-
-        Returns
-        -------
-        Optional[CustomMean]
-            The mean module for the output, or None if not specified.
-
-        """
-        mean_module = self._get_module(mean_modules, name)
-        if mean_module is not None:
-            fixed_model = False if name in self.trainable_mean_keys else True
-            mean_module = CustomMean(
-                mean_module, input_transform, outcome_transform, fixed_model=fixed_model
-            )
-        return mean_module
 
     @staticmethod
     def _get_module(base, name):
@@ -557,7 +332,7 @@ class StandardModelConstructor(ModelConstructor):
         return input_transform
 
 
-class BatchedModelConstructor(StandardModelConstructor):
+class BatchedSaasModelConstructor(SaasModelConstructor):
     """
     BatchedModelConstructor treats outputs as an additional dimension instead of looping over them.
     It is useful when multiple outputs are being modelled and their settings are similar.
@@ -648,24 +423,6 @@ class BatchedModelConstructor(StandardModelConstructor):
                 train_X=train_X, train_Y=train_Y
             )
         )
-
-        covar_module = None
-        if len(self.covar_modules) > 1:
-            raise ValueError(
-                "Covariance modules cannot be specified individually when using BatchedModelConstructor"
-            )
-        elif len(self.covar_modules) == 1:
-            covar_module = list(self.covar_modules.values())[0]
-
-        mean_module = None
-        if len(self.mean_modules) > 1:
-            raise ValueError(
-                "Mean modules cannot be specified individually when using BatchedModelConstructor"
-            )
-        # assume that if have 1 module, it is to be used for all outputs
-        elif len(self.mean_modules) == 1:
-            mean_module = list(self.mean_modules.values())[0]
-
         # input and output transforms are applied BEFORE tensors are unrolled
         input_transform = self._get_input_transform(
             outcome_names,
@@ -679,8 +436,6 @@ class BatchedModelConstructor(StandardModelConstructor):
         kwargs = {
             "input_transform": input_transform,
             "outcome_transform": outcome_transform,
-            "covar_module": covar_module,
-            "mean_module": mean_module,
         }
 
         if train_Yvar is None:
