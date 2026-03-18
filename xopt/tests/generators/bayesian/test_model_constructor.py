@@ -10,7 +10,7 @@ import torch
 import yaml
 from botorch import fit_gpytorch_mll
 from botorch.exceptions import ModelFittingError
-from botorch.models import SingleTaskGP
+from botorch.models import SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch import ExactMarginalLogLikelihood
@@ -26,6 +26,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,
 )
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
+from xopt.generators.bayesian.models.approximate import ApproximateModelConstructor
 from xopt.generators.bayesian.models.standard import (
     AdamNumericalOptimizerConfig,
     BatchedModelConstructor,
@@ -1148,3 +1149,11 @@ class TestBatchedModelConstructor:
         constructor = BatchedModelConstructor()
         with pytest.raises(ValueError, match="no data found"):
             constructor.build_model_from_vocs(test_vocs, empty_data)
+
+    def test_variational_gp(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = ApproximateModelConstructor()
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model.models[0], SingleTaskVariationalGP)
