@@ -381,51 +381,73 @@ class StandardModelConstructor(ModelConstructor):
             full_model.load_state_dict(store)
 
         if self.train_model:
-            full_model = self._train_model(full_model)
+            trained_models = []
+            models = models = (
+                full_model.models
+                if isinstance(full_model, ModelListGP)
+                else [full_model]
+            )
+            for m in models:
+                mll = ExactMarginalLogLikelihood(m.likelihood, m)
+                trained_models.append(self._train_model(m, mll))
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
         return full_model.to(**tkwargs)
 
-    def _train_model(self, model):
-        models = model.models if isinstance(model, ModelListGP) else [model]
-        for m in models:
-            mll = ExactMarginalLogLikelihood(m.likelihood, m)
-            tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
-            if "optimizer_kwargs" not in tr_kwargs:
-                tr_kwargs["optimizer_kwargs"] = {}
-            if self.train_config is not None and self.train_config.timeout is not None:
-                tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
-            if self.train_method == "adam":
-                cfg_adam: AdamNumericalOptimizerConfig = (
-                    self.train_config or AdamNumericalOptimizerConfig()
-                )
-                sc = ExpMAStoppingCriterion(
-                    maxiter=cfg_adam.stopping_criterion.maxiter,
-                    n_window=cfg_adam.stopping_criterion.n_window,
-                    eta=cfg_adam.stopping_criterion.eta,
-                    rel_tol=cfg_adam.stopping_criterion.rel_tol,
-                )
-                opt = partial(Adam, lr=cfg_adam.lr)
-                tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
-                tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
-                optimizer = fit_gpytorch_mll_torch
-            else:
-                cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
-                    self.train_config or LBFGSNumericalOptimizerConfig()
-                )
-                if "options" not in tr_kwargs["optimizer_kwargs"]:
-                    tr_kwargs["optimizer_kwargs"]["options"] = {}
-                tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
-                tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
-                tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
-                optimizer = fit_gpytorch_mll_scipy
+    def _train_model(self, model, mll):
+        """
+        Train a single GP model using the specified training method and configuration.
 
-            try:
-                fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
-            except ModelFittingError:
-                warnings.warn("Model fitting failed. Returning untrained model.")
+        Parameters
+        ----------
+        model : gpytorch.gp.GP
+            The model to be trained.
+        mll : gpytorch.mll.MarginalLogLikelihood
+            The marginal log likelihood for the model.
+
+        Returns
+        -------
+        gpytorch.gp.GP
+            The trained model.
+
+        """
+
+        tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
+        if "optimizer_kwargs" not in tr_kwargs:
+            tr_kwargs["optimizer_kwargs"] = {}
+        if self.train_config is not None and self.train_config.timeout is not None:
+            tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
+        if self.train_method == "adam":
+            cfg_adam: AdamNumericalOptimizerConfig = (
+                self.train_config or AdamNumericalOptimizerConfig()
+            )
+            sc = ExpMAStoppingCriterion(
+                maxiter=cfg_adam.stopping_criterion.maxiter,
+                n_window=cfg_adam.stopping_criterion.n_window,
+                eta=cfg_adam.stopping_criterion.eta,
+                rel_tol=cfg_adam.stopping_criterion.rel_tol,
+            )
+            opt = partial(Adam, lr=cfg_adam.lr)
+            tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
+            tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
+            optimizer = fit_gpytorch_mll_torch
+        else:
+            cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
+                self.train_config or LBFGSNumericalOptimizerConfig()
+            )
+            if "options" not in tr_kwargs["optimizer_kwargs"]:
+                tr_kwargs["optimizer_kwargs"]["options"] = {}
+            tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
+            tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
+            tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
+            optimizer = fit_gpytorch_mll_scipy
+
+        try:
+            fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+        except ModelFittingError:
+            warnings.warn("Model fitting failed. Returning untrained model.")
         return model
 
     def build_mean_module(
@@ -674,7 +696,8 @@ class BatchedModelConstructor(StandardModelConstructor):
             full_model.load_state_dict(store)
 
         if self.train_model:
-            full_model = self._train_model(full_model)
+            mll = ExactMarginalLogLikelihood(full_model.likelihood, full_model)
+            full_model = self._train_model(full_model, mll)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()

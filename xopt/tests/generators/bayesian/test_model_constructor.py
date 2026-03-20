@@ -191,10 +191,13 @@ class TestModelConstructor:
                 warnings.simplefilter("always")
 
                 # Call _train_model which should handle the exception gracefully
-                trained_model = constructor._train_model(model)
+                mll = ExactMarginalLogLikelihood(
+                    model.models[0].likelihood, model.models[0]
+                )
+                trained_model = constructor._train_model(model, mll)
 
-                # Verify warnings were issued (one for each output: y1 and c1)
-                assert len(w) == 2
+                # Verify warnings were issued (only trained one model in this case)
+                assert len(w) == 1
                 assert all(
                     "Model fitting failed" in str(warning.message) for warning in w
                 )
