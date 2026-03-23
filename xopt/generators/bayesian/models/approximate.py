@@ -132,7 +132,7 @@ class ApproximateModelConstructor(StandardModelConstructor):
 
             # train basic approximate single-task-gp model
             models.append(
-                self.build_variational_gp(
+                self.build_approximate_gp(
                     train_X.to(**tkwargs),
                     train_Y.to(**tkwargs),
                     likelihood=self.get_likelihood(),

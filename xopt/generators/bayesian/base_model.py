@@ -214,8 +214,9 @@ class ModelConstructor(XoptBaseModel, ABC):
                 )
         return model
 
-    def build_variational_gp(
-        self, X: Tensor, Y: Tensor, train: bool = True, **kwargs
+    @staticmethod
+    def build_approximate_gp(
+        X: Tensor, Y: Tensor, train: bool = True, **kwargs
     ) -> Model:
         """
         Utility method for creating variational SingleTaskGP models.

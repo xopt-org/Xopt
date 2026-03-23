@@ -10,7 +10,7 @@ import torch
 import yaml
 from botorch import fit_gpytorch_mll
 from botorch.exceptions import ModelFittingError
-from botorch.models import SingleTaskGP, SingleTaskVariationalGP
+from botorch.models import ModelListGP, SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch import ExactMarginalLogLikelihood
@@ -242,37 +242,59 @@ class TestModelConstructor:
         model = constructor.build_model_from_vocs(test_vocs, test_data)
         assert model.num_outputs == 2
 
-    def test_custom_model(self):
+    @pytest.mark.parametrize(
+        "constructor_class",
+        [
+            StandardModelConstructor,
+            ApproximateModelConstructor,
+            BatchedModelConstructor,
+        ],
+    )
+    def test_custom_model(self, constructor_class):
         test_data = deepcopy(TEST_DATA)
         test_vocs = deepcopy(TEST_VOCS)
 
         custom_covar = {"y1": ScaleKernel(PeriodicKernel())}
 
         with pytest.raises(ValidationError):
-            StandardModelConstructor(
+            constructor_class(
                 vocs=test_vocs, covar_modules=deepcopy(custom_covar)["y1"]
             )
 
         # test custom covar module
-        constructor = StandardModelConstructor(covar_modules=deepcopy(custom_covar))
+        constructor = constructor_class(covar_modules=deepcopy(custom_covar))
         model = constructor.build_model(
             test_vocs.variable_names, test_vocs.output_names, test_data
         )
-        assert isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
+
+        if isinstance(model, SingleTaskGP):
+            assert isinstance(model.covar_module.base_kernel, PeriodicKernel)
+        elif isinstance(model, ModelListGP):
+            if isinstance(model.models[0], SingleTaskVariationalGP):
+                assert isinstance(
+                    model.models[0].model.covar_module.base_kernel, PeriodicKernel
+                )
 
         # test prior mean
         class ConstraintPrior(torch.nn.Module):
             def forward(self, X):
-                return X[:, 0] ** 2
+                return X[..., 0] ** 2
 
         mean_modules = {"c1": ConstraintPrior()}
-        constructor = StandardModelConstructor(mean_modules=mean_modules)
+        constructor = constructor_class(mean_modules=mean_modules)
         model = constructor.build_model_from_vocs(test_vocs, test_data)
-        assert isinstance(model.models[1].mean_module.model, ConstraintPrior)
+
+        if constructor_class == StandardModelConstructor:
+            assert isinstance(model.models[1].mean_module.model, ConstraintPrior)
+        elif constructor_class == BatchedModelConstructor:
+            assert isinstance(model.mean_module, ConstraintPrior)
+        elif constructor_class == ApproximateModelConstructor:
+            assert isinstance(model.models[1].model.mean_module.model, ConstraintPrior)
 
     def test_model_w_nans(self):
         test_data = deepcopy(TEST_DATA)
         test_vocs = deepcopy(TEST_VOCS)
+
         constructor = StandardModelConstructor()
 
         # add nans to ouputs
@@ -282,15 +304,21 @@ class TestModelConstructor:
 
         model = constructor.build_model_from_vocs(test_vocs, test_data)
 
-        assert model.train_inputs[0][0].shape == torch.Size([9, test_vocs.n_variables])
-        assert model.train_inputs[1][0].shape == torch.Size([8, test_vocs.n_variables])
+        assert model.models[0].train_inputs[0].shape == torch.Size(
+            [9, test_vocs.n_variables]
+        )
+        assert model.models[1].train_inputs[0].shape == torch.Size(
+            [8, test_vocs.n_variables]
+        )
 
         # add nans to inputs
         test_data2 = deepcopy(TEST_DATA)
         test_data2.loc[5, "x1"] = np.nan
 
         model2 = constructor.build_model_from_vocs(test_vocs, test_data2)
-        assert model2.train_inputs[0][0].shape == torch.Size([9, test_vocs.n_variables])
+        assert model2.models[0].train_inputs[0].shape == torch.Size(
+            [9, test_vocs.n_variables]
+        )
 
         # add nans to both
         test_data3 = deepcopy(TEST_DATA)
@@ -298,8 +326,12 @@ class TestModelConstructor:
         test_data3.loc[7, "c1"] = np.nan
 
         model3 = constructor.build_model_from_vocs(test_vocs, test_data3)
-        assert model3.train_inputs[0][0].shape == torch.Size([9, test_vocs.n_variables])
-        assert model3.train_inputs[1][0].shape == torch.Size([8, test_vocs.n_variables])
+        assert model3.models[0].train_inputs[0].shape == torch.Size(
+            [9, test_vocs.n_variables]
+        )
+        assert model3.models[1].train_inputs[0].shape == torch.Size(
+            [8, test_vocs.n_variables]
+        )
 
     def test_model_w_same_data(self):
         test_data = deepcopy(TEST_VOCS_DATA)
@@ -639,7 +671,10 @@ class TestModelConstructor:
 
         assert isinstance(model.models[0], XoptHeteroskedasticSingleTaskGP)
 
+    def test_build_models_no_data(self):
         # test building models directly with no data
+        gp_constructor = StandardModelConstructor()
+
         with pytest.raises(ValueError):
             gp_constructor.build_single_task_gp(
                 X=torch.empty((0, 1)),
@@ -648,6 +683,13 @@ class TestModelConstructor:
 
         with pytest.raises(ValueError):
             gp_constructor.build_heteroskedastic_gp(
+                X=torch.empty((0, 1)),
+                Y=torch.empty((0, 1)),
+                Yvar=torch.empty((0, 1)),
+            )
+
+        with pytest.raises(ValueError):
+            gp_constructor.build_approximate_gp(
                 X=torch.empty((0, 1)),
                 Y=torch.empty((0, 1)),
                 Yvar=torch.empty((0, 1)),
@@ -752,21 +794,35 @@ class TestModelConstructor:
                 test_vocs.variable_names, test_vocs.output_names, test_data
             )
 
-    def test_build_models_without_training(self):
+    def test_build_models_with_training(self):
         # Create some test data
         X = torch.randn(10, 2)
         Y = torch.randn(10, 1)
         Yvar = torch.ones(10, 1) * 0.1
 
-        # Test build_single_task_gp without training
-        model = StandardModelConstructor.build_single_task_gp(X, Y, train=False)
+        # Test build_single_task_gp with training
+        model = StandardModelConstructor.build_single_task_gp(X, Y, train=True)
         assert isinstance(model, SingleTaskGP)
 
-        # Test build_heteroskedastic_gp without training
+        # Test build_heteroskedastic_gp with training
         model_hetero = StandardModelConstructor.build_heteroskedastic_gp(
-            X, Y, Yvar, train=False
+            X, Y, Yvar, train=True
         )
         assert isinstance(model_hetero, XoptHeteroskedasticSingleTaskGP)
+
+        # test_training approximate model
+        model_approx = ApproximateModelConstructor.build_approximate_gp(
+            X, Y, train=True
+        )
+        assert isinstance(model_approx, SingleTaskVariationalGP)
+
+    def test_variational_gp(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = ApproximateModelConstructor()
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model.models[0], SingleTaskVariationalGP)
 
     @pytest.fixture(autouse=True)
     def clean_up(self):
@@ -1152,11 +1208,3 @@ class TestBatchedModelConstructor:
         constructor = BatchedModelConstructor()
         with pytest.raises(ValueError, match="no data found"):
             constructor.build_model_from_vocs(test_vocs, empty_data)
-
-    def test_variational_gp(self):
-        test_vocs = deepcopy(TEST_VOCS)
-        test_data = deepcopy(TEST_DATA)
-
-        constructor = ApproximateModelConstructor()
-        model = constructor.build_model_from_vocs(test_vocs, test_data)
-        assert isinstance(model.models[0], SingleTaskVariationalGP)
