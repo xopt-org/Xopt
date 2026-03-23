@@ -228,12 +228,20 @@ class TestModelConstructor:
         assert hasattr(model.models[0], "input_transform")
         assert not hasattr(model.models[1], "input_transform")
 
-    def test_duplicate_keys(self):
+    @pytest.mark.parametrize(
+        "constructor_class",
+        [
+            StandardModelConstructor,
+            ApproximateModelConstructor,
+            BatchedModelConstructor,
+        ],
+    )
+    def test_duplicate_keys(self, constructor_class):
         test_data = deepcopy(TEST_DATA)
         test_vocs = deepcopy(TEST_VOCS)
         test_vocs.observables = ["y1"]
 
-        constructor = StandardModelConstructor()
+        constructor = constructor_class()
 
         constructor.build_model(
             test_vocs.variable_names, test_vocs.output_names, test_data
