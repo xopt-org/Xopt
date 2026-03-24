@@ -13,6 +13,7 @@ from botorch.exceptions import ModelFittingError
 from botorch.models import ModelListGP, SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.transforms import Normalize, Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
+from botorch.models.utils.inducing_point_allocators import GreedyVarianceReduction
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
@@ -832,13 +833,30 @@ class TestModelConstructor:
         )
         assert isinstance(model_approx, SingleTaskVariationalGP)
 
-    def test_variational_gp(self):
+    def test_approximate_gp(self):
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
 
         constructor = ApproximateModelConstructor()
         model = constructor.build_model_from_vocs(test_vocs, test_data)
         assert isinstance(model.models[0], SingleTaskVariationalGP)
+
+        constructor = ApproximateModelConstructor(
+            inducing_points=3, inducing_point_allocator=GreedyVarianceReduction()
+        )
+        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        assert isinstance(model.models[0], SingleTaskVariationalGP)
+        assert (
+            model.models[0]
+            .model._modules["variational_strategy"]
+            .inducing_points.shape[0]
+            == 3
+        )
+
+        # test to make sure that warning is raised if use_cached_hyperparameters is True
+        constructor.use_cached_hyperparameters = True
+        with pytest.warns(UserWarning):
+            constructor.build_model_from_vocs(test_vocs, test_data)
 
     @pytest.fixture(autouse=True)
     def clean_up(self):

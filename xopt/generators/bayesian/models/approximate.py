@@ -63,8 +63,8 @@ class ApproximateModelConstructor(StandardModelConstructor):
         will use the default number of inducing points in botorch.
 
     inducing_point_allocator : Optional[InducingPointAllocator]
-        An optional InducingPointAllocator to specify how inducing points should 
-        be allocated for the approximate GP model. If None, will use the default 
+        An optional InducingPointAllocator to specify how inducing points should
+        be allocated for the approximate GP model. If None, will use the default
         inducing point allocator in botorch.
 
     """
