@@ -290,7 +290,9 @@ class TestModelConstructor:
 
         mean_modules = {"c1": ConstraintPrior()}
         constructor = constructor_class(mean_modules=mean_modules)
-        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        model = constructor.build_model(
+            test_vocs.variable_names, test_vocs.output_names, test_data
+        )
 
         if constructor_class == StandardModelConstructor:
             assert isinstance(model.models[1].mean_module.model, ConstraintPrior)
@@ -719,11 +721,17 @@ class TestModelConstructor:
         assert model.models[1].likelihood.noise_covar.noise_prior.rate == 1000.0
         assert model.models[1].likelihood.noise_covar.noise_prior.concentration == 1.0
 
-    def test_model_caching(self):
+    @pytest.mark.parametrize(
+        "constructor_class",
+        [
+            StandardModelConstructor,
+        ],
+    )
+    def test_model_caching(self, constructor_class):
         test_data = deepcopy(TEST_DATA)
         test_vocs = deepcopy(TEST_VOCS)
 
-        constructor = StandardModelConstructor()
+        constructor = constructor_class()
 
         constructor.build_model(
             test_vocs.variable_names, test_vocs.output_names, test_data
@@ -794,7 +802,7 @@ class TestModelConstructor:
 
         # test error handling - should raise a warning that hyperparameters were not
         # used
-        constructor = StandardModelConstructor()
+        constructor = constructor_class()
         constructor.use_cached_hyperparameters = True
 
         with pytest.raises(RuntimeWarning):

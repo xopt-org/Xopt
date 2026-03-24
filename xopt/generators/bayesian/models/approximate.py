@@ -100,11 +100,10 @@ class ApproximateModelConstructor(StandardModelConstructor):
 
         # validate if model caching can be used if requested
         if self.use_cached_hyperparameters:
-            if self._hyperparameter_store is None:
-                raise RuntimeWarning(
-                    "cannot use cached hyperparameters, hyperparameter store empty, "
-                    "training GP model hyperparameters instead"
-                )
+            warnings.warn(
+                "cannot use cached hyperparameters for ApproximateGP model due to botorch bug, "
+                "training GP model hyperparameters instead"
+            )
 
         covar_modules = deepcopy(self.covar_modules)
         mean_modules = deepcopy(self.mean_modules)
@@ -142,12 +141,12 @@ class ApproximateModelConstructor(StandardModelConstructor):
             )
 
         # check all specified modules were added to the model
-        if covar_modules:
+        if self.covar_modules:
             warnings.warn(
                 f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
                 f"could not be added to the model."
             )
-        if mean_modules:
+        if self.mean_modules:
             warnings.warn(
                 f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
                 f"could not be added to the model."
@@ -155,13 +154,15 @@ class ApproximateModelConstructor(StandardModelConstructor):
 
         full_model = ModelListGP(*models)
 
+        # TODO: will renable once botorch bug is fixed for ApproximateGP load_state_dict
         # if specified, use cached model hyperparameters
-        if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
-            store = {
-                name: ele.to(**tkwargs)
-                for name, ele in self._hyperparameter_store.items()
-            }
-            full_model.load_state_dict(store)
+        # if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
+        #    store = {
+        #        name: ele.to(**tkwargs)
+        #        for name, ele in self._hyperparameter_store.items()
+        #    }
+        #    store.pop("train_targets", None)
+        #    full_model.load_state_dict(store)
 
         if self.train_model:
             trained_models = []

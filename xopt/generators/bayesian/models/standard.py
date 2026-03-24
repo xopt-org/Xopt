@@ -359,12 +359,12 @@ class StandardModelConstructor(ModelConstructor):
                     )
                 )
         # check all specified modules were added to the model
-        if covar_modules:
+        if self.covar_modules:
             warnings.warn(
                 f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
                 f"could not be added to the model."
             )
-        if mean_modules:
+        if self.mean_modules:
             warnings.warn(
                 f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
                 f"could not be added to the model."
