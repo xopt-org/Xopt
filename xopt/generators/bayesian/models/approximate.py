@@ -1,11 +1,12 @@
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Standardize
+from botorch.models.utils.inducing_point_allocators import InducingPointAllocator
 from pydantic import Field
 from gpytorch.mlls import VariationalELBO
 
@@ -57,9 +58,20 @@ class ApproximateModelConstructor(StandardModelConstructor):
     train_config : NumericalOptimizerConfig
         Configuration of the numerical optimizer.
 
+    inducing_points : Optional[int]
+        Number of inducing points to use for the approximate GP model. If None,
+        will use the default number of inducing points in botorch.
+
+    inducing_point_allocator : Optional[InducingPointAllocator]
+        An optional InducingPointAllocator to specify how inducing points should 
+        be allocated for the approximate GP model. If None, will use the default 
+        inducing point allocator in botorch.
+
     """
 
     name: str = Field("approximate", frozen=True)
+    inducing_points: Optional[int] = None
+    inducing_point_allocator: Optional[InducingPointAllocator] = None
 
     def build_model(
         self,
@@ -128,6 +140,11 @@ class ApproximateModelConstructor(StandardModelConstructor):
                 "covar_module": covar_module,
                 "mean_module": mean_module,
             }
+
+            if self.inducing_points is not None:
+                kwargs["inducing_points"] = self.inducing_points
+            if self.inducing_point_allocator is not None:
+                kwargs["inducing_point_allocator"] = self.inducing_point_allocator
 
             # train basic approximate single-task-gp model
             models.append(
