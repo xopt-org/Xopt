@@ -574,6 +574,8 @@ class BatchedModelConstructor(StandardModelConstructor):
     See benchmarking docs on how to run tests for your specific hardware.
     """
 
+    name: str = Field("batched", frozen=True)
+
     def _get_input_transform(
         self,
         outcome_names: list[str],
