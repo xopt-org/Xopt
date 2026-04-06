@@ -858,6 +858,30 @@ class TestModelConstructor:
         with pytest.warns(UserWarning):
             constructor.build_model_from_vocs(test_vocs, test_data)
 
+    @pytest.mark.parametrize(
+        "constructor_class",
+        [
+            StandardModelConstructor,
+            ApproximateModelConstructor,
+        ],
+    )
+    def test_extra_covar_mean_modules_warning(self, constructor_class):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        # test unused covariance or mean module
+        kwargs_covar = {"covar_modules": {"faulty_output_name": PeriodicKernel()}}
+        kwargs_mean = {"mean_modules": {"faulty_output_name": ConstantMean()}}
+
+        for kwargs in [kwargs_covar, kwargs_mean]:
+            gp_constructor = constructor_class(**kwargs)
+            generator = ExpectedImprovementGenerator(
+                vocs=test_vocs, gp_constructor=gp_constructor
+            )
+            generator.add_data(test_data)
+            with pytest.warns(UserWarning):
+                _ = generator.train_model()
+
     @pytest.fixture(autouse=True)
     def clean_up(self):
         yield
