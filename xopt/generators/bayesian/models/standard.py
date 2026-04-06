@@ -359,14 +359,16 @@ class StandardModelConstructor(ModelConstructor):
                     )
                 )
         # check all specified modules were added to the model
-        if self.covar_modules:
+        # covar_modules / mean_modules are popped from the dict as they are used,
+        # so if any remain, they were not added to the model
+        if covar_modules:
             warnings.warn(
-                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"Covariance modules for output names {[k for k, v in covar_modules.items()]} "
                 f"could not be added to the model."
             )
-        if self.mean_modules:
+        if mean_modules:
             warnings.warn(
-                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"Mean modules for output names {[k for k, v in mean_modules.items()]} "
                 f"could not be added to the model."
             )
 
@@ -382,7 +384,7 @@ class StandardModelConstructor(ModelConstructor):
 
         if self.train_model:
             trained_models = []
-            models = models = (
+            models = (
                 full_model.models
                 if isinstance(full_model, ModelListGP)
                 else [full_model]
@@ -390,6 +392,9 @@ class StandardModelConstructor(ModelConstructor):
             for m in models:
                 mll = ExactMarginalLogLikelihood(m.likelihood, m)
                 trained_models.append(self._train_model(m, mll))
+
+            # add the trained models to a ModelListGP if training was performed
+            full_model = ModelListGP(*trained_models)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
@@ -402,14 +407,14 @@ class StandardModelConstructor(ModelConstructor):
 
         Parameters
         ----------
-        model : gpytorch.gp.GP
+        model : gpytorch.module.Module
             The model to be trained.
         mll : gpytorch.mll.MarginalLogLikelihood
             The marginal log likelihood for the model.
 
         Returns
         -------
-        gpytorch.gp.GP
+        gpytorch.module.Module
             The trained model.
 
         """
@@ -460,7 +465,7 @@ class StandardModelConstructor(ModelConstructor):
         ----------
         name : str
             The name of the output.
-        mean_modules: dict
+        mean_modules: dict[str, Module]
             The dictionary of mean modules.
         input_transform : InputTransform
             Transform for input variables.

@@ -146,26 +146,34 @@ class ApproximateModelConstructor(StandardModelConstructor):
             if self.inducing_point_allocator is not None:
                 kwargs["inducing_point_allocator"] = self.inducing_point_allocator
 
-            # train basic approximate single-task-gp model
-            models.append(
-                self.build_approximate_gp(
-                    train_X.to(**tkwargs),
-                    train_Y.to(**tkwargs),
-                    likelihood=self.get_likelihood(),
-                    train=False,
-                    **kwargs,
-                )
+            # build basic approximate single-task-gp model
+            model = self.build_approximate_gp(
+                train_X.to(**tkwargs),
+                train_Y.to(**tkwargs),
+                likelihood=self.get_likelihood(),
+                train=False,
+                **kwargs,
             )
 
+            # if train_model is True train the model here
+            if self.train_model:
+                num_data = train_X.shape[0]
+                mll = VariationalELBO(model.likelihood, model.model, num_data=num_data)
+                model = self._train_model(model, mll)
+
+            models.append(model)
+
         # check all specified modules were added to the model
-        if self.covar_modules:
+        # covar_modules / mean_modules are popped from the dict as they are used,
+        # so if any remain, they were not added to the model
+        if covar_modules:
             warnings.warn(
-                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"Covariance modules for output names {[k for k, v in covar_modules.items()]} "
                 f"could not be added to the model."
             )
-        if self.mean_modules:
+        if mean_modules:
             warnings.warn(
-                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"Mean modules for output names {[k for k, v in mean_modules.items()]} "
                 f"could not be added to the model."
             )
 
@@ -180,19 +188,6 @@ class ApproximateModelConstructor(StandardModelConstructor):
         #    }
         #    store.pop("train_targets", None)
         #    full_model.load_state_dict(store)
-
-        if self.train_model:
-            trained_models = []
-            models = (
-                full_model.models
-                if isinstance(full_model, ModelListGP)
-                else [full_model]
-            )
-            for m in models:
-                num_data = train_X.shape[0]
-                mll = VariationalELBO(m.likelihood, m.model, num_data=num_data)
-                trained_models.append(self._train_model(m, mll))
-            full_model = ModelListGP(*trained_models)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
