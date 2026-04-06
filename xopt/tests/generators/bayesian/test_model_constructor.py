@@ -703,7 +703,6 @@ class TestModelConstructor:
             gp_constructor.build_approximate_gp(
                 X=torch.empty((0, 1)),
                 Y=torch.empty((0, 1)),
-                Yvar=torch.empty((0, 1)),
             )
 
     def test_custom_noise_prior(self):
