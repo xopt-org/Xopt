@@ -39,7 +39,12 @@ from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
 from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
     LogAcquisitionFunction,
 )
-from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.models.approximate import ApproximateModelConstructor
+from xopt.generators.bayesian.models.standard import (
+    BatchedModelConstructor,
+    StandardModelConstructor,
+)
+from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 from xopt.generators.bayesian.objectives import (
     create_constraint_callables,
     create_mc_objective,
@@ -238,7 +243,12 @@ class BayesianGenerator(Generator, ABC):
     @field_validator("gp_constructor", mode="before")
     @classmethod
     def validate_gp_constructor(cls, value: Any):
-        constructor_dict = {"standard": StandardModelConstructor}
+        constructor_dict = {
+            "standard": StandardModelConstructor,
+            "batched": BatchedModelConstructor,
+            "time_dependent": TimeDependentModelConstructor,
+            "approximate": ApproximateModelConstructor,
+        }
         if value is None:
             value = StandardModelConstructor()
         elif isinstance(value, ModelConstructor):

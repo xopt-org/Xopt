@@ -6,9 +6,10 @@ from botorch.exceptions import ModelFittingError
 import pandas as pd
 import torch
 from botorch import fit_fully_bayesian_model_nuts, fit_gpytorch_mll
-from botorch.models import ModelListGP, SaasFullyBayesianSingleTaskGP, SingleTaskGP
+from botorch.models import ModelListGP, SaasFullyBayesianSingleTaskGP, SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.model import Model
 from gpytorch import ExactMarginalLogLikelihood
+from gpytorch.mlls import VariationalELBO
 from pydantic import ConfigDict
 from torch import Tensor
 from botorch.models.map_saas import get_map_saas_model
@@ -97,7 +98,7 @@ class ModelConstructor(XoptBaseModel, ABC):
         data: pd.DataFrame,
         dtype: torch.dtype = torch.double,
         device: Union[torch.device, str] = "cpu",
-    ):
+    ) -> ModelListGP:
         """
         Convenience wrapper around `build_model` for use with VOCS (Variables,
         Objectives, Constraints, Statics).
@@ -215,11 +216,12 @@ class ModelConstructor(XoptBaseModel, ABC):
         return model
 
     @staticmethod
-    def build_saas_gp(
-        X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs
+
+    def build_approximate_gp(
+        X: Tensor, Y: Tensor, train: bool = True, **kwargs
     ) -> Model:
         """
-        Utility method for creating and training a fully Bayesian SAAS SingleTaskGP model.
+        Utility method for creating variational SingleTaskGP models.
 
         Parameters
         ----------
@@ -227,98 +229,23 @@ class ModelConstructor(XoptBaseModel, ABC):
             Training data for input variables.
         Y : Tensor
             Training data for outcome variables.
-        Yvar : Tensor
-            Training data for outcome variable variances.
         train : bool, True
-            Flag to specify if hyperparameter training should take place
+            Flag to specify if hyperparameter training should take place.
         **kwargs
             Additional keyword arguments for model configuration.
 
         Returns
         -------
         Model
-            The trained SAAS SingleTaskGP model.
-
-        Notes
-        -----
-        SAAS modeling can be unstable when the number of dimensions is high and the amount of data is low.
-        Your results may vary and keep an eye on warnings.
+            The variational SingleTaskGP model.
 
         """
-        WARMUP_STEPS = 512
-        NUM_SAMPLES = 256
-        THINNING = 16
-
         if X.shape[0] == 0 or Y.shape[0] == 0:
             raise ValueError("no data found to train model!")
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore")
-            model = SaasFullyBayesianSingleTaskGP(X, Y, Yvar, **kwargs)
+        model = SingleTaskVariationalGP(X, Y, **kwargs)
 
         if train:
-            try:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore")
-                    fit_fully_bayesian_model_nuts(
-                        model,
-                        warmup_steps=WARMUP_STEPS,
-                        num_samples=NUM_SAMPLES,
-                        thinning=THINNING,
-                        disable_progbar=True,
-                    )
-            except ModelFittingError:
-                warnings.warn(
-                    "Model fitting failed for SAAS GP. Returning untrained model."
-                )
-        return model
-
-    @staticmethod
-    def build_map_saas_gp(
-        X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs
-    ):
-        """
-        Utility method for creating and training a MAP SAAS SingleTaskGP model.
-
-        Parameters
-        ----------
-        X : Tensor
-            Training data for input variables.
-        Y : Tensor
-            Training data for outcome variables.
-        Yvar : Tensor
-            Training data for outcome variable variances.
-        train : bool, True
-            Flag to specify if hyperparameter training should take place
-        **kwargs
-            Additional keyword arguments for model configuration.
-
-        Returns
-        -------
-        Model
-            The trained MAP SAAS SingleTaskGP model.
-
-        Notes
-        -----
-        MAP SAAS modeling can be unstable when the number of dimensions is high and the amount of data is low.
-        Your results may vary and keep an eye on warnings.
-
-        """
-
-        if X.shape[0] == 0 or Y.shape[0] == 0:
-            raise ValueError("no data found to train model!")
-
-        model = get_map_saas_model(X, Y, Yvar, **kwargs)
-
-        if train:
-            try:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore")
-                    mll = ExactMarginalLogLikelihood(model.likelihood, model)
-                    fit_gpytorch_mll(mll)
-            except ModelFittingError:
-                warnings.warn(
-                    "Model fitting failed for MAP SAAS GP. Returning untrained model."
-                )
+            mll = VariationalELBO(model.likelihood, model.model, num_data=X.shape[-2])
+            fit_gpytorch_mll(mll)
 
         return model
