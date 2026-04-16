@@ -5,8 +5,8 @@ import warnings
 from botorch.exceptions import ModelFittingError
 import pandas as pd
 import torch
-from botorch import fit_fully_bayesian_model_nuts, fit_gpytorch_mll
-from botorch.models import ModelListGP, SaasFullyBayesianSingleTaskGP, SingleTaskGP, SingleTaskVariationalGP
+from botorch import fit_gpytorch_mll
+from botorch.models import ModelListGP, SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.model import Model
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.mlls import VariationalELBO
@@ -216,7 +216,6 @@ class ModelConstructor(XoptBaseModel, ABC):
         return model
 
     @staticmethod
-
     def build_approximate_gp(
         X: Tensor, Y: Tensor, train: bool = True, **kwargs
     ) -> Model:
@@ -249,7 +248,7 @@ class ModelConstructor(XoptBaseModel, ABC):
             fit_gpytorch_mll(mll)
 
         return model
-    
+
     @staticmethod
     def build_map_saas_gp(
         X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs
