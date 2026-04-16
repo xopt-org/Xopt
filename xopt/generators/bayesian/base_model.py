@@ -249,3 +249,53 @@ class ModelConstructor(XoptBaseModel, ABC):
             fit_gpytorch_mll(mll)
 
         return model
+    
+    @staticmethod
+    def build_map_saas_gp(
+        X: Tensor, Y: Tensor, Yvar: Tensor, train: bool = True, **kwargs
+    ):
+        """
+        Utility method for creating and training a MAP SAAS SingleTaskGP model.
+
+        Parameters
+        ----------
+        X : Tensor
+            Training data for input variables.
+        Y : Tensor
+            Training data for outcome variables.
+        Yvar : Tensor
+            Training data for outcome variable variances.
+        train : bool, True
+            Flag to specify if hyperparameter training should take place
+        **kwargs
+            Additional keyword arguments for model configuration.
+
+        Returns
+        -------
+        Model
+            The trained MAP SAAS SingleTaskGP model.
+
+        Notes
+        -----
+        MAP SAAS modeling can be unstable when the number of dimensions is high and the amount of data is low.
+        Your results may vary and keep an eye on warnings.
+
+        """
+
+        if X.shape[0] == 0 or Y.shape[0] == 0:
+            raise ValueError("no data found to train model!")
+
+        model = get_map_saas_model(X, Y, Yvar, **kwargs)
+
+        if train:
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore")
+                    mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                    fit_gpytorch_mll(mll)
+            except ModelFittingError:
+                warnings.warn(
+                    "Model fitting failed for MAP SAAS GP. Returning untrained model."
+                )
+
+        return model

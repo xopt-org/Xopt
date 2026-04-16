@@ -25,16 +25,15 @@ from pydantic_core.core_schema import ValidationInfo
 from torch.nn import Module
 from torch.optim import Adam
 
-from xopt.generators.bayesian.base_model import ModelConstructor
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_training_data, get_training_data_batched
-from xopt.pydantic import XoptBaseModel, decode_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 
-class SaasModelConstructor(ModelConstructor):
+class SaasModelConstructor(StandardModelConstructor):
     """
     A class for constructing Sparse Axis-Aligned Subspace (SAAS) models.
 
@@ -245,91 +244,6 @@ class SaasModelConstructor(ModelConstructor):
         self._hyperparameter_store = full_model.state_dict()
 
         return full_model.to(**tkwargs)
-
-    def _train_model(self, model):
-        models = model.models if isinstance(model, ModelListGP) else [model]
-
-        for m in models:
-            try:
-                fit_fully_bayesian_model_nuts(
-                    m,
-                    warmup_steps=self.warmup_steps,
-                    num_samples=self.num_samples,
-                    thinning=self.thinning,
-                    disable_progbar=True,
-                )
-            except ModelFittingError:
-                warnings.warn("Model fitting failed. Returning untrained model.")
-        return model
-
-    @staticmethod
-    def _get_module(base, name):
-        """
-        Get the module for a given name.
-
-        Parameters
-        ----------
-        base : Union[Module, Dict[str, Module]]
-            The base module or a dictionary of modules.
-        name : str
-            The name of the module.
-
-        Returns
-        -------
-        Module
-            The retrieved module.
-
-        """
-        if isinstance(base, Module):
-            return deepcopy(base)
-        elif isinstance(base, dict):
-            return deepcopy(base.pop(name, None))
-        else:
-            return None
-
-    def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
-        """
-        Get input transform based on the supplied bounds and attributes
-
-        Parameters
-        ----------
-        outcome_name : str
-            The name of the outcome variable.
-        input_names : list[str]
-            The names of the input variables.
-        input_bounds : dict[str, tuple[float, float]]
-            The bounds for the input variables.
-        tkwargs : dict
-            Additional keyword arguments for tensor creation.
-
-        """
-        # get input bounds
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
-            ).T
-
-        # create transform
-        input_transform = Normalize(len(input_names), bounds=bounds)
-
-        # remove input transform if the bool is False or the dict entry is false
-        if isinstance(self.transform_inputs, bool):
-            if not self.transform_inputs:
-                input_transform = None
-        if (
-            isinstance(self.transform_inputs, dict)
-            and outcome_name in self.transform_inputs
-        ):
-            if not self.transform_inputs[outcome_name]:
-                input_transform = None
-
-        # remove warnings if input transform is None
-        if input_transform is None:
-            botorch.settings.validate_input_scaling(False)
-
-        return input_transform
 
 
 class BatchedSaasModelConstructor(SaasModelConstructor):
