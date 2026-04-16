@@ -34,7 +34,6 @@ from xopt.generators.bayesian.models.standard import (
     LBFGSNumericalOptimizerConfig,
     StandardModelConstructor,
 )
-from xopt.generators.bayesian.models import SaasModelConstructor
 from xopt.generators.bayesian.utils import get_training_data_batched
 from xopt.resources.testing import (
     TEST_VOCS_BASE,
@@ -1271,6 +1270,6 @@ class TestBatchedModelConstructor:
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
 
-        constructor = SaasModelConstructor(warmup_steps=2, num_samples=4, thinning=2)
+        constructor = StandardModelConstructor(saas_outputs=["y1", "c1"])
         model = constructor.build_model_from_vocs(test_vocs, test_data)
         assert isinstance(model, ModelListGP)
