@@ -124,9 +124,7 @@ class TestBaxGenerator:
             # need to call each sub-model on some data before conditioning
             [m(x_exe) for m in model.models]
 
-            x_exe_list = [
-                x_exe for i in range(len(model.models))
-            ]
+            x_exe_list = [x_exe for i in range(len(model.models))]
             y_exe_list = [
                 torch.index_select(y_exe, dim=-1, index=torch.tensor([i]))
                 for i in range(len(model.models))
@@ -201,18 +199,30 @@ class TestBaxGenerator:
         acqf = gen.get_acquisition(model)
 
         n_grid = 3
-        test_mesh = torch.meshgrid(torch.linspace(*test_vocs.variables["x1"].domain, n_grid),
-                                   torch.linspace(*test_vocs.variables["x2"].domain, n_grid),
-                                   indexing='ij',
-                                  )
-        test_x = torch.stack((test_mesh[0].flatten(),
-                              test_mesh[1].flatten()),
-                              dim=-1,
-                            )
+        test_mesh = torch.meshgrid(
+            torch.linspace(*test_vocs.variables["x1"].domain, n_grid),
+            torch.linspace(*test_vocs.variables["x2"].domain, n_grid),
+            indexing="ij",
+        )
+        test_x = torch.stack(
+            (test_mesh[0].flatten(), test_mesh[1].flatten()),
+            dim=-1,
+        )
         acqf_vals = acqf(test_x.reshape(-1, 1, 2))
         # numerical benchmarking of bax algorithm/acquisition function values in lieu of analytical form
-        test_acqf_vals = torch.tensor([-14.1820,  -6.5169,  -4.7833,  -6.7005,  -8.0354,  -4.7237,  -4.9605,
-                 -4.8018,  -9.2135])
+        test_acqf_vals = torch.tensor(
+            [
+                -14.1820,
+                -6.5169,
+                -4.7833,
+                -6.7005,
+                -8.0354,
+                -4.7237,
+                -4.9605,
+                -4.8018,
+                -9.2135,
+            ]
+        )
         assert torch.allclose(acqf_vals, test_acqf_vals, atol=1e-4)
 
     def test_generate(self):
