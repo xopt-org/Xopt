@@ -15,6 +15,7 @@ nav:
             - examples/basic/xopt_evaluator.ipynb
             - examples/basic/xopt_generator.ipynb
             - examples/basic/xopt_stopping_condition.ipynb
+            - Checkpointing and restarts: examples/basic/checkpointing_and_restarts.ipynb
         - Bayesian:
             - Gaussian Process Model Creation:
                 - Basic example: examples/gp_model_creation/model_creation.ipynb
@@ -23,6 +24,8 @@ nav:
             - Bayesian Exploration:
                 - Bayesian Exploration: examples/bayes_exp/bayesian_exploration.ipynb
                 - Bayesian Exploration from yaml: examples/bayes_exp/bayesian_exploration_from_yaml.ipynb
+                - Bayesian Exploration with interpolation: examples/bayes_exp/bayesian_exploration_w_interpolation.ipynb
+                - Bayesian Exploration with NaNs: examples/bayes_exp/bayesian_exploration_with_nans.ipynb
             - Single Objective Bayesian Optimization:
                 - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
                 - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
@@ -35,6 +38,10 @@ nav:
                 - Bayesian Optimization with fixed features: examples/single_objective_bayes_opt/fixed_features.ipynb
                 - Custom objectives: examples/single_objective_bayes_opt/custom_objective.ipynb
                 - Heteroskedastic modeling: examples/single_objective_bayes_opt/heteroskedastic_noise_tutorial.ipynb
+                - Noisy Bayesian optimization: examples/single_objective_bayes_opt/noisy_bo_tutorial.ipynb
+                - Fast model evaluation: examples/single_objective_bayes_opt/fast_model_eval.ipynb
+                - Hessian kernel: examples/single_objective_bayes_opt/hessian_kernel.ipynb
+                - Benchmarking: examples/single_objective_bayes_opt/benchmarking.ipynb
             - Trust Region Bayesian Optimization:
                 - Basic example: examples/trust_region_bo/turbo_basics.ipynb
                 - Optimization: examples/trust_region_bo/turbo_optimize.ipynb
