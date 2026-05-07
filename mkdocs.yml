@@ -8,13 +8,13 @@ nav:
     - Algorithms: algorithms.md
     - Examples:
         - Basics:
-            - examples/basic/xopt_basic.ipynb
-            - examples/basic/xopt_cli.md
-            - examples/basic/xopt_parallel.ipynb
-            - examples/basic/xopt_vocs.ipynb
-            - examples/basic/xopt_evaluator.ipynb
-            - examples/basic/xopt_generator.ipynb
-            - examples/basic/xopt_stopping_condition.ipynb
+            - Basic example: examples/basic/xopt_basic.ipynb
+            - Running from the command line: examples/basic/xopt_cli.md
+            - Parallel examples: examples/basic/xopt_parallel.ipynb
+            - VOCS data structure: examples/basic/xopt_vocs.ipynb
+            - Evaluator basic usage: examples/basic/xopt_evaluator.ipynb
+            - Working with generators: examples/basic/xopt_generator.ipynb
+            - Stopping conditions: examples/basic/xopt_stopping_condition.ipynb
             - Checkpointing and restarts: examples/basic/checkpointing_and_restarts.ipynb
         - Bayesian:
             - Gaussian Process Model Creation:
@@ -53,14 +53,14 @@ nav:
         - Evolutionary / Genetic:
             - CNSGA: examples/ga/cnsga_tnk.ipynb
             - NSGA-II:
-              - examples/ga/nsga2/index.md
+              - Overview: examples/ga/nsga2/index.md
               - "YAML Interface":
-                - examples/ga/nsga2/yaml_interface/index.md
-                - examples/ga/nsga2/yaml_interface/nsga2_yaml.ipynb
+                - Overview: examples/ga/nsga2/yaml_interface/index.md
+                - Companion notebook: examples/ga/nsga2/yaml_interface/nsga2_yaml.ipynb
                 - "Download Template": examples/ga/nsga2/yaml_interface/assets/yaml_runner_example.zip
-              - examples/ga/nsga2/nsga2_python.ipynb
-              - examples/ga/nsga2/nsga2_to_cnsga.ipynb
-              - examples/ga/nsga2/genetic_operators.ipynb
+              - Python interface: examples/ga/nsga2/nsga2_python.ipynb
+              - Output conversion: examples/ga/nsga2/nsga2_to_cnsga.ipynb
+              - Genetic operators: examples/ga/nsga2/genetic_operators.ipynb
 
         - Sequential:
             - Nelder-Mead: examples/sequential/neldermead.ipynb
