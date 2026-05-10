@@ -3,6 +3,7 @@ from botorch.acquisition.multi_objective.analytic import (
     MultiObjectiveAnalyticAcquisitionFunction,
 )
 from botorch.models.model import Model, ModelList
+from botorch.posteriors.ensemble import EnsemblePosterior
 from botorch.utils.transforms import t_batch_mode_transform
 from torch import Tensor
 
@@ -83,17 +84,27 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
 
         # calculcate the variance of the posterior for each input x
         post = self.model.posterior(X)
-        var_post = post.variance
 
-        # calculcate the variance of the fantasy posteriors
-        fantasy_posts = self.fantasy_models.posterior(
-            (
-                X.reshape(*X.shape[:-2], 1, *X.shape[-2:]).expand(
-                    *X.shape[:-2], self.xs_exe.shape[0], *X.shape[-2:]
+        # Some different shape handling with EnsemblePosterior -- maybe we can move this upstream?
+        if isinstance(post, EnsemblePosterior):
+            var_post = post.variance.unsqueeze(-1)
+
+            # calculcate the variance of the fantasy posteriors
+            fantasy_posts = self.fantasy_models.posterior(X)
+            var_fantasy_posts = fantasy_posts.variance.unsqueeze(-1).unsqueeze(-1)
+
+        else:
+            var_post = post.variance
+
+            # calculcate the variance of the fantasy posteriors
+            fantasy_posts = self.fantasy_models.posterior(
+                (
+                    X.reshape(*X.shape[:-2], 1, *X.shape[-2:]).expand(
+                        *X.shape[:-2], self.xs_exe.shape[0], *X.shape[-2:]
+                    )
                 )
             )
-        )
-        var_fantasy_posts = fantasy_posts.variance
+            var_fantasy_posts = fantasy_posts.variance
 
         # calculate Shannon entropy for posterior given the current data
         h_current = 0.5 * torch.log(2 * torch.pi * var_post) + 0.5
@@ -113,5 +124,8 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         # eq (4) of https://arxiv.org/pdf/2104.09460.pdf
         # (avg_h_fantasy is a Monte-Carlo estimate of the second term on the right)
         eig = h_current_scalar - avg_h_fantasy
+
+        # mean over properties
+        eig = eig.mean(dim=-1, keepdim=True)
 
         return eig.reshape(X.shape[:-2])
