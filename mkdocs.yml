@@ -41,7 +41,6 @@ nav:
                 - Noisy Bayesian optimization: examples/single_objective_bayes_opt/noisy_bo_tutorial.ipynb
                 - Fast model evaluation: examples/single_objective_bayes_opt/fast_model_eval.ipynb
                 - Hessian kernel: examples/single_objective_bayes_opt/hessian_kernel.ipynb
-                - Benchmarking: examples/single_objective_bayes_opt/benchmarking.ipynb
             - Trust Region Bayesian Optimization:
                 - Basic example: examples/trust_region_bo/turbo_basics.ipynb
                 - Optimization: examples/trust_region_bo/turbo_optimize.ipynb
@@ -57,7 +56,6 @@ nav:
               - "YAML Interface":
                 - Overview: examples/ga/nsga2/yaml_interface/index.md
                 - Companion notebook: examples/ga/nsga2/yaml_interface/nsga2_yaml.ipynb
-                - "Download Template": examples/ga/nsga2/yaml_interface/assets/yaml_runner_example.zip
               - Python interface: examples/ga/nsga2/nsga2_python.ipynb
               - Output conversion: examples/ga/nsga2/nsga2_to_cnsga.ipynb
               - Genetic operators: examples/ga/nsga2/genetic_operators.ipynb
