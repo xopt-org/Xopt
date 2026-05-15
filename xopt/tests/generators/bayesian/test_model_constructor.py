@@ -852,7 +852,7 @@ class TestModelConstructor:
 
         with pytest.raises(ValueError, match="no data found to train model!"):
             StandardModelConstructor.build_map_saas_gp(
-                torch.empty(0, 2), torch.empty(0, 1), torch.empty(0, 1), train=False
+                torch.empty(0, 2), torch.empty(0, 1), torch.empty(0, 1)
             )
 
         with patch.object(
@@ -1327,6 +1327,9 @@ class TestBatchedModelConstructor:
         }
         assert expected_warning_messages.issubset(warning_messages)
         assert mock_build_map_saas_gp.call_count == 1
+        assert isinstance(model.models[0], SingleTaskGP)
+        assert isinstance(model.models[0].covar_module, ScaleKernel)
+        assert isinstance(model.models[0].mean_module, ConstantMean)
         assert not isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
         assert not isinstance(model.models[0].mean_module, LinearMean)
         assert isinstance(model, ModelListGP)
