@@ -1330,3 +1330,13 @@ class TestBatchedModelConstructor:
         assert not isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
         assert not isinstance(model.models[0].mean_module, LinearMean)
         assert isinstance(model, ModelListGP)
+
+        constructor_multi = StandardModelConstructor(saas_outputs=["y1", "c1"])
+        with patch.object(
+            StandardModelConstructor,
+            "build_map_saas_gp",
+            wraps=StandardModelConstructor.build_map_saas_gp,
+        ) as mock_build_map_saas_gp_multi:
+            model_multi = constructor_multi.build_model_from_vocs(test_vocs, test_data)
+        assert mock_build_map_saas_gp_multi.call_count == 2
+        assert isinstance(model_multi, ModelListGP)
