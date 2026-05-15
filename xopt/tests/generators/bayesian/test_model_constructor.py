@@ -834,16 +834,6 @@ class TestModelConstructor:
         )
         assert isinstance(model_approx, SingleTaskVariationalGP)
 
-        # Test build_map_saas_gp with training
-        with patch.object(
-            base_model, "fit_gpytorch_mll", wraps=base_model.fit_gpytorch_mll
-        ) as mock_fit_gpytorch_mll:
-            model_saas = StandardModelConstructor.build_map_saas_gp(
-                X, Y, Yvar, train=True
-            )
-        assert mock_fit_gpytorch_mll.call_count == 1
-        assert isinstance(model_saas, SingleTaskGP)
-
     def test_build_map_saas_gp(self):
         torch.manual_seed(0)
         X = torch.randn(10, 2)
@@ -1316,7 +1306,9 @@ class TestBatchedModelConstructor:
                 "build_map_saas_gp",
                 wraps=StandardModelConstructor.build_map_saas_gp,
             ) as mock_build_map_saas_gp,
-            pytest.warns(UserWarning) as warning_records,
+            pytest.warns(
+                UserWarning, match="will be overwritten by SAAS model construction"
+            ) as warning_records,
         ):
             model = constructor.build_model_from_vocs(test_vocs, test_data)
 
