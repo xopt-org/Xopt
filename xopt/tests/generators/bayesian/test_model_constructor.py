@@ -18,7 +18,7 @@ from botorch.models.utils.inducing_point_allocators import GreedyVarianceReducti
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.means import ConstantMean
+from gpytorch.means import ConstantMean, LinearMean
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
 
@@ -835,7 +835,13 @@ class TestModelConstructor:
         assert isinstance(model_approx, SingleTaskVariationalGP)
 
         # Test build_map_saas_gp with training
-        model_saas = StandardModelConstructor.build_map_saas_gp(X, Y, Yvar, train=True)
+        with patch.object(
+            base_model, "fit_gpytorch_mll", wraps=base_model.fit_gpytorch_mll
+        ) as mock_fit_gpytorch_mll:
+            model_saas = StandardModelConstructor.build_map_saas_gp(
+                X, Y, Yvar, train=True
+            )
+        assert mock_fit_gpytorch_mll.call_count == 1
         assert isinstance(model_saas, SingleTaskGP)
 
     def test_build_map_saas_gp(self):
@@ -1301,7 +1307,7 @@ class TestBatchedModelConstructor:
         constructor = StandardModelConstructor(
             saas_outputs=["y1"],
             covar_modules={"y1": ScaleKernel(PeriodicKernel())},
-            mean_modules={"y1": ConstantMean()},
+            mean_modules={"y1": LinearMean(TEST_VOCS.n_variables)},
         )
         with (
             patch.object(
@@ -1317,4 +1323,6 @@ class TestBatchedModelConstructor:
         assert any("Covariance module specified for output y1" in msg for msg in warning_messages)
         assert any("Mean module specified for output y1" in msg for msg in warning_messages)
         assert mock_build_map_saas_gp.call_count == 1
+        assert not isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
+        assert not isinstance(model.models[0].mean_module, LinearMean)
         assert isinstance(model, ModelListGP)
