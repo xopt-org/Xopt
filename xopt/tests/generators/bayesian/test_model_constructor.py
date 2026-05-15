@@ -845,6 +845,7 @@ class TestModelConstructor:
         assert isinstance(model_saas, SingleTaskGP)
 
     def test_build_map_saas_gp(self):
+        torch.manual_seed(0)
         X = torch.randn(10, 2)
         Y = torch.randn(10, 1)
         Yvar = torch.ones(10, 1) * 0.1
@@ -1319,9 +1320,12 @@ class TestBatchedModelConstructor:
         ):
             model = constructor.build_model_from_vocs(test_vocs, test_data)
 
-        warning_messages = [str(record.message) for record in warning_records]
-        assert any("Covariance module specified for output y1" in msg for msg in warning_messages)
-        assert any("Mean module specified for output y1" in msg for msg in warning_messages)
+        warning_messages = {str(record.message) for record in warning_records}
+        expected_warning_messages = {
+            "Covariance module specified for output y1 will be overwritten by SAAS model construction.",
+            "Mean module specified for output y1 will be overwritten by SAAS model construction.",
+        }
+        assert expected_warning_messages.issubset(warning_messages)
         assert mock_build_map_saas_gp.call_count == 1
         assert not isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
         assert not isinstance(model.models[0].mean_module, LinearMean)
