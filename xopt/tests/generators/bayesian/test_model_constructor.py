@@ -2,6 +2,7 @@ import json
 import os
 import time
 from copy import deepcopy
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -832,6 +833,36 @@ class TestModelConstructor:
         )
         assert isinstance(model_approx, SingleTaskVariationalGP)
 
+        # Test build_map_saas_gp with training
+        model_saas = StandardModelConstructor.build_map_saas_gp(X, Y, Yvar, train=True)
+        assert isinstance(model_saas, SingleTaskGP)
+
+    def test_build_map_saas_gp(self):
+        X = torch.randn(10, 2)
+        Y = torch.randn(10, 1)
+        Yvar = torch.ones(10, 1) * 0.1
+
+        with pytest.raises(ValueError, match="no data found to train model!"):
+            StandardModelConstructor.build_map_saas_gp(
+                torch.empty(0, 2), torch.empty(0, 1), torch.empty(0, 1), train=False
+            )
+
+        import xopt.generators.bayesian.base_model as base_model
+
+        original = base_model.fit_gpytorch_mll
+        base_model.fit_gpytorch_mll = lambda *args, **kwargs: (_ for _ in ()).throw(
+            ModelFittingError("fitting failed")
+        )
+        try:
+            with pytest.warns(
+                UserWarning,
+                match="Model fitting failed for MAP SAAS GP. Returning untrained model.",
+            ):
+                model = StandardModelConstructor.build_map_saas_gp(X, Y, Yvar, train=True)
+            assert isinstance(model, SingleTaskGP)
+        finally:
+            base_model.fit_gpytorch_mll = original
+
     def test_approximate_gp(self):
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
@@ -1270,6 +1301,23 @@ class TestBatchedModelConstructor:
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
 
-        constructor = StandardModelConstructor(saas_outputs=["y1", "c1"])
-        model = constructor.build_model_from_vocs(test_vocs, test_data)
+        constructor = StandardModelConstructor(
+            saas_outputs=["y1"],
+            covar_modules={"y1": ScaleKernel(PeriodicKernel())},
+            mean_modules={"y1": ConstantMean()},
+        )
+        with (
+            patch.object(
+                StandardModelConstructor,
+                "build_map_saas_gp",
+                wraps=StandardModelConstructor.build_map_saas_gp,
+            ) as build_map_saas_gp,
+            pytest.warns(UserWarning) as warning_records,
+        ):
+            model = constructor.build_model_from_vocs(test_vocs, test_data)
+
+        warning_messages = [str(record.message) for record in warning_records]
+        assert any("Covariance module specified for output y1" in msg for msg in warning_messages)
+        assert any("Mean module specified for output y1" in msg for msg in warning_messages)
+        assert build_map_saas_gp.call_count == 1
         assert isinstance(model, ModelListGP)
