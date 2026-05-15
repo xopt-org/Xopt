@@ -27,7 +27,6 @@ from gest_api.vocs import VOCS, ContinuousVariable
 from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,
 )
-import xopt.generators.bayesian.base_model as base_model
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.approximate import ApproximateModelConstructor
 from xopt.generators.bayesian.models.standard import (
@@ -845,9 +844,8 @@ class TestModelConstructor:
                 torch.empty(0, 2), torch.empty(0, 1), torch.empty(0, 1)
             )
 
-        with patch.object(
-            base_model,
-            "fit_gpytorch_mll",
+        with patch(
+            "xopt.generators.bayesian.base_model.fit_gpytorch_mll",
             side_effect=ModelFittingError("fitting failed"),
         ):
             with pytest.warns(
@@ -1322,6 +1320,7 @@ class TestBatchedModelConstructor:
         assert isinstance(model.models[0], SingleTaskGP)
         assert isinstance(model.models[0].covar_module, ScaleKernel)
         assert isinstance(model.models[0].mean_module, ConstantMean)
+        assert hasattr(model.models[0].covar_module.base_kernel, "lengthscale")
         assert not isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
         assert not isinstance(model.models[0].mean_module, LinearMean)
         assert isinstance(model, ModelListGP)
