@@ -1308,7 +1308,7 @@ class TestBatchedModelConstructor:
                 StandardModelConstructor,
                 "build_map_saas_gp",
                 wraps=StandardModelConstructor.build_map_saas_gp,
-            ) as build_map_saas_gp,
+            ) as mock_build_map_saas_gp,
             pytest.warns(UserWarning) as warning_records,
         ):
             model = constructor.build_model_from_vocs(test_vocs, test_data)
@@ -1316,5 +1316,5 @@ class TestBatchedModelConstructor:
         warning_messages = [str(record.message) for record in warning_records]
         assert any("Covariance module specified for output y1" in msg for msg in warning_messages)
         assert any("Mean module specified for output y1" in msg for msg in warning_messages)
-        assert build_map_saas_gp.call_count == 1
+        assert mock_build_map_saas_gp.call_count == 1
         assert isinstance(model, ModelListGP)
