@@ -27,6 +27,7 @@ from gest_api.vocs import VOCS, ContinuousVariable
 from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,
 )
+import xopt.generators.bayesian.base_model as base_model
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.models.approximate import ApproximateModelConstructor
 from xopt.generators.bayesian.models.standard import (
@@ -847,21 +848,17 @@ class TestModelConstructor:
                 torch.empty(0, 2), torch.empty(0, 1), torch.empty(0, 1), train=False
             )
 
-        import xopt.generators.bayesian.base_model as base_model
-
-        original = base_model.fit_gpytorch_mll
-        base_model.fit_gpytorch_mll = lambda *args, **kwargs: (_ for _ in ()).throw(
-            ModelFittingError("fitting failed")
-        )
-        try:
+        with patch.object(
+            base_model,
+            "fit_gpytorch_mll",
+            side_effect=ModelFittingError("fitting failed"),
+        ):
             with pytest.warns(
                 UserWarning,
                 match="Model fitting failed for MAP SAAS GP. Returning untrained model.",
             ):
                 model = StandardModelConstructor.build_map_saas_gp(X, Y, Yvar, train=True)
             assert isinstance(model, SingleTaskGP)
-        finally:
-            base_model.fit_gpytorch_mll = original
 
     def test_approximate_gp(self):
         test_vocs = deepcopy(TEST_VOCS)
