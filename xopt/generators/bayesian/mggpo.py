@@ -6,10 +6,8 @@ from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
     qLogNoisyExpectedHypervolumeImprovement,
 )
-from gest_api.vocs import DiscreteVariable
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field
 
-from xopt.errors import VOCSError
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.ga.cnsga import CNSGAGenerator
 from .bayesian_generator import MultiObjectiveBayesianGenerator
@@ -54,20 +52,6 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
     ga_generator: Optional[CNSGAGenerator] = Field(
         None, description="CNSGA generator used to generate candidates"
     )
-
-    @field_validator("vocs", mode="after")
-    def validate_vocs(cls, vocs, info: ValidationInfo):
-        # Preserve inherited Bayesian VOCS validation behavior.
-        vocs = MultiObjectiveBayesianGenerator.validate_vocs(vocs, info)
-
-        if any(
-            isinstance(vocs.variables[name], DiscreteVariable)
-            for name in vocs.variable_names
-        ):
-            raise VOCSError(
-                "MGGPO does not currently support DiscreteVariable inputs"
-            )
-        return vocs
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

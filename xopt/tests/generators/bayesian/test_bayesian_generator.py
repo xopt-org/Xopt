@@ -315,62 +315,6 @@ class TestBayesianGenerator(TestCase):
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
-    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
-    def test_discrete_optimization_kwargs(self):
-        vocs = VOCS(
-            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}},
-            objectives={"y1": "MINIMIZE"},
-        )
-
-        gen = PatchBayesianGenerator(vocs=vocs)
-        kwargs = gen._get_discrete_optimization_kwargs()
-
-        assert "fixed_features_list" in kwargs
-        assert kwargs["fixed_features_list"] == [
-            {1: 0.0},
-            {1: 0.5},
-            {1: 1.0},
-        ]
-
-    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
-    def test_discrete_only_optimization_kwargs(self):
-        vocs = VOCS(
-            variables={"x1": {0.0, 1.0}, "x2": {2.0, 3.0}},
-            objectives={"y1": "MINIMIZE"},
-        )
-
-        gen = PatchBayesianGenerator(vocs=vocs)
-        kwargs = gen._get_discrete_optimization_kwargs()
-        assert "discrete_choices" in kwargs
-        assert kwargs["discrete_choices"].shape == (4, 2)
-
-    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
-    def test_snap_and_validate_discrete_candidates(self):
-        vocs = VOCS(
-            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
-            objectives={"y1": "MINIMIZE"},
-        )
-        gen = PatchBayesianGenerator(vocs=vocs)
-
-        raw_candidates = torch.tensor([[0.2, 0.6], [0.1, 0.1]], dtype=torch.double)
-        snapped = gen._snap_discrete_candidates(raw_candidates)
-        assert torch.allclose(snapped[:, 1], torch.tensor([1.0, 0.0]))
-
-        result_df = pd.DataFrame(snapped.numpy(), columns=vocs.variable_names)
-        gen._validate_discrete_outputs(result_df)
-
-    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
-    def test_discrete_with_max_travel_distances_raises(self):
-        vocs = VOCS(
-            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
-            objectives={"y1": "MINIMIZE"},
-        )
-
-        gen = PatchBayesianGenerator(vocs=vocs)
-        gen.max_travel_distances = [0.1, 0.2]
-        with pytest.raises(ValueError, match="max_travel_distances"):
-            gen._get_optimization_bounds()
-
         # test with max_travel_distances specified and data
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.max_travel_distances = [0.1, 0.2]

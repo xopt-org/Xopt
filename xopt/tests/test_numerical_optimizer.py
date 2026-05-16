@@ -65,54 +65,6 @@ class TestNumericalOptimizers:
         with pytest.raises(ValueError, match="bounds must have the shape"):
             optimizer.optimize(f, bad_bounds, n_candidates=1)
 
-    def test_lbfgsoptimizer_mixed_route(self):
-        optimizer = LBFGSOptimizer()
-        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
-        fixed_features_list = [{1: 0.0}, {1: 1.0}]
-
-        with patch("xopt.numerical_optimizer.optimize_acqf_mixed") as mock_opt:
-            mock_opt.return_value = (torch.zeros(1, 2), None)
-            candidates = optimizer.optimize(
-                f,
-                bounds,
-                n_candidates=1,
-                fixed_features_list=fixed_features_list,
-            )
-
-        assert candidates.shape == (1, 2)
-        assert mock_opt.call_args[1]["fixed_features_list"] == fixed_features_list
-
-    def test_lbfgsoptimizer_discrete_route(self):
-        optimizer = LBFGSOptimizer(discrete_max_batch_size=16)
-        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
-        choices = torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.double)
-
-        with patch("xopt.numerical_optimizer.optimize_acqf_discrete") as mock_opt:
-            mock_opt.return_value = (torch.zeros(1, 2), None)
-            candidates = optimizer.optimize(
-                f,
-                bounds,
-                n_candidates=1,
-                discrete_choices=choices,
-            )
-
-        assert candidates.shape == (1, 2)
-        assert mock_opt.call_args[1]["max_batch_size"] == 16
-
-    def test_lbfgsoptimizer_discrete_and_mixed_conflict(self):
-        optimizer = LBFGSOptimizer()
-        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
-        choices = torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.double)
-
-        with pytest.raises(ValueError, match="cannot specify both"):
-            optimizer.optimize(
-                f,
-                bounds,
-                n_candidates=1,
-                discrete_choices=choices,
-                fixed_features_list=[{1: 0.0}],
-            )
-
     def test_grid_optimizer(self):
         optimizer = GridOptimizer()
         for ndim in [1, 3]:
