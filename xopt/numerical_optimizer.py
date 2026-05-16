@@ -194,7 +194,7 @@ class LBFGSOptimizer(NumericalOptimizer):
             return candidates
 
         if discrete_choices is not None:
-            if kwargs.get("batch_initial_conditions") is not None:
+            if "batch_initial_conditions" in kwargs:
                 logger.warning(
                     "batch_initial_conditions are not used by optimize_acqf_discrete"
                 )
