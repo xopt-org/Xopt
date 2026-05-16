@@ -3,6 +3,7 @@ import os
 import time
 import warnings
 from abc import ABC, abstractmethod
+from itertools import product
 from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
@@ -28,7 +29,7 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from gest_api.vocs import MinimizeObjective, MaximizeObjective
+from gest_api.vocs import DiscreteVariable, MinimizeObjective, MaximizeObjective
 
 from xopt.errors import VOCSError, XoptError, FeasibilityError
 from xopt.generator import Generator
@@ -496,7 +497,8 @@ class BayesianGenerator(Generator, ABC):
 
         # get input bounds
         variable_bounds = {
-            name: ele.domain for name, ele in self.vocs.variables.items()
+            name: self._get_variable_domain_bounds(ele)
+            for name, ele in self.vocs.variables.items()
         }
 
         # if turbo restrict points is true then set the bounds to the trust region
@@ -574,14 +576,25 @@ class BayesianGenerator(Generator, ABC):
         # get initial candidates to start acquisition function optimization
         initial_points = self._get_initial_conditions(n_candidates)
 
+        optimization_kwargs = self._get_discrete_optimization_kwargs()
+
         # get candidates -- grid optimizer does not support batch_initial_conditions
         if isinstance(self.numerical_optimizer, GridOptimizer):
+            if optimization_kwargs:
+                raise ValueError(
+                    "grid optimizer does not support discrete variable optimization; "
+                    "use LBFGS optimizer"
+                )
             candidates = self.numerical_optimizer.optimize(
                 acq_funct, bounds, n_candidates
             )
         else:
             candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
+                acq_funct,
+                bounds,
+                n_candidates,
+                batch_initial_conditions=initial_points,
+                **optimization_kwargs,
             )
         return candidates
 
@@ -714,7 +727,14 @@ class BayesianGenerator(Generator, ABC):
         acq = acq.to(**self.tkwargs)
 
         # use default initial conditions for a global search
-        result = self.numerical_optimizer.optimize(acq, bounds, 1)
+        optimization_kwargs = self._get_discrete_optimization_kwargs()
+        if isinstance(self.numerical_optimizer, GridOptimizer) and optimization_kwargs:
+            raise ValueError(
+                "grid optimizer does not support discrete variable optimization; "
+                "use LBFGS optimizer"
+            )
+
+        result = self.numerical_optimizer.optimize(acq, bounds, 1, **optimization_kwargs)
 
         return self._process_candidates(result)
 
@@ -771,6 +791,7 @@ class BayesianGenerator(Generator, ABC):
     def _process_candidates(self, candidates: Tensor):
         """process pytorch candidates from optimizing the acquisition function"""
         logger.debug(f"Best candidate from optimize {candidates}")
+        candidates = self._snap_discrete_candidates(candidates)
 
         if self.fixed_features is not None:
             results = pd.DataFrame(
@@ -783,6 +804,8 @@ class BayesianGenerator(Generator, ABC):
             results = convert_numpy_to_inputs(
                 self.vocs, candidates.detach().cpu().numpy(), include_constants=False
             )
+
+        self._validate_discrete_outputs(results)
 
         return results
 
@@ -885,7 +908,89 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds, dtype=torch.double).T
+        bounds = [
+            self._get_variable_domain_bounds(self.vocs.variables[name])
+            for name in self.vocs.variable_names
+        ]
+        return torch.tensor(bounds, dtype=torch.double).T
+
+    @staticmethod
+    def _get_variable_domain_bounds(variable) -> list[float]:
+        if isinstance(variable, DiscreteVariable):
+            values = sorted(float(v) for v in variable.values)
+            return [values[0], values[-1]]
+        return variable.domain
+
+    def _get_active_discrete_variable_values(self) -> dict[int, list[float]]:
+        discrete_values: dict[int, list[float]] = {}
+        for idx, name in enumerate(self._candidate_names):
+            variable = self.vocs.variables[name]
+            if isinstance(variable, DiscreteVariable):
+                discrete_values[idx] = sorted(float(v) for v in variable.values)
+        return discrete_values
+
+    def _has_discrete_candidates(self) -> bool:
+        return len(self._get_active_discrete_variable_values()) > 0
+
+    def _get_discrete_optimization_kwargs(self) -> dict[str, Any]:
+        discrete_values = self._get_active_discrete_variable_values()
+        if not discrete_values:
+            return {}
+
+        discrete_indices = sorted(discrete_values)
+        value_lists = [discrete_values[idx] for idx in discrete_indices]
+        combinations = list(product(*value_lists))
+
+        if isinstance(self.numerical_optimizer, LBFGSOptimizer):
+            max_configs = self.numerical_optimizer.mixed_max_discrete_configurations
+            if len(combinations) > max_configs:
+                logger.warning(
+                    "truncating discrete configuration count from %d to %d",
+                    len(combinations),
+                    max_configs,
+                )
+                combinations = combinations[:max_configs]
+
+        # all candidates are discrete
+        if len(discrete_indices) == len(self._candidate_names):
+            choices = torch.tensor(combinations, **self.tkwargs)
+            return {"discrete_choices": choices}
+
+        fixed_features_list = [
+            {
+                dim: value
+                for dim, value in zip(discrete_indices, discrete_configuration)
+            }
+            for discrete_configuration in combinations
+        ]
+        return {"fixed_features_list": fixed_features_list}
+
+    def _snap_discrete_candidates(self, candidates: Tensor) -> Tensor:
+        discrete_values = self._get_active_discrete_variable_values()
+        if not discrete_values:
+            return candidates
+
+        candidates = candidates.clone()
+        for idx, values in discrete_values.items():
+            allowed = torch.tensor(values, device=candidates.device, dtype=candidates.dtype)
+            distances = torch.abs(candidates[..., idx].unsqueeze(-1) - allowed)
+            nearest_idx = torch.argmin(distances, dim=-1)
+            candidates[..., idx] = allowed[nearest_idx]
+        return candidates
+
+    def _validate_discrete_outputs(self, results: pd.DataFrame) -> None:
+        for name in self.vocs.variable_names:
+            variable = self.vocs.variables[name]
+            if not isinstance(variable, DiscreteVariable):
+                continue
+
+            allowed_values = set(float(v) for v in variable.values)
+            candidate_values = results[name].astype(float).tolist()
+            if any(value not in allowed_values for value in candidate_values):
+                raise ValueError(
+                    f"candidate values for discrete variable '{name}' are not members "
+                    "of the configured discrete set"
+                )
 
     def _get_optimization_bounds(self):
         """
@@ -909,6 +1014,16 @@ class BayesianGenerator(Generator, ABC):
 
         """
         bounds = self._get_bounds()
+
+        if self._has_discrete_candidates():
+            if self.max_travel_distances is not None:
+                raise ValueError(
+                    "max_travel_distances is not supported for discrete variables"
+                )
+            if self.turbo_controller is not None:
+                raise ValueError(
+                    "turbo_controller is not supported for discrete variables"
+                )
 
         # if specified modify bounds to limit maximum travel distances
         if self.max_travel_distances is not None:
