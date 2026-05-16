@@ -852,7 +852,9 @@ class TestModelConstructor:
                 UserWarning,
                 match="Model fitting failed for MAP SAAS GP. Returning untrained model.",
             ):
-                model = StandardModelConstructor.build_map_saas_gp(X, Y, Yvar, train=True)
+                model = StandardModelConstructor.build_map_saas_gp(
+                    X, Y, Yvar, train=True
+                )
             assert isinstance(model, SingleTaskGP)
 
     def test_approximate_gp(self):
