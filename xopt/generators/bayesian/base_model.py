@@ -18,6 +18,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 )
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
+from gest_api.vocs import DiscreteVariable
 
 
 class ModelConstructor(XoptBaseModel, ABC):
@@ -120,7 +121,13 @@ class ModelConstructor(XoptBaseModel, ABC):
             The trained botorch model.
 
         """
-        variable_bounds = {name: ele.domain for name, ele in vocs.variables.items()}
+        variable_bounds = {}
+        for name, variable in vocs.variables.items():
+            if isinstance(variable, DiscreteVariable):
+                values = sorted(float(v) for v in variable.values)
+                variable_bounds[name] = [values[0], values[-1]]
+            else:
+                variable_bounds[name] = variable.domain
 
         return self.build_model(
             vocs.variable_names, vocs.output_names, data, variable_bounds, dtype, device
