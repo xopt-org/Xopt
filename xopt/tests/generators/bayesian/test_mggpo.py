@@ -3,8 +3,10 @@ from copy import deepcopy
 import pandas as pd
 import pytest
 import torch
+from gest_api.vocs import VOCS
 
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
@@ -88,3 +90,12 @@ class TestMGGPO:
 
         for _ in [0, 1]:
             X.step()
+
+    def test_discrete_variables_not_supported(self):
+        vocs = VOCS(
+            variables={"x1": {0.0, 1.0}, "x2": [0.0, 1.0]},
+            objectives={"y1": "MINIMIZE", "y2": "MINIMIZE"},
+        )
+
+        with pytest.raises(VOCSError, match="DiscreteVariable"):
+            MGGPOGenerator(vocs=vocs, reference_point={"y1": 1.0, "y2": 1.0})
