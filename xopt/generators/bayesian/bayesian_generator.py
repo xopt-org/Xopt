@@ -734,7 +734,9 @@ class BayesianGenerator(Generator, ABC):
                 "use LBFGS optimizer"
             )
 
-        result = self.numerical_optimizer.optimize(acq, bounds, 1, **optimization_kwargs)
+        result = self.numerical_optimizer.optimize(
+            acq, bounds, 1, **optimization_kwargs
+        )
 
         return self._process_candidates(result)
 
@@ -957,10 +959,7 @@ class BayesianGenerator(Generator, ABC):
             return {"discrete_choices": choices}
 
         fixed_features_list = [
-            {
-                dim: value
-                for dim, value in zip(discrete_indices, discrete_configuration)
-            }
+            {dim: value for dim, value in zip(discrete_indices, discrete_configuration)}
             for discrete_configuration in combinations
         ]
         return {"fixed_features_list": fixed_features_list}
@@ -972,7 +971,9 @@ class BayesianGenerator(Generator, ABC):
 
         candidates = candidates.clone()
         for idx, values in discrete_values.items():
-            allowed = torch.tensor(values, device=candidates.device, dtype=candidates.dtype)
+            allowed = torch.tensor(
+                values, device=candidates.device, dtype=candidates.dtype
+            )
             distances = torch.abs(candidates[..., idx].unsqueeze(-1) - allowed)
             nearest_idx = torch.argmin(distances, dim=-1)
             candidates[..., idx] = allowed[nearest_idx]

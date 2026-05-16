@@ -64,9 +64,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
             isinstance(vocs.variables[name], DiscreteVariable)
             for name in vocs.variable_names
         ):
-            raise VOCSError(
-                "MGGPO does not currently support DiscreteVariable inputs"
-            )
+            raise VOCSError("MGGPO does not currently support DiscreteVariable inputs")
         return vocs
 
     def __init__(self, **kwargs):

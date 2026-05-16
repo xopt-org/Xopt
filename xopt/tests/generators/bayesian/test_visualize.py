@@ -162,7 +162,9 @@ def test_generate_input_mesh_mixed_discrete_shape_and_reference(vocs_mixed_discr
     assert np.allclose(mesh[:, 2].cpu().numpy(), 0.2)
 
 
-def test_plot_model_prediction_1d_discrete_ticks(vocs_mixed_discrete, data_mixed_discrete):
+def test_plot_model_prediction_1d_discrete_ticks(
+    vocs_mixed_discrete, data_mixed_discrete
+):
     model = DummyModel()
     ax = visualize.plot_model_prediction(
         model=model,

@@ -189,14 +189,18 @@ def visualize_model(
     tkwargs = tkwargs or {}
 
     output_names, variable_names = _validate_names(output_names, variable_names, vocs)
-    reference_point_names = [name for name in vocs.variable_names if name not in variable_names]
+    reference_point_names = [
+        name for name in vocs.variable_names if name not in variable_names
+    ]
     if show_acquisition and acquisition_function is None:
         show_acquisition = False
 
     dim_x, dim_y = len(variable_names), len(output_names)
     # --- ENFORCE: Only allow up to 2 variables for visualization ---
     if dim_x > 2:
-        raise ValueError("Visualization only supported for up to 2 variables. Please fix additional variables using the 'reference_point' argument.")
+        raise ValueError(
+            "Visualization only supported for up to 2 variables. Please fix additional variables using the 'reference_point' argument."
+        )
 
     # plot configuration
     figure_config = _get_figure_config(
@@ -209,6 +213,7 @@ def visualize_model(
     plots: tuple[Figure, Array[Axes]]
     if axes is None:
         from matplotlib import pyplot as plt  # lazy import
+
         plots = plt.subplots(**figure_config, squeeze=False)
     else:
         plots = _get_figure_from_axes(axes), axes
@@ -475,11 +480,7 @@ def plot_model_prediction(
     if len(variable_names) == 1:
         var_name = variable_names[0]
         var = vocs.variables[var_name]
-        x_axis = (
-            input_mesh[:, vocs.variable_names.index(var_name)]
-            .squeeze()
-            .numpy()
-        )
+        x_axis = input_mesh[:, vocs.variable_names.index(var_name)].squeeze().numpy()
         # Helper to detect discrete variables
         is_discrete = _is_discrete_variable(var)
         if output_name in vocs.constraint_names:
@@ -491,17 +492,34 @@ def plot_model_prediction(
             )
         if is_discrete:
             # Discrete: use scatter for mean, error bars for std, and set categorical ticks
-            axis.errorbar(x_axis, posterior_mean, yerr=2*posterior_std, fmt="o", color=color, label="Posterior Mean ± 2σ")
+            axis.errorbar(
+                x_axis,
+                posterior_mean,
+                yerr=2 * posterior_std,
+                fmt="o",
+                color=color,
+                label="Posterior Mean ± 2σ",
+            )
             if show_prior_mean:
-                axis.scatter(x_axis, prior_mean, color=color, marker="x", label="Prior Mean")
+                axis.scatter(
+                    x_axis, prior_mean, color=color, marker="x", label="Prior Mean"
+                )
             discrete_values = _get_discrete_values(var)
             axis.set_xticks(discrete_values)
             axis.set_xticklabels([str(v) for v in discrete_values])
         else:
             # Continuous: use line and fill
             if show_prior_mean:
-                axis.plot(x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean")
-            axis.plot(x_axis, posterior_mean, color=color, linestyle="-", label="Posterior Mean")
+                axis.plot(
+                    x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean"
+                )
+            axis.plot(
+                x_axis,
+                posterior_mean,
+                color=color,
+                linestyle="-",
+                label="Posterior Mean",
+            )
             c = axis.fill_between(
                 x=x_axis,
                 y1=posterior_mean - 2 * posterior_std,
@@ -534,6 +552,7 @@ def plot_model_prediction(
                         labels[j] = r"Posterior Mean $\pm 2\,\sigma$"
                         handles[j] = (handles[j], c)
                 from matplotlib.legend_handler import HandlerTuple  # lazy import
+
                 axis.legend(
                     labels=labels,
                     handles=handles,
@@ -681,9 +700,7 @@ def plot_acquisition_function(
         var = vocs.variables[variable_name]
         is_discrete = _is_discrete_variable(var)
         x_axis = (
-            input_mesh[:, vocs.variable_names.index(variable_name)]
-            .squeeze()
-            .numpy()
+            input_mesh[:, vocs.variable_names.index(variable_name)].squeeze().numpy()
         )
         base_acq = None
         if hasattr(acquisition_function, "base_acquisition"):
@@ -705,12 +722,16 @@ def plot_acquisition_function(
                 axis.plot(x_axis, acq, "C0-")
         else:
             if is_discrete:
-                axis.scatter(x_axis, base_acq, color="C0", marker="x", label="Base Acq. Function")
+                axis.scatter(
+                    x_axis, base_acq, color="C0", marker="x", label="Base Acq. Function"
+                )
             else:
                 axis.plot(x_axis, base_acq, "C0--", label="Base Acq. Function")
             if not only_base_acq:
                 if is_discrete:
-                    axis.scatter(x_axis, acq, color="C0", label="Constrained Acq. Function")
+                    axis.scatter(
+                        x_axis, acq, color="C0", label="Constrained Acq. Function"
+                    )
                 else:
                     axis.plot(x_axis, acq, "C0-", label="Constrained Acq. Function")
             if show_samples:
@@ -1119,17 +1140,30 @@ def _generate_input_mesh(
     for k in variable_names:
         var = vocs.variables[k]
         if _is_discrete_variable(var):
-            mesh_axes.append(torch.tensor(_get_discrete_values(var), dtype=torch.float64))
+            mesh_axes.append(
+                torch.tensor(_get_discrete_values(var), dtype=torch.float64)
+            )
         else:
-            mesh_axes.append(torch.linspace(var.domain[0], var.domain[1], n_grid, dtype=torch.float64))
+            mesh_axes.append(
+                torch.linspace(
+                    var.domain[0], var.domain[1], n_grid, dtype=torch.float64
+                )
+            )
 
     x_mesh = torch.meshgrid(*mesh_axes, indexing="ij")
     x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh])
     # For each variable in vocs.variable_names, fill with mesh if in variable_names, else with reference_point
-    x = torch.stack([
-        (x_v[:, variable_names.index(k)] if k in variable_names else reference_point[k] * torch.ones(x_v.shape[0], dtype=torch.float64))
-        for k in vocs.variable_names
-    ], dim=-1)
+    x = torch.stack(
+        [
+            (
+                x_v[:, variable_names.index(k)]
+                if k in variable_names
+                else reference_point[k] * torch.ones(x_v.shape[0], dtype=torch.float64)
+            )
+            for k in vocs.variable_names
+        ],
+        dim=-1,
+    )
     x = x.to(**tkwargs)
     return x
 

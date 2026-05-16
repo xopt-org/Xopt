@@ -14,8 +14,12 @@ from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGen
 from xopt.generators.bayesian.expected_improvement import TDExpectedImprovementGenerator
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.generators.bayesian.multi_fidelity import MultiFidelityGenerator
-from xopt.generators.bayesian.upper_confidence_bound import UpperConfidenceBoundGenerator
-from xopt.generators.bayesian.upper_confidence_bound import TDUpperConfidenceBoundGenerator
+from xopt.generators.bayesian.upper_confidence_bound import (
+    UpperConfidenceBoundGenerator,
+)
+from xopt.generators.bayesian.upper_confidence_bound import (
+    TDUpperConfidenceBoundGenerator,
+)
 
 
 def _build_training_data(discrete_only: bool) -> pd.DataFrame:
