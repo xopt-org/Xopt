@@ -473,7 +473,7 @@ class TestBayesianGenerator(TestCase):
 
     def test_model_constructor_discrete_bounds(self):
         class _CaptureBoundsModelConstructor(ModelConstructor):
-            name: str = "capture_bounds"
+            name: str = "capture_bounds_model_constructor"
 
             def build_model(self, *args, **kwargs):
                 return None
