@@ -480,7 +480,7 @@ class TestBayesianGenerator(TestCase):
 
         constructor = _CaptureBoundsModelConstructor()
         vocs = VOCS(
-            variables={"x1": [0.0, 1.0], "x2": {3.0, 1.0, 2.0}},
+            variables={"x1": [0.0, 1.0], "x2": {1.0, 2.0, 3.0}},
             objectives={"y1": "MINIMIZE"},
         )
         data = pd.DataFrame({"x1": [0.0], "x2": [1.0], "y1": [0.0]})
