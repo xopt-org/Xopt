@@ -489,7 +489,8 @@ class TestBayesianGenerator(TestCase):
         )
         data = pd.DataFrame({"x1": [0.0], "x2": [1.0], "y1": [0.0]})
         constructor.build_model_from_vocs(vocs, data)
-        assert captured["args"][3] == {
+        _, _, _, input_bounds, _, _ = captured["args"]
+        assert input_bounds == {
             "x1": [0.0, 1.0],
             "x2": [1.0, 3.0],
         }
