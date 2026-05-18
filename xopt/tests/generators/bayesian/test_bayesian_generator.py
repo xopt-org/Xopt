@@ -472,14 +472,10 @@ class TestBayesianGenerator(TestCase):
                 gen.propose_candidates(MagicMock(), n_candidates=1)
 
     def test_model_constructor_discrete_bounds(self):
-        captured = {}
-
         class _CaptureBoundsModelConstructor(ModelConstructor):
             name: str = "capture-bounds"
 
             def build_model(self, *args, **kwargs):
-                captured["args"] = args
-                captured["kwargs"] = kwargs
                 return None
 
         constructor = _CaptureBoundsModelConstructor()
@@ -488,8 +484,11 @@ class TestBayesianGenerator(TestCase):
             objectives={"y1": "MINIMIZE"},
         )
         data = pd.DataFrame({"x1": [0.0], "x2": [1.0], "y1": [0.0]})
-        constructor.build_model_from_vocs(vocs, data)
-        _, _, _, input_bounds, _, _ = captured["args"]
+        with patch.object(
+            _CaptureBoundsModelConstructor, "build_model", autospec=True
+        ) as mock_build:
+            constructor.build_model_from_vocs(vocs, data)
+        _, _, _, _, input_bounds, _, _ = mock_build.call_args.args
         assert input_bounds == {
             "x1": [0.0, 1.0],
             "x2": [1.0, 3.0],

@@ -131,7 +131,9 @@ class TestNumericalOptimizers:
     def test_lbfgsoptimizer_discrete_truncation_and_drops_batch_ic(self):
         optimizer = LBFGSOptimizer(discrete_max_choices=2, discrete_max_batch_size=8)
         bounds = torch.stack((torch.zeros(2), torch.ones(2)))
-        choices = torch.tensor([[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]], dtype=torch.double)
+        discrete_choices = torch.tensor(
+            [[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]], dtype=torch.double
+        )
 
         with (
             patch("xopt.numerical_optimizer.optimize_acqf_discrete") as mock_opt,
@@ -142,7 +144,7 @@ class TestNumericalOptimizers:
                 f,
                 bounds,
                 n_candidates=1,
-                discrete_choices=choices,
+                discrete_choices=discrete_choices,
                 batch_initial_conditions=torch.zeros(1, 1, 2),
             )
 
