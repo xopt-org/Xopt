@@ -42,7 +42,7 @@ def _is_discrete_variable(variable: Any) -> bool:
 
 
 def _get_discrete_values(variable: DiscreteVariable) -> list[float]:
-    return [float(value) for value in variable.values]
+    return sorted(float(value) for value in variable.values)
 
 
 def visualize_generator_model(
@@ -1045,16 +1045,36 @@ def _plot2d_prediction(
     """
     axis = _get_axis(axis, dim=len(variable_names))
     axis.locator_params(axis="both", nbins=5)
+
+    def _centers_to_edges(values: np.ndarray) -> np.ndarray:
+        values = np.asarray(values, dtype=float)
+        if values.size == 1:
+            return np.array([values[0] - 0.5, values[0] + 0.5], dtype=float)
+        mids = 0.5 * (values[:-1] + values[1:])
+        first_edge = values[0] - (mids[0] - values[0])
+        last_edge = values[-1] + (values[-1] - mids[-1])
+        return np.concatenate(([first_edge], mids, [last_edge]))
+
     x_index = vocs.variable_names.index(variable_names[0])
     y_index = vocs.variable_names.index(variable_names[1])
     x_values = input_mesh[:, x_index].detach().cpu().numpy()
     y_values = input_mesh[:, y_index].detach().cpu().numpy()
     nx = np.unique(x_values).size
     ny = np.unique(y_values).size
+
+    x_centers = np.unique(x_values)
+    y_centers = np.unique(y_values)
+    prediction_grid = prediction.reshape(nx, ny).T
+
+    x_edges = _centers_to_edges(x_centers)
+    y_edges = _centers_to_edges(y_centers)
+    x_edge_grid, y_edge_grid = np.meshgrid(x_edges, y_edges)
+
     pcm = axis.pcolormesh(
-        x_values.reshape(nx, ny),
-        y_values.reshape(nx, ny),
-        prediction.reshape(nx, ny),
+        x_edge_grid,
+        y_edge_grid,
+        prediction_grid,
+        shading="flat",
         rasterized=True,
     )
     from mpl_toolkits.axes_grid1 import make_axes_locatable  # lazy import

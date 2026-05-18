@@ -177,6 +177,7 @@ def test_plot_model_prediction_1d_discrete_ticks(
     )
     assert ax is not None
     assert set(ax.get_xticks()) == {0.0, 5.0, 10.0}
+    assert np.allclose(ax.get_xticks(), [0.0, 5.0, 10.0])
 
 
 def test_plot_acquisition_function_1d_discrete_ticks(
@@ -193,6 +194,7 @@ def test_plot_acquisition_function_1d_discrete_ticks(
     )
     assert ax is not None
     assert set(ax.get_xticks()) == {0.0, 5.0, 10.0}
+    assert np.allclose(ax.get_xticks(), [0.0, 5.0, 10.0])
 
 
 def test_plot_acquisition_function_2d_mixed_discrete(
