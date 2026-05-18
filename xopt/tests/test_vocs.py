@@ -410,9 +410,7 @@ class TestVOCS(object):
         )
 
         # Valid discrete values should pass.
-        validate_input_data(
-            test_vocs, pd.DataFrame({"x": [0.2, 0.8], "d": [0.0, 1.6]})
-        )
+        validate_input_data(test_vocs, pd.DataFrame({"x": [0.2, 0.8], "d": [0.0, 1.6]}))
 
         # This value is inside [0.0, 2.4] but not in the discrete set.
         with pytest.raises(ValueError):
