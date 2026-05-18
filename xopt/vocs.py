@@ -20,8 +20,22 @@ from gest_api.vocs import (
     GreaterThanConstraint,
     LessThanConstraint,
     BoundsConstraint,
+    DiscreteVariable,
     MaximizeObjective,
 )
+
+
+def _get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
+    """Return [min, max] bounds for all variables, including discrete variables."""
+    bounds = {}
+    for name in vocs.variable_names:
+        variable = vocs.variables[name]
+        if isinstance(variable, DiscreteVariable):
+            values = sorted(float(v) for v in variable.values)
+            bounds[name] = (values[0], values[-1])
+        else:
+            bounds[name] = (float(variable.domain[0]), float(variable.domain[1]))
+    return bounds
 
 
 def random_inputs(
@@ -55,16 +69,36 @@ def random_inputs(
     inputs = {}
     if seed is None:
         rng_sample_function = np.random.random
+        rng_choice_function = np.random.choice
     else:
         rng = np.random.default_rng(seed=seed)
         rng_sample_function = rng.random
+        rng_choice_function = rng.choice
 
     bounds = clip_variable_bounds(vocs, custom_bounds)
 
-    for key, val in bounds.items():  # No need to sort here
-        a, b = val
-        x = rng_sample_function(n)
-        inputs[key] = x * a + (1 - x) * b
+    for key, val in bounds.items():
+        variable = vocs.variables[key]
+
+        if isinstance(variable, DiscreteVariable):
+            a, b = val
+            allowed_values = sorted(float(v) for v in variable.values)
+            selectable_values = [v for v in allowed_values if a <= v <= b]
+
+            if len(selectable_values) == 0:
+                raise ValueError(
+                    f"no discrete values for '{key}' inside bounds [{a}, {b}]"
+                )
+
+            if n is None:
+                inputs[key] = float(rng_choice_function(selectable_values))
+            else:
+                inputs[key] = rng_choice_function(selectable_values, size=n)
+
+        else:
+            a, b = val
+            x = rng_sample_function(n)
+            inputs[key] = x * a + (1 - x) * b
 
     # Constants
     if include_constants and vocs.constants is not None:
@@ -554,17 +588,32 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
     ------
         ValueError: if input data does not satisfy requirements.
     """
-    variable_data = input_points.loc[:, vocs.variable_names].values
-    bounds = np.array(vocs.bounds).T
+    variable_data = input_points.loc[:, vocs.variable_names]
+    variable_bounds = _get_variable_bounds(vocs)
+    bad_mask = np.zeros((len(variable_data), len(vocs.variable_names)), dtype=bool)
 
-    is_out_of_bounds_lower = variable_data < bounds[0, :]
-    is_out_of_bounds_upper = variable_data > bounds[1, :]
-    bad_mask = np.logical_or(is_out_of_bounds_upper, is_out_of_bounds_lower)
-    any_bad = bad_mask.any()
+    for idx, name in enumerate(vocs.variable_names):
+        variable = vocs.variables[name]
+        values = variable_data[name].astype(float).to_numpy()
 
-    if any_bad:
+        if isinstance(variable, DiscreteVariable):
+            allowed = np.array(sorted(float(v) for v in variable.values), dtype=float)
+            is_allowed = np.isclose(
+                values[:, None], allowed[None, :], rtol=0.0, atol=1e-12
+            ).any(axis=1)
+            bad_mask[:, idx] = ~is_allowed
+        else:
+            lb, ub = variable_bounds[name]
+            bad_mask[:, idx] = np.logical_or(values < lb, values > ub)
+
+    if bad_mask.any():
+        row_indices = np.nonzero(bad_mask.any(axis=1))[0].tolist()
+        bad_variables = [
+            vocs.variable_names[i] for i in np.nonzero(bad_mask.any(axis=0))[0]
+        ]
         raise ValueError(
-            f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
+            f"input points at row indices {row_indices} are not valid for "
+            f"variables {bad_variables}"
         )
 
 
@@ -760,11 +809,11 @@ def clip_variable_bounds(
         The final bounds after clipping custom bounds with vocs bounds.
     """
     if custom_bounds is None:
-        final_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
+        final_bounds = _get_variable_bounds(vocs)
     elif not isinstance(custom_bounds, dict):
         raise TypeError("specified `custom_bounds` must be a dict")
     else:
-        variable_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
+        variable_bounds = _get_variable_bounds(vocs)
 
         try:
             validate_variable_bounds(custom_bounds)
