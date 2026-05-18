@@ -124,12 +124,14 @@ def grid_inputs(
     vocs : VOCS
         The variable-objective-constraint space (VOCS) defining the problem.
     n : Union[int, Dict[str, int]]
-        Number of points to generate along each axis. If an integer is provided, the same number of points
-        is used for all variables. If a dictionary is provided, it should have variable names as keys and
-        the number of points as values.
+        Number of points to generate along each axis for continuous variables. If an integer is provided,
+        the same number of points is used for all continuous variables. If a dictionary is provided, it
+        should have continuous variable names as keys and the number of points as values. Discrete
+        variables always use their configured values (optionally filtered by custom bounds).
     custom_bounds : dict, optional
         Custom bounds for the variables. If None, the default bounds from `vocs.variables` are used.
         The dictionary should have variable names as keys and a list of two values [min, max] as values.
+        For discrete variables, bounds are used to filter allowed values.
     include_constants : bool, optional
         If True, include constant values from `vocs.constants` in the output DataFrame.
 
@@ -154,14 +156,39 @@ def grid_inputs(
     Notes
     -----
     The function generates a meshgrid of inputs based on the specified bounds. If `custom_bounds` are provided,
-    they are validated and clipped to ensure they lie within the domain of `vocs.variables`. The resulting meshgrid
-    is flattened and returned as a DataFrame. If `include_constants` is True, constant values from `vocs.constants`
-    are added to the DataFrame.
+    they are validated and clipped to ensure they lie within the domain of `vocs.variables`.
+
+    Continuous variables are sampled using linspace. Discrete variables are enumerated using their allowed
+    values (sorted ascending), filtered by active bounds when applicable.
+
+    The resulting meshgrid is flattened and returned as a DataFrame. If `include_constants` is True, constant
+    values from `vocs.constants` are added to the DataFrame.
     """
     bounds = clip_variable_bounds(vocs, custom_bounds)
 
     grid_axes = []
     for key, val in bounds.items():
+        variable = vocs.variables[key]
+
+        if isinstance(variable, DiscreteVariable):
+            if isinstance(n, dict) and key in n:
+                warnings.warn(
+                    f"ignoring requested grid count for discrete variable '{key}'",
+                    RuntimeWarning,
+                )
+
+            lb, ub = val
+            discrete_values = sorted(float(v) for v in variable.values)
+            filtered_values = [v for v in discrete_values if lb <= v <= ub]
+
+            if len(filtered_values) == 0:
+                raise ValueError(
+                    f"no discrete values for '{key}' inside bounds [{lb}, {ub}]"
+                )
+
+            grid_axes.append(np.array(filtered_values, dtype=float))
+            continue
+
         if isinstance(n, int):
             num_points = n
         elif isinstance(n, dict) and key in n:

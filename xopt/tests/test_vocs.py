@@ -243,6 +243,48 @@ class TestVOCS(object):
         assert "c1" in grid.columns
         assert np.all(grid["c1"] == 5.0)
 
+    def test_grid_inputs_with_discrete_variables(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {0.0, 0.8, 1.6, 2.4}},
+            constraints={},
+            objectives={},
+            constants={"c1": 5.0},
+            observables=[],
+        )
+
+        # Scalar n applies to continuous axis only. Discrete axis enumerates all values.
+        grid = grid_inputs(vocs, n=5, include_constants=False)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (5 * 4, 2)
+        assert np.allclose(sorted(grid["d"].unique()), [0.0, 0.8, 1.6, 2.4])
+
+        # Dict n with a discrete entry should warn and still enumerate all discrete values.
+        with pytest.warns(RuntimeWarning, match="ignoring requested grid count"):
+            grid = grid_inputs(vocs, n={"x": 3, "d": 10}, include_constants=False)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (3 * 4, 2)
+        assert np.allclose(sorted(grid["d"].unique()), [0.0, 0.8, 1.6, 2.4])
+
+        # Custom bounds should filter discrete values.
+        grid = grid_inputs(
+            vocs,
+            n={"x": 2},
+            custom_bounds={"d": [0.7, 2.0]},
+            include_constants=False,
+        )
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (2 * 2, 2)
+        assert np.allclose(sorted(grid["d"].unique()), [0.8, 1.6])
+
+        # Custom bounds with no discrete values should raise.
+        with pytest.raises(ValueError, match="no discrete values"):
+            grid_inputs(
+                vocs,
+                n={"x": 2},
+                custom_bounds={"d": [0.81, 1.59]},
+                include_constants=False,
+            )
+
     def test_random_sampling_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)
 
@@ -368,7 +410,9 @@ class TestVOCS(object):
         )
 
         # Valid discrete values should pass.
-        validate_input_data(test_vocs, pd.DataFrame({"x": [0.2, 0.8], "d": [0.0, 1.6]}))
+        validate_input_data(
+            test_vocs, pd.DataFrame({"x": [0.2, 0.8], "d": [0.0, 1.6]})
+        )
 
         # This value is inside [0.0, 2.4] but not in the discrete set.
         with pytest.raises(ValueError):
