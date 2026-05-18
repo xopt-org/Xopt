@@ -406,6 +406,95 @@ class TestBayesianGenerator(TestCase):
             gen._get_optimization_bounds()
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_with_turbo_controller_raises(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs)
+        object.__setattr__(gen, "turbo_controller", object())
+        with pytest.raises(ValueError, match="turbo_controller"):
+            gen._get_optimization_bounds()
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs_truncation(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}, "x3": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            numerical_optimizer=LBFGSOptimizer(mixed_max_discrete_configurations=4),
+        )
+        with patch(
+            "xopt.generators.bayesian.bayesian_generator.logger.warning"
+        ) as mock_warn:
+            kwargs = gen._get_discrete_optimization_kwargs()
+        assert "fixed_features_list" in kwargs
+        assert len(kwargs["fixed_features_list"]) == 4
+        mock_warn.assert_called_once_with(
+            "truncating discrete configuration count from %d to %d", 6, 4
+        )
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_validate_discrete_outputs_raises(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs)
+        with pytest.raises(ValueError, match="configured discrete set"):
+            gen._validate_discrete_outputs(pd.DataFrame({"x1": [0.2], "x2": [0.25]}))
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_grid_optimizer_discrete_candidates_raise_in_propose(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs, numerical_optimizer=GridOptimizer())
+        with (
+            patch.object(
+                PatchBayesianGenerator,
+                "_get_optimization_bounds",
+                return_value=torch.zeros(2, 2),
+            ),
+            patch.object(
+                PatchBayesianGenerator, "get_acquisition", return_value=MagicMock()
+            ),
+            patch.object(
+                PatchBayesianGenerator,
+                "_get_initial_conditions",
+                return_value=torch.zeros(1, 1, 2),
+            ),
+        ):
+            with pytest.raises(ValueError, match="grid optimizer does not support"):
+                gen.propose_candidates(MagicMock(), n_candidates=1)
+
+    def test_model_constructor_discrete_bounds(self):
+        captured = {}
+
+        class _CaptureBoundsModelConstructor(ModelConstructor):
+            name: str = "capture-bounds"
+
+            def build_model(self, *args, **kwargs):
+                captured["args"] = args
+                captured["kwargs"] = kwargs
+                return None
+
+        constructor = _CaptureBoundsModelConstructor()
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {3.0, 1.0, 2.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        data = pd.DataFrame({"x1": [0.0], "x2": [1.0], "y1": [0.0]})
+        constructor.build_model_from_vocs(vocs, data)
+        assert captured["args"][3] == {
+            "x1": [0.0, 1.0],
+            "x2": [1.0, 3.0],
+        }
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_fixed_feature(self):
         # test with a fixed feature not contained in vocs
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
