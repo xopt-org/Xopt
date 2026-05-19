@@ -64,8 +64,8 @@ class BaxGenerator(BayesianGenerator):
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
-        if v.n_constraints > 0 and not info.data["supports_constraints"]:
-            raise VOCSError("this generator does not support constraints")
+        # Preserve inherited Bayesian VOCS validation behavior.
+        v = super().validate_vocs(v, info)
 
         # assert that the generator had no objectives
         if not v.n_objectives == 0:

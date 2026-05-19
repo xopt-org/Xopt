@@ -97,5 +97,5 @@ class TestMGGPO:
             objectives={"y1": "MINIMIZE", "y2": "MINIMIZE"},
         )
 
-        with pytest.raises(VOCSError, match="DiscreteVariable"):
+        with pytest.raises(VOCSError, match="does not support discrete variables"):
             MGGPOGenerator(vocs=vocs, reference_point={"y1": 1.0, "y2": 1.0})

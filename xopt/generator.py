@@ -10,7 +10,7 @@ from pydantic_core.core_schema import ValidationInfo
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
 
-from gest_api.vocs import VOCS
+from gest_api.vocs import VOCS, DiscreteVariable
 from gest_api.generator import Generator as BaseGenerator
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         frozen=True,
         exclude=True,
     )
+    supports_discrete_variables: bool = Field(
+        default=False,
+        description="flag that describes if this generator can optimize discrete "
+        "input variables",
+        frozen=True,
+        exclude=True,
+    )
 
     vocs: VOCS = Field(description="generator VOCS")
     data: Optional[pd.DataFrame] = Field(
@@ -77,10 +84,24 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
+    @staticmethod
+    def _has_discrete_variables(vocs: VOCS) -> bool:
+        n_discrete_variables = getattr(vocs, "n_discrete_variables", None)
+        if n_discrete_variables is not None:
+            return n_discrete_variables > 0
+
+        return any(
+            isinstance(vocs.variables[name], DiscreteVariable)
+            for name in vocs.variable_names
+        )
+
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
+
+        if cls._has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
+            raise VOCSError("this generator does not support discrete variables")
 
         # assert that the generator needs at least one objective
         if v.n_objectives == 0:
