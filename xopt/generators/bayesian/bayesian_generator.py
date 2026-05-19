@@ -195,7 +195,10 @@ class BayesianGenerator(Generator, ABC):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
 
-        if cls._has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
+        if (
+            cls._has_discrete_variables(v)
+            and not info.data["supports_discrete_variables"]
+        ):
             raise VOCSError("this generator does not support discrete variables")
 
         # assertion that at least one objective exists is done in model_validator below

@@ -100,7 +100,10 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
 
-        if cls._has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
+        if (
+            cls._has_discrete_variables(v)
+            and not info.data["supports_discrete_variables"]
+        ):
             raise VOCSError("this generator does not support discrete variables")
 
         # assert that the generator needs at least one objective
