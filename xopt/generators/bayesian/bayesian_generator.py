@@ -1,9 +1,10 @@
 import logging
+from math import prod
 import os
 import time
 import warnings
 from abc import ABC, abstractmethod
-from itertools import product
+from itertools import islice, product
 from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
@@ -948,21 +949,25 @@ class BayesianGenerator(Generator, ABC):
 
         discrete_indices = sorted(discrete_values)
         value_lists = [discrete_values[idx] for idx in discrete_indices]
-        combinations = list(product(*value_lists))
+        total_configurations = prod(len(values) for values in value_lists)
 
+        max_configs = None
         if isinstance(self.numerical_optimizer, LBFGSOptimizer):
             max_configs = self.numerical_optimizer.mixed_max_discrete_configurations
-            if len(combinations) > max_configs:
+            if total_configurations > max_configs:
                 logger.warning(
                     "truncating discrete configuration count from %d to %d",
-                    len(combinations),
+                    total_configurations,
                     max_configs,
                 )
-                combinations = combinations[:max_configs]
+
+        combinations = product(*value_lists)
+        if max_configs is not None:
+            combinations = islice(combinations, max_configs)
 
         # all candidates are discrete
         if len(discrete_indices) == len(self._candidate_names):
-            choices = torch.tensor(combinations, **self.tkwargs)
+            choices = torch.tensor(list(combinations), **self.tkwargs)
             return {"discrete_choices": choices}
 
         fixed_features_list = [

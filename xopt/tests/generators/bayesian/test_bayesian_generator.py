@@ -437,6 +437,35 @@ class TestBayesianGenerator(TestCase):
         )
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs_truncation_is_lazy(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}, "x3": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            numerical_optimizer=LBFGSOptimizer(mixed_max_discrete_configurations=3),
+        )
+
+        def iter_with_guard(*_):
+            for i in range(6):
+                if i >= 3:
+                    raise RuntimeError("product consumed past truncation limit")
+                yield (float(i), float(i + 1))
+
+        with patch(
+            "xopt.generators.bayesian.bayesian_generator.product",
+            return_value=iter_with_guard(),
+        ):
+            kwargs = gen._get_discrete_optimization_kwargs()
+
+        assert kwargs["fixed_features_list"] == [
+            {1: 0.0, 2: 1.0},
+            {1: 1.0, 2: 2.0},
+            {1: 2.0, 2: 3.0},
+        ]
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_validate_discrete_outputs_raises(self):
         vocs = VOCS(
             variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
