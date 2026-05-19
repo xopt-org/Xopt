@@ -455,7 +455,7 @@ class TestBayesianGenerator(TestCase):
 
         with patch(
             "xopt.generators.bayesian.bayesian_generator.product",
-            return_value=iter_with_guard(),
+            side_effect=lambda *args: iter_with_guard(),
         ):
             kwargs = gen._get_discrete_optimization_kwargs()
 
