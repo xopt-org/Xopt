@@ -196,11 +196,6 @@ def visualize_model(
         show_acquisition = False
 
     dim_x, dim_y = len(variable_names), len(output_names)
-    # --- ENFORCE: Only allow up to 2 variables for visualization ---
-    if dim_x > 2:
-        raise ValueError(
-            "Visualization only supported for up to 2 variables. Please fix additional variables using the 'reference_point' argument."
-        )
 
     # plot configuration
     figure_config = _get_figure_config(
