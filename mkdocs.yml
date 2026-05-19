@@ -28,7 +28,6 @@ nav:
                 - Bayesian Exploration with NaNs: examples/bayes_exp/bayesian_exploration_with_nans.ipynb
             - Single Objective Bayesian Optimization:
                 - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
-                - Mixed continuous-discrete optimization: examples/single_objective_bayes_opt/mixed_continuous_discrete_bo.ipynb
                 - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
