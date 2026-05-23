@@ -213,12 +213,16 @@ def visualize_model(
 
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
 
-    figure_title = _format_reference_point_title(
-        reference_point,
-        reference_point_names,
-        fallback_names=vocs.variable_names,
-    )
-    fig.suptitle(figure_title)
+    if reference_point_names:
+        figure_title = _format_reference_point_title(
+            reference_point,
+            reference_point_names,
+        )
+        fig.suptitle(figure_title)
+    elif fig._suptitle is not None:
+        # Clear existing title when reusing axes for full-dimensional plots.
+        fig._suptitle.remove()
+        fig._suptitle = None
 
     # create plot
     if dim_x == 1:
@@ -1127,15 +1131,13 @@ def _get_reference_point(
 def _format_reference_point_title(
     reference_point: dict[str, Any],
     reference_point_names: list[str],
-    fallback_names: Optional[list[str]] = None,
     max_line_length: int = 90,
 ) -> str:
     """Formats reference-point values into a readable, wrapped figure title."""
-    title_names = reference_point_names or (fallback_names or [])
-    if not title_names:
+    if not reference_point_names:
         return "Reference point"
 
-    entries = [f"{name}: {reference_point[name]:.2}" for name in title_names]
+    entries = [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
     lines: list[str] = []
     current_line = ""
 

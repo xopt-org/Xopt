@@ -99,6 +99,51 @@ def test_visualize_model(vocs, data, variable_names, show_acquisition):
     )
 
 
+def test_visualize_model_reference_title_visibility(vocs, data):
+    generator = UpperConfidenceBoundGenerator(vocs=vocs)
+    generator.add_data(data)
+    generator.train_model()
+
+    fig, _ = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x"],
+        n_grid=5,
+        show_acquisition=False,
+    )
+    assert fig._suptitle is not None
+    assert fig._suptitle.get_text().startswith("Reference point:\n")
+
+    fig, ax = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x", "y"],
+        n_grid=5,
+        show_acquisition=False,
+    )
+    assert fig._suptitle is None
+
+    fig.suptitle("Temporary title")
+    fig, _ = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x", "y"],
+        n_grid=5,
+        show_acquisition=False,
+        axes=ax,
+    )
+    assert fig._suptitle is None
+
+
 def test_plot_model_prediction_1d(vocs, data):
     model = DummyModel()
     ax = visualize.plot_model_prediction(
@@ -312,18 +357,6 @@ def test_format_reference_point_title_wraps_long_text():
 
     assert title.startswith("Reference point:\n")
     assert title.count("\n") > 1
-
-
-def test_format_reference_point_title_uses_fallback_names():
-    reference_point = {"x": 0.25, "y": 0.75}
-    title = visualize._format_reference_point_title(
-        reference_point,
-        [],
-        fallback_names=["x", "y"],
-    )
-    assert title.startswith("Reference point:\n")
-    assert "x: 0.25" in title
-    assert "y: 0.75" in title
 
 
 def test_format_reference_point_title_empty_without_names():
