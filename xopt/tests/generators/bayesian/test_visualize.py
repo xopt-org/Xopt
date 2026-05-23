@@ -222,6 +222,12 @@ def test_get_reference_point(vocs, data):
     assert ref == {"x": 1.0, "y": 1.0}
 
 
+def test_get_reference_point_returns_explicit_reference(vocs, data):
+    explicit = {"x": 0.123, "y": 0.456}
+    ref = visualize._get_reference_point(explicit, vocs, data)
+    assert ref == explicit
+
+
 def test_get_reference_point_falls_back_to_idx_for_multi_objective():
     vocs = VOCS(
         variables={"x": [0, 1], "y": [0, 1]},
@@ -240,6 +246,36 @@ def test_get_reference_point_falls_back_to_idx_for_multi_objective():
 
     ref = visualize._get_reference_point(None, vocs, data, idx=0)
     assert ref == {"x": 0.1, "y": 0.2}
+
+
+def test_get_reference_point_falls_back_to_idx_for_no_feasible_points():
+    vocs = VOCS(
+        variables={"x": [0, 1], "y": [0, 1]},
+        objectives={"z": "MAXIMIZE"},
+        constraints={"z": ["LESS_THAN", -10.0]},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": [0.2, 0.8],
+            "y": [0.3, 0.9],
+            "z": [0.1, 0.2],
+        }
+    )
+
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.2, "y": 0.3}
+
+
+def test_get_reference_point_falls_back_to_idx_for_runtime_error(
+    vocs, data, monkeypatch
+):
+    def raise_runtime_error(*args, **kwargs):
+        raise RuntimeError("synthetic select_best failure")
+
+    monkeypatch.setattr(visualize, "select_best", raise_runtime_error)
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.0, "y": 0.0}
 
 
 def test_format_reference_point_title_wraps_long_text():
@@ -274,6 +310,22 @@ def test_format_reference_point_title_uses_fallback_names():
 def test_format_reference_point_title_empty_without_names():
     title = visualize._format_reference_point_title({}, [])
     assert title == "Reference point"
+
+
+def test_format_reference_point_title_handles_empty_wrap_result(monkeypatch):
+    reference_point = {"x": 0.25}
+
+    def empty_wrap(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(visualize.textwrap, "wrap", empty_wrap)
+    title = visualize._format_reference_point_title(
+        reference_point,
+        ["x"],
+        max_line_length=1,
+    )
+    assert title.startswith("Reference point:\n")
+    assert "x: 0.25" in title
 
 
 def test_verify_axes():
