@@ -248,6 +248,25 @@ def test_get_reference_point_falls_back_to_idx_for_multi_objective():
     assert ref == {"x": 0.1, "y": 0.2}
 
 
+def test_get_reference_point_falls_back_to_idx_for_explore_objective():
+    vocs = VOCS(
+        variables={"x": [0, 1], "y": [0, 1]},
+        objectives={"z": "EXPLORE"},
+        constraints={},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": [0.1, 0.9],
+            "y": [0.2, 0.8],
+            "z": [1.0, 0.0],
+        }
+    )
+
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.1, "y": 0.2}
+
+
 def test_get_reference_point_falls_back_to_idx_for_no_feasible_points():
     vocs = VOCS(
         variables={"x": [0, 1], "y": [0, 1]},
