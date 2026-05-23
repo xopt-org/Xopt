@@ -22,8 +22,9 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
+from xopt.errors import FeasibilityError
 from xopt.generator import Generator
-from xopt.vocs import VOCS, get_feasibility_data
+from xopt.vocs import VOCS, get_feasibility_data, select_best
 
 from .objectives import feasibility
 from .utils import torch_compile_gp_model, torch_trace_gp_model
@@ -148,10 +149,12 @@ def visualize_model(
         Defaults to vocs.variable_names.
     idx : int
         Index of the last sample to use. This also selects the point of reference in
-        higher dimensions unless an explicit reference_point is given.
+        higher dimensions when the reference point cannot be inferred from
+        :func:`xopt.vocs.select_best` and no explicit reference_point is given.
     reference_point : dict
         Reference point determining the value of variables in vocs.variable_names, but not in variable_names
-        (slice plots in higher dimensions). Defaults to last used sample.
+        (slice plots in higher dimensions). Defaults to the current best feasible point
+        from :func:`xopt.vocs.select_best` when available, otherwise to the sample at idx.
     show_samples : bool, optional
         Whether samples are shown.
     show_prior_mean : bool, optional
@@ -1090,7 +1093,10 @@ def _get_reference_point(
 ) -> dict[str, Any]:
     """Returns a valid reference point.
 
-    If the given reference point is None, the data sample corresponding to the given index is used.
+    If the given reference point is None, the best feasible point from
+    :func:`xopt.vocs.select_best` is used when available. If this is not possible
+    (e.g., multi-objective problem or no feasible points), the data sample
+    corresponding to the given index is used.
 
     Parameters
     ----------
@@ -1101,7 +1107,7 @@ def _get_reference_point(
     data : DataFrame
         Data used to select a reference point.
     idx : int, optional
-        Index of the sample to use as a reference point.
+        Index of the sample to use as a fallback reference point.
 
     Returns
     -------
@@ -1110,7 +1116,11 @@ def _get_reference_point(
     """
     if reference_point is not None:
         return reference_point
-    else:
+
+    try:
+        _, _, best_point = select_best(vocs, data)
+        return best_point
+    except (FeasibilityError, NotImplementedError, RuntimeError):
         return data[vocs.variable_names].iloc[idx].to_dict()
 
 

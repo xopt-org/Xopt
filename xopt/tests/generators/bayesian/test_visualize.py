@@ -219,6 +219,27 @@ def test_validate_names(vocs):
 def test_get_reference_point(vocs, data):
     ref = visualize._get_reference_point(None, vocs, data)
     assert isinstance(ref, dict)
+    assert ref == {"x": 1.0, "y": 1.0}
+
+
+def test_get_reference_point_falls_back_to_idx_for_multi_objective():
+    vocs = VOCS(
+        variables={"x": [0, 1], "y": [0, 1]},
+        objectives={"obj1": "MAXIMIZE", "obj2": "MINIMIZE"},
+        constraints={},
+        observables=["obj1", "obj2"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": [0.1, 0.9],
+            "y": [0.2, 0.8],
+            "obj1": [1.0, 0.0],
+            "obj2": [1.0, 0.0],
+        }
+    )
+
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.1, "y": 0.2}
 
 
 def test_format_reference_point_title_wraps_long_text():
