@@ -9,6 +9,7 @@ from typing import (
     TypedDict,
     Union,
 )
+import textwrap
 
 import gpytorch
 import numpy as np
@@ -209,8 +210,10 @@ def visualize_model(
 
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
 
-    figure_title = "Reference point: " + " ".join(
-        [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
+    figure_title = _format_reference_point_title(
+        reference_point,
+        reference_point_names,
+        fallback_names=vocs.variable_names,
     )
     fig.suptitle(figure_title)
 
@@ -1109,6 +1112,49 @@ def _get_reference_point(
         return reference_point
     else:
         return data[vocs.variable_names].iloc[idx].to_dict()
+
+
+def _format_reference_point_title(
+    reference_point: dict[str, Any],
+    reference_point_names: list[str],
+    fallback_names: Optional[list[str]] = None,
+    max_line_length: int = 90,
+) -> str:
+    """Formats reference-point values into a readable, wrapped figure title."""
+    title_names = reference_point_names or (fallback_names or [])
+    if not title_names:
+        return "Reference point"
+
+    entries = [f"{name}: {reference_point[name]:.2}" for name in title_names]
+    lines: list[str] = []
+    current_line = ""
+
+    for entry in entries:
+        candidate = entry if not current_line else f"{current_line}, {entry}"
+        if len(candidate) <= max_line_length:
+            current_line = candidate
+            continue
+
+        if current_line:
+            lines.append(current_line)
+
+        # Keep very long variable labels readable instead of letting them overflow.
+        wrapped_entry = textwrap.wrap(
+            entry,
+            width=max_line_length,
+            break_long_words=True,
+            break_on_hyphens=False,
+        )
+        if wrapped_entry:
+            lines.extend(wrapped_entry[:-1])
+            current_line = wrapped_entry[-1]
+        else:
+            current_line = entry
+
+    if current_line:
+        lines.append(current_line)
+
+    return "Reference point:\n" + "\n".join(lines)
 
 
 def _get_model_predictions(

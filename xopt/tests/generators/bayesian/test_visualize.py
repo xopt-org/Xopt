@@ -221,6 +221,40 @@ def test_get_reference_point(vocs, data):
     assert isinstance(ref, dict)
 
 
+def test_format_reference_point_title_wraps_long_text():
+    reference_point = {
+        "SIOC:SYS1:ML00:AO551": 0.59,
+        "SIOC:SYS1:ML00:AO556": -1.2,
+        "SIOC:SYS1:ML00:AO501": 0.48,
+        "SIOC:SYS1:ML00:AO506": 0.42,
+    }
+    title = visualize._format_reference_point_title(
+        reference_point,
+        list(reference_point.keys()),
+        max_line_length=45,
+    )
+
+    assert title.startswith("Reference point:\n")
+    assert title.count("\n") > 1
+
+
+def test_format_reference_point_title_uses_fallback_names():
+    reference_point = {"x": 0.25, "y": 0.75}
+    title = visualize._format_reference_point_title(
+        reference_point,
+        [],
+        fallback_names=["x", "y"],
+    )
+    assert title.startswith("Reference point:\n")
+    assert "x: 0.25" in title
+    assert "y: 0.75" in title
+
+
+def test_format_reference_point_title_empty_without_names():
+    title = visualize._format_reference_point_title({}, [])
+    assert title == "Reference point"
+
+
 def test_verify_axes():
     with pytest.raises(ValueError):
         visualize._verify_axes("str", 5, 5)
