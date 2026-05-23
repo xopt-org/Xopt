@@ -642,9 +642,7 @@ def select_best(vocs: VOCS, data: pd.DataFrame, n: int = 1):
     obj_name = vocs.objective_names[0]
     obj = vocs.objectives[obj_name].__class__.__name__
     if obj == "ExploreObjective":
-        raise NotImplementedError(
-            "cannot select best point for EXPLORE objective"
-        )
+        raise NotImplementedError("cannot select best point for EXPLORE objective")
 
     if data.empty:
         raise RuntimeError("cannot select best point if dataframe is empty")
