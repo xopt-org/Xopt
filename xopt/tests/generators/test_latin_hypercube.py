@@ -7,7 +7,7 @@ from scipy.stats import qmc
 from gest_api.vocs import ContinuousVariable
 
 from xopt.errors import VOCSError
-from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
+from xopt.generators.latin_hypercube import LatinHypercubeGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 
 
