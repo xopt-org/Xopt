@@ -41,7 +41,7 @@ Currenty **Xopt** provides:
   - `extremum_seeking` Extremum seeking time-dependent optimization
   - `rcds` Robust Conjugate Direction Search (RCDS)
   - `neldermead` Nelder-Mead Simplex
-  - `cobyqa` COBYQA trust-region derivative-free optimization
+  - `scipy` Generic scipy.optimize.minimize sequential optimization
 - Sampling algorithms:
   - `random` Uniform random sampling
 - Convenient YAML/JSON based input format

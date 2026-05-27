@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -14,32 +14,47 @@ class _RequestEvaluation(Exception):
 
     def __init__(self, x: np.ndarray):
         self.x = np.array(x, dtype=float)
-        super().__init__("COBYQA requested a new point evaluation")
+        super().__init__("scipy.optimize.minimize requested a new point evaluation")
 
 
-class COBYQAGenerator(SequentialGenerator):
+class ScipyGenerator(SequentialGenerator):
     """
-    Sequential COBYQA generator based on ``scipy.optimize.minimize``.
+    Sequential scipy generator based on ``scipy.optimize.minimize``.
 
     This implementation follows an ask/tell pattern by replaying known evaluations from
     ``self.data``. Whenever scipy requests a point that has not been evaluated yet, the
     generator returns that point so that Xopt can evaluate it externally.
     """
 
-    name = "cobyqa"
+    name = "scipy"
     supports_single_objective: bool = True
 
+    method: str = Field(
+        "Powell",
+        description="Method name passed to scipy.optimize.minimize (e.g. 'Powell', 'Nelder-Mead').",
+    )
     initial_point: Optional[Dict[str, float]] = None
     tol: Optional[float] = Field(
-        None, description="Termination tolerance passed to scipy.optimize.minimize"
+        1e-8, description="Termination tolerance passed to scipy.optimize.minimize"
     )
-    options: Dict = Field(
+    options: Dict[str, Any] = Field(
         default_factory=dict,
         description="Options dictionary passed directly to scipy.optimize.minimize",
+    )
+    scipy_kwargs: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional keyword arguments passed to scipy.optimize.minimize.",
     )
 
     # Internal state
     _last_outcome: Optional[float] = None
+
+    @field_validator("method")
+    def validate_method(cls, v: str):
+        value = v.strip()
+        if not value:
+            raise ValueError("method cannot be empty")
+        return value
 
     @field_validator("initial_point")
     def validate_initial_point(cls, v: Optional[Dict[str, float]]):
@@ -48,9 +63,6 @@ class COBYQAGenerator(SequentialGenerator):
         if len(v) == 0:
             raise ValueError("initial_point cannot be an empty dictionary")
         return v
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     @property
     def x0(self) -> np.ndarray:
@@ -96,15 +108,16 @@ class COBYQAGenerator(SequentialGenerator):
                 return cache[key]
             raise _RequestEvaluation(x)
 
+        minimize_kwargs = {
+            "method": self.method,
+            "bounds": bounds,
+            "tol": self.tol,
+            "options": self.options,
+            **self.scipy_kwargs,
+        }
+
         try:
-            minimize(
-                objective,
-                self.x0,
-                method="cobyqa",
-                bounds=bounds,
-                tol=self.tol,
-                options=self.options,
-            )
+            minimize(objective, self.x0, **minimize_kwargs)
         except _RequestEvaluation as req:
             inputs = dict(zip(self.vocs.variable_names, req.x.tolist()))
             if self.vocs.constants is not None:
@@ -112,16 +125,14 @@ class COBYQAGenerator(SequentialGenerator):
             return [inputs]
         except ValueError as ex:
             msg = str(ex).lower()
-            if "unknown solver" in msg and "cobyqa" in msg:
+            if "unknown solver" in msg:
                 raise RuntimeError(
-                    "scipy COBYQA is not available in this environment. "
-                    "Install a scipy version that supports minimize(method='cobyqa')."
+                    f"scipy method '{self.method}' is not available in this environment."
                 ) from ex
             raise
 
         # If scipy converges using only cached data, return the latest known point.
-        last_x = self.x0
-        inputs = dict(zip(self.vocs.variable_names, np.array(last_x).tolist()))
+        inputs = self.data[self.vocs.variable_names].iloc[-1].to_dict()
         if self.vocs.constants is not None:
             inputs.update(self.vocs.constants)
         return [inputs]
