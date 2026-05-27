@@ -1,5 +1,6 @@
 import json
 
+import pandas as pd
 import pytest
 
 from xopt import Xopt
@@ -47,7 +48,9 @@ class TestScipyGenerator:
             function: xopt.tests.generators.sequential.test_scipy.sphere
         """
         X_no_init = Xopt.from_yaml(YAML_NO_INIT)
-        X_no_init.random_evaluate(1)  # generate some data to build an initial point from
+        X_no_init.random_evaluate(
+            1
+        )  # generate some data to build an initial point from
         X_no_init.step()
 
     def test_scipy_generate_multiple_points(self):
@@ -117,3 +120,80 @@ class TestScipyGenerator:
         first = gen.generate(1)
         assert len(first) == 1
         assert set(first[0].keys()) == {"x0", "x1"}
+
+    def test_scipy_reset(self):
+        YAML = """
+        generator:
+            name: scipy
+            method: Powell
+            initial_point: {x0: 0.75, x1: -0.25}
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                objectives: {y: MINIMIZE}
+        evaluator:
+            function: xopt.tests.generators.sequential.test_scipy.sphere
+        """
+        X = Xopt.from_yaml(YAML)
+        gen: ScipyGenerator = X.generator
+
+        X.step()
+        assert gen.is_active
+        assert gen._last_candidate is not None
+        assert gen._last_outcome is not None
+
+        gen.reset()
+
+        assert not gen.is_active
+        assert gen._last_candidate is None
+        assert gen._last_outcome is None
+
+        candidate = gen.generate(1)
+        assert len(candidate) == 1
+        assert set(candidate[0].keys()) == {"x0", "x1"}
+
+    def test_scipy_sequence_repeats_after_reset(self):
+        YAML = """
+        generator:
+            name: scipy
+            method: Powell
+            initial_point: {x0: 0.75, x1: -0.25}
+            options:
+                maxiter: 200
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                objectives: {y: MINIMIZE}
+        evaluator:
+            function: xopt.tests.generators.sequential.test_scipy.sphere
+        """
+        X = Xopt.from_yaml(YAML)
+        gen: ScipyGenerator = X.generator
+
+        def run_sequence(n_steps: int):
+            seq = []
+            for _ in range(n_steps):
+                candidate = gen.generate(1)[0]
+                seq.append((candidate["x0"], candidate["x1"]))
+
+                objective = sphere(candidate)["y"]
+                gen.add_data(
+                    pd.DataFrame(
+                        [
+                            {
+                                "x0": candidate["x0"],
+                                "x1": candidate["x1"],
+                                "y": objective,
+                            }
+                        ]
+                    )
+                )
+            return seq
+
+        first_sequence = run_sequence(5)
+        gen.reset()
+        second_sequence = run_sequence(5)
+
+        assert second_sequence == pytest.approx(first_sequence)

@@ -94,6 +94,8 @@ class ScipyGenerator(SequentialGenerator):
         return self._get_initial_point()[0]
 
     def _reset(self):
+        # Reset replay state so a subsequent run starts from fresh history.
+        self.data = None
         self._last_outcome = None
 
     def _set_data(self, data: pd.DataFrame):
