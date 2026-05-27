@@ -62,6 +62,7 @@ nav:
 
         - Sequential:
             - Nelder-Mead: examples/sequential/neldermead.ipynb
+            - COBYQA: examples/sequential/cobyqa.ipynb
             - Extremum seeking: examples/sequential/extremum_seeking.ipynb
             - RCDS: examples/sequential/rcds.ipynb
         - Other:
@@ -106,6 +107,7 @@ nav:
               - RCDS: api/generators/sequential/rcds.md
               - Extremum Seeking: api/generators/sequential/extremumseeking.md
               - Nelder-Mead: api/generators/sequential/neldermead.md
+              - COBYQA: api/generators/sequential/cobyqa.md
           - Random Generator: api/generators/random.md
           - Deduplicated Base: api/generators/deduplicated.md
           - Generator Utilities: api/generators/utils.md

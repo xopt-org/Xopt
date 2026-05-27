@@ -6,6 +6,7 @@ from xopt.generators.sequential import (
     RCDSGenerator,
     ExtremumSeekingGenerator,
     NelderMeadGenerator,
+    COBYQAGenerator,
 )
 from xopt import Evaluator, Xopt
 from xopt.vocs import VOCS
@@ -20,7 +21,8 @@ def sin_function(input_dict):
 
 class TestSequentialSerialization:
     @pytest.mark.parametrize(
-        "generator", [RCDSGenerator, ExtremumSeekingGenerator, NelderMeadGenerator]
+        "generator",
+        [RCDSGenerator, ExtremumSeekingGenerator, NelderMeadGenerator, COBYQAGenerator],
     )
     def test_serialization_and_restart(self, generator):
         test_vocs = VOCS(

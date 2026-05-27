@@ -15,7 +15,7 @@ generators = {gen.name: gen for gen in registered_generators}
 # don't import this directly -- use
 all_generator_names = {
     "mggpo": {"mggpo"},
-    "scipy": {"neldermead", "latin_hypercube"},
+    "scipy": {"neldermead", "latin_hypercube", "cobyqa"},
     "bo": {
         "upper_confidence_bound",
         "mobo",
@@ -59,10 +59,12 @@ def get_generator_dynamic(name: str) -> type[Generator]:
     elif name in all_generator_names["scipy"]:
         try:
             from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
+            from xopt.generators.sequential.cobyqa import COBYQAGenerator
             from xopt.generators.sequential.neldermead import NelderMeadGenerator
 
             registered_generators = [
                 NelderMeadGenerator,
+                COBYQAGenerator,
                 LatinHypercubeGenerator,
             ]
 
