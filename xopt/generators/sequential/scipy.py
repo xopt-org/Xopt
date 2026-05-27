@@ -81,9 +81,7 @@ class ScipyGenerator(SequentialGenerator):
 
     @field_validator("initial_point")
     def validate_initial_point(cls, v: Optional[Dict[str, float]]):
-        if v is None:
-            return v
-        if len(v) == 0:
+        if v is not None and len(v) == 0:
             raise ValueError("initial_point cannot be an empty dictionary")
         return v
 
