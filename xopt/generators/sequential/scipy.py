@@ -19,11 +19,34 @@ class _RequestEvaluation(Exception):
 
 class ScipyGenerator(SequentialGenerator):
     """
-    Sequential scipy generator based on ``scipy.optimize.minimize``.
+        Sequential wrapper around ``scipy.optimize.minimize``.
 
-    This implementation follows an ask/tell pattern by replaying known evaluations from
-    ``self.data``. Whenever scipy requests a point that has not been evaluated yet, the
-    generator returns that point so that Xopt can evaluate it externally.
+        Integration model
+        -----------------
+        Xopt uses ask/tell semantics (one new point per ``step``), while scipy
+        ``minimize`` expects direct access to objective evaluations. This class bridges
+        the two by replaying previously-evaluated points from ``self.data``:
+
+        1. Build a cache from existing Xopt observations.
+        2. Run ``scipy.optimize.minimize`` with an objective function that first checks
+             the cache.
+        3. If scipy asks for a point not in cache, raise ``_RequestEvaluation`` to exit
+             minimize early and return that point to Xopt.
+        4. Xopt evaluates the point externally and appends it to ``self.data``.
+        5. The next ``step`` repeats the process with the larger cache.
+
+        Performance implications
+        ------------------------
+        - ``_build_cache`` is O(N) in number of past evaluations and is executed every
+            ``step``. This overhead is typically small when objective evaluations are
+            expensive, but can dominate for very cheap objectives.
+        - ``minimize`` is restarted from ``x0`` each ``step`` and progresses by replaying
+            cached points. This is robust and method-agnostic, but adds repeated optimizer
+            bookkeeping work compared to a persistent in-memory scipy run.
+        - Point keys are rounded (12 decimals) before cache lookup to avoid fragile
+            floating-point equality checks. This improves replay stability across methods
+            that revisit numerically-close points.
+
     """
 
     name = "scipy"
@@ -92,6 +115,7 @@ class ScipyGenerator(SequentialGenerator):
         if self.data is None or len(self.data) == 0:
             return {}
 
+        # Build a deterministic replay table from prior Xopt observations.
         x_data = get_variable_data(self.vocs, self.data).to_numpy(dtype=float)
         y_data = get_objective_data(self.vocs, self.data).to_numpy()[:, 0]
 
@@ -106,6 +130,7 @@ class ScipyGenerator(SequentialGenerator):
             key = self._point_key(x)
             if key in cache:
                 return cache[key]
+            # Exit scipy early when a new point is requested so Xopt can evaluate it.
             raise _RequestEvaluation(x)
 
         minimize_kwargs = {
