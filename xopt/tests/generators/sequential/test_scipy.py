@@ -213,7 +213,9 @@ class TestScipyGenerator:
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
         )
-        with pytest.raises(ValueError, match="initial_point cannot be an empty dictionary"):
+        with pytest.raises(
+            ValueError, match="initial_point cannot be an empty dictionary"
+        ):
             ScipyGenerator(vocs=vocs, initial_point={})
 
     def test_add_data_empty_dataframe(self):
