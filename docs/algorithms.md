@@ -65,7 +65,7 @@ Scipy Generators
 These generators serve as wrappers for algorithms implemented in scipy.
 
 - [`NelderMeadGenerator`](examples/sequential/neldermead.ipynb): implements Nelder-Mead (simplex) optimization.
-- [`ScipyGenerator`](examples/sequential/neldermead.ipynb): generic wrapper around `scipy.optimize.minimize` methods.
+- [`ScipyGenerator`](examples/sequential/scipy.ipynb): generic wrapper around `scipy.optimize.minimize` methods.
 - [`LatinHypercubeGenerator`](examples/scipy/latin_hypercube.ipynb): perform latin hypercube sampling of the evaluation function.
 
 RCDS Generators

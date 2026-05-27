@@ -12,6 +12,44 @@ def sphere(input_dict):
 
 
 class TestScipyGenerator:
+    def test_scipy_generate_single_point(self):
+        YAML = """
+        generator:
+            name: scipy
+            method: Powell
+            initial_point: {x0: 0.5, x1: -0.5}
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                objectives: {y: MINIMIZE}
+        evaluator:
+            function: xopt.tests.generators.sequential.test_scipy.sphere
+        """
+        X = Xopt.from_yaml(YAML)
+        gen: ScipyGenerator = X.generator
+
+        first = gen.generate(1)
+        assert len(first) == 1
+        assert set(first[0].keys()) == {"x0", "x1"}
+
+        # test without initial point
+        YAML_NO_INIT = """
+        generator:
+            name: scipy
+            method: Powell
+            vocs:
+                variables:
+                    x0: [-5, 5]
+                    x1: [-5, 5]
+                objectives: {y: MINIMIZE}
+        evaluator:
+            function: xopt.tests.generators.sequential.test_scipy.sphere
+        """
+        X_no_init = Xopt.from_yaml(YAML_NO_INIT)
+        X_no_init.random_evaluate(1)  # generate some data to build an initial point from
+        X_no_init.step()
+
     def test_scipy_generate_multiple_points(self):
         YAML = """
         generator:

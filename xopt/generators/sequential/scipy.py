@@ -19,33 +19,33 @@ class _RequestEvaluation(Exception):
 
 class ScipyGenerator(SequentialGenerator):
     """
-        Sequential wrapper around ``scipy.optimize.minimize``.
+    Sequential wrapper around ``scipy.optimize.minimize``.
 
-        Integration model
-        -----------------
-        Xopt uses ask/tell semantics (one new point per ``step``), while scipy
-        ``minimize`` expects direct access to objective evaluations. This class bridges
-        the two by replaying previously-evaluated points from ``self.data``:
+    Integration model
+    -----------------
+    Xopt uses ask/tell semantics (one new point per ``step``), while scipy
+    ``minimize`` expects direct access to objective evaluations. This class bridges
+    the two by replaying previously-evaluated points from ``self.data``:
 
-        1. Build a cache from existing Xopt observations.
-        2. Run ``scipy.optimize.minimize`` with an objective function that first checks
-             the cache.
-        3. If scipy asks for a point not in cache, raise ``_RequestEvaluation`` to exit
-             minimize early and return that point to Xopt.
-        4. Xopt evaluates the point externally and appends it to ``self.data``.
-        5. The next ``step`` repeats the process with the larger cache.
+    1. Build a cache from existing Xopt observations.
+    2. Run ``scipy.optimize.minimize`` with an objective function that first checks
+         the cache.
+    3. If scipy asks for a point not in cache, raise ``_RequestEvaluation`` to exit
+         minimize early and return that point to Xopt.
+    4. Xopt evaluates the point externally and appends it to ``self.data``.
+    5. The next ``step`` repeats the process with the larger cache.
 
-        Performance implications
-        ------------------------
-        - ``_build_cache`` is O(N) in number of past evaluations and is executed every
-            ``step``. This overhead is typically small when objective evaluations are
-            expensive, but can dominate for very cheap objectives.
-        - ``minimize`` is restarted from ``x0`` each ``step`` and progresses by replaying
-            cached points. This is robust and method-agnostic, but adds repeated optimizer
-            bookkeeping work compared to a persistent in-memory scipy run.
-        - Point keys are rounded (12 decimals) before cache lookup to avoid fragile
-            floating-point equality checks. This improves replay stability across methods
-            that revisit numerically-close points.
+    Performance implications
+    ------------------------
+    - ``_build_cache`` is O(N) in number of past evaluations and is executed every
+        ``step``. This overhead is typically small when objective evaluations are
+        expensive, but can dominate for very cheap objectives.
+    - ``minimize`` is restarted from ``x0`` each ``step`` and progresses by replaying
+        cached points. This is robust and method-agnostic, but adds repeated optimizer
+        bookkeeping work compared to a persistent in-memory scipy run.
+    - Point keys are rounded (12 decimals) before cache lookup to avoid fragile
+        floating-point equality checks. This improves replay stability across methods
+        that revisit numerically-close points.
 
     """
 

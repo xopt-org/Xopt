@@ -61,6 +61,7 @@ nav:
               - Genetic operators: examples/ga/nsga2/genetic_operators.ipynb
 
         - Sequential:
+            - Scipy Minimize: examples/sequential/scipy.ipynb
             - Nelder-Mead: examples/sequential/neldermead.ipynb
             - Extremum seeking: examples/sequential/extremum_seeking.ipynb
             - RCDS: examples/sequential/rcds.ipynb
@@ -103,6 +104,7 @@ nav:
               - Genetic Operators: api/generators/ga/operators.md
           - Sequential generators:
               - Sequential Base Class: api/generators/sequential/sequential_generator.md
+              - Scipy Minimize: api/generators/sequential/scipy.md
               - RCDS: api/generators/sequential/rcds.md
               - Extremum Seeking: api/generators/sequential/extremumseeking.md
               - Nelder-Mead: api/generators/sequential/neldermead.md
