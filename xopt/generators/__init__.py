@@ -157,6 +157,8 @@ def get_generator_defaults(
 
         if v.is_required():
             defaults[k] = None
+        elif v.default_factory is not None:
+            defaults[k] = v.default_factory()
         else:
             if v.default is None:
                 defaults[k] = None
