@@ -17,11 +17,22 @@ import pandas as pd
 from xopt.errors import FeasibilityError
 from gest_api.vocs import (
     VOCS,
+    ContinuousVariable,
     GreaterThanConstraint,
     LessThanConstraint,
     BoundsConstraint,
     MaximizeObjective,
 )
+
+
+class ContextualVariable(ContinuousVariable):
+    """
+    A variable that is not optimized over, but rather is observed and can be conditioned on.
+    """
+
+    def __init__(self):
+        domain = [-np.inf, np.inf]
+        super().__init__(domain=domain)
 
 
 def random_inputs(
@@ -168,7 +179,14 @@ def convert_dataframe_to_inputs(
         A dataframe containing the extracted inputs.
     """
     # make sure that the df keys only contain vocs variables
-    if not set(vocs.variable_names) == set(data.keys()):
+    non_contextual_variable_names = sorted(
+        [
+            name
+            for name, var in vocs.variables.items()
+            if not isinstance(var, ContextualVariable)
+        ]
+    )
+    if not set(non_contextual_variable_names) == set(data.keys()):
         raise ValueError("input dataframe column set must equal set of vocs variables")
 
     # only keep the variables
@@ -206,7 +224,14 @@ def convert_numpy_to_inputs(
     pd.DataFrame
         A dataframe containing the converted inputs.
     """
-    df = pd.DataFrame(inputs, columns=vocs.variable_names)
+    non_contextual_variable_names = sorted(
+        [
+            name
+            for name, var in vocs.variables.items()
+            if not isinstance(var, ContextualVariable)
+        ]
+    )
+    df = pd.DataFrame(inputs, columns=non_contextual_variable_names)
     return convert_dataframe_to_inputs(vocs, df, include_constants)
 
 

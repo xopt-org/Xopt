@@ -1,9 +1,12 @@
 import pandas as pd
-from xopt.generators.bayesian.contextual_ei import (
-    ContextualExpectedImprovementGenerator,
+from xopt.generators.bayesian import (
+    ExpectedImprovementGenerator,
 )
 from xopt.evaluator import Evaluator
-from xopt.vocs import VOCS
+from xopt.generators.bayesian.upper_confidence_bound import (
+    UpperConfidenceBoundGenerator,
+)
+from xopt.vocs import VOCS, ContextualVariable
 import pytest
 import torch
 import numpy as np
@@ -13,9 +16,8 @@ class TestContextualBO:
     @pytest.fixture(autouse=True)
     def setup(self):
         self.vocs = VOCS(
-            variables={"x1": [0, 1]},
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
             objectives={"y": "MAXIMIZE"},
-            observables=["x2"],
         )
 
         def f(inputs):
@@ -26,10 +28,12 @@ class TestContextualBO:
 
         self.evaluator = Evaluator(function=f)
 
-    def test_contextual_ei_generator(self):
-        generator = ContextualExpectedImprovementGenerator(
+    @pytest.mark.parametrize(
+        "generator_class", [ExpectedImprovementGenerator, UpperConfidenceBoundGenerator]
+    )
+    def test_contextual_ei_generator(self, generator_class):
+        generator = generator_class(
             vocs=self.vocs,
-            contextual_observables=["x2"],
         )
 
         # Create initial data with varying x2
@@ -43,6 +47,8 @@ class TestContextualBO:
 
         # check model input names
         assert generator.model_input_names == ["x1", "x2"]
+        # check model output names
+        assert generator.model_output_names == ["y"]
         # check model input bounds
         bounds = generator.get_model_input_bounds(data)
         assert bounds["x1"] == [0, 1]

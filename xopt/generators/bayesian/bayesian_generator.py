@@ -65,7 +65,7 @@ from xopt.generators.bayesian.utils import (
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
-from xopt.vocs import convert_numpy_to_inputs, extract_data
+from xopt.vocs import ContextualVariable, convert_numpy_to_inputs, extract_data
 
 
 logger = logging.getLogger()
@@ -195,7 +195,6 @@ class BayesianGenerator(Generator, ABC):
             raise VOCSError("this generator does not support constraints")
 
         # assertion that at least one objective exists is done in model_validator below
-
         if v.n_objectives == 1:
             if not info.data["supports_single_objective"]:
                 raise VOCSError(
@@ -508,25 +507,9 @@ class BayesianGenerator(Generator, ABC):
                     )
                 )
 
-        # add fixed feature bounds if requested
-        if self.fixed_features is not None:
-            # get bounds for each fixed_feature (vocs bounds take precedent)
-            for key in self.fixed_features:
-                if key not in variable_bounds:
-                    if key not in data:
-                        raise KeyError(
-                            "generator data needs to contain fixed feature "
-                            f"column name `{key}`"
-                        )
-                    f_data = data[key]
-                    bounds = [f_data.min(), f_data.max()]
-                    if bounds[1] - bounds[0] < 1e-8:
-                        bounds[1] = bounds[0] + 1e-8
-                    variable_bounds[key] = bounds
-
         _model = self.gp_constructor.build_model(
             self.model_input_names,
-            self.vocs.output_names,
+            self.model_output_names,
             data,
             variable_bounds,
             **self.tkwargs,
@@ -679,7 +662,7 @@ class BayesianGenerator(Generator, ABC):
             # log transform the result to handle the constraints
             acq = LogAcquisitionFunction(acq)
 
-        acq = self._apply_fixed_features(acq)
+        acq = self._apply_fixed_features_and_contextual_variables(acq)
         acq = acq.to(**self.tkwargs)
         return acq
 
@@ -698,8 +681,8 @@ class BayesianGenerator(Generator, ABC):
             )
         bounds = self._get_bounds()
 
-        if self.fixed_features is not None:
-            acq = self._apply_fixed_features(acq)
+        if self.fixed_features is not None or self.contextual_variables:
+            acq = self._apply_fixed_features_and_contextual_variables(acq)
 
             indices = []
             for idx, name in enumerate(self.vocs.variable_names):
@@ -824,17 +807,26 @@ class BayesianGenerator(Generator, ABC):
             constraint_callables = None
         return constraint_callables
 
-    def _apply_fixed_features(self, acq):
-        """apply fixed features to the acquisition function if needed"""
+    def _apply_fixed_features_and_contextual_variables(self, acq):
+        """apply fixed features and contextual variables to the acquisition function if needed"""
+        # get input dim
+        dim = len(self.model_input_names)
+        columns = []
+        values = []
+
         if self.fixed_features is not None:
-            # get input dim
-            dim = len(self.model_input_names)
-            columns = []
-            values = []
             for name, value in self.fixed_features.items():
                 columns.append(self.model_input_names.index(name))
                 values.append(value)
 
+        if self.contextual_variables is not None:
+            # get the last contextual variable values
+            for var in self.contextual_variables:
+                columns.append(self.model_input_names.index(var))
+                values.append(self.data[var].iloc[-1])
+
+        # if we have fixed features or contextual variables then we need to apply the fixed feature acquisition function
+        if len(columns) > 0:
             # necessary because fixed feature acq must get tensor - it searches for dtype/device
             values = torch.tensor(values).to(**self.tkwargs)
             acq = FixedFeatureAcquisitionFunction(
@@ -865,11 +857,27 @@ class BayesianGenerator(Generator, ABC):
             for name, val in self.fixed_features.items():
                 if name not in variable_names:
                     variable_names += [name]
+
         return variable_names
-    
+
+    @property
+    def contextual_variables(self):
+        return [
+            name
+            for name, var in self.vocs.variables.items()
+            if isinstance(var, ContextualVariable)
+        ]
+
+    @property
+    def model_output_names(self):
+        """output names corresponding to trained model"""
+        return self.vocs.output_names
+
     def get_model_input_bounds(self, data: pd.DataFrame) -> Dict[str, List[float]]:
         """variable bounds corresponding to trained model"""
-        variable_bounds = deepcopy({name: var.domain for name, var in self.vocs.variables.items()})
+        variable_bounds = deepcopy(
+            {name: var.domain for name, var in self.vocs.variables.items()}
+        )
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -897,6 +905,15 @@ class BayesianGenerator(Generator, ABC):
                     if bounds[1] - bounds[0] < 1e-8:
                         bounds[1] = bounds[0] + 1e-8
                     variable_bounds[key] = bounds
+
+        # add contextual variable bounds if requested
+        if self.contextual_variables:
+            for var in self.contextual_variables:
+                variable_bounds[var] = (
+                    data[var].min(),
+                    data[var].max() + 1e-6,
+                )  # small epsilon to avoid zero range
+
         return variable_bounds
 
     @property
@@ -961,6 +978,15 @@ class BayesianGenerator(Generator, ABC):
                     indices += [idx]
 
             # grab indexed bounds
+            bounds = bounds[:, indices]
+
+        # if we have contextual variables we also need to remove the bounds associated with those variables
+        if self.contextual_variables:
+            indices = []
+            for idx, name in enumerate(self.vocs.variable_names):
+                if name not in self.contextual_variables:
+                    indices += [idx]
+
             bounds = bounds[:, indices]
 
         bounds = bounds.to(**self.tkwargs)
