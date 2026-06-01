@@ -4,7 +4,9 @@ from xopt.generators.bayesian import (
     ExpectedImprovementGenerator,
 )
 from xopt.evaluator import Evaluator
-from xopt.generators.bayesian.upper_confidence_bound import UpperConfidenceBoundGenerator
+from xopt.generators.bayesian.upper_confidence_bound import (
+    UpperConfidenceBoundGenerator,
+)
 from xopt.vocs import VOCS, ContextualVariable
 import pytest
 import torch
