@@ -10,6 +10,7 @@ from typing import (
     Union,
 )
 import textwrap
+import warnings
 
 import gpytorch
 import numpy as np
@@ -24,7 +25,7 @@ from matplotlib.ticker import FormatStrFormatter
 
 from xopt.errors import FeasibilityError
 from xopt.generator import Generator
-from xopt.vocs import VOCS, get_feasibility_data, select_best
+from xopt.vocs import ContextualVariable, VOCS, get_feasibility_data, select_best
 
 from .objectives import feasibility
 from .utils import torch_compile_gp_model, torch_trace_gp_model
@@ -36,6 +37,12 @@ DType = TypeVar("DType")
 class Array(np.ndarray, Generic[DType]):
     def __getitem__(self, key) -> DType:
         return super().__getitem__(key)
+
+
+ACQUISITION_CONTEXTUAL_WARNING = (
+    "Acquisition plot unavailable: conditioned on contextual variables and defined over "
+    "controllable dimensions only."
+)
 
 
 def visualize_generator_model(
@@ -163,6 +170,8 @@ def visualize_model(
         Whether the feasibility region is shown.
     show_acquisition : bool, optional
         Whether the acquisition function is computed and shown (only if acquisition function is not None).
+        If a contextual variable is selected as a plot axis, acquisition evaluation is skipped and a
+        warning panel is rendered instead.
     n_grid : int, optional
         Number of grid points per dimension used to display the model predictions.
     axes : Axes, optional
@@ -281,6 +290,7 @@ def visualize_model(
             reference_point=reference_point,
             variable_names=variable_names,
             vocs=vocs,
+            data=data,
             n_grid=n_grid,
             tkwargs=tkwargs,
         )
@@ -341,6 +351,7 @@ def visualize_model(
                     show_samples=False,
                     variable_names=variable_names,
                     tkwargs=tkwargs,
+                    emit_warning=True,
                     interactive=interactive,
                 )
                 ax_acq = ax[len(output_names), 1]
@@ -359,6 +370,7 @@ def visualize_model(
                 show_samples=False,
                 variable_names=variable_names,
                 tkwargs=tkwargs,
+                emit_warning=not hasattr(acquisition_function, "base_acquisition"),
                 interactive=interactive,
             )
         if show_feasibility:
@@ -445,6 +457,8 @@ def plot_model_prediction(
         The axis to use for plotting. If None is given, a new one is generated.
     interactive : bool, optional
         Whether to enable picker functionality for samples in the subplots.
+    emit_warning : bool, optional
+        Whether to emit a Python warning when acquisition evaluation is skipped for contextual axes.
 
     Returns
     -------
@@ -459,6 +473,7 @@ def plot_model_prediction(
     input_mesh = _generate_input_mesh(
         vocs=vocs,
         variable_names=variable_names,
+        data=data,
         n_grid=n_grid,
         reference_point=reference_point,
         tkwargs=tkwargs,
@@ -614,6 +629,7 @@ def plot_acquisition_function(
     n_grid: int = 100,
     axis: Optional[Axes] = None,
     exponentiate: bool = True,
+    emit_warning: bool = True,
     interactive: bool = False,
 ) -> Axes:
     """Displays the given acquisition function.
@@ -654,12 +670,20 @@ def plot_acquisition_function(
     """
     _, variable_names = _validate_names(vocs.output_names, variable_names, vocs)
     axis = _get_axis(axis, dim=len(variable_names))
+
+    contextual_axes = _get_contextual_axes(variable_names, vocs)
+    if contextual_axes:
+        if emit_warning:
+            warnings.warn(ACQUISITION_CONTEXTUAL_WARNING, RuntimeWarning, stacklevel=2)
+        return _plot_acquisition_warning(axis, contextual_axes)
+
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
     input_mesh = _generate_input_mesh(
         n_grid=n_grid,
         reference_point=reference_point,
         variable_names=variable_names,
         vocs=vocs,
+        data=data,
         tkwargs=tkwargs,
     )
 
@@ -811,6 +835,7 @@ def plot_feasibility(
         reference_point=reference_point,
         variable_names=variable_names,
         vocs=vocs,
+        data=data,
         tkwargs=tkwargs,
     )
     feas = (
@@ -1046,6 +1071,7 @@ def _plot2d_prediction(
 def _generate_input_mesh(
     vocs: VOCS,
     variable_names: list[str],
+    data: DataFrame,
     reference_point: dict[str, Any],
     n_grid: int,
     tkwargs: dict[str, Any],
@@ -1058,6 +1084,8 @@ def _generate_input_mesh(
         VOCS object for visualization.
     variable_names : List[str]
         Variable names with respect to which the GP model(s) shall be displayed.
+    data : DataFrame
+        Data used to infer finite contextual bounds for mesh generation.
     reference_point : dict
         Reference point determining the value of variables in vocs, but not in variable_names.
     n_grid : int
@@ -1070,7 +1098,32 @@ def _generate_input_mesh(
     torch.Tensor
         The input mesh for visualization.
     """
-    x_lim = torch.tensor([vocs.variables[k].domain for k in variable_names])
+    bounds: list[list[float]] = []
+    for name in variable_names:
+        variable = vocs.variables[name]
+        if isinstance(variable, ContextualVariable):
+            if name not in data:
+                raise KeyError(
+                    f"Missing contextual variable `{name}` in data required for visualization."
+                )
+
+            lower = float(data[name].min())
+            upper = float(data[name].max())
+            if not np.isfinite(lower) or not np.isfinite(upper):
+                raise ValueError(
+                    f"Contextual variable `{name}` has non-finite bounds in data."
+                )
+
+            width = upper - lower
+            padding = max(0.05 * width, 1e-8)
+            lower = lower - padding
+            upper = upper + padding
+
+            bounds.append([lower, upper])
+        else:
+            bounds.append([float(variable.domain[0]), float(variable.domain[1])])
+
+    x_lim = torch.tensor(bounds, dtype=torch.double)
     x_i = [torch.linspace(*x_lim[i], n_grid) for i in range(x_lim.shape[0])]
     x_mesh = torch.meshgrid(*x_i, indexing="ij")
     x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh]).double()
@@ -1087,6 +1140,38 @@ def _generate_input_mesh(
     )
     x = x.to(**tkwargs)
     return x
+
+
+def _get_contextual_axes(variable_names: list[str], vocs: VOCS) -> list[str]:
+    """Return contextual variable names present in selected visualization axes."""
+    return [
+        name
+        for name in variable_names
+        if isinstance(vocs.variables.get(name), ContextualVariable)
+    ]
+
+
+def _plot_acquisition_warning(axis: Axes, contextual_axes: list[str]) -> Axes:
+    """Render an acquisition warning panel when contextual axes are selected."""
+    contextual_label = ", ".join(contextual_axes)
+    message = (
+        f"{ACQUISITION_CONTEXTUAL_WARNING}\n"
+        f"Selected contextual axis variable(s): {contextual_label}"
+    )
+
+    axis.clear()
+    axis.set_title("Acquisition Function")
+    axis.text(
+        0.5,
+        0.5,
+        message,
+        ha="center",
+        va="center",
+        transform=axis.transAxes,
+        wrap=True,
+        fontsize=10,
+    )
+    return axis
 
 
 def _get_reference_point(

@@ -12,7 +12,7 @@ from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-from xopt.vocs import VOCS
+from xopt.vocs import ContextualVariable, VOCS
 
 
 class DummyPosterior:
@@ -196,6 +196,72 @@ def test_plot_acquisition_function_2d(vocs, data):
         n_grid=5,
     )
     assert ax is not None
+
+
+def test_plot_acquisition_function_with_contextual_axis_warns():
+    vocs = VOCS(
+        variables={"x": [0, 1], "context": ContextualVariable()},
+        objectives={"z": "MAXIMIZE"},
+        constraints={},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": np.linspace(0, 1, 5),
+            "context": np.linspace(0.2, 0.8, 5),
+            "z": np.linspace(0.0, 1.0, 5),
+        }
+    )
+
+    fig, axis = plt.subplots(1, 1)
+    with pytest.warns(RuntimeWarning, match="Acquisition plot unavailable"):
+        ax = visualize.plot_acquisition_function(
+            acquisition_function=DummyAcq(),
+            vocs=vocs,
+            data=data,
+            tkwargs={},
+            variable_names=["x", "context"],
+            n_grid=5,
+            axis=axis,
+        )
+
+    assert any("Acquisition plot unavailable" in text.get_text() for text in ax.texts)
+    plt.close(fig)
+
+
+def test_visualize_model_with_contextual_axis_shows_acquisition_warning():
+    vocs = VOCS(
+        variables={"x": [0, 1], "context": ContextualVariable()},
+        objectives={"z": "MAXIMIZE"},
+        constraints={},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": np.linspace(0, 1, 8),
+            "context": np.linspace(0.1, 0.9, 8),
+            "z": np.sin(np.linspace(0, np.pi, 8)),
+        }
+    )
+
+    generator = UpperConfidenceBoundGenerator(vocs=vocs)
+    generator.add_data(data)
+    generator.train_model()
+
+    with pytest.warns(RuntimeWarning, match="Acquisition plot unavailable"):
+        fig, ax = generator.visualize_model(
+            output_names=["z"],
+            variable_names=["x", "context"],
+            n_grid=5,
+            show_acquisition=True,
+        )
+
+    acquisition_axis = ax[1, 0]
+    assert any(
+        "Acquisition plot unavailable" in text.get_text()
+        for text in acquisition_axis.texts
+    )
+    plt.close(fig)
 
 
 # @pytest.fixture(autouse=True)

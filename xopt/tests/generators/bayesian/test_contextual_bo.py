@@ -53,7 +53,7 @@ class TestContextualBO:
         # check model input bounds
         bounds = generator.get_model_input_bounds(data)
         assert bounds["x1"] == [0, 1]
-        assert np.allclose(bounds["x2"], [0.0, 1.0 + 1e-6])
+        assert np.allclose(bounds["x2"], [-0.05, 1.05])
 
         # check training the model
         generator.train_model(generator.data)
@@ -85,3 +85,17 @@ class TestContextualBO:
         # Evaluation should succeed without requiring contextual inputs.
         xopt.evaluate_data(candidates)
         assert "x2" in xopt.data.columns
+
+    def test_visualize_model_with_contextual_axis_warns(self):
+        generator = UpperConfidenceBoundGenerator(vocs=self.vocs)
+        xopt = Xopt(generator=generator, evaluator=self.evaluator)
+        xopt.evaluate_data(pd.DataFrame({"x1": np.linspace(0, 1, 5)}))
+        xopt.generator.train_model()
+
+        with pytest.warns(RuntimeWarning, match="Acquisition plot unavailable"):
+            xopt.generator.visualize_model(
+                output_names=["y"],
+                variable_names=["x1", "x2"],
+                show_acquisition=True,
+                n_grid=5,
+            )

@@ -716,6 +716,7 @@ class BayesianGenerator(Generator, ABC):
             - variable_names : List[str]
                 The variables with respect to which the GP models are displayed (maximum of 2).
                 Defaults to vocs.variable_names.
+                Contextual variables are allowed for GP model visualization axes.
             - idx : int
                 Index of the last sample to use. This also selects the point of reference in
                 higher dimensions unless an explicit reference_point is given.
@@ -730,6 +731,8 @@ class BayesianGenerator(Generator, ABC):
                 Whether the feasibility region is shown.
             - show_acquisition : bool, optional
                 Whether the acquisition function is computed and shown (only if acquisition function is not None).
+                If contextual variables are selected as plot axes, the acquisition subplot is replaced
+                with warning text because the acquisition is conditioned on contextual values.
             - n_grid : int, optional
                 Number of grid points per dimension used to display the model predictions.
             - axes : Axes, optional
@@ -909,10 +912,22 @@ class BayesianGenerator(Generator, ABC):
         # add contextual variable bounds if requested
         if self.contextual_variables:
             for var in self.contextual_variables:
-                variable_bounds[var] = (
-                    data[var].min(),
-                    data[var].max() + 1e-6,
-                )  # small epsilon to avoid zero range
+                if var not in data:
+                    raise KeyError(
+                        "generator data needs to contain contextual variable "
+                        f"column name `{var}`"
+                    )
+
+                lower = float(data[var].min())
+                upper = float(data[var].max())
+                if not np.isfinite(lower) or not np.isfinite(upper):
+                    raise ValueError(
+                        f"contextual variable `{var}` has non-finite bounds in data"
+                    )
+
+                width = upper - lower
+                padding = max(0.05 * width, 1e-8)
+                variable_bounds[var] = [lower - padding, upper + padding]
 
         return variable_bounds
 
