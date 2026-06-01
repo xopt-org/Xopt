@@ -15,6 +15,7 @@ from pydantic import Field
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.utils import get_training_data
 from xopt.vocs import VOCS
+from gest_api.vocs import ContinuousVariable
 
 
 class TimeDependentModelConstructor(StandardModelConstructor):
@@ -158,7 +159,10 @@ class TimeDependentModelConstructor(StandardModelConstructor):
             vocs.variable_names + ["time"],
             vocs.output_names,
             data,
-            vocs.variables,
+            {
+                n: v.domain if isinstance(v, ContinuousVariable) else v
+                for n, v in vocs.variables.items()
+            },
             dtype,
             device,
         )

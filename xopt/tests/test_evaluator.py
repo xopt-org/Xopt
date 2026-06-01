@@ -1,7 +1,10 @@
+import pytest
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
+
+from xopt.vocs import random_inputs
 
 from xopt import Evaluator, Xopt
 from xopt.generators import RandomGenerator
@@ -130,7 +133,7 @@ class TestEvaluator:
         MAX_WORKERS = 10
 
         vocs = VOCS(variables={"x": [0, 1], "y": [0, 1]}, objectives={"f1": "MINIMIZE"})
-        in10 = vocs.random_inputs(10)
+        in10 = random_inputs(vocs, 10)
 
         # Create Executor insance
         executor = ProcessPoolExecutor(max_workers=MAX_WORKERS)
@@ -159,6 +162,33 @@ class TestEvaluator:
             evaluator = Evaluator(function=func)
             generator = RandomGenerator(vocs=vocs)
 
-            X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+            X = Xopt(evaluator=evaluator, generator=generator)
 
             X.random_evaluate(5)
+
+    def test_submit_non_dict(self):
+        evaluator = Evaluator(function=self.f)
+        with pytest.raises(ValueError):
+            evaluator.submit([1, 2, 3])
+        with pytest.raises(ValueError):
+            evaluator.submit("not a dict")
+        with pytest.raises(ValueError):
+            evaluator.submit(42)
+
+    def test_submit_data_vectorized(self):
+        evaluator = Evaluator(function=self.f, vectorized=True)
+        candidates = pd.DataFrame(np.random.rand(5, 2), columns=["x1", "x2"])
+        futures = evaluator.submit_data(candidates)
+        assert len(futures) == 1
+        result = futures[0].result()
+        assert "f" in result
+
+    def test_evaluate_data_vectorized(self):
+        evaluator = Evaluator(function=self.f, vectorized=True)
+        candidates = pd.DataFrame(np.random.rand(5, 2), columns=["x1", "x2"])
+
+        result = evaluator.evaluate_data(candidates)
+        assert isinstance(result, pd.DataFrame)
+        assert result.shape[0] == 5
+        assert "f" in result.columns
+        assert all(result["f"] == candidates["x1"] ** 2 + candidates["x2"] ** 2)

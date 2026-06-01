@@ -14,7 +14,7 @@ class Test_IO:
     def test_options_to_dict(self):
         evaluator = Evaluator(function=dummy)
         generator = RandomGenerator(vocs=TEST_VOCS_BASE)
-        X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=generator, evaluator=evaluator)
         print(X.model_dump_json())
         print(X.to_json(base_key="bk"))
 
@@ -22,7 +22,7 @@ class Test_IO:
         evaluator = Evaluator(function=dummy)
         generator = RandomGenerator(vocs=TEST_VOCS_BASE)
 
-        X = Xopt(generator=generator, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=generator, evaluator=evaluator)
         state_dict = X.dict()
         assert state_dict["generator"]["name"] == generator.name
         print(state_dict)

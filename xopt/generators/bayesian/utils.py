@@ -10,10 +10,13 @@ import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
+from botorch.models.utils import multioutput_to_batch_mode_transform
 from botorch.utils.multi_objective import is_non_dominated, Hypervolume
 
+from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
+
 from xopt.generators.bayesian.turbo import TurboController
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 def get_training_data(
@@ -59,18 +62,79 @@ def get_training_data(
     input_data = input_data[non_nans]
     outcome_data = outcome_data[non_nans]
 
-    train_X = torch.tensor(input_data[~outcome_data.isnull()].to_numpy(dtype="double"))
+    train_X = torch.tensor(
+        input_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
+    )
     train_Y = torch.tensor(
-        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double")
+        outcome_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
     ).unsqueeze(-1)
 
     train_Yvar = None
     if f"{outcome_name}_var" in data:
         variance_data = data[f"{outcome_name}_var"][non_nans]
         train_Yvar = torch.tensor(
-            variance_data[~outcome_data.isnull()].to_numpy(dtype="double")
+            variance_data[~outcome_data.isnull()].to_numpy(dtype="double").copy()
         ).unsqueeze(-1)
 
+    return train_X, train_Y, train_Yvar
+
+
+def get_training_data_batched(
+    input_names: List[str],
+    outcome_names: List[str],
+    data: pd.DataFrame,
+    batch_mode: bool = False,
+) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    """
+    Get data for multiple outcomes. Valid points have no NaNs for all inputs and outcomes.
+
+    Parameters
+    ----------
+    batch_mode: bool
+        If false, not unrolled - will be done by SingleTaskGP. If true, unrolls the data
+        so that each outcome is treated as a separate task in a batch mode model.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        train_X `n x d` or `m x n x d`
+        train_Y `n x m` or `m x n x 1`
+        train_Yvar `n x m` or `m x n x 1`
+    """
+    input_data = data[input_names]
+    outcome_data = data[outcome_names]
+
+    non_nans_input = ~input_data.isnull().T.any()
+    non_nans_output = ~outcome_data.isnull().T.any()
+    non_nans_all = non_nans_input & non_nans_output
+    input_data = input_data[non_nans_all]
+    outcome_data = outcome_data[non_nans_all]
+
+    train_X = torch.tensor(input_data.to_numpy(dtype="double"))
+
+    train_Y = torch.tensor(outcome_data[outcome_names].to_numpy(dtype="double"))
+
+    train_Yvar = None
+    yvar_names = [f"{outcome}_var" for outcome in outcome_names]
+    have_yvar = [x in data for x in yvar_names]
+    if all(have_yvar):
+        train_Yvar = torch.tensor(
+            data.loc[non_nans_all, yvar_names].to_numpy(dtype="double")
+        )
+    elif not any(have_yvar):
+        # no var
+        pass
+    else:
+        # partial - not allowed
+        raise ValueError("either all or none of the outcomes must have variance data")
+
+    if batch_mode:
+        train_X, train_Y, train_Yvar = multioutput_to_batch_mode_transform(
+            train_X, train_Y, len(outcome_names), train_Yvar
+        )
+        train_Y = train_Y.unsqueeze(-1)
+        if train_Yvar is not None:
+            train_Yvar = train_Yvar.unsqueeze(-1)
     return train_X, train_Y, train_Yvar
 
 
@@ -80,20 +144,16 @@ def set_botorch_weights(vocs: VOCS):
 
     weights = torch.zeros(len(output_names), dtype=torch.double)
 
-    if vocs.n_objectives > 0:
-        # if objectives exist this is an optimization problem
-        # set weights according to the index of the models -- corresponds to the
-        # ordering of output names
-        for objective_name in vocs.objective_names:
-            if vocs.objectives[objective_name] == "MINIMIZE":
-                weights[output_names.index(objective_name)] = -1.0
-            elif vocs.objectives[objective_name] == "MAXIMIZE":
-                weights[output_names.index(objective_name)] = 1.0
-    if vocs.n_objectives == 0:
-        # if no objectives exist this may be an exploration problem, weight each
-        # observable by 1.0
-        for observable_name in vocs.observables:
-            weights[output_names.index(observable_name)] = 1.0
+    # if objectives exist this is an optimization problem
+    # set weights according to the index of the models -- corresponds to the
+    # ordering of output names
+    for objective_name in vocs.objective_names:
+        if isinstance(vocs.objectives[objective_name], MinimizeObjective):
+            weights[output_names.index(objective_name)] = -1.0
+        elif isinstance(vocs.objectives[objective_name], MaximizeObjective):
+            weights[output_names.index(objective_name)] = 1.0
+        elif isinstance(vocs.objectives[objective_name], ExploreObjective):
+            weights[output_names.index(objective_name)] = 1.0
 
     return weights
 
@@ -249,6 +309,26 @@ def validate_turbo_controller_base(
         )
 
 
+def validate_turbo_controller_center(generator):
+    if generator.turbo_controller is not None:
+        # Check that values for center_x are within trust region bounds
+        trust_region = generator.turbo_controller.get_trust_region(generator)
+
+        center_x = generator.turbo_controller.center_x
+        if center_x is not None:
+            for key, value in center_x.items():
+                if key in generator.vocs.variable_names:
+                    idx = generator.vocs.variable_names.index(key)
+                    lower_bound = trust_region[0, idx].item()
+                    upper_bound = trust_region[1, idx].item()
+                    if not (lower_bound <= value <= upper_bound):
+                        raise ValueError(
+                            f"Turbo controller center_x value for {key} : "
+                            f"{value} is outside of trust region bounds "
+                            f"[{lower_bound}, {upper_bound}]"
+                        )
+
+
 class MeanVarModelWrapper(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -303,7 +383,7 @@ def torch_trace_gp_model(
         raise ValueError(
             "ModelListGP is not supported for JIT tracing - use individual models"
         )
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
     )
@@ -368,7 +448,7 @@ def torch_compile_gp_model(
     """
     if isinstance(model, ModelListGP):
         raise ValueError("ModelListGP is not supported - use individual models")
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
@@ -417,7 +497,7 @@ def torch_trace_acqf(
         The keyword arguments for the torch tensor.
     """
     # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
@@ -429,8 +509,7 @@ def torch_trace_acqf(
         saqcf = torch.jit.trace(
             acq,
             example_inputs=test_x.clone().detach(),
-            check_trace=True,
-            check_tolerance=1e-8,
+            check_trace=False,
         )
     return saqcf
 
@@ -468,7 +547,7 @@ def torch_compile_acqf(
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
         if verify:
-            rand_point = vocs.random_inputs()[0]
+            rand_point = random_inputs(vocs)[0]
             rand_vec = torch.stack(
                 [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
             )

@@ -84,7 +84,7 @@ class Algorithm(XoptBaseModel, ABC):
         Tensor
             The evaluated virtual objective values.
         """
-        pass
+        pass  # pragma: no cover
 
 
 class GridScanAlgorithm(Algorithm, ABC):

@@ -14,7 +14,7 @@ class MOProblem(Problem):
     @property
     @abstractmethod
     def ref_point(self) -> np.ndarray:
-        pass
+        pass  # pragma: no cover
 
     @property
     def ref_point_dict(self):
@@ -49,7 +49,7 @@ class QuadraticMO(MOProblem):
         self.scale = scale
         self.offset = offset
         self.negate = negate
-        self._bounds = [(0, 3.0) for _ in range(n_var)]
+        self._bounds = [[0, 3.0] for _ in range(n_var)]
         self.vocs = self.VOCS
         self.shift = 0
 
@@ -91,7 +91,7 @@ class LinearMO(MOProblem):
         self.scale = scale
         self.offset = offset
         self.negate = negate
-        self._bounds = [(0, 6.0) for _ in range(n_var)]
+        self._bounds = [[0, 6.0] for _ in range(n_var)]
         self.vocs = self.VOCS
         self.shift = 0.0
 
@@ -131,7 +131,7 @@ class DTLZ2(MOProblem):
         # negate -> maximization
         super().__init__(n_var, n_obj=2)
         self.negate = negate
-        self._bounds = [(0.0, 1.0) for _ in range(n_var)]
+        self._bounds = [[0.0, 1.0] for _ in range(n_var)]
         self.vocs = self.VOCS
 
     @property

@@ -10,9 +10,10 @@ from botorch.acquisition.multi_objective.logei import (
 )
 
 from xopt.base import Xopt
-from xopt.errors import XoptError
+from xopt.errors import XoptError, VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
+from xopt.generators.bayesian.models.standard import BatchedModelConstructor
 from xopt.numerical_optimizer import GridOptimizer
 from xopt.resources.test_functions.tnk import (
     evaluate_TNK,
@@ -46,6 +47,12 @@ class TestMOBOGenerator:
         with pytest.raises(XoptError):
             MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point={})
 
+        # test bad vocs
+        bad_vocs = deepcopy(TEST_VOCS_BASE_MO)
+        bad_vocs.objectives = {}
+        with pytest.raises(VOCSError):
+            MOBOGenerator(vocs=bad_vocs, reference_point=TEST_VOCS_REF_POINT)
+
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_generate(self, use_cuda):
         gen = MOBOGenerator(vocs=TEST_VOCS_BASE_MO, reference_point=TEST_VOCS_REF_POINT)
@@ -71,6 +78,24 @@ class TestMOBOGenerator:
         assert len(candidate) == 2
 
         check_generator_tensor_locations(gen, device_map[use_cuda])
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate_batched(self, use_cuda):
+        for vocs in [TEST_VOCS_BASE_MO, TEST_VOCS_BASE_MO_NC]:
+            gen = MOBOGenerator(
+                vocs=vocs,
+                gp_constructor=BatchedModelConstructor(),
+                reference_point=TEST_VOCS_REF_POINT,
+            )
+            set_options(gen, use_cuda, add_data=True)
+
+            candidate = gen.generate(1)
+            assert len(candidate) == 1
+
+            candidate = gen.generate(2)
+            assert len(candidate) == 2
+
+            check_generator_tensor_locations(gen, device_map[use_cuda])
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_round_trip(self, use_cuda):
@@ -122,8 +147,8 @@ class TestMOBOGenerator:
 
         for ele in [gen]:
             dump = ele.model_dump()
-            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
-            X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+            generator = MOBOGenerator(**dump)
+            X = Xopt(generator=generator, evaluator=evaluator)
             X.random_evaluate(3)
             X.step()
 
@@ -324,8 +349,8 @@ class TestMOBOGenerator:
 
         for ele in [gen]:
             dump = ele.model_dump()
-            generator = MOBOGenerator(vocs=tnk_vocs, **dump)
-            X = Xopt(generator=generator, evaluator=evaluator, vocs=tnk_vocs)
+            generator = MOBOGenerator(**dump)
+            X = Xopt(generator=generator, evaluator=evaluator)
             X.generator.numerical_optimizer.max_iter = 1
             X.random_evaluate(3)
             X.step()
@@ -357,3 +382,18 @@ class TestMOBOGenerator:
         gen.numerical_optimizer.max_iter = 1
         gen.add_data(test_data)
         gen.generate(1)
+
+    def test_custom_objective(self):
+        def custom_objective(samples):
+            return samples[..., 0] ** 2 + samples[..., 1] ** 2
+
+        reference_point = {"y1": 10.0, "y2": 1.5}
+        vocs = deepcopy(TEST_VOCS_BASE_MO)
+
+        with pytest.raises(ValueError):
+            MOBOGenerator(
+                vocs=vocs,
+                reference_point=reference_point,
+                n_monte_carlo_samples=1,
+                custom_objective=custom_objective,
+            )

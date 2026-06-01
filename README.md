@@ -13,9 +13,9 @@ Xopt
 |----------------------------------------------------------------------------------------------------------------------------------|
 | [![Documentation](https://img.shields.io/badge/Xopt-documentation-blue.svg)](https://xopt-org.github.io/Xopt/index.html) |
 
-| Name | Downloads | Version | Platforms |
-| --- | --- | --- | --- |
-| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) |
+| Name | Downloads | Version | Platforms | Codecov |
+| --- | --- | --- | --- | -- |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-xopt-green.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/xopt.svg)](https://anaconda.org/conda-forge/xopt) | [![codecov](https://codecov.io/gh/xopt-org/Xopt/graph/badge.svg?token=GCBUQSFBFD)](https://codecov.io/gh/xopt-org/Xopt) |
 
 
 
@@ -65,6 +65,11 @@ Xopt does **not** provide:
 
 Installing Xopt
 ===============
+`xopt` can be installed using pip
+
+```shell
+pip install xopt
+```
 
 Installing `xopt` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
 
@@ -87,32 +92,35 @@ conda search xopt --channel conda-forge
 
 Configuring an Xopt run
 ===============
-Xopt runs can be specified via a YAML file or dictonary input. This requires `generator`, `evaluator`, and `vocs` to be specified, along with optional general options such as `max_evaluations`. An example to run a multi-objective optimiation of a user-defined function `my_function` is:
+Xopt runs can be specified via a YAML file or dictonary input. This requires `generator`, `evaluator`, and `vocs` to be specified. An example to run a multi-objective optimiation of a user-defined function `my_function` is:
 ```yaml
 generator:
     name: cnsga
     population_size: 64
     population_file: test.csv
     output_path: .
+    vocs:
+      variables:
+          x1: [0, 3.14159]
+          x2: [0, 3.14159]
+      objectives:
+          y1: MINIMIZE
+          y2: MINIMIZE
+      constraints:
+          c1: [GREATER_THAN, 0]
+          c2: [LESS_THAN, 0.5]
+      constants: {a: dummy_constant}
 
 evaluator:
     function: my_function
     function_kwargs:
       my_arguments: 42
 
-vocs:
-    variables:
-        x1: [0, 3.14159]
-        x2: [0, 3.14159]
-    objectives:
-        y1: MINIMIZE
-        y2: MINIMIZE
-    constraints:
-        c1: [GREATER_THAN, 0]
-        c2: [LESS_THAN, 0.5]
-    constants: {a: dummy_constant}
 
-max_evaluations: 6400
+
+stopping_condition:
+    name: MaxEvaluationsCondition
+    max_evaluations: 6400
 ```
 
 Xopt can also be used through a simple Python interface.
@@ -137,7 +145,7 @@ def sin_function(input_dict):
 # create Xopt evaluator, generator, and Xopt objects
 evaluator = Evaluator(function=sin_function)
 generator = UpperConfidenceBoundGenerator(vocs=vocs)
-X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+X = Xopt(evaluator=evaluator, generator=generator)
 
 # call X.random_evaluate() to generate + evaluate 3 initial points
 X.random_evaluate(3)

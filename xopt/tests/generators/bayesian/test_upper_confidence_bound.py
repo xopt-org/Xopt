@@ -9,6 +9,7 @@ import torch
 from xopt.base import Xopt
 from xopt.errors import GeneratorWarning
 from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.models.standard import BatchedModelConstructor
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
@@ -69,6 +70,23 @@ class TestUpperConfidenceBoundGenerator:
         check_generator_tensor_locations(gen, device_map[use_cuda])
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
+    def test_generate_batched_c(self, use_cuda):
+        gen = UpperConfidenceBoundGenerator(
+            vocs=TEST_VOCS_BASE, gp_constructor=BatchedModelConstructor()
+        )
+        set_options(gen, use_cuda, add_data=True)
+
+        candidate = generate_without_warnings(gen, 1)
+        assert len(candidate) == 1
+
+        with warnings.catch_warnings(record=True) as w:
+            candidate = gen.generate(2)
+            assert sum(issubclass(x.category, GeneratorWarning) for x in w) == 1
+        assert len(candidate) == 2
+
+        check_generator_tensor_locations(gen, device_map[use_cuda])
+
+    @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_generate_nc(self, use_cuda):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.constraints = {}
@@ -97,7 +115,7 @@ class TestUpperConfidenceBoundGenerator:
         )
         set_options(gen, use_cuda=False, add_data=True)
         evaluator = Evaluator(function=xtest_callable)
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(10)
         for _ in range(1):
             X.step()
@@ -121,7 +139,7 @@ class TestUpperConfidenceBoundGenerator:
         )
         set_options(gen)
 
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(5)
         for _ in range(2):
             X.step()
@@ -165,22 +183,22 @@ class TestUpperConfidenceBoundGenerator:
         X = Xopt.from_yaml(
             """
             generator:
-              name: upper_confidence_bound
-
+                name: upper_confidence_bound
+                vocs:
+                    variables:
+                        x1: [0, 6.28]
+                    constraints:
+                        c1: [LESS_THAN, 0.0]
+                    objectives:
+                        y1: 'MAXIMIZE'
             evaluator:
               function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
 
-            vocs:
-              variables:
-                x1: [0, 6.28]
-              constraints:
-                c1: [LESS_THAN, 0.0]
-              objectives:
-                y1: 'MAXIMIZE'
+
             """
         )
         _ = X.random_evaluate(10, seed=0)
-        test_x = torch.linspace(*X.vocs.variables["x1"], 10, dtype=torch.float64)
+        test_x = torch.linspace(*X.vocs.variables["x1"].domain, 10, dtype=torch.float64)
         model = X.generator.train_model(X.data)
         acq = X.generator.get_acquisition(model)
         with pytest.warns(UserWarning):

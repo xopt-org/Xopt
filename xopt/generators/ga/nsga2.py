@@ -10,6 +10,7 @@ import pandas as pd
 import time
 import warnings
 
+from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
 from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
@@ -405,8 +406,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
                 "output directory is required for loading from checkpoint."
             )
+
         with open(vocs_fname) as f:
-            vocs = VOCS.from_dict(json.load(f))
+            vocs = VOCS(**json.load(f))
 
         # Load the checkpoint
         with open(fname) as f:
@@ -483,7 +485,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Returns true if every variable in the data dictionary is within bounds.
         """
         return all(
-            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+            bnd.domain[0] <= data[key] <= bnd.domain[1]
+            for key, bnd in self.vocs.variables.items()
         )
 
     def _generate(self, n_candidates: int) -> list[dict]:
@@ -497,10 +500,13 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Generate candidates one by one
             candidates = []
-            pop_x = self.vocs.variable_data(self.pop).to_numpy()
-            pop_f = self.vocs.objective_data(self.pop).to_numpy()
-            pop_g = vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy())
+            pop_x = get_variable_data(self.vocs, self.pop).to_numpy()
+            pop_f = get_objective_data(self.vocs, self.pop).to_numpy()
+            pop_g = vocs_data_to_arr(
+                get_constraint_data(self.vocs, self.pop).to_numpy()
+            )
             fitness = get_fitness(pop_f, pop_g)
+            bounds = np.array(self.vocs.bounds).T
             for _ in range(n_candidates):
                 candidates.append(
                     {
@@ -511,7 +517,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                                 pop_x,
                                 pop_f,
                                 pop_g,
-                                self.vocs.bounds,
+                                bounds,
                                 mutate=self.mutation_operator,
                                 crossover=self.crossover_operator,
                                 fitness=fitness,
@@ -525,10 +531,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             )
         else:
             vars = np.vstack(
-                [
-                    np.random.uniform(x[0], x[1], n_candidates)
-                    for x in self.vocs.bounds.T
-                ]
+                [np.random.uniform(x[0], x[1], n_candidates) for x in self.vocs.bounds]
             ).T
             candidates = [
                 {k: v for k, v in zip(self.vocs.variable_names, individual)}
@@ -582,9 +585,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Select using domination rank / crowding distance
             idx = cull_population(
-                self.vocs.variable_data(self.pop).to_numpy(),
-                self.vocs.objective_data(self.pop).to_numpy(),
-                vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy()),
+                get_variable_data(self.vocs, self.pop).to_numpy(),
+                get_objective_data(self.vocs, self.pop).to_numpy(),
+                vocs_data_to_arr(get_constraint_data(self.vocs, self.pop).to_numpy()),
                 self.population_size,
             )
             self.pop = [self.pop[i] for i in idx]
@@ -596,7 +599,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Generate logging message
             n_feasible = np.sum(
-                (self.vocs.constraint_data(self.pop).to_numpy() <= 0.0).all(axis=1)
+                (get_constraint_data(self.vocs, self.pop).to_numpy() <= 0.0).all(axis=1)
             )
             n_err = np.sum([x["xopt_error"] for x in self.pop])
             self._logger.info(
@@ -619,7 +622,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 # Save all Xopt data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
                 with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
-                    f.write(self.vocs.to_json())
+                    json.dump(self.vocs.dict(), f)
 
                 # Construct the DataFrame for this population
                 pop_df = pd.DataFrame(self.pop)

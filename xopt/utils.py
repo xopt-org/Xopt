@@ -14,10 +14,10 @@ import torch
 import traceback
 import yaml
 
+from gest_api.vocs import VOCS, GreaterThanConstraint
+
 from .generator import Generator
 from .pydantic import get_descriptions_defaults
-from .vocs import VOCS
-
 
 # Grab the logger
 logger = logging.getLogger(__name__)
@@ -34,10 +34,10 @@ def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
     constraints = vocs.constraints
 
     for name, value in constraints.items():
-        if value[0] == "GREATER_THAN":
-            temp_data[name] = -(data[name] - value[1])
+        if isinstance(value, GreaterThanConstraint):
+            temp_data[name] = -(data[name] - value.value)
         else:
-            temp_data[name] = data[name] - value[1]
+            temp_data[name] = data[name] - value.value
 
         # add column to original dataframe
         data[f"{name}_feas"] = temp_data[name] < 0.0
@@ -55,6 +55,13 @@ def isotime(include_microseconds=False):
         t = t.replace(microsecond=0)
 
     return t.isoformat()
+
+
+def get_generator_name(generator):
+    """
+    Returns the name of the generator if it has one as an attribute, otherwise returns the module name.
+    """
+    return getattr(generator, "name", inspect.getmodule(generator).__name__)
 
 
 def get_function(name):
@@ -252,17 +259,23 @@ def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> d
 
     bounds = {}
     widths = {
-        ele: vocs.variables[ele][1] - vocs.variables[ele][0]
+        ele: vocs.variables[ele].domain[1] - vocs.variables[ele].domain[0]
         for ele in vocs.variable_names
     }
 
     for name in vocs.variable_names:
         bounds[name] = [
             np.max(
-                (center_point[name] - widths[name] * fraction, vocs.variables[name][0])
+                (
+                    center_point[name] - widths[name] * fraction,
+                    vocs.variables[name].domain[0],
+                )
             ),
             np.min(
-                (center_point[name] + widths[name] * fraction, vocs.variables[name][1])
+                (
+                    center_point[name] + widths[name] * fraction,
+                    vocs.variables[name].domain[1],
+                )
             ),
         ]
 

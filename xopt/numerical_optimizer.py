@@ -23,7 +23,7 @@ class NumericalOptimizer(XoptBaseModel, ABC):
 
     Methods
     -------
-    optimize(function, bounds, n_candidates=1, **kwargs)
+    optimize
         Abstract method to optimize a function to produce a number of candidate points that minimize the function.
     """
 
@@ -54,7 +54,7 @@ class LBFGSOptimizer(NumericalOptimizer):
 
     Methods
     -------
-    optimize(function, bounds, n_candidates=1, **kwargs)
+    optimize
         Optimize the given acquisition function within the specified bounds.
 
     Parameters
@@ -93,18 +93,18 @@ class LBFGSOptimizer(NumericalOptimizer):
         **kwargs: Any,
     ):
         """
-        Optimize the given acquisition function within the specified bounds.
+        Optimize the given function within the specified bounds using LBFGS.
 
         Parameters
         ----------
         function : Callable
-            The acquisition function to be optimized.
+            The function to be optimized.
         bounds : Tensor
             A tensor specifying the bounds for the optimization. It must have the shape [2, ndim].
         n_candidates : int, optional
             The number of candidates to generate (default is 1).
         **kwargs : dict
-            Additional keyword arguments to be passed to the acquisition function optimizer.
+            Additional keyword arguments to be passed to the function optimizer.
 
         Returns
         -------
@@ -149,8 +149,8 @@ class GridOptimizer(NumericalOptimizer):
 
     Methods
     -------
-    optimize(function, bounds, n_candidates=1)
-        Optimize the given acquisition function within the specified bounds.
+    optimize
+        Optimize the given function within the specified bounds.
 
     Parameters
     ----------
@@ -174,12 +174,12 @@ class GridOptimizer(NumericalOptimizer):
 
     def optimize(self, function, bounds, n_candidates=1):
         """
-        Optimize the given acquisition function within the specified bounds.
+        Optimize the given function within the specified bounds using a brute-force grid search.
 
         Parameters
         ----------
         function : Callable
-            The acquisition function to be optimized.
+            The function to be optimized.
         bounds : Tensor
             A tensor specifying the bounds for the optimization. It must have the shape [2, ndim].
         n_candidates : int, optional

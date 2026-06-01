@@ -1,0 +1,1 @@
+::: xopt.generators.bayesian.base_model

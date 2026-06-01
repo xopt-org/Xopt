@@ -10,6 +10,7 @@ from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
 from botorch.sampling import get_sampler
 from torch import Tensor
 from functools import partial
+from gest_api.vocs import LessThanConstraint
 
 from xopt import VOCS
 
@@ -120,8 +121,8 @@ def create_constraint_callables(vocs: VOCS) -> Optional[List[Callable]]:
         for name in constraint_names:
             constraint = vocs.constraints[name]
             index = output_names.index(name)
-            value = constraint[1]
-            sign = 1 if constraint[0] == "LESS_THAN" else -1
+            value = constraint.value
+            sign = 1 if isinstance(constraint, LessThanConstraint) else -1
 
             def cbf(Z: Tensor, index: int, value: float, sign: float) -> Tensor:
                 return sign * (Z[..., index] - value)

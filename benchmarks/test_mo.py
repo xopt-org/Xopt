@@ -3,7 +3,7 @@ import logging
 import pytest
 import torch
 
-from xopt.resources.benchmarking import BenchMOBO
+from xopt.resources.bench_framework import BenchMOBO
 
 df_bench_mobo = BenchMOBO.crate_parameter_table()
 bmobo = BenchMOBO(df_bench_mobo)

@@ -1,8 +1,11 @@
-name: Documentation
+name: Deploy Documentation
 
 on:
-  pull_request:
   push:
+    branches:
+      - main
+    tags:
+      - '*'
   release:
     types:
       - published
@@ -10,54 +13,340 @@ on:
 permissions:
   id-token: write
   contents: write
-  pull-requests: write
+  pages: write
   actions: read
 
 jobs:
-  build:
+  test-notebooks:
     runs-on: ubuntu-latest
-    name: "Build docs"
+    name: "Test Notebooks"
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - uses: ./.github/actions/conda-setup
+          fetch-depth: 1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
-          extras: "doc"
-      - name: Execute notebooks
-        shell: bash -l {0}
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Execute notebooks in parallel
+        id: execute
+        shell: bash
+        env:
+          GROUP: ${{ matrix.group }}
+          TOTAL_GROUPS: 4 # Make sure to NOT set SMOKE_TEST to a value here
         run: |
-          scripts/execute_notebooks.bash
-      - name: Build Docs
-        shell: bash -l {0}
-        run: mkdocs build
+          set +e  # Don't exit on first error
+          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' | sort)
+          NOTEBOOK_ARRAY=($NOTEBOOKS)
+
+          # Create temp directory for tracking
+          TMPDIR=$(mktemp -d)
+          trap "rm -rf $TMPDIR" EXIT
+          SCRIPT_START=$(date +%s)
+
+          # Directory to stage executed notebooks for upload
+          mkdir -p executed-notebooks
+          # Function to execute a notebook and track results, with jitter + retries
+          execute_notebook() {
+              local file=$1
+              local tmpdir=$2
+
+              # Add small random jitter (0–2s) to desynchronize parallel starts
+              sleep "$(awk -v seed="$RANDOM" 'BEGIN{srand(seed); printf "%.2f", rand() * 2}')"
+
+              local START_TIME END_TIME DURATION
+              local MAX_RETRIES=3
+              local RETRY_COUNT=0
+              local SUCCESS=false
+
+              # Use a unique log file per notebook (based on filename hash) to avoid collisions
+              local FILE_HASH=$(echo "$file" | md5sum | cut -c1-8)
+              local LAST_LOG_FILE=""
+
+              START_TIME=$(date +%s)
+
+              while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+                  LAST_LOG_FILE="/tmp/nbconvert_${FILE_HASH}_${RETRY_COUNT}.log"
+
+                  if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
+                        --ExecutePreprocessor.timeout=600 \
+                        >"$LAST_LOG_FILE" 2>&1; then
+                      SUCCESS=true
+                      # On success, stream log to stdout for context if it exists
+                      if [ -f "$LAST_LOG_FILE" ]; then
+                          echo "--- Begin nbconvert log for $file (SUCCESS) ---"
+                          cat "$LAST_LOG_FILE"
+                          echo "--- End nbconvert log for $file (SUCCESS) ---"
+                          rm -f "$LAST_LOG_FILE"
+                      fi
+                      break
+                  fi
+
+                  # If this looks like a transient kernel/port issue, retry with backoff
+                  if [ -f "$LAST_LOG_FILE" ] && \
+                     grep -qE "Address already in use|ZMQError|Kernel died before replying" "$LAST_LOG_FILE"; then
+                      RETRY_COUNT=$((RETRY_COUNT + 1))
+                      if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                          local WAIT_TIME=$((2 ** RETRY_COUNT))  # 2,4,8s
+                          echo "Port/kernel issue for $file, retrying in ${WAIT_TIME}s (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+                          sleep "$WAIT_TIME"
+                          continue
+                      fi
+                  fi
+
+                  # Non-retryable error or max retries reached - exit loop
+                  break
+              done
+
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+
+              if [ "$SUCCESS" = true ]; then
+                  echo "$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "✓ Successfully executed $file (${DURATION}s)"
+                  # Copy executed notebook to staging directory, preserving path structure
+                  target_dir="executed-notebooks/$(dirname "$file")"
+                  mkdir -p "$target_dir"
+                  cp "$file" "$target_dir/"
+              else
+                  echo "failed:$DURATION" > "$tmpdir/$(basename $file).status"
+                  echo "✗ Failed to execute $file (${DURATION}s)"
+                  # Always print the log file for failed notebooks
+                  if [ -f "$LAST_LOG_FILE" ]; then
+                      echo "--- Begin nbconvert log for $file (FAILURE) ---"
+                      cat "$LAST_LOG_FILE"
+                      echo "--- End nbconvert log for $file (FAILURE) ---"
+                      rm -f "$LAST_LOG_FILE"
+                  else
+                      echo "No log file found for $file"
+                  fi
+              fi
+          }
+          export -f execute_notebook
+          # Execute notebooks in this group in parallel (all notebooks in this group)
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              execute_notebook "${NOTEBOOK_ARRAY[$i]}" "$TMPDIR" &
+          done
+          wait
+          # Collect results
+          TOTAL=0
+          SUCCESS=0
+          FAILED=0
+          TOTAL_TIME=0
+
+          # Write group summary header
+          echo "## Group $GROUP Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Collect status for each notebook in this group
+          for ((i=GROUP-1; i<${#NOTEBOOK_ARRAY[@]}; i+=TOTAL_GROUPS)); do
+              file="${NOTEBOOK_ARRAY[$i]}"
+              TOTAL=$((TOTAL + 1))
+              status_file="$TMPDIR/$(basename $file).status"
+
+              if [ -f "$status_file" ]; then
+                  status=$(cat "$status_file")
+
+                  if [[ "$status" == failed:* ]]; then
+                      FAILED=$((FAILED + 1))
+                      duration=${status#failed:}
+                      TOTAL_TIME=$((TOTAL_TIME + duration))
+                      echo "- ❌ \`$file\` (${duration}s)" >> $GITHUB_STEP_SUMMARY
+                  else
+                      SUCCESS=$((SUCCESS + 1))
+                      TOTAL_TIME=$((TOTAL_TIME + status))
+                      echo "- ✅ \`$file\` (${status}s)" >> $GITHUB_STEP_SUMMARY
+                  fi
+              fi
+          done
+
+          # Calculate wall clock time
+          SCRIPT_END=$(date +%s)
+          SCRIPT_DURATION=$((SCRIPT_END - SCRIPT_START))
+
+          # Write summary totals
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Summary for Group $GROUP:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Total: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "- Success: $SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- Failed: $FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Total execution time: ${TOTAL_TIME}s" >> $GITHUB_STEP_SUMMARY
+          echo "- Wall clock time: ${SCRIPT_DURATION}s" >> $GITHUB_STEP_SUMMARY
+
+          # Export outputs for next step
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+          # Exit with error if any notebooks failed
+          [ $FAILED -gt 0 ] && exit 1 || exit 0
+
+      - name: Save results for summary
+        if: always()
+        run: |
+          mkdir -p results
+          echo "${{ steps.execute.outputs.success }},${{ steps.execute.outputs.failed }},${{ steps.execute.outputs.total }}" > results/group-${{ matrix.group }}-results.txt
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-results-group-${{ matrix.group }}
+          path: results/group-${{ matrix.group }}-results.txt
+
+      - name: Upload executed notebooks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-notebooks-group-${{ matrix.group }}
+          path: executed-notebooks/**/*.ipynb
+
+      - name: Minimize uv cache
+        run: uv cache prune --ci
+
+  summary:
+    name: "Notebook Execution Summary"
+    needs: test-notebooks
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: notebook-results-group-*
+          merge-multiple: true
+
+      - name: Generate overall summary
+        run: |
+          echo "# 📊 Notebook Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          TOTAL_SUCCESS=0
+          TOTAL_FAILED=0
+          TOTAL_NOTEBOOKS=0
+
+          echo "## Results by Group" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Group | Total | Success ✅ | Failed ❌ |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          for i in 1 2 3 4; do
+            if [ -f "group-$i-results.txt" ]; then
+              IFS=',' read -r success failed total < "group-$i-results.txt"
+              echo "| $i | $total | $success | $failed |" >> $GITHUB_STEP_SUMMARY
+              TOTAL_SUCCESS=$((TOTAL_SUCCESS + success))
+              TOTAL_FAILED=$((TOTAL_FAILED + failed))
+              TOTAL_NOTEBOOKS=$((TOTAL_NOTEBOOKS + total))
+            else
+              echo "| $i | - | - | ⚠️ No results |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📈 Overall Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Notebooks**: $TOTAL_NOTEBOOKS" >> $GITHUB_STEP_SUMMARY
+          echo "- **✅ Successful**: $TOTAL_SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- **❌ Failed**: $TOTAL_FAILED" >> $GITHUB_STEP_SUMMARY
+
+          if [ $TOTAL_FAILED -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Some notebooks failed.** Check individual group summaries above for details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎉 **All notebooks executed successfully!**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Check individual group job summaries for detailed notebook-by-notebook results.*" >> $GITHUB_STEP_SUMMARY
+
+  build:
+    needs: [test-notebooks, summary]
+    runs-on: ubuntu-latest
+    name: "Build Documentation"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for setuptools_scm version calculation
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra doc
+
+      - name: Download executed notebooks
+        uses: actions/download-artifact@v4
+        with:
+          pattern: executed-notebooks-group-*
+          path: downloaded-notebooks
+          merge-multiple: true
+
+      - name: Replace original notebooks with executed versions
+        run: |
+          # Copy executed notebooks to replace originals
+          # Artifacts preserve the structure from executed-notebooks/ which includes ./docs/examples/
+          find downloaded-notebooks -name "*.ipynb" -type f | while read notebook; do
+            # Strip the downloaded-notebooks/ prefix
+            relative_path=${notebook#downloaded-notebooks/}
+            # Strip an optional leading ./
+            relative_path=${relative_path#./}
+            # Strip the executed-notebooks/ prefix to get back to repo paths
+            relative_path=${relative_path#executed-notebooks/}
+            target_path="$relative_path"
+            echo "Replacing $target_path with executed version from $notebook"
+            cp "$notebook" "$target_path"
+          done
+
+      - name: Build docs
+        run: uv run mkdocs build
+
       - name: Extract examples
-        shell: bash -l {0}
         run: |
           zip -r xopt-examples.zip docs/examples/
           mv xopt-examples.zip ./site/assets/
+
       - name: Upload docs artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
-  deploy:
-    if: ${{ github.repository_owner == 'xopt-org' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags')) }}
-    needs: build
-    name: "Deploy docs"
 
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
-    permissions:
-      pages: write      # to deploy to Pages
-      id-token: write   # to verify the deployment originates from an appropriate source
+  deploy:
+    if: ${{ github.repository_owner == 'xopt-org' }}
+    needs: build
+    runs-on: ubuntu-latest
+    name: "Deploy to GitHub Pages"
 
     # Deploy to the github-pages environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    # Specify runner + deployment step
-    runs-on: ubuntu-latest
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

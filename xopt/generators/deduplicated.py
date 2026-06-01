@@ -1,9 +1,11 @@
 import numpy as np
-from xopt.generator import Generator
 from pydantic import field_validator
 from typing import Optional
 import logging
 import time
+
+from xopt.generator import Generator
+from xopt.vocs import get_variable_data
 
 
 class DeduplicatedGeneratorBase(Generator):
@@ -90,16 +92,16 @@ class DeduplicatedGeneratorBase(Generator):
                 # Add the new data
                 if self.decision_vars_seen is None:
                     n_existing_vars = 0
-                    self.decision_vars_seen = self.vocs.variable_data(
-                        from_generator
+                    self.decision_vars_seen = get_variable_data(
+                        self.vocs, from_generator
                     ).to_numpy()
                 else:
                     n_existing_vars = self.decision_vars_seen.shape[0]
                     self.decision_vars_seen = np.concatenate(
                         (
                             self.decision_vars_seen,  # Must go first since first instance of unique elements are included
-                            self.vocs.variable_data(
-                                from_generator
+                            get_variable_data(
+                                self.vocs, from_generator
                             ).to_numpy(),  # Do not accept repeated elements here
                         ),
                         axis=0,
