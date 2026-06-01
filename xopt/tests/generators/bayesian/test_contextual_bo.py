@@ -45,8 +45,8 @@ class TestContextualBO:
         assert generator.model_input_names == ["x1", "x2"]
         # check model input bounds
         bounds = generator.get_model_input_bounds(data)
-        assert bounds["x1"] == (0, 1)
-        assert np.allclose(bounds["x2"], (0.0, 1.0 + 1e-6))
+        assert bounds["x1"] == [0, 1]
+        assert np.allclose(bounds["x2"], [0.0, 1.0 + 1e-6])
 
         # check training the model
         generator.train_model(generator.data)

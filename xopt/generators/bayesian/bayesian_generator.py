@@ -2,6 +2,7 @@ import logging
 import os
 import time
 import warnings
+from copy import deepcopy
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, cast
 
@@ -868,7 +869,7 @@ class BayesianGenerator(Generator, ABC):
     
     def get_model_input_bounds(self, data: pd.DataFrame) -> Dict[str, List[float]]:
         """variable bounds corresponding to trained model"""
-        variable_bounds = deepcopy(self.vocs.variables)
+        variable_bounds = deepcopy({name: var.domain for name, var in self.vocs.variables.items()})
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
