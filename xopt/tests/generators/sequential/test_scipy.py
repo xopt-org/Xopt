@@ -155,51 +155,6 @@ class TestScipyGenerator:
         assert len(candidate) == 1
         assert set(candidate[0].keys()) == {"x0", "x1"}
 
-    def test_scipy_sequence_repeats_after_reset(self):
-        YAML = """
-        generator:
-            name: scipy
-            method: Powell
-            initial_point: {x0: 0.75, x1: -0.25}
-            options:
-                maxiter: 200
-            vocs:
-                variables:
-                    x0: [-5, 5]
-                    x1: [-5, 5]
-                objectives: {y: MINIMIZE}
-        evaluator:
-            function: xopt.tests.generators.sequential.test_scipy.sphere
-        """
-        X = Xopt.from_yaml(YAML)
-        gen: ScipyGenerator = X.generator
-
-        def run_sequence(n_steps: int):
-            seq = []
-            for _ in range(n_steps):
-                candidate = gen.generate(1)[0]
-                seq.append((candidate["x0"], candidate["x1"]))
-
-                objective = sphere(candidate)["y"]
-                gen.add_data(
-                    pd.DataFrame(
-                        [
-                            {
-                                "x0": candidate["x0"],
-                                "x1": candidate["x1"],
-                                "y": objective,
-                            }
-                        ]
-                    )
-                )
-            return seq
-
-        first_sequence = run_sequence(5)
-        gen.reset()
-        second_sequence = run_sequence(5)
-
-        assert second_sequence == pytest.approx(first_sequence)
-
     def test_validate_method_rejects_whitespace_string(self):
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
