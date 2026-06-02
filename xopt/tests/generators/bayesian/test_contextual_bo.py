@@ -92,7 +92,7 @@ class TestContextualBO:
 
         x1 = np.linspace(0, 1, 5)
         x2 = np.linspace(0.2, 0.8, 5)
-        y = np.sin(2 * 3.14 * x1) * np.cos(2 * 3.14 * x2)
+        y = np.sin(2 * np.pi * x1) * np.cos(2 * np.pi * x2)
         data = pd.DataFrame({"x1": x1, "x2": x2, "y": y})
         generator.add_data(data)
         generator.train_model()

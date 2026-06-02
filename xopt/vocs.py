@@ -207,13 +207,16 @@ def convert_numpy_to_inputs(
     Convert 2D numpy array to list of dicts (inputs) for evaluation.
     Assumes that the columns of the array correspond to the non-contextual
     variables in `vocs.variable_names` order (contextual variables excluded).
+    The number of columns in `inputs` must equal the number of non-contextual
+    variables in the VOCS.
 
     Parameters
     ----------
     vocs: VOCS
         The variable-objective-constraint space (VOCS) defining the problem.
     inputs : np.ndarray
-        The 2D numpy array to convert.
+        The 2D numpy array to convert. Must have shape (n, k) where k is the
+        number of non-contextual variables in vocs.
     include_constants : bool, optional
         Whether to include constants in the inputs. Defaults to True.
 
