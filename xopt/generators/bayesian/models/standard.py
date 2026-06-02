@@ -84,7 +84,8 @@ class StandardModelConstructor(ModelConstructor):
         Covariance modules for GP models.
 
     mean_modules : Dict[str, Module]
-        Prior mean modules for GP models.
+        Prior mean modules for GP models.A mean function should reduce a
+        (batch) x n x d-dimensional input into a (batch) x n dimensional output.
 
     trainable_mean_keys : List[str]
         List of prior mean modules that can be trained.
