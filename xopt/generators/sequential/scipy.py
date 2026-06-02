@@ -154,6 +154,10 @@ class ScipyGenerator(SequentialGenerator):
                 raise RuntimeError(
                     f"scipy method '{self.method}' is not available in this environment."
                 ) from ex
+            if "cannot handle bounds" in msg:
+                raise RuntimeError(
+                    f"scipy method '{self.method}' does not support bounds; choose a bounded method (e.g. 'Powell', 'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr')."
+                ) from ex
             raise
 
         # If scipy converges using only cached data, return the latest known point.
