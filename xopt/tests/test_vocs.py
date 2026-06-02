@@ -517,3 +517,47 @@ class TestVOCS(object):
         data = extract_data(vocs, test_data)
         assert len(data[0]) == 4
         assert data[2].empty
+
+    def test_contextual_variable(self):
+        from xopt.vocs import ContextualVariable, convert_numpy_to_inputs
+
+        # ContextualVariable should have infinite domain
+        cv = ContextualVariable()
+        assert cv.domain[0] == float("-inf")
+        assert cv.domain[1] == float("inf")
+
+        # VOCS with a contextual variable
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
+            objectives={"y": "MAXIMIZE"},
+        )
+        assert vocs.variable_names == ["x1", "x2"]
+
+    def test_convert_numpy_to_inputs_with_contextual_variable(self):
+        """Ensure convert_numpy_to_inputs preserves variable order and excludes contextual vars."""
+        from xopt.vocs import ContextualVariable, convert_numpy_to_inputs
+
+        # Variables in non-alphabetical order: 'z' before 'a'
+        vocs = VOCS(
+            variables={"z": [0, 10], "a": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        inputs = np.array([[5.0, 0.5]])
+        result = convert_numpy_to_inputs(vocs, inputs, include_constants=False)
+        # Should preserve variable_names order: ['z', 'a']
+        assert list(result.columns) == ["z", "a"]
+        assert result["z"].iloc[0] == 5.0
+        assert result["a"].iloc[0] == 0.5
+
+        # With a contextual variable mixed in
+        vocs2 = VOCS(
+            variables={"z": [0, 10], "ctx": ContextualVariable(), "a": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        # optimizer output has 2 dims (z and a, excluding ctx)
+        inputs2 = np.array([[5.0, 0.5]])
+        result2 = convert_numpy_to_inputs(vocs2, inputs2, include_constants=False)
+        # Should only have z and a (ctx excluded), in original order
+        assert list(result2.columns) == ["z", "a"]
+        assert result2["z"].iloc[0] == 5.0
+        assert result2["a"].iloc[0] == 0.5

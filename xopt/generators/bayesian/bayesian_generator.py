@@ -684,9 +684,10 @@ class BayesianGenerator(Generator, ABC):
         if self.fixed_features is not None or self.contextual_variables:
             acq = self._apply_fixed_features_and_contextual_variables(acq)
 
+            fixed = self.fixed_features or {}
             indices = []
             for idx, name in enumerate(self.vocs.variable_names):
-                if name not in self.fixed_features:
+                if name not in fixed and name not in self.contextual_variables:
                     indices += [idx]
 
             bounds = bounds[:, indices]

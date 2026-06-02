@@ -86,6 +86,39 @@ class TestContextualBO:
         xopt.evaluate_data(candidates)
         assert "x2" in xopt.data.columns
 
+    def test_get_optimum_with_contextual_variable(self):
+        """Test that get_optimum works correctly when contextual variables are present."""
+        generator = UpperConfidenceBoundGenerator(vocs=self.vocs)
+
+        x1 = np.linspace(0, 1, 5)
+        x2 = np.linspace(0.2, 0.8, 5)
+        y = np.sin(2 * 3.14 * x1) * np.cos(2 * 3.14 * x2)
+        data = pd.DataFrame({"x1": x1, "x2": x2, "y": y})
+        generator.add_data(data)
+        generator.train_model()
+
+        optimum = generator.get_optimum()
+        # optimum should only contain x1 (the controllable variable)
+        assert "x1" in optimum.columns
+        assert optimum["x1"].iloc[0] >= 0.0
+        assert optimum["x1"].iloc[0] <= 1.0
+
+    def test_contextual_variable_bounds_from_data(self):
+        """Test that model input bounds for contextual variables are derived from data."""
+        generator = UpperConfidenceBoundGenerator(vocs=self.vocs)
+        x1 = np.linspace(0, 1, 5)
+        x2 = np.array([0.3, 0.4, 0.5, 0.6, 0.7])
+        y = np.ones(5)
+        data = pd.DataFrame({"x1": x1, "x2": x2, "y": y})
+        generator.add_data(data)
+
+        bounds = generator.get_model_input_bounds(data)
+        # x2 bounds should be derived from data with 5% padding
+        width = 0.7 - 0.3
+        padding = 0.05 * width
+        assert np.isclose(bounds["x2"][0], 0.3 - padding)
+        assert np.isclose(bounds["x2"][1], 0.7 + padding)
+
     def test_visualize_model_with_contextual_axis_warns(self):
         generator = UpperConfidenceBoundGenerator(vocs=self.vocs)
         xopt = Xopt(generator=generator, evaluator=self.evaluator)

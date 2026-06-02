@@ -179,13 +179,11 @@ def convert_dataframe_to_inputs(
         A dataframe containing the extracted inputs.
     """
     # make sure that the df keys only contain vocs variables
-    non_contextual_variable_names = sorted(
-        [
-            name
-            for name, var in vocs.variables.items()
-            if not isinstance(var, ContextualVariable)
-        ]
-    )
+    non_contextual_variable_names = [
+        name
+        for name in vocs.variable_names
+        if not isinstance(vocs.variables[name], ContextualVariable)
+    ]
     if not set(non_contextual_variable_names) == set(data.keys()):
         raise ValueError("input dataframe column set must equal set of vocs variables")
 
@@ -207,8 +205,8 @@ def convert_numpy_to_inputs(
 ) -> pd.DataFrame:
     """
     Convert 2D numpy array to list of dicts (inputs) for evaluation.
-    Assumes that the columns of the array match correspond to
-    `sorted(vocs.variables.keys())`
+    Assumes that the columns of the array correspond to the non-contextual
+    variables in `vocs.variable_names` order (contextual variables excluded).
 
     Parameters
     ----------
@@ -224,13 +222,11 @@ def convert_numpy_to_inputs(
     pd.DataFrame
         A dataframe containing the converted inputs.
     """
-    non_contextual_variable_names = sorted(
-        [
-            name
-            for name, var in vocs.variables.items()
-            if not isinstance(var, ContextualVariable)
-        ]
-    )
+    non_contextual_variable_names = [
+        name
+        for name in vocs.variable_names
+        if not isinstance(vocs.variables[name], ContextualVariable)
+    ]
     df = pd.DataFrame(inputs, columns=non_contextual_variable_names)
     return convert_dataframe_to_inputs(vocs, df, include_constants)
 
