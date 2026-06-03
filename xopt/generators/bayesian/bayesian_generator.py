@@ -935,11 +935,9 @@ class BayesianGenerator(Generator, ABC):
     @property
     def _candidate_names(self):
         """variable names corresponding to generated candidates"""
-        variable_names = self.vocs.variable_names
-        if self.fixed_features is not None:
-            for name in self.fixed_features:
-                if name in variable_names:
-                    variable_names.remove(name)
+        variable_names = list(self.vocs.variable_names)
+        excluded = set(self.fixed_features or {}) | set(self.contextual_variables)
+        variable_names = [n for n in variable_names if n not in excluded]
         return variable_names
 
     def _get_bounds(self) -> torch.Tensor:
@@ -984,25 +982,15 @@ class BayesianGenerator(Generator, ABC):
             turbo_bounds = self.turbo_controller.get_trust_region(self)
             bounds = rectilinear_domain_union(bounds, turbo_bounds)
 
-        # if fixed features key is in vocs then we need to remove the bounds
-        # associated with that key
-        if self.fixed_features is not None:
-            # grab variable name indices that are NOT in fixed features
-            indices = []
-            for idx, name in enumerate(self.vocs.variable_names):
-                if name not in self.fixed_features:
-                    indices += [idx]
-
-            # grab indexed bounds
-            bounds = bounds[:, indices]
-
-        # if we have contextual variables we also need to remove the bounds associated with those variables
-        if self.contextual_variables:
-            indices = []
-            for idx, name in enumerate(self.vocs.variable_names):
-                if name not in self.contextual_variables:
-                    indices += [idx]
-
+        # if fixed features or contextual variables are present, remove their bounds
+        excluded = set(self.fixed_features or {}) | set(self.contextual_variables)
+        if excluded:
+            # compute keep-indices once from the original variable list
+            indices = [
+                idx
+                for idx, name in enumerate(self.vocs.variable_names)
+                if name not in excluded
+            ]
             bounds = bounds[:, indices]
 
         bounds = bounds.to(**self.tkwargs)

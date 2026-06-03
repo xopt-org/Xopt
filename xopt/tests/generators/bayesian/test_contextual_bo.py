@@ -7,7 +7,7 @@ from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
-from xopt.vocs import VOCS, ContextualVariable
+from xopt.vocs import VOCS, ContextualVariable, convert_dataframe_to_inputs
 import pytest
 import torch
 import numpy as np
@@ -132,3 +132,53 @@ class TestContextualBO:
                 show_acquisition=True,
                 n_grid=5,
             )
+
+    def test_candidate_names_excludes_contextual_and_fixed(self):
+        """_candidate_names must exclude both fixed features and contextual variables."""
+        # VOCS: x1 (controllable), x2 (contextual), x3 (controllable)
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(), "x3": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        generator = UpperConfidenceBoundGenerator(vocs=vocs)
+
+        # Without fixed features: only contextual x2 excluded
+        assert generator._candidate_names == ["x1", "x3"]
+
+        # With x3 fixed: both x2 (contextual) and x3 (fixed) excluded
+        generator.fixed_features = {"x3": 0.5}
+        assert generator._candidate_names == ["x1"]
+
+        # Calling _candidate_names multiple times must not mutate vocs
+        _ = generator._candidate_names
+        assert generator.vocs.variable_names == ["x1", "x2", "x3"]
+
+    def test_optimization_bounds_excludes_contextual_and_fixed(self):
+        """_get_optimization_bounds must correctly exclude both fixed features and
+        contextual variables in a single pass, avoiding double-slicing."""
+        # VOCS: x1 [0,1], x2 contextual, x3 [0,2]
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(), "x3": [0, 2]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        generator = UpperConfidenceBoundGenerator(vocs=vocs)
+
+        # With x3 fixed: only x1 bounds should remain
+        generator.fixed_features = {"x3": 1.0}
+        bounds = generator._get_optimization_bounds()
+        assert bounds.shape == (2, 1)
+        assert torch.allclose(bounds, torch.tensor([[0.0], [1.0]]).double())
+
+    def test_convert_dataframe_to_inputs_error_message_contextual(self):
+        """The error message when input columns mismatch must mention non-contextual
+        variables so users are not confused by contextual variables being absent."""
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
+            objectives={"y": "MAXIMIZE"},
+        )
+        # Providing x2 (contextual) instead of x1 should raise with an informative message
+        with pytest.raises(
+            ValueError,
+            match="non-contextual",
+        ):
+            convert_dataframe_to_inputs(vocs, pd.DataFrame({"x2": [0.5]}))
