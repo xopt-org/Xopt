@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 import yaml
 
+from xopt.vocs import ContextualVariable
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import (
     convert_dataframe_to_inputs,
@@ -519,8 +520,6 @@ class TestVOCS(object):
         assert data[2].empty
 
     def test_contextual_variable(self):
-        from xopt.vocs import ContextualVariable, convert_numpy_to_inputs
-
         # ContextualVariable should have infinite domain
         cv = ContextualVariable()
         assert cv.domain[0] == float("-inf")
