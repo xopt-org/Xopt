@@ -185,7 +185,9 @@ def convert_dataframe_to_inputs(
         if not isinstance(vocs.variables[name], ContextualVariable)
     ]
     if not set(non_contextual_variable_names) == set(data.keys()):
-        raise ValueError("input dataframe column set must equal set of vocs variables")
+        raise ValueError(
+                "input dataframe column set must equal set of non-contextual vocs variables"
+            )
 
     # only keep the variables
     inner_copy = data.copy()
