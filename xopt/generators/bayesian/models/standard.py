@@ -444,10 +444,37 @@ class StandardModelConstructor(ModelConstructor):
             )
             if "options" not in tr_kwargs["optimizer_kwargs"]:
                 tr_kwargs["optimizer_kwargs"]["options"] = {}
-            tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
-            tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
-            tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
-            optimizer = fit_gpytorch_mll_scipy
+            options = tr_kwargs["optimizer_kwargs"]["options"]
+            options["maxiter"] = cfg_lbfgs.maxiter
+            options["gtol"] = cfg_lbfgs.gtol
+            options["ftol"] = cfg_lbfgs.ftol
+
+            batch_shape = getattr(model, "_aug_batch_shape", None)
+            if batch_shape is None:
+                batch_shape = getattr(model, "batch_shape", torch.Size())
+            is_batched = len(batch_shape) > 0
+            if is_batched:
+                # Batched scipy optimizer in newer botorch/scipy combinations can
+                # assert when both ftol and default factr are active.
+                options["factr"] = None
+
+            # Shared (non-batched) parameters in batched models are incompatible
+            # with botorch's independent scipy batching path; use torch fitting.
+            has_unbatched_trainable_params = is_batched and any(
+                p.requires_grad
+                and (
+                    p.ndim < len(batch_shape)
+                    or tuple(p.shape[: len(batch_shape)]) != tuple(batch_shape)
+                )
+                for p in model.parameters()
+            )
+
+            if has_unbatched_trainable_params:
+                tr_kwargs["optimizer_kwargs"].pop("options", None)
+                tr_kwargs["optimizer_kwargs"]["step_limit"] = cfg_lbfgs.maxiter
+                optimizer = fit_gpytorch_mll_torch
+            else:
+                optimizer = fit_gpytorch_mll_scipy
 
         try:
             fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
