@@ -94,6 +94,7 @@ class ScipyGenerator(SequentialGenerator):
     def _reset(self):
         # Reset internal replay state without discarding collected observations.
         self._last_outcome = None
+
     def _set_data(self, data: pd.DataFrame):
         self.data = data
         if len(data) > 0:
