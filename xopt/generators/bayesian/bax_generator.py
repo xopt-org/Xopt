@@ -52,6 +52,7 @@ class BaxGenerator(BayesianGenerator):
 
     name = "BAX"
     supports_constraints: bool = True
+    supports_discrete_variables: bool = False
     algorithm: Algorithm = Field(description="algorithm evaluated in the BAX process")
     algorithm_results: Dict = Field(
         None, description="dictionary results from algorithm", exclude=True

@@ -350,6 +350,12 @@ class BayesianGenerator(Generator, ABC):
         # validate turbo controller center if it exists
         validate_turbo_controller_center(self)
 
+        # cannot have both a discrete variable and n_interpolate_points
+        if self._has_discrete_variables(self.vocs) and self.n_interpolate_points is not None:
+            raise ValueError(
+                "cannot have both discrete variables and n_interpolate_points"
+            )
+
         # check to make sure that either multiple objectives exist or custom objective is set
         if self.vocs.n_objectives == 0 and self.custom_objective is None:
             raise VOCSError(
@@ -451,6 +457,9 @@ class BayesianGenerator(Generator, ABC):
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
 
             if self.n_interpolate_points is not None:
+                if self._has_discrete_variables:
+                    raise RuntimeError("cannot generate interpolated points for discrete variables")
+
                 if self.n_candidates > 1:
                     raise RuntimeError(
                         "cannot generate interpolated points for "
