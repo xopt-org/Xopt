@@ -7,9 +7,10 @@ import pytest
 from pydantic import ValidationError
 import yaml
 
-from xopt.vocs import ContextualVariable
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import (
+    ContextualVariable,
+    convert_numpy_to_inputs,
     convert_dataframe_to_inputs,
     cumulative_optimum,
     denormalize_inputs,
@@ -521,7 +522,6 @@ class TestVOCS(object):
 
     def test_convert_numpy_to_inputs_with_contextual_variable(self):
         """Ensure convert_numpy_to_inputs preserves variable order and excludes contextual vars."""
-        from xopt.vocs import ContextualVariable, convert_numpy_to_inputs
 
         # Variables in non-alphabetical order: 'z' before 'a'
         vocs = VOCS(
