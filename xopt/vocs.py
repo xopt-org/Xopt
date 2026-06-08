@@ -694,6 +694,7 @@ def select_best(vocs: VOCS, data: pd.DataFrame, n: int = 1):
     """
     get the best value and point for a given data set based on vocs
     - does not work for multi-objective problems
+    - does not work for EXPLORE objectives
     - data that violates any constraints is ignored
 
     Parameters
@@ -714,6 +715,11 @@ def select_best(vocs: VOCS, data: pd.DataFrame, n: int = 1):
     if vocs.n_objectives != 1:
         raise NotImplementedError("cannot select best point when n_objectives is not 1")
 
+    obj_name = vocs.objective_names[0]
+    obj = vocs.objectives[obj_name].__class__.__name__
+    if obj == "ExploreObjective":
+        raise NotImplementedError("cannot select best point for EXPLORE objective")
+
     if data.empty:
         raise RuntimeError("cannot select best point if dataframe is empty")
 
@@ -724,8 +730,8 @@ def select_best(vocs: VOCS, data: pd.DataFrame, n: int = 1):
         )
 
     ascending_flag = {"MinimizeObjective": True, "MaximizeObjective": False}
-    obj = vocs.objectives[vocs.objective_names[0]].__class__.__name__
-    obj_name = vocs.objective_names[0]
+    if obj not in ascending_flag:
+        raise NotImplementedError(f"cannot select best point for objective type: {obj}")
 
     res = (
         data.loc[feasible_data["feasible"], :]

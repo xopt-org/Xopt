@@ -9,6 +9,7 @@ from typing import (
     TypedDict,
     Union,
 )
+import textwrap
 
 import gpytorch
 import numpy as np
@@ -22,8 +23,9 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
+from xopt.errors import FeasibilityError
 from xopt.generator import Generator
-from xopt.vocs import VOCS, get_feasibility_data
+from xopt.vocs import VOCS, get_feasibility_data, select_best
 
 from .objectives import feasibility
 from .utils import torch_compile_gp_model, torch_trace_gp_model
@@ -156,10 +158,12 @@ def visualize_model(
         Defaults to vocs.variable_names.
     idx : int
         Index of the last sample to use. This also selects the point of reference in
-        higher dimensions unless an explicit reference_point is given.
+        higher dimensions when the reference point cannot be inferred from
+        :func:`xopt.vocs.select_best` and no explicit reference_point is given.
     reference_point : dict
         Reference point determining the value of variables in vocs.variable_names, but not in variable_names
-        (slice plots in higher dimensions). Defaults to last used sample.
+        (slice plots in higher dimensions). Defaults to the current best feasible point
+        from :func:`xopt.vocs.select_best` when available, otherwise to the sample at idx.
     show_samples : bool, optional
         Whether samples are shown.
     show_prior_mean : bool, optional
@@ -218,10 +222,16 @@ def visualize_model(
 
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
 
-    figure_title = "Reference point: " + " ".join(
-        [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
-    )
-    fig.suptitle(figure_title)
+    if reference_point_names:
+        figure_title = _format_reference_point_title(
+            reference_point,
+            reference_point_names,
+        )
+        fig.suptitle(figure_title)
+    elif fig._suptitle is not None:
+        # Clear existing title when reusing axes for full-dimensional plots.
+        fig._suptitle.remove()
+        fig._suptitle = None
 
     # create plot
     if dim_x == 1:
@@ -1191,7 +1201,10 @@ def _get_reference_point(
 ) -> dict[str, Any]:
     """Returns a valid reference point.
 
-    If the given reference point is None, the data sample corresponding to the given index is used.
+    If the given reference point is None, the best feasible point from
+    :func:`xopt.vocs.select_best` is used when available. If this is not possible
+    (e.g., multi-objective problem or no feasible points), the data sample
+    corresponding to the given index is used.
 
     Parameters
     ----------
@@ -1202,7 +1215,7 @@ def _get_reference_point(
     data : DataFrame
         Data used to select a reference point.
     idx : int, optional
-        Index of the sample to use as a reference point.
+        Index of the sample to use as a fallback reference point.
 
     Returns
     -------
@@ -1211,8 +1224,53 @@ def _get_reference_point(
     """
     if reference_point is not None:
         return reference_point
-    else:
+
+    try:
+        _, _, best_point = select_best(vocs, data)
+        return best_point
+    except (FeasibilityError, NotImplementedError, RuntimeError):
         return data[vocs.variable_names].iloc[idx].to_dict()
+
+
+def _format_reference_point_title(
+    reference_point: dict[str, Any],
+    reference_point_names: list[str],
+    max_line_length: int = 90,
+) -> str:
+    """Formats reference-point values into a readable, wrapped figure title."""
+    if not reference_point_names:
+        return "Reference point"
+
+    entries = [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
+    lines: list[str] = []
+    current_line = ""
+
+    for entry in entries:
+        candidate = entry if not current_line else f"{current_line}, {entry}"
+        if len(candidate) <= max_line_length:
+            current_line = candidate
+            continue
+
+        if current_line:
+            lines.append(current_line)
+
+        # Keep very long variable labels readable instead of letting them overflow.
+        wrapped_entry = textwrap.wrap(
+            entry,
+            width=max_line_length,
+            break_long_words=True,
+            break_on_hyphens=False,
+        )
+        if wrapped_entry:
+            lines.extend(wrapped_entry[:-1])
+            current_line = wrapped_entry[-1]
+        else:
+            current_line = entry
+
+    if current_line:
+        lines.append(current_line)
+
+    return "Reference point:\n" + "\n".join(lines)
 
 
 def _get_model_predictions(

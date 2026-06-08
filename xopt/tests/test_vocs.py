@@ -467,6 +467,30 @@ class TestVOCS(object):
             with pytest.raises(RuntimeError):
                 select_best(vocs, pd.DataFrame())
 
+    def test_select_best_unsupported_objectives(self):
+        test_data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2],
+                "x2": [0.1, 0.2],
+                "y1": [0.5, 0.6],
+                "y2": [0.7, 0.8],
+            }
+        )
+
+        # Explore-only objectives are not orderable for "best" point selection.
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.constraints = {}
+        vocs.objectives = {"y1": "EXPLORE"}
+        with pytest.raises(NotImplementedError, match="EXPLORE objective"):
+            select_best(vocs, test_data)
+
+        # Multi-objective problems are not supported by select_best.
+        vocs = deepcopy(TEST_VOCS_BASE)
+        vocs.constraints = {}
+        vocs.objectives = {"y1": "MAXIMIZE", "y2": "MINIMIZE"}
+        with pytest.raises(NotImplementedError, match="n_objectives is not 1"):
+            select_best(vocs, test_data)
+
     @pytest.mark.filterwarnings("ignore: All-NaN axis encountered")
     def test_cumulative_optimum(self):
         vocs = deepcopy(TEST_VOCS_BASE)

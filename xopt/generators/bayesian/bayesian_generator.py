@@ -17,7 +17,7 @@ from botorch.acquisition import (
     MCAcquisitionObjective,
 )
 from botorch.models.model import Model
-from botorch.sampling import get_sampler
+from botorch.sampling.get_sampler import get_sampler
 from gpytorch import Module
 from pydantic import (
     Field,
