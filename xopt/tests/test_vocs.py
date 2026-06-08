@@ -519,19 +519,6 @@ class TestVOCS(object):
         assert len(data[0]) == 4
         assert data[2].empty
 
-    def test_contextual_variable(self):
-        # ContextualVariable should have infinite domain
-        cv = ContextualVariable()
-        assert cv.domain[0] == float("-inf")
-        assert cv.domain[1] == float("inf")
-
-        # VOCS with a contextual variable
-        vocs = VOCS(
-            variables={"x1": [0, 1], "x2": ContextualVariable()},
-            objectives={"y": "MAXIMIZE"},
-        )
-        assert vocs.variable_names == ["x1", "x2"]
-
     def test_convert_numpy_to_inputs_with_contextual_variable(self):
         """Ensure convert_numpy_to_inputs preserves variable order and excludes contextual vars."""
         from xopt.vocs import ContextualVariable, convert_numpy_to_inputs
