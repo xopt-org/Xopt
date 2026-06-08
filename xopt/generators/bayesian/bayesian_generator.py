@@ -880,7 +880,11 @@ class BayesianGenerator(Generator, ABC):
     def get_model_input_bounds(self, data: pd.DataFrame) -> Dict[str, List[float]]:
         """variable bounds corresponding to trained model"""
         variable_bounds = deepcopy(
-            {name: var.domain for name, var in self.vocs.variables.items()}
+            {
+                name: var.domain
+                for name, var in self.vocs.variables.items()
+                if not isinstance(var, ContextualVariable)
+            }
         )
 
         # if turbo restrict points is true then set the bounds to the trust region
@@ -889,7 +893,11 @@ class BayesianGenerator(Generator, ABC):
             if self.turbo_controller.restrict_model_data:
                 variable_bounds = dict(
                     zip(
-                        self.vocs.variable_names,
+                        [
+                            name
+                            for name in self.vocs.variable_names
+                            if name not in self.contextual_variables
+                        ],
                         self.turbo_controller.get_trust_region(self).numpy().T,
                     )
                 )
@@ -946,7 +954,13 @@ class BayesianGenerator(Generator, ABC):
 
         Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds, dtype=torch.double).T
+        bounds = [
+            var.domain
+            for var in self.vocs.variables.values()
+            if not isinstance(var, ContextualVariable)
+        ]
+
+        return torch.tensor(bounds, dtype=torch.double).T
 
     def _get_optimization_bounds(self):
         """

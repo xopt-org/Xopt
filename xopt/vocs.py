@@ -17,7 +17,7 @@ import pandas as pd
 from xopt.errors import FeasibilityError
 from gest_api.vocs import (
     VOCS,
-    ContinuousVariable,
+    BaseVariable,
     GreaterThanConstraint,
     LessThanConstraint,
     BoundsConstraint,
@@ -25,14 +25,12 @@ from gest_api.vocs import (
 )
 
 
-class ContextualVariable(ContinuousVariable):
+class ContextualVariable(BaseVariable):
     """
     A variable that is not optimized over, but rather is observed and can be conditioned on.
     """
 
-    def __init__(self):
-        domain = [-np.inf, np.inf]
-        super().__init__(domain=domain)
+    pass
 
 
 def random_inputs(
@@ -581,7 +579,13 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
         ValueError: if input data does not satisfy requirements.
     """
     variable_data = input_points.loc[:, vocs.variable_names].values
-    bounds = np.array(vocs.bounds).T
+
+    bounds = [
+        var.domain
+        for var in vocs.variables.values()
+        if not isinstance(var, ContextualVariable)
+    ]
+    bounds = np.array(bounds).T
 
     is_out_of_bounds_lower = variable_data < bounds[0, :]
     is_out_of_bounds_upper = variable_data > bounds[1, :]
