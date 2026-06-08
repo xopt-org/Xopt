@@ -25,6 +25,9 @@ from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
 )
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+)
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
 from xopt.pydantic import encode_torch_module
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
@@ -648,3 +651,41 @@ class TestBayesianGenerator(TestCase):
     def test_validate_computation_time(self):
         with pytest.raises(ValueError):
             BayesianGenerator.validate_computation_time(10)
+
+    @patch.multiple(
+        PatchBayesianGenerator,
+        __abstractmethods__=set(),
+        _compatible_turbo_controllers=[OptimizeTurboController],
+    )
+    def test_discrete_variables(self):
+        # test fixed feature with discrete variables
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 5.0, 10.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs, fixed_features={"x2": 5.0})  # pin x2
+
+        # since we have a fixed feature, candidate names should only include x1
+        assert gen._candidate_names == ["x1"]
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.0], [1.0]]).to(bounds))
+
+        # test max travel distance with discrete variable
+        gen = PatchBayesianGenerator(vocs=vocs)
+        gen.max_travel_distances = [0.1, 0.2]
+
+        gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5]}))
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
+
+        # test turbo branch with fixed discrete feature
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            turbo_controller={
+                "name": "OptimizeTurboController",
+                "center_x": {"x1": 0.5, "x2": 5.0},
+                "length": 0.4,
+            },
+        )
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.3, 3.0], [0.7, 7.0]]).to(bounds))

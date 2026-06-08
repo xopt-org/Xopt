@@ -25,7 +25,7 @@ from gest_api.vocs import (
 )
 
 
-def _get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
+def get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
     """Return [min, max] bounds for all variables, including discrete variables."""
     bounds = {}
     for name in vocs.variable_names:
@@ -36,6 +36,12 @@ def _get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
         else:
             bounds[name] = (float(variable.domain[0]), float(variable.domain[1]))
     return bounds
+
+
+def get_variable_bounds_array(vocs: VOCS) -> np.ndarray:
+    """Return bounds for all variables as a 2 x d numpy array."""
+    bounds = get_variable_bounds(vocs)
+    return np.array(list(bounds.values())).T
 
 
 def random_inputs(
@@ -616,7 +622,7 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
         ValueError: if input data does not satisfy requirements.
     """
     variable_data = input_points.loc[:, vocs.variable_names]
-    variable_bounds = _get_variable_bounds(vocs)
+    variable_bounds = get_variable_bounds(vocs)
     bad_mask = np.zeros((len(variable_data), len(vocs.variable_names)), dtype=bool)
 
     for idx, name in enumerate(vocs.variable_names):
@@ -842,11 +848,11 @@ def clip_variable_bounds(
         The final bounds after clipping custom bounds with vocs bounds.
     """
     if custom_bounds is None:
-        final_bounds = _get_variable_bounds(vocs)
+        final_bounds = get_variable_bounds(vocs)
     elif not isinstance(custom_bounds, dict):
         raise TypeError("specified `custom_bounds` must be a dict")
     else:
-        variable_bounds = _get_variable_bounds(vocs)
+        variable_bounds = get_variable_bounds(vocs)
 
         try:
             validate_variable_bounds(custom_bounds)
