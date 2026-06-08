@@ -12,8 +12,10 @@ from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
+from botorch.optim.closures import get_loss_closure_with_grads
 from botorch.optim import ExpMAStoppingCriterion
 from botorch.optim.fit import fit_gpytorch_mll_scipy, fit_gpytorch_mll_torch
+from botorch.optim.utils import get_parameters
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
@@ -445,9 +447,39 @@ class StandardModelConstructor(ModelConstructor):
             )
             if "options" not in tr_kwargs["optimizer_kwargs"]:
                 tr_kwargs["optimizer_kwargs"]["options"] = {}
-            tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
-            tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
-            tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
+            options = tr_kwargs["optimizer_kwargs"]["options"]
+            options["maxiter"] = cfg_lbfgs.maxiter
+            options["gtol"] = cfg_lbfgs.gtol
+            options["ftol"] = cfg_lbfgs.ftol
+
+            batch_shape = getattr(model, "_aug_batch_shape", None)
+            if batch_shape is None:
+                batch_shape = getattr(model, "batch_shape", torch.Size())
+            is_batched = len(batch_shape) > 0
+            if is_batched:
+                # Batched scipy optimizer in newer botorch/scipy combinations can
+                # assert when both ftol and default factr are active.
+                options["factr"] = None
+
+            # Shared (non-batched) parameters in batched models are incompatible
+            # with botorch's independent scipy batching path. Use an explicit
+            # closure to preserve single-sum-loss behavior while keeping scipy.
+            has_unbatched_trainable_params = is_batched and any(
+                p.requires_grad
+                and (
+                    p.ndim < len(batch_shape)
+                    or tuple(p.shape[: len(batch_shape)]) != tuple(batch_shape)
+                )
+                for p in model.parameters()
+            )
+
+            if has_unbatched_trainable_params:
+                params = get_parameters(mll, requires_grad=True)
+                tr_kwargs["closure"] = get_loss_closure_with_grads(
+                    mll, parameters=params
+                )
+                tr_kwargs["optimizer_kwargs"].pop("closure", None)
+
             optimizer = fit_gpytorch_mll_scipy
 
         try:
