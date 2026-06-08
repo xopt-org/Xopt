@@ -209,7 +209,7 @@ class LBFGSOptimizer(NumericalOptimizer):
                 discrete_choices = discrete_choices[: self.discrete_max_choices]
 
             # if the user does not set unique, set it to False if we want more than 1 candidate
-            unique = kwargs.pop("unique", n_candidates == 1)  
+            unique = kwargs.pop("unique", n_candidates == 1)
             candidates, _ = optimize_acqf_discrete(
                 acq_function=function,
                 q=n_candidates,
