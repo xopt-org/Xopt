@@ -43,6 +43,13 @@ def get_variable_bounds_array(vocs: VOCS) -> np.ndarray:
     bounds = get_variable_bounds(vocs)
     return np.array(list(bounds.values())).T
 
+def has_discrete_variables(vocs: VOCS) -> bool:
+    """Check if there are any discrete variables in the VOCS."""
+    for name in vocs.variable_names:
+        variable = vocs.variables[name]
+        if isinstance(variable, DiscreteVariable):
+            return True
+    return False
 
 def random_inputs(
     vocs: VOCS,

@@ -71,6 +71,7 @@ from xopt.vocs import (
     extract_data,
     get_variable_bounds,
     get_variable_bounds_array,
+    has_discrete_variables,
 )
 
 
@@ -202,7 +203,7 @@ class BayesianGenerator(Generator, ABC):
             raise VOCSError("this generator does not support constraints")
 
         if (
-            cls._has_discrete_variables(v)
+            has_discrete_variables(v)
             and not info.data["supports_discrete_variables"]
         ):
             raise VOCSError("this generator does not support discrete variables")
@@ -351,7 +352,7 @@ class BayesianGenerator(Generator, ABC):
         validate_turbo_controller_center(self)
 
         # cannot have both a discrete variable and n_interpolate_points
-        if self._has_discrete_variables(self.vocs) and self.n_interpolate_points is not None:
+        if has_discrete_variables(self.vocs) and self.n_interpolate_points is not None:
             raise ValueError(
                 "cannot have both discrete variables and n_interpolate_points"
             )
@@ -457,7 +458,7 @@ class BayesianGenerator(Generator, ABC):
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
 
             if self.n_interpolate_points is not None:
-                if self._has_discrete_variables:
+                if has_discrete_variables(self.vocs):
                     raise RuntimeError("cannot generate interpolated points for discrete variables")
 
                 if self.n_candidates > 1:
@@ -935,17 +936,13 @@ class BayesianGenerator(Generator, ABC):
         return torch.tensor(bounds, dtype=torch.double)
 
     def _get_active_discrete_variable_values(self) -> dict[int, list[float]]:
-        """Get the possible values of the discrete variables in the candidate set."""
+        """Get the possible values of the discrete variables from vocs."""
         discrete_values: dict[int, list[float]] = {}
         for idx, name in enumerate(self._candidate_names):
             variable = self.vocs.variables[name]
             if isinstance(variable, DiscreteVariable):
                 discrete_values[idx] = sorted(float(v) for v in variable.values)
         return discrete_values
-
-    def _has_discrete_candidates(self) -> bool:
-        """Check if there are any discrete variables in the candidate set."""
-        return len(self._get_active_discrete_variable_values()) > 0
 
     def _get_discrete_optimization_kwargs(self) -> dict[str, Any]:
         """
