@@ -555,12 +555,15 @@ def normalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
 
     """
     normed_data = {}
+    variable_bounds = get_variable_bounds(vocs)
     for name in vocs.variable_names:
         if name in input_points.columns:
-            width = vocs.variables[name].domain[1] - vocs.variables[name].domain[0]
-            normed_data[name] = (
-                input_points[name] - vocs.variables[name].domain[0]
-            ) / width
+            lb, ub = variable_bounds[name]
+            width = ub - lb
+            if np.isclose(width, 0.0):
+                normed_data[name] = input_points[name].astype(float) - lb
+            else:
+                normed_data[name] = (input_points[name] - lb) / width
 
     if len(normed_data):
         return pd.DataFrame(normed_data)
@@ -595,12 +598,15 @@ def denormalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
 
     """
     denormed_data = {}
+    variable_bounds = get_variable_bounds(vocs)
     for name in vocs.variable_names:
         if name in input_points.columns:
-            width = vocs.variables[name].domain[1] - vocs.variables[name].domain[0]
-            denormed_data[name] = (
-                input_points[name] * width + vocs.variables[name].domain[0]
-            )
+            lb, ub = variable_bounds[name]
+            width = ub - lb
+            if np.isclose(width, 0.0):
+                denormed_data[name] = input_points[name].astype(float) + lb
+            else:
+                denormed_data[name] = input_points[name] * width + lb
 
     if len(denormed_data):
         return pd.DataFrame(denormed_data)

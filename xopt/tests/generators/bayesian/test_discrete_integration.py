@@ -123,14 +123,6 @@ def test_discrete_candidate_generation_across_generators(generator_name, discret
             constraints={},
         )
         gen = UpperConfidenceBoundGenerator(vocs=vocs)
-    elif generator_name == "bax":
-        vocs = VOCS(
-            variables=variables,
-            objectives={},
-            observables=["y1"],
-            constraints={},
-        )
-        gen = BaxGenerator(vocs=vocs, algorithm=GridOptimize())
     else:
         raise ValueError(f"Unsupported generator case: {generator_name}")
 

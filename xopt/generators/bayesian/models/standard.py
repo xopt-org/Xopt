@@ -38,6 +38,37 @@ MIN_INFERRED_NOISE_LEVEL = 1e-4
 # TODO: make custom stopping criterion that checks lengthscales
 
 
+def _get_non_degenerate_normalize_bounds(
+    input_names: list[str],
+    input_bounds: dict[str, list] | None,
+    tkwargs: dict | None = None,
+) -> torch.Tensor | None:
+    """Build bounds tensor for Normalize, expanding zero-width dimensions."""
+    if input_bounds is None:
+        return None
+
+    tensor_kwargs = tkwargs or {}
+    bounds = torch.vstack(
+        [torch.tensor(input_bounds[name], **tensor_kwargs) for name in input_names]
+    ).T
+
+    widths = bounds[1] - bounds[0]
+    zero_width_mask = torch.isclose(
+        widths,
+        torch.zeros_like(widths),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    if zero_width_mask.any():
+        # Singleton dimensions (e.g., one-value discrete sets) need finite width for Normalize.
+        bounds = bounds.clone()
+        centers = 0.5 * (bounds[0, zero_width_mask] + bounds[1, zero_width_mask])
+        bounds[0, zero_width_mask] = centers - 0.5
+        bounds[1, zero_width_mask] = centers + 0.5
+
+    return bounds
+
+
 class ExpMAStoppingCriterionModel(XoptBaseModel):
     maxiter: int = Field(500, description="maximum number of iterations")
     n_window: int = Field(
@@ -561,12 +592,7 @@ class StandardModelConstructor(ModelConstructor):
 
         """
         # get input bounds
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(input_names, input_bounds, tkwargs)
 
         # create transform
         input_transform = Normalize(len(input_names), bounds=bounds)
@@ -616,12 +642,7 @@ class BatchedModelConstructor(StandardModelConstructor):
         input_bounds,
         batch_shape: torch.Size = torch.Size(),
     ) -> Optional[Normalize]:
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name]) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(input_names, input_bounds)
 
         input_transform = Normalize(
             len(input_names),

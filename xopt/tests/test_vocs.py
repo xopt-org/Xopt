@@ -563,6 +563,23 @@ class TestVOCS(object):
             test_data[vocs.variable_names].to_numpy(),
         ).all()
 
+    def test_normalize_inputs_singleton_discrete_variable(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {5.0}},
+            objectives={"y": "MINIMIZE"},
+        )
+        test_data = pd.DataFrame({"x": [0.2, 0.8], "d": [5.0, 5.0]})
+
+        normed_data = normalize_inputs(vocs, test_data)
+        assert np.isfinite(normed_data["d"]).all()
+        assert normed_data["d"].to_list() == [0.0, 0.0]
+
+        round_trip = denormalize_inputs(vocs, normed_data)
+        np.testing.assert_allclose(
+            round_trip[["x", "d"]].to_numpy(),
+            test_data[["x", "d"]].to_numpy(),
+        )
+
     def test_extract_data(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         test_data = pd.DataFrame(
