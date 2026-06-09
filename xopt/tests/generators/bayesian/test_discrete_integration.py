@@ -93,13 +93,14 @@ def _assert_discrete_membership(candidates, discrete_sets):
 
 @pytest.mark.parametrize("discrete_only", [False, True])
 @pytest.mark.parametrize("generator_name", ["ei", "exploration", "ucb"])
-def test_discrete_candidate_generation_across_generators(generator_name, discrete_only):
+@pytest.mark.parametrize("discrete_set", [{5.0}, {0.0, 5.0, 10.0}])
+def test_discrete_candidate_generation_across_generators(generator_name, discrete_only, discrete_set):
     torch.manual_seed(7)
 
     if discrete_only:
-        variables = {"x1": {0.0, 1.0}, "x2": {0.0, 5.0, 10.0}}
+        variables = {"x1": {0.0, 1.0}, "x2": discrete_set}
     else:
-        variables = {"x1": [0.0, 1.0], "x2": {0.0, 5.0, 10.0}}
+        variables = {"x1": [0.0, 1.0], "x2": discrete_set}
 
     if generator_name == "ei":
         vocs = VOCS(
@@ -146,7 +147,7 @@ def test_discrete_candidate_generation_across_generators(generator_name, discret
     candidates = gen.generate(1)
     assert len(candidates) == 1
 
-    discrete_sets = {"x2": {0.0, 5.0, 10.0}}
+    discrete_sets = {"x2": discrete_set}
     if discrete_only:
         discrete_sets["x1"] = {0.0, 1.0}
     else:
