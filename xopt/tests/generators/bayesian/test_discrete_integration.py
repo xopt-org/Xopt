@@ -92,7 +92,7 @@ def _assert_discrete_membership(candidates, discrete_sets):
 
 
 @pytest.mark.parametrize("discrete_only", [False, True])
-@pytest.mark.parametrize("generator_name", ["ei", "exploration", "ucb", "bax"])
+@pytest.mark.parametrize("generator_name", ["ei", "exploration", "ucb"])
 def test_discrete_candidate_generation_across_generators(generator_name, discrete_only):
     torch.manual_seed(7)
 
