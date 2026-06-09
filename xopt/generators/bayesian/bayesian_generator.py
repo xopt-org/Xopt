@@ -202,10 +202,7 @@ class BayesianGenerator(Generator, ABC):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
 
-        if (
-            has_discrete_variables(v)
-            and not info.data["supports_discrete_variables"]
-        ):
+        if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
             raise VOCSError("this generator does not support discrete variables")
 
         # assertion that at least one objective exists is done in model_validator below
@@ -459,7 +456,9 @@ class BayesianGenerator(Generator, ABC):
 
             if self.n_interpolate_points is not None:
                 if has_discrete_variables(self.vocs):
-                    raise RuntimeError("cannot generate interpolated points for discrete variables")
+                    raise RuntimeError(
+                        "cannot generate interpolated points for discrete variables"
+                    )
 
                 if self.n_candidates > 1:
                     raise RuntimeError(

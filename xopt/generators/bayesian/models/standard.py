@@ -592,7 +592,9 @@ class StandardModelConstructor(ModelConstructor):
 
         """
         # get input bounds
-        bounds = _get_non_degenerate_normalize_bounds(input_names, input_bounds, tkwargs)
+        bounds = _get_non_degenerate_normalize_bounds(
+            input_names, input_bounds, tkwargs
+        )
 
         # create transform
         input_transform = Normalize(len(input_names), bounds=bounds)

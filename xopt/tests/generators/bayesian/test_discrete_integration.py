@@ -7,8 +7,6 @@ import torch
 
 from gest_api.vocs import VOCS
 
-from xopt.generators.bayesian.bax.algorithms import GridOptimize
-from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
 from xopt.generators.bayesian.expected_improvement import TDExpectedImprovementGenerator
@@ -94,7 +92,9 @@ def _assert_discrete_membership(candidates, discrete_sets):
 @pytest.mark.parametrize("discrete_only", [False, True])
 @pytest.mark.parametrize("generator_name", ["ei", "exploration", "ucb"])
 @pytest.mark.parametrize("discrete_set", [{5.0}, {0.0, 5.0, 10.0}])
-def test_discrete_candidate_generation_across_generators(generator_name, discrete_only, discrete_set):
+def test_discrete_candidate_generation_across_generators(
+    generator_name, discrete_only, discrete_set
+):
     torch.manual_seed(7)
 
     if discrete_only:
