@@ -136,6 +136,30 @@ class TestVOCS(object):
         test_inputs = random_inputs(TEST_VOCS_BASE)
         assert isinstance(test_inputs[0]["x1"], float)
 
+    def test_random_inputs_discrete_variables(self):
+        vocs = VOCS(
+            variables={
+                "x": [0.0, 1.0],
+                "d": {0.0, 0.8, 1.6, 2.4},
+            },
+            objectives={"f": "MINIMIZE"},
+        )
+
+        sampled = pd.DataFrame(random_inputs(vocs, 200, seed=123))
+        allowed = {0.0, 0.8, 1.6, 2.4}
+        assert set(sampled["d"]).issubset(allowed)
+        assert len(set(sampled["d"])) > 1
+
+        # custom bounds should restrict the selectable discrete values
+        bounded = pd.DataFrame(
+            random_inputs(vocs, 200, seed=123, custom_bounds={"d": [0.7, 2.0]})
+        )
+        assert set(bounded["d"]).issubset({0.8, 1.6})
+
+        # single-sample path should also honor discrete sampling
+        single = random_inputs(vocs, seed=123)
+        assert single[0]["d"] in allowed
+
     def test_serialization(self):
         vocs = deepcopy(TEST_VOCS_BASE)
         vocs.model_dump_json()
@@ -218,6 +242,48 @@ class TestVOCS(object):
         assert "x2" in grid.columns
         assert "c1" in grid.columns
         assert np.all(grid["c1"] == 5.0)
+
+    def test_grid_inputs_with_discrete_variables(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {0.0, 0.8, 1.6, 2.4}},
+            constraints={},
+            objectives={},
+            constants={"c1": 5.0},
+            observables=[],
+        )
+
+        # Scalar n applies to continuous axis only. Discrete axis enumerates all values.
+        grid = grid_inputs(vocs, n=5, include_constants=False)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (5 * 4, 2)
+        assert np.allclose(sorted(grid["d"].unique()), [0.0, 0.8, 1.6, 2.4])
+
+        # Dict n with a discrete entry should warn and still enumerate all discrete values.
+        with pytest.warns(RuntimeWarning, match="ignoring requested grid count"):
+            grid = grid_inputs(vocs, n={"x": 3, "d": 10}, include_constants=False)
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (3 * 4, 2)
+        assert np.allclose(sorted(grid["d"].unique()), [0.0, 0.8, 1.6, 2.4])
+
+        # Custom bounds should filter discrete values.
+        grid = grid_inputs(
+            vocs,
+            n={"x": 2},
+            custom_bounds={"d": [0.7, 2.0]},
+            include_constants=False,
+        )
+        assert isinstance(grid, pd.DataFrame)
+        assert grid.shape == (2 * 2, 2)
+        assert np.allclose(sorted(grid["d"].unique()), [0.8, 1.6])
+
+        # Custom bounds with no discrete values should raise.
+        with pytest.raises(ValueError, match="no discrete values"):
+            grid_inputs(
+                vocs,
+                n={"x": 2},
+                custom_bounds={"d": [0.81, 1.59]},
+                include_constants=False,
+            )
 
     def test_random_sampling_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)
@@ -336,6 +402,19 @@ class TestVOCS(object):
             validate_input_data(
                 test_vocs, pd.DataFrame({"x1": [-0.5, 2.5], "x2": [1.0, 11.0]})
             )
+
+    def test_validate_input_data_discrete_membership(self):
+        test_vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {0.0, 0.8, 1.6, 2.4}},
+            objectives={"f": "MINIMIZE"},
+        )
+
+        # Valid discrete values should pass.
+        validate_input_data(test_vocs, pd.DataFrame({"x": [0.2, 0.8], "d": [0.0, 1.6]}))
+
+        # This value is inside [0.0, 2.4] but not in the discrete set.
+        with pytest.raises(ValueError):
+            validate_input_data(test_vocs, pd.DataFrame({"x": [0.5], "d": [0.4]}))
 
     def test_select_best(self):
         test_data = pd.DataFrame(
@@ -483,6 +562,23 @@ class TestVOCS(object):
             denormalize_inputs(vocs, normed_data)[vocs.variable_names].to_numpy(),
             test_data[vocs.variable_names].to_numpy(),
         ).all()
+
+    def test_normalize_inputs_singleton_discrete_variable(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {5.0}},
+            objectives={"y": "MINIMIZE"},
+        )
+        test_data = pd.DataFrame({"x": [0.2, 0.8], "d": [5.0, 5.0]})
+
+        normed_data = normalize_inputs(vocs, test_data)
+        assert np.isfinite(normed_data["d"]).all()
+        assert normed_data["d"].to_list() == [0.0, 0.0]
+
+        round_trip = denormalize_inputs(vocs, normed_data)
+        np.testing.assert_allclose(
+            round_trip[["x", "d"]].to_numpy(),
+            test_data[["x", "d"]].to_numpy(),
+        )
 
     def test_extract_data(self):
         vocs = deepcopy(TEST_VOCS_BASE)

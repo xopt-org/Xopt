@@ -52,6 +52,7 @@ class BaxGenerator(BayesianGenerator):
 
     name = "BAX"
     supports_constraints: bool = True
+    supports_discrete_variables: bool = False
     algorithm: Algorithm = Field(description="algorithm evaluated in the BAX process")
     algorithm_results: Dict = Field(
         None, description="dictionary results from algorithm", exclude=True
@@ -64,8 +65,8 @@ class BaxGenerator(BayesianGenerator):
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
-        if v.n_constraints > 0 and not info.data["supports_constraints"]:
-            raise VOCSError("this generator does not support constraints")
+        # Preserve inherited Bayesian VOCS validation behavior.
+        v = super().validate_vocs(v, info)
 
         # assert that the generator had no objectives
         if not v.n_objectives == 0:

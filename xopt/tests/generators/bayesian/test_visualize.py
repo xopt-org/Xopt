@@ -67,6 +67,28 @@ def data(vocs):
     )
 
 
+@pytest.fixture
+def vocs_mixed_discrete():
+    return VOCS(
+        variables={"x": [0, 1], "y": {0.0, 5.0, 10.0}, "w": [0, 1]},
+        objectives={"z": "MAXIMIZE"},
+        constraints={},
+        observables=["z"],
+    )
+
+
+@pytest.fixture
+def data_mixed_discrete(vocs_mixed_discrete):
+    return pd.DataFrame(
+        {
+            "x": [0.0, 0.5, 1.0, 0.25, 0.75],
+            "y": [0.0, 5.0, 10.0, 5.0, 0.0],
+            "w": [0.2, 0.2, 0.2, 0.2, 0.2],
+            "z": [0.0, 0.4, 0.8, 0.2, 0.6],
+        }
+    )
+
+
 @pytest.mark.parametrize("show_acquisition", [True, False])
 @pytest.mark.parametrize("variable_names", [["x"], ["x", "y"]])
 def test_visualize_model(vocs, data, variable_names, show_acquisition):
@@ -170,6 +192,105 @@ def test_plot_model_prediction_2d(vocs, data):
         n_grid=5,
     )
     assert ax is not None
+
+
+def test_generate_input_mesh_mixed_discrete_shape_and_reference(vocs_mixed_discrete):
+    mesh = visualize._generate_input_mesh(
+        vocs=vocs_mixed_discrete,
+        variable_names=["x", "y"],
+        reference_point={"w": 0.2},
+        n_grid=5,
+        tkwargs={},
+    )
+    # Mixed mesh: 5 continuous points times 3 discrete choices.
+    assert mesh.shape == (15, 3)
+    assert np.allclose(mesh[:, 2].cpu().numpy(), 0.2)
+
+
+def test_plot_model_prediction_1d_discrete_ticks(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    model = DummyModel()
+    ax = visualize.plot_model_prediction(
+        model=model,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        output_name="z",
+        variable_names=["y"],
+        n_grid=5,
+    )
+    assert ax is not None
+    assert set(ax.get_xticks()) == {0.0, 5.0, 10.0}
+    assert np.allclose(ax.get_xticks(), [0.0, 5.0, 10.0])
+
+
+def test_plot_acquisition_function_1d_discrete_ticks(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    acq = DummyAcq()
+    ax = visualize.plot_acquisition_function(
+        acquisition_function=acq,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        variable_names=["y"],
+        n_grid=5,
+    )
+    assert ax is not None
+    assert set(ax.get_xticks()) == {0.0, 5.0, 10.0}
+    assert np.allclose(ax.get_xticks(), [0.0, 5.0, 10.0])
+
+
+def test_plot_acquisition_function_2d_mixed_discrete(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    acq = DummyAcq()
+    ax = visualize.plot_acquisition_function(
+        acquisition_function=acq,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        variable_names=["x", "y"],
+        n_grid=5,
+    )
+    assert ax is not None
+
+
+def test_visualize_model_with_fixed_variable_reference_point(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    model = DummyModel()
+    fig, ax = visualize.visualize_model(
+        model=model,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x", "y"],
+        reference_point={"w": 0.2},
+        show_acquisition=False,
+        n_grid=5,
+    )
+    assert fig is not None
+    assert ax is not None
+
+
+def test_visualize_model_requires_variable_selection_for_higher_dim(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    model = DummyModel()
+    with pytest.raises(ValueError):
+        visualize.visualize_model(
+            model=model,
+            vocs=vocs_mixed_discrete,
+            data=data_mixed_discrete,
+            tkwargs={},
+            output_names=["z"],
+            variable_names=None,
+            show_acquisition=False,
+            n_grid=5,
+        )
 
 
 def test_plot_acquisition_function_1d(vocs, data):
