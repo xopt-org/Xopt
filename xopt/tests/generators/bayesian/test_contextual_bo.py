@@ -45,7 +45,7 @@ class TestContextualBO:
 
         data = pd.DataFrame(initial_data)
         generator.add_data(data)
-    
+
         # check model input names
         assert generator.model_input_names == ["x1", "x2"]
         # check model output names

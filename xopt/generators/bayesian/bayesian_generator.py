@@ -518,7 +518,6 @@ class BayesianGenerator(Generator, ABC):
         if data.empty:
             raise ValueError("no data available to build model")
 
-
         # get input bounds
         variable_bounds = self.get_model_input_bounds(data)
 
@@ -929,7 +928,7 @@ class BayesianGenerator(Generator, ABC):
     def get_model_input_bounds(self, data: pd.DataFrame) -> Dict[str, List[float]]:
         """
         This will create a dictionary of variable bounds for the model input variables. It starts with the
-        bounds from vocs, and then updates them based on the turbo trust region, fixed features, and 
+        bounds from vocs, and then updates them based on the turbo trust region, fixed features, and
         contextual variables if they are specified.
 
         Parameters
@@ -941,7 +940,7 @@ class BayesianGenerator(Generator, ABC):
         -------
         variable_bounds : Dict[str, List[float]]
             A dictionary containing the variable bounds for the model input variables.
-        
+
         """
         variable_bounds = deepcopy(get_variable_bounds(self.vocs))
 

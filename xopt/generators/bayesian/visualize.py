@@ -45,6 +45,7 @@ ACQUISITION_CONTEXTUAL_WARNING = (
     "controllable dimensions only."
 )
 
+
 def _is_discrete_variable(variable: Any) -> bool:
     return isinstance(variable, DiscreteVariable)
 

@@ -43,7 +43,7 @@ def get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
             values = sorted(float(v) for v in variable.values)
             bounds[name] = (values[0], values[-1])
         elif isinstance(variable, ContextualVariable):
-            continue # don't add bounds for contextual variables
+            continue  # don't add bounds for contextual variables
         else:
             bounds[name] = (float(variable.domain[0]), float(variable.domain[1]))
     return bounds
@@ -678,7 +678,7 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
             ).any(axis=1)
             bad_mask[:, idx] = ~is_allowed
         elif isinstance(variable, ContextualVariable):
-            continue # don't validate contextual variables
+            continue  # don't validate contextual variables
         else:
             lb, ub = variable_bounds[name]
             bad_mask[:, idx] = np.logical_or(values < lb, values > ub)
