@@ -21,6 +21,7 @@ from gest_api.vocs import (
     GreaterThanConstraint,
     LessThanConstraint,
     BoundsConstraint,
+    DiscreteVariable,
     MaximizeObjective,
 )
 
@@ -31,6 +32,36 @@ class ContextualVariable(BaseVariable):
     """
 
     pass
+
+
+def get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
+    """Return [min, max] bounds for all variables, including discrete variables."""
+    bounds = {}
+    for name in vocs.variable_names:
+        variable = vocs.variables[name]
+        if isinstance(variable, DiscreteVariable):
+            values = sorted(float(v) for v in variable.values)
+            bounds[name] = (values[0], values[-1])
+        elif isinstance(variable, ContextualVariable):
+            continue # don't add bounds for contextual variables
+        else:
+            bounds[name] = (float(variable.domain[0]), float(variable.domain[1]))
+    return bounds
+
+
+def get_variable_bounds_array(vocs: VOCS) -> np.ndarray:
+    """Return bounds for all variables as a 2 x d numpy array."""
+    bounds = get_variable_bounds(vocs)
+    return np.array(list(bounds.values())).T
+
+
+def has_discrete_variables(vocs: VOCS) -> bool:
+    """Check if there are any discrete variables in the VOCS."""
+    for name in vocs.variable_names:
+        variable = vocs.variables[name]
+        if isinstance(variable, DiscreteVariable):
+            return True
+    return False
 
 
 def random_inputs(
@@ -64,16 +95,36 @@ def random_inputs(
     inputs = {}
     if seed is None:
         rng_sample_function = np.random.random
+        rng_choice_function = np.random.choice
     else:
         rng = np.random.default_rng(seed=seed)
         rng_sample_function = rng.random
+        rng_choice_function = rng.choice
 
     bounds = clip_variable_bounds(vocs, custom_bounds)
 
-    for key, val in bounds.items():  # No need to sort here
-        a, b = val
-        x = rng_sample_function(n)
-        inputs[key] = x * a + (1 - x) * b
+    for key, val in bounds.items():
+        variable = vocs.variables[key]
+
+        if isinstance(variable, DiscreteVariable):
+            a, b = val
+            allowed_values = sorted(float(v) for v in variable.values)
+            selectable_values = [v for v in allowed_values if a <= v <= b]
+
+            if len(selectable_values) == 0:
+                raise ValueError(
+                    f"no discrete values for '{key}' inside bounds [{a}, {b}]"
+                )
+
+            if n is None:
+                inputs[key] = float(rng_choice_function(selectable_values))
+            else:
+                inputs[key] = rng_choice_function(selectable_values, size=n)
+
+        else:
+            a, b = val
+            x = rng_sample_function(n)
+            inputs[key] = x * a + (1 - x) * b
 
     # Constants
     if include_constants and vocs.constants is not None:
@@ -99,12 +150,14 @@ def grid_inputs(
     vocs : VOCS
         The variable-objective-constraint space (VOCS) defining the problem.
     n : Union[int, Dict[str, int]]
-        Number of points to generate along each axis. If an integer is provided, the same number of points
-        is used for all variables. If a dictionary is provided, it should have variable names as keys and
-        the number of points as values.
+        Number of points to generate along each axis for continuous variables. If an integer is provided,
+        the same number of points is used for all continuous variables. If a dictionary is provided, it
+        should have continuous variable names as keys and the number of points as values. Discrete
+        variables always use their configured values (optionally filtered by custom bounds).
     custom_bounds : dict, optional
         Custom bounds for the variables. If None, the default bounds from `vocs.variables` are used.
         The dictionary should have variable names as keys and a list of two values [min, max] as values.
+        For discrete variables, bounds are used to filter allowed values.
     include_constants : bool, optional
         If True, include constant values from `vocs.constants` in the output DataFrame.
 
@@ -129,14 +182,39 @@ def grid_inputs(
     Notes
     -----
     The function generates a meshgrid of inputs based on the specified bounds. If `custom_bounds` are provided,
-    they are validated and clipped to ensure they lie within the domain of `vocs.variables`. The resulting meshgrid
-    is flattened and returned as a DataFrame. If `include_constants` is True, constant values from `vocs.constants`
-    are added to the DataFrame.
+    they are validated and clipped to ensure they lie within the domain of `vocs.variables`.
+
+    Continuous variables are sampled using linspace. Discrete variables are enumerated using their allowed
+    values (sorted ascending), filtered by active bounds when applicable.
+
+    The resulting meshgrid is flattened and returned as a DataFrame. If `include_constants` is True, constant
+    values from `vocs.constants` are added to the DataFrame.
     """
     bounds = clip_variable_bounds(vocs, custom_bounds)
 
     grid_axes = []
     for key, val in bounds.items():
+        variable = vocs.variables[key]
+
+        if isinstance(variable, DiscreteVariable):
+            if isinstance(n, dict) and key in n:
+                warnings.warn(
+                    f"ignoring requested grid count for discrete variable '{key}'",
+                    RuntimeWarning,
+                )
+
+            lb, ub = val
+            discrete_values = sorted(float(v) for v in variable.values)
+            filtered_values = [v for v in discrete_values if lb <= v <= ub]
+
+            if len(filtered_values) == 0:
+                raise ValueError(
+                    f"no discrete values for '{key}' inside bounds [{lb}, {ub}]"
+                )
+
+            grid_axes.append(np.array(filtered_values, dtype=float))
+            continue
+
         if isinstance(n, int):
             num_points = n
         elif isinstance(n, dict) and key in n:
@@ -505,12 +583,15 @@ def normalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
 
     """
     normed_data = {}
+    variable_bounds = get_variable_bounds(vocs)
     for name in vocs.variable_names:
         if name in input_points.columns:
-            width = vocs.variables[name].domain[1] - vocs.variables[name].domain[0]
-            normed_data[name] = (
-                input_points[name] - vocs.variables[name].domain[0]
-            ) / width
+            lb, ub = variable_bounds[name]
+            width = ub - lb
+            if np.isclose(width, 0.0):
+                normed_data[name] = input_points[name].astype(float) - lb
+            else:
+                normed_data[name] = (input_points[name] - lb) / width
 
     if len(normed_data):
         return pd.DataFrame(normed_data)
@@ -545,12 +626,15 @@ def denormalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
 
     """
     denormed_data = {}
+    variable_bounds = get_variable_bounds(vocs)
     for name in vocs.variable_names:
         if name in input_points.columns:
-            width = vocs.variables[name].domain[1] - vocs.variables[name].domain[0]
-            denormed_data[name] = (
-                input_points[name] * width + vocs.variables[name].domain[0]
-            )
+            lb, ub = variable_bounds[name]
+            width = ub - lb
+            if np.isclose(width, 0.0):
+                denormed_data[name] = input_points[name].astype(float) + lb
+            else:
+                denormed_data[name] = input_points[name] * width + lb
 
     if len(denormed_data):
         return pd.DataFrame(denormed_data)
@@ -578,23 +662,33 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
     ------
         ValueError: if input data does not satisfy requirements.
     """
-    variable_data = input_points.loc[:, vocs.variable_names].values
 
-    bounds = [
-        var.domain
-        for var in vocs.variables.values()
-        if not isinstance(var, ContextualVariable)
-    ]
-    bounds = np.array(bounds).T
+    variable_data = input_points.loc[:, vocs.variable_names]
+    variable_bounds = get_variable_bounds(vocs)
+    bad_mask = np.zeros((len(variable_data), len(vocs.variable_names)), dtype=bool)
 
-    is_out_of_bounds_lower = variable_data < bounds[0, :]
-    is_out_of_bounds_upper = variable_data > bounds[1, :]
-    bad_mask = np.logical_or(is_out_of_bounds_upper, is_out_of_bounds_lower)
-    any_bad = bad_mask.any()
+    for idx, name in enumerate(vocs.variable_names):
+        variable = vocs.variables[name]
+        values = variable_data[name].astype(float).to_numpy()
 
-    if any_bad:
+        if isinstance(variable, DiscreteVariable):
+            allowed = np.array(sorted(float(v) for v in variable.values), dtype=float)
+            is_allowed = np.isclose(
+                values[:, None], allowed[None, :], rtol=0.0, atol=1e-12
+            ).any(axis=1)
+            bad_mask[:, idx] = ~is_allowed
+        else:
+            lb, ub = variable_bounds[name]
+            bad_mask[:, idx] = np.logical_or(values < lb, values > ub)
+
+    if bad_mask.any():
+        row_indices = np.nonzero(bad_mask.any(axis=1))[0].tolist()
+        bad_variables = [
+            vocs.variable_names[i] for i in np.nonzero(bad_mask.any(axis=0))[0]
+        ]
         raise ValueError(
-            f"input points at indices {np.nonzero(bad_mask.any(axis=0))} are not valid"
+            f"input points at row indices {row_indices} are not valid for "
+            f"variables {bad_variables}"
         )
 
 
@@ -796,11 +890,11 @@ def clip_variable_bounds(
         The final bounds after clipping custom bounds with vocs bounds.
     """
     if custom_bounds is None:
-        final_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
+        final_bounds = get_variable_bounds(vocs)
     elif not isinstance(custom_bounds, dict):
         raise TypeError("specified `custom_bounds` must be a dict")
     else:
-        variable_bounds = dict(zip(vocs.variable_names, np.array(vocs.bounds)))
+        variable_bounds = get_variable_bounds(vocs)
 
         try:
             validate_variable_bounds(custom_bounds)

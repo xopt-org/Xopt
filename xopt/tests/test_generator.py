@@ -35,6 +35,14 @@ class PatchGeneratorNoConstraints(Generator):
         pass
 
 
+class PatchGeneratorSupportsDiscrete(Generator):
+    supports_single_objective: bool = True
+    supports_discrete_variables: bool = True
+
+    def generate(self, n_candidates) -> list[dict]:
+        pass
+
+
 class TestGenerator:
     def test_init(self):
         PatchGenerator(vocs=TEST_VOCS_BASE)
@@ -106,6 +114,19 @@ class TestGenerator:
             VOCSError, match="this generator does not support constraints"
         ):
             PatchGeneratorNoConstraints(vocs=vocs_with_constraints)
+
+    def test_generator_discrete_validation(self):
+        vocs_with_discrete = VOCS(
+            variables={"x1": [0, 1], "x2": {0.0, 0.5, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+
+        with pytest.raises(
+            VOCSError, match="this generator does not support discrete variables"
+        ):
+            PatchGenerator(vocs=vocs_with_discrete)
+
+        PatchGeneratorSupportsDiscrete(vocs=vocs_with_discrete)
 
     def test_data_validator_indexerror(self):
         data_dict = {"x1": 1.0, "x2": 2.0}

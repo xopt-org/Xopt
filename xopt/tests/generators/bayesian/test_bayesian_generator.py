@@ -13,7 +13,6 @@ from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
 
-from gest_api.vocs import ContinuousVariable
 
 from xopt import VOCS
 from xopt.base import Xopt
@@ -24,6 +23,9 @@ from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
+)
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
 )
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
 from xopt.pydantic import encode_torch_module
@@ -315,39 +317,156 @@ class TestBayesianGenerator(TestCase):
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
-        # test with max_travel_distances specified and data
-        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
-        gen.max_travel_distances = [0.1, 0.2]
-        gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
-        bounds = gen._get_optimization_bounds()
-        assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
-
-        # test with max_travel_distances specified and data
-        high_d_vocs = deepcopy(TEST_VOCS_BASE)
-        high_d_vocs.variables["x3"] = ContinuousVariable(domain=[0, 1.0])
-
-        gen = PatchBayesianGenerator(vocs=high_d_vocs)
-        gen.max_travel_distances = [0.1, 0.2, 0.1]
-        gen.add_data(
-            pd.DataFrame(
-                {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
-            )
-        )
-        bounds = gen._get_optimization_bounds()
-        assert torch.allclose(
-            bounds, torch.tensor([[0.4, 3.0, 0.4], [0.6, 7.0, 0.6]]).to(bounds)
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}},
+            objectives={"y1": "MINIMIZE"},
         )
 
-        # test with bad max_distances
-        gen = PatchBayesianGenerator(vocs=high_d_vocs)
-        gen.max_travel_distances = [0.1, 0.2]
-        gen.add_data(
-            pd.DataFrame(
-                {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
-            )
+        gen = PatchBayesianGenerator(vocs=vocs)
+        kwargs = gen._get_discrete_optimization_kwargs()
+
+        assert "fixed_features_list" in kwargs
+        assert kwargs["fixed_features_list"] == [
+            {1: 0.0},
+            {1: 0.5},
+            {1: 1.0},
+        ]
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_only_optimization_kwargs(self):
+        vocs = VOCS(
+            variables={"x1": {0.0, 1.0}, "x2": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
         )
-        with pytest.raises(ValueError):
-            gen._get_optimization_bounds()
+
+        gen = PatchBayesianGenerator(vocs=vocs)
+        kwargs = gen._get_discrete_optimization_kwargs()
+        assert "discrete_choices" in kwargs
+        assert kwargs["discrete_choices"].shape == (4, 2)
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_snap_and_validate_discrete_candidates(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs)
+
+        raw_candidates = torch.tensor([[0.2, 0.6], [0.1, 0.1]], dtype=torch.double)
+        snapped = gen._snap_discrete_candidates(raw_candidates)
+        assert torch.allclose(snapped[:, 1], torch.tensor([1.0, 0.0]))
+
+        result_df = pd.DataFrame(snapped.numpy(), columns=vocs.variable_names)
+        gen._validate_discrete_outputs(result_df)
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs_truncation(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}, "x3": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            numerical_optimizer=LBFGSOptimizer(mixed_max_discrete_configurations=4),
+        )
+        with patch(
+            "xopt.generators.bayesian.bayesian_generator.logger.warning"
+        ) as mock_warn:
+            kwargs = gen._get_discrete_optimization_kwargs()
+        assert "fixed_features_list" in kwargs
+        assert len(kwargs["fixed_features_list"]) == 4
+        mock_warn.assert_called_once_with(
+            "truncating discrete configuration count from %d to %d", 6, 4
+        )
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs_truncation_is_lazy(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}, "x3": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            numerical_optimizer=LBFGSOptimizer(mixed_max_discrete_configurations=3),
+        )
+
+        def iter_with_guard(*_):
+            for i in range(6):
+                if i >= 3:
+                    raise RuntimeError("product consumed past truncation limit")
+                yield (float(i), float(i + 1))
+
+        with patch(
+            "xopt.generators.bayesian.bayesian_generator.product",
+            side_effect=lambda *args: iter_with_guard(),
+        ):
+            kwargs = gen._get_discrete_optimization_kwargs()
+
+        assert kwargs["fixed_features_list"] == [
+            {1: 0.0, 2: 1.0},
+            {1: 1.0, 2: 2.0},
+            {1: 2.0, 2: 3.0},
+        ]
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_validate_discrete_outputs_raises(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs)
+        with pytest.raises(ValueError, match="configured discrete set"):
+            gen._validate_discrete_outputs(pd.DataFrame({"x1": [0.2], "x2": [0.25]}))
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_grid_optimizer_discrete_candidates_raise_in_propose(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs, numerical_optimizer=GridOptimizer())
+        with (
+            patch.object(
+                PatchBayesianGenerator,
+                "_get_optimization_bounds",
+                return_value=torch.zeros(2, 2),
+            ),
+            patch.object(
+                PatchBayesianGenerator, "get_acquisition", return_value=MagicMock()
+            ),
+            patch.object(
+                PatchBayesianGenerator,
+                "_get_initial_conditions",
+                return_value=torch.zeros(1, 1, 2),
+            ),
+        ):
+            with pytest.raises(ValueError, match="grid optimizer does not support"):
+                gen.propose_candidates(MagicMock(), n_candidates=1)
+
+    def test_model_constructor_discrete_bounds(self):
+        class _CaptureBoundsModelConstructor(ModelConstructor):
+            name: str = "capture_bounds_model_constructor"
+
+            def build_model(self, *args, **kwargs):
+                return None
+
+        constructor = _CaptureBoundsModelConstructor()
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {1.0, 2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        data = pd.DataFrame({"x1": [0.0], "x2": [1.0], "y1": [0.0]})
+        with patch.object(
+            _CaptureBoundsModelConstructor, "build_model", autospec=True
+        ) as mock_build:
+            constructor.build_model_from_vocs(vocs, data)
+        _, _, _, _, input_bounds, _, _ = mock_build.call_args.args
+        assert input_bounds == {
+            "x1": [0.0, 1.0],
+            "x2": [1.0, 3.0],
+        }
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_fixed_feature(self):
@@ -474,3 +593,41 @@ class TestBayesianGenerator(TestCase):
     def test_validate_computation_time(self):
         with pytest.raises(ValueError):
             BayesianGenerator.validate_computation_time(10)
+
+    @patch.multiple(
+        PatchBayesianGenerator,
+        __abstractmethods__=set(),
+        _compatible_turbo_controllers=[OptimizeTurboController],
+    )
+    def test_discrete_variables(self):
+        # test fixed feature with discrete variables
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 5.0, 10.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs, fixed_features={"x2": 5.0})  # pin x2
+
+        # since we have a fixed feature, candidate names should only include x1
+        assert gen._candidate_names == ["x1"]
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.0], [1.0]]).to(bounds))
+
+        # test max travel distance with discrete variable
+        gen = PatchBayesianGenerator(vocs=vocs)
+        gen.max_travel_distances = [0.1, 0.2]
+
+        gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5]}))
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
+
+        # test turbo branch with fixed discrete feature
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            turbo_controller={
+                "name": "OptimizeTurboController",
+                "center_x": {"x1": 0.5, "x2": 5.0},
+                "length": 0.4,
+            },
+        )
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.3, 3.0], [0.7, 7.0]]).to(bounds))
