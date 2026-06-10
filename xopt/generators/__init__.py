@@ -61,13 +61,13 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
             from xopt.generators.sequential.neldermead import NelderMeadGenerator
 
-            registered_generators = [
+            registered_generators: list[type[Generator]] = [
                 NelderMeadGenerator,
                 LatinHypercubeGenerator,
             ]
 
-            for gen in registered_generators:
-                generators[gen.name] = gen
+            for gen_type in registered_generators:
+                generators[gen_type.name] = gen_type
             return generators[name]
         except ModuleNotFoundError:
             warnings.warn(
@@ -87,7 +87,7 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             UpperConfidenceBoundGenerator,
         )
 
-        registered_generators: list[type[Generator]] = [
+        registered_generators = [
             UpperConfidenceBoundGenerator,
             MOBOGenerator,
             BayesianExplorationGenerator,

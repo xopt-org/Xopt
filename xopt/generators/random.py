@@ -1,3 +1,4 @@
+from typing import Any, Hashable
 from xopt.generator import Generator
 
 
@@ -12,6 +13,6 @@ class RandomGenerator(Generator):
     supports_single_objective: bool = True
     supports_constraints: bool = True
 
-    def generate(self, n_candidates) -> list[dict]:
+    def generate(self, n_candidates: int | None = None) -> list[dict[Hashable, Any]]:
         """generate uniform random data points"""
         return self.vocs.random_inputs(n_candidates, include_constants=False)

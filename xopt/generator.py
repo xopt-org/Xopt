@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Hashable, Optional
+from typing import Any, ClassVar, Hashable, Optional, cast
 
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
@@ -74,16 +74,16 @@ class Generator(XoptBaseModel, ABC):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    def __init__(self, **kwargs: Any):
-        """
-        Initialize the generator.
-        """
-        super().__init__(**kwargs)
-        logger.info(f"Initialized generator {self.name}")
+    # def __init__(self, **kwargs: Any):
+    #     """
+    #     Initialize the generator.
+    #     """
+    #     super().__init__(**kwargs)
+    #     logger.info(f"Initialized generator {self.name}")
 
     @field_validator("vocs", mode="after")
     @classmethod
-    def validate_vocs(cls, value: VOCS, info: ValidationInfo):
+    def validate_vocs(cls, value: VOCS, info: ValidationInfo) -> VOCS:
         if value.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
         if value.n_objectives == 1:
@@ -100,19 +100,23 @@ class Generator(XoptBaseModel, ABC):
 
     @field_validator("data", mode="before")
     @classmethod
-    def validate_data(cls, value: Any):
+    def validate_data(cls, value: Any) -> Optional[pd.DataFrame]:
         if isinstance(value, dict):
+            value_dict = cast(dict[str, Any], value)
+
             try:
-                value = pd.DataFrame(value)
+                value = pd.DataFrame(value_dict)
             except IndexError:
-                value = pd.DataFrame(value, index=[0])
+                value = pd.DataFrame(value_dict, index=[0])
+            return value
+
         return value
 
     @abstractmethod
     def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
         raise NotImplementedError
 
-    def add_data(self, new_data: pd.DataFrame):
+    def add_data(self, new_data: pd.DataFrame) -> None:
         """
         update dataframe with results from new evaluations.
 

@@ -4,7 +4,7 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ from botorch.acquisition import (
     MCAcquisitionObjective,
 )
 from botorch.models.model import Model
-from botorch.sampling import get_sampler
+from botorch.sampling import MCSampler, get_sampler
 from pydantic import (
     Field,
     field_validator,
@@ -661,7 +661,7 @@ class BayesianGenerator(Generator, ABC):
         acq = acq.to(**self.tkwargs)
         return acq
 
-    def get_optimum(self):
+    def get_optimum(self) -> pd.DataFrame:
         """select the best point(s) given by the
         model using the Posterior mean"""
         if self.model is None:
@@ -696,7 +696,7 @@ class BayesianGenerator(Generator, ABC):
 
         return self._process_candidates(result)
 
-    def visualize_model(self, **kwargs: Any):
+    def visualize_model(self, **kwargs: Any) -> tuple[Any, Any]:
         """Display GP model predictions for the selected output(s).
 
         The GP models are displayed with respect to the named variables. If None are given, the list of variables in
@@ -746,7 +746,7 @@ class BayesianGenerator(Generator, ABC):
         the acquisition function"""
         return None
 
-    def _process_candidates(self, candidates: Tensor):
+    def _process_candidates(self, candidates: Tensor) -> pd.DataFrame:
         """process pytorch candidates from optimizing the acquisition function"""
         logger.debug(f"Best candidate from optimize {candidates}")
 
@@ -766,7 +766,7 @@ class BayesianGenerator(Generator, ABC):
 
         return results
 
-    def _get_sampler(self, model: Model):
+    def _get_sampler(self, model: Model) -> MCSampler:
         if self.data is None:
             raise XoptError("no data available to build sampler")
         input_data = self.get_input_data(self.data)
@@ -801,7 +801,9 @@ class BayesianGenerator(Generator, ABC):
 
         return objective.to(**self.tkwargs)
 
-    def _get_constraint_callables(self):
+    def _get_constraint_callables(
+        self,
+    ) -> Optional[list[Callable[[torch.Tensor], torch.Tensor]]]:
         """return constraint callable determined by vocs"""
         constraint_callables = create_constraint_callables(self.vocs)
         if len(constraint_callables) == 0:
@@ -842,7 +844,7 @@ class BayesianGenerator(Generator, ABC):
         return {"dtype": torch.double, "device": device}
 
     @property
-    def model_input_names(self):
+    def model_input_names(self) -> list[str]:
         """variable names corresponding to trained model"""
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
@@ -852,7 +854,7 @@ class BayesianGenerator(Generator, ABC):
         return variable_names
 
     @property
-    def _candidate_names(self):
+    def _candidate_names(self) -> list[str]:
         """variable names corresponding to generated candidates"""
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
@@ -869,7 +871,7 @@ class BayesianGenerator(Generator, ABC):
         """
         return torch.tensor(self.vocs.bounds)  # type: ignore
 
-    def _get_optimization_bounds(self):
+    def _get_optimization_bounds(self) -> torch.Tensor:
         """
         Get optimization bounds based on the union of several domains.
 
@@ -1000,7 +1002,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
 
     @field_validator("reference_point", mode="after")
     @classmethod
-    def validate_reference_point(cls, value: dict[str, float], info: ValidationInfo):
+    def validate_reference_point(
+        cls, value: dict[str, float], info: ValidationInfo
+    ) -> dict[str, float]:
         # set default reference point if not specified
         _vocs: VOCS | None = info.data.get("vocs", None)
         objective_names = _vocs.objective_names if _vocs is not None else []
@@ -1011,7 +1015,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         return value
 
     @property
-    def torch_reference_point(self):
+    def torch_reference_point(self) -> torch.Tensor:
         pt = []
         for name in self.vocs.objective_names:
             try:
@@ -1079,7 +1083,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             hv,
         )
 
-    def update_pareto_front_history(self):
+    def update_pareto_front_history(self) -> None:
         """
         Update the historical pareto front statistics in the generator.
 
@@ -1129,7 +1133,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                 ignore_index=False,
             )
 
-    def _get_scaled_data(self, data: pd.DataFrame):
+    def _get_scaled_data(
+        self, data: pd.DataFrame
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """get scaled input/objective data for use with botorch logic which assumes
         maximization for each objective"""
 
@@ -1144,6 +1150,6 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         return variable_data, objective_data * weights, weights
 
 
-def formatted_base_docstring():
+def formatted_base_docstring() -> str:
     doc = BayesianGenerator.__doc__ or ""
     return "\nBase Generator\n---------------\n" + doc
