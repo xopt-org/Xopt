@@ -68,6 +68,7 @@ from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
 from xopt.vocs import (
+    ContextualVariable,
     convert_numpy_to_inputs,
     extract_data,
     get_variable_bounds,
@@ -519,7 +520,7 @@ class BayesianGenerator(Generator, ABC):
 
 
         # get input bounds
-        variable_bounds = get_variable_bounds(self.vocs)
+        variable_bounds = self.get_model_input_bounds(data)
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -926,14 +927,23 @@ class BayesianGenerator(Generator, ABC):
         return self.vocs.output_names
 
     def get_model_input_bounds(self, data: pd.DataFrame) -> Dict[str, List[float]]:
-        """variable bounds corresponding to trained model"""
-        variable_bounds = deepcopy(
-            {
-                name: var.domain
-                for name, var in self.vocs.variables.items()
-                if not isinstance(var, ContextualVariable)
-            }
-        )
+        """
+        This will create a dictionary of variable bounds for the model input variables. It starts with the
+        bounds from vocs, and then updates them based on the turbo trust region, fixed features, and 
+        contextual variables if they are specified.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data in the form of a pandas DataFrame.
+
+        Returns
+        -------
+        variable_bounds : Dict[str, List[float]]
+            A dictionary containing the variable bounds for the model input variables.
+        
+        """
+        variable_bounds = deepcopy(get_variable_bounds(self.vocs))
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -954,6 +964,7 @@ class BayesianGenerator(Generator, ABC):
         if self.fixed_features is not None:
             # get bounds for each fixed_feature (vocs bounds take precedent)
             for key in self.fixed_features:
+                # if the fixed feature is not in the variable bounds, then we need to add it based on the data
                 if key not in variable_bounds:
                     if key not in data:
                         raise KeyError(

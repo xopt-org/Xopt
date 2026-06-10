@@ -199,6 +199,7 @@ def test_generate_input_mesh_mixed_discrete_shape_and_reference(vocs_mixed_discr
         vocs=vocs_mixed_discrete,
         variable_names=["x", "y"],
         reference_point={"w": 0.2},
+        data=None,
         n_grid=5,
         tkwargs={},
     )

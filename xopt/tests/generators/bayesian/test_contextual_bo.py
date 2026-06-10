@@ -45,14 +45,14 @@ class TestContextualBO:
 
         data = pd.DataFrame(initial_data)
         generator.add_data(data)
-
+    
         # check model input names
         assert generator.model_input_names == ["x1", "x2"]
         # check model output names
         assert generator.model_output_names == ["y"]
         # check model input bounds
         bounds = generator.get_model_input_bounds(data)
-        assert bounds["x1"] == [0, 1]
+        assert bounds["x1"] == (0.0, 1.0)
         assert np.allclose(bounds["x2"], [-0.05, 1.05])
 
         # check training the model

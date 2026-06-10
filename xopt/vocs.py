@@ -677,6 +677,8 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
                 values[:, None], allowed[None, :], rtol=0.0, atol=1e-12
             ).any(axis=1)
             bad_mask[:, idx] = ~is_allowed
+        elif isinstance(variable, ContextualVariable):
+            continue # don't validate contextual variables
         else:
             lb, ub = variable_bounds[name]
             bad_mask[:, idx] = np.logical_or(values < lb, values > ub)
@@ -707,7 +709,7 @@ def extract_data(vocs: VOCS, data: pd.DataFrame, return_raw=False, return_valid=
     return_raw : bool, optional
         If True, return untransformed objective data
     return_valid : bool, optional
-        If True, only return data that satisfies all of the contraint
+        If True, only return data that satisfies all of the constraint
         conditions.
 
     Returns

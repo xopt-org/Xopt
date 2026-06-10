@@ -1212,12 +1212,12 @@ def _generate_input_mesh(
             mesh_axes.append(torch.linspace(lower, upper, n_grid, dtype=torch.float64))
         elif isinstance(variable, DiscreteVariable):
             mesh_axes.append(
-                torch.tensor(_get_discrete_values(var), dtype=torch.float64)
+                torch.tensor(_get_discrete_values(variable), dtype=torch.float64)
             )
         else:
             mesh_axes.append(
                 torch.linspace(
-                    var.domain[0], var.domain[1], n_grid, dtype=torch.float64
+                    variable.domain[0], variable.domain[1], n_grid, dtype=torch.float64
                 )
             )
 
