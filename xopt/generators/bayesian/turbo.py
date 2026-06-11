@@ -23,7 +23,12 @@ if TYPE_CHECKING:
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
 from xopt.errors import FeasibilityError
-from xopt.vocs import get_feasibility_data, get_variable_data, get_objective_data
+from xopt.vocs import (
+    get_feasibility_data,
+    get_variable_bounds_array,
+    get_variable_data,
+    get_objective_data,
+)
 
 logger = logging.getLogger()
 
@@ -213,7 +218,7 @@ class TurboController(XoptBaseModel, ABC):
 
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds, dtype=torch.double).T
+        bounds = torch.tensor(get_variable_bounds_array(self.vocs), dtype=torch.double)
 
         if self.center_x is not None:
             # get bounds width

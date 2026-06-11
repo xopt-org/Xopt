@@ -147,6 +147,7 @@ def get_generator_defaults(
             "supports_multi_objective",
             "supports_single_objective",
             "supports_constraints",
+            "supports_discrete_variables",
         ]:
             continue
 

@@ -1,8 +1,10 @@
 import logging
+from math import prod
 import os
 import time
 import warnings
 from abc import ABC, abstractmethod
+from itertools import islice, product
 from typing import Any, Dict, List, Optional, Union, cast
 
 import numpy as np
@@ -15,7 +17,7 @@ from botorch.acquisition import (
     MCAcquisitionObjective,
 )
 from botorch.models.model import Model
-from botorch.sampling import get_sampler
+from botorch.sampling.get_sampler import get_sampler
 from gpytorch import Module
 from pydantic import (
     Field,
@@ -28,7 +30,7 @@ from pydantic.fields import PrivateAttr, ModelPrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from gest_api.vocs import MinimizeObjective, MaximizeObjective
+from gest_api.vocs import DiscreteVariable, MinimizeObjective, MaximizeObjective
 
 from xopt.errors import VOCSError, XoptError, FeasibilityError
 from xopt.generator import Generator
@@ -64,7 +66,13 @@ from xopt.generators.bayesian.utils import (
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
-from xopt.vocs import convert_numpy_to_inputs, extract_data
+from xopt.vocs import (
+    convert_numpy_to_inputs,
+    extract_data,
+    get_variable_bounds,
+    get_variable_bounds_array,
+    has_discrete_variables,
+)
 
 
 logger = logging.getLogger()
@@ -145,6 +153,7 @@ class BayesianGenerator(Generator, ABC):
     """
 
     name = "base_bayesian_generator"
+    supports_discrete_variables: bool = True
     model: Optional[Model] = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
@@ -192,6 +201,9 @@ class BayesianGenerator(Generator, ABC):
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
+
+        if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
+            raise VOCSError("this generator does not support discrete variables")
 
         # assertion that at least one objective exists is done in model_validator below
 
@@ -336,6 +348,12 @@ class BayesianGenerator(Generator, ABC):
         # validate turbo controller center if it exists
         validate_turbo_controller_center(self)
 
+        # cannot have both a discrete variable and n_interpolate_points
+        if has_discrete_variables(self.vocs) and self.n_interpolate_points is not None:
+            raise ValueError(
+                "cannot have both discrete variables and n_interpolate_points"
+            )
+
         # check to make sure that either multiple objectives exist or custom objective is set
         if self.vocs.n_objectives == 0 and self.custom_objective is None:
             raise VOCSError(
@@ -437,6 +455,11 @@ class BayesianGenerator(Generator, ABC):
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
 
             if self.n_interpolate_points is not None:
+                if has_discrete_variables(self.vocs):
+                    raise RuntimeError(
+                        "cannot generate interpolated points for discrete variables"
+                    )
+
                 if self.n_candidates > 1:
                     raise RuntimeError(
                         "cannot generate interpolated points for "
@@ -495,9 +518,7 @@ class BayesianGenerator(Generator, ABC):
             raise ValueError("no data available to build model")
 
         # get input bounds
-        variable_bounds = {
-            name: ele.domain for name, ele in self.vocs.variables.items()
-        }
+        variable_bounds = get_variable_bounds(self.vocs)
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
@@ -574,14 +595,25 @@ class BayesianGenerator(Generator, ABC):
         # get initial candidates to start acquisition function optimization
         initial_points = self._get_initial_conditions(n_candidates)
 
+        optimization_kwargs = self._get_discrete_optimization_kwargs()
+
         # get candidates -- grid optimizer does not support batch_initial_conditions
         if isinstance(self.numerical_optimizer, GridOptimizer):
+            if optimization_kwargs:
+                raise ValueError(
+                    "grid optimizer does not support discrete variable optimization; "
+                    "use LBFGS optimizer"
+                )
             candidates = self.numerical_optimizer.optimize(
                 acq_funct, bounds, n_candidates
             )
         else:
             candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
+                acq_funct,
+                bounds,
+                n_candidates,
+                batch_initial_conditions=initial_points,
+                **optimization_kwargs,
             )
         return candidates
 
@@ -698,7 +730,7 @@ class BayesianGenerator(Generator, ABC):
                 self._get_constraint_callables(),
                 sampler=self._get_sampler(self.model),
             )
-        bounds = self._get_bounds()
+        bounds = self._get_torch_bounds()
 
         if self.fixed_features is not None:
             acq = self._apply_fixed_features(acq)
@@ -714,7 +746,16 @@ class BayesianGenerator(Generator, ABC):
         acq = acq.to(**self.tkwargs)
 
         # use default initial conditions for a global search
-        result = self.numerical_optimizer.optimize(acq, bounds, 1)
+        optimization_kwargs = self._get_discrete_optimization_kwargs()
+        if isinstance(self.numerical_optimizer, GridOptimizer) and optimization_kwargs:
+            raise ValueError(
+                "grid optimizer does not support discrete variable optimization; "
+                "use LBFGS optimizer"
+            )
+
+        result = self.numerical_optimizer.optimize(
+            acq, bounds, 1, **optimization_kwargs
+        )
 
         return self._process_candidates(result)
 
@@ -771,6 +812,7 @@ class BayesianGenerator(Generator, ABC):
     def _process_candidates(self, candidates: Tensor):
         """process pytorch candidates from optimizing the acquisition function"""
         logger.debug(f"Best candidate from optimize {candidates}")
+        candidates = self._snap_discrete_candidates(candidates)
 
         if self.fixed_features is not None:
             results = pd.DataFrame(
@@ -783,6 +825,8 @@ class BayesianGenerator(Generator, ABC):
             results = convert_numpy_to_inputs(
                 self.vocs, candidates.detach().cpu().numpy(), include_constants=False
             )
+
+        self._validate_discrete_outputs(results)
 
         return results
 
@@ -871,7 +915,10 @@ class BayesianGenerator(Generator, ABC):
 
     @property
     def _candidate_names(self):
-        """variable names corresponding to generated candidates"""
+        """
+        variable names corresponding to candidates
+        generated by optimizing the acquisition function
+        """
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
             for name in self.fixed_features:
@@ -879,13 +926,91 @@ class BayesianGenerator(Generator, ABC):
                     variable_names.remove(name)
         return variable_names
 
-    def _get_bounds(self) -> torch.Tensor:
+    def _get_torch_bounds(self) -> torch.Tensor:
         """
-        Convert bounds from vocs to torch tensors of shape 2 x d.
+        Convert bounds from vocs `get_variable_bounds` to torch tensors of shape 2 x d.
 
-        Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds, dtype=torch.double).T
+        bounds = get_variable_bounds_array(self.vocs)
+        return torch.tensor(bounds, dtype=torch.double)
+
+    def _get_active_discrete_variable_values(self) -> dict[int, list[float]]:
+        """Get the possible values of the discrete variables from vocs."""
+        discrete_values: dict[int, list[float]] = {}
+        for idx, name in enumerate(self._candidate_names):
+            variable = self.vocs.variables[name]
+            if isinstance(variable, DiscreteVariable):
+                discrete_values[idx] = sorted(float(v) for v in variable.values)
+        return discrete_values
+
+    def _get_discrete_optimization_kwargs(self) -> dict[str, Any]:
+        """
+        If there are discrete variables, get the optimization kwargs
+        needed to optimize over those variables. If there are no discrete variables,
+        return an empty dict.
+        """
+        discrete_values = self._get_active_discrete_variable_values()
+        if not discrete_values:
+            return {}
+
+        discrete_indices = sorted(discrete_values)
+        value_lists = [discrete_values[idx] for idx in discrete_indices]
+        total_configurations = prod(len(values) for values in value_lists)
+
+        max_configs = None
+        if isinstance(self.numerical_optimizer, LBFGSOptimizer):
+            max_configs = self.numerical_optimizer.mixed_max_discrete_configurations
+            if total_configurations > max_configs:
+                logger.warning(
+                    "truncating discrete configuration count from %d to %d",
+                    total_configurations,
+                    max_configs,
+                )
+
+        combinations = product(*value_lists)
+        if max_configs is not None:
+            combinations = islice(combinations, max_configs)
+
+        # all candidates are discrete
+        if len(discrete_indices) == len(self._candidate_names):
+            choices = torch.tensor(list(combinations), **self.tkwargs)
+            return {"discrete_choices": choices}
+
+        fixed_features_list = [
+            {dim: value for dim, value in zip(discrete_indices, discrete_configuration)}
+            for discrete_configuration in combinations
+        ]
+        return {"fixed_features_list": fixed_features_list}
+
+    def _snap_discrete_candidates(self, candidates: Tensor) -> Tensor:
+        """Snap candidate values to nearest discrete variable values if discrete variables are present."""
+        discrete_values = self._get_active_discrete_variable_values()
+        if not discrete_values:
+            return candidates
+
+        candidates = candidates.clone()
+        for idx, values in discrete_values.items():
+            allowed = torch.tensor(
+                values, device=candidates.device, dtype=candidates.dtype
+            )
+            distances = torch.abs(candidates[..., idx].unsqueeze(-1) - allowed)
+            nearest_idx = torch.argmin(distances, dim=-1)
+            candidates[..., idx] = allowed[nearest_idx]
+        return candidates
+
+    def _validate_discrete_outputs(self, results: pd.DataFrame) -> None:
+        for name in self.vocs.variable_names:
+            variable = self.vocs.variables[name]
+            if not isinstance(variable, DiscreteVariable):
+                continue
+
+            allowed_values = set(float(v) for v in variable.values)
+            candidate_values = results[name].astype(float).tolist()
+            if any(value not in allowed_values for value in candidate_values):
+                raise ValueError(
+                    f"candidate values for discrete variable '{name}' are not members "
+                    "of the configured discrete set"
+                )
 
     def _get_optimization_bounds(self):
         """
@@ -908,7 +1033,7 @@ class BayesianGenerator(Generator, ABC):
             the bounds associated with those features are removed.
 
         """
-        bounds = self._get_bounds()
+        bounds = self._get_torch_bounds()
 
         # if specified modify bounds to limit maximum travel distances
         if self.max_travel_distances is not None:
@@ -983,7 +1108,7 @@ class BayesianGenerator(Generator, ABC):
         last_point = self.data[self.vocs.variable_names].iloc[-1].to_numpy()
 
         # bound lengths based on vocs for normalization
-        vocs_bounds = np.array(self.vocs.bounds).T
+        vocs_bounds = get_variable_bounds_array(self.vocs)
         lengths = vocs_bounds[1, :] - vocs_bounds[0, :]
 
         # get maximum travel distances
