@@ -1,7 +1,7 @@
+import importlib
 import logging
 import pickle
-from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from botorch.models import ModelListGP, SingleTaskGP
 from pydantic import (
@@ -53,11 +53,13 @@ class BaxGenerator(BayesianGenerator):
 
     name = "BAX"
     supports_constraints: bool = True
-    algorithm: SerializeAsAny[Algorithm] = Field(description="algorithm evaluated in the BAX process")
-    algorithm_results: Dict = Field(
+    algorithm: SerializeAsAny[Algorithm] = Field(
+        description="algorithm evaluated in the BAX process"
+    )
+    algorithm_results: Optional[Dict] = Field(
         None, description="dictionary results from algorithm", exclude=True
     )
-    algorithm_results_file: str = Field(
+    algorithm_results_file: Optional[str] = Field(
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0
@@ -81,13 +83,14 @@ class BaxGenerator(BayesianGenerator):
 
         return self
 
-    # @field_validator(mode="before")
-    # def validate_algorithm(cls, v, info: ValidationInfo):
-    #     if isinstance(v, dict):
-    #         name = v.pop("name")
-    #         algorithm_class = 
-    #         data["algorithm"] = algorithm_class.model_validate(data["algorithm"])
-    #     return data
+    @field_validator("algorithm", mode="before")
+    def validate_algorithm(cls, v, info: ValidationInfo):
+        if isinstance(v, dict):
+            name = v.pop("class_name")
+            module = v.pop("module_name")
+            algorithm_class = getattr(importlib.import_module(module), name)
+            v = algorithm_class.model_validate(v)
+        return v
 
     def generate(self, n_candidates: int) -> List[Dict]:
         """
@@ -139,6 +142,8 @@ class BaxGenerator(BayesianGenerator):
             with open(
                 f"{self.algorithm_results_file}_{self._n_calls}.pkl", "wb"
             ) as outfile:
-                pickle.dump(self.algorithm_results, outfile, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(
+                    self.algorithm_results, outfile, protocol=pickle.HIGHEST_PROTOCOL
+                )
 
         return eig

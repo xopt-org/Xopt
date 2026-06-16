@@ -373,6 +373,23 @@ class TestBaxGenerator:
         assert torch.all(result[:, 0] == 0)
         assert torch.all(result[:, -1] == 0)
 
+    def test_bax_serialization(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        alg = GridOptimize()
+        gen = BaxGenerator(vocs=test_vocs, algorithm=alg, n_monte_carlo_samples=10)
+        gen.numerical_optimizer.n_restarts = 1
+
+        serialized_gen = gen.model_dump()
+        deserialized_gen = BaxGenerator.model_validate(serialized_gen)
+        assert isinstance(deserialized_gen, BaxGenerator)
+        assert deserialized_gen.algorithm.n_samples == gen.algorithm.n_samples
+        assert deserialized_gen.algorithm.class_name == gen.algorithm.class_name
+
+        deserialized_gen.add_data(TEST_VOCS_DATA)
+        deserialized_gen.generate(1)
+
     def test_visualization(self):
         evaluator = Evaluator(function=xtest_callable)
         alg = GridOptimize()
