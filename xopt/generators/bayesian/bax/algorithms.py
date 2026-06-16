@@ -15,7 +15,7 @@ class Algorithm(XoptBaseModel, ABC):
 
     Attributes
     ----------
-    name : str
+    name : ClassVar[str]
         The name of the algorithm.
     n_samples : PositiveInt
         Number of execution paths to generate.

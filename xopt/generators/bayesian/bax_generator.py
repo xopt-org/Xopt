@@ -14,7 +14,7 @@ from pydantic import (
 
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
-from xopt.generators.bayesian.bax.algorithms import Algorithm
+from xopt.generators.bayesian.bax.algorithms import Algorithm, GridOptimize
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
 from xopt.generators.bayesian.utils import validate_turbo_controller_center
@@ -53,6 +53,7 @@ class BaxGenerator(BayesianGenerator):
 
     name = "BAX"
     supports_constraints: bool = True
+    supports_discrete_variables: bool = False
     algorithm: SerializeAsAny[Algorithm] = Field(
         description="algorithm evaluated in the BAX process"
     )
@@ -64,6 +65,9 @@ class BaxGenerator(BayesianGenerator):
     )
     _n_calls: int = 0
     _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
+
+    # NOTE: this is meant for use in Badger, TODO: add it to Xopt
+    _compatible_algorithms = [GridOptimize]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
