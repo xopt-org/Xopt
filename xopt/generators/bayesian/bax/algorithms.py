@@ -1,12 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Tuple
+from typing import Any, TypedDict
 
+import numpy as np
 import torch
 from botorch.models.model import Model, ModelList
+from numpy.typing import NDArray
 from pydantic import Field, PositiveInt, computed_field
 from torch import Tensor
-
 from xopt.pydantic import XoptBaseModel
+
+
+class ExecutionPathsResult(TypedDict):
+    test_points: Tensor
+    posterior_samples: Tensor
+    execution_paths: Tensor
+    solution_center: NDArray[np.floating]
+    solution_entropy: float
 
 
 class Algorithm(XoptBaseModel, ABC):
@@ -15,7 +24,7 @@ class Algorithm(XoptBaseModel, ABC):
 
     Attributes
     ----------
-    name : ClassVar[str]
+    name : str
         The name of the algorithm.
     n_samples : PositiveInt
         Number of execution paths to generate.
@@ -28,20 +37,20 @@ class Algorithm(XoptBaseModel, ABC):
         Evaluate the virtual objective at the given inputs.
     """
 
-    name: ClassVar[str] = "base_algorithm"
+    name: str = Field(default="base_algorithm", frozen=True)
     n_samples: PositiveInt = Field(
         default=20, description="number of execution paths to generate"
     )
 
-    @computed_field
     @property
+    @computed_field
     def class_path(self) -> str:
         return f"{self.__class__.__module__}.{self.__class__.__name__}"
 
     @abstractmethod
     def get_execution_paths(
         self, model: Model, bounds: Tensor
-    ) -> Tuple[Tensor, Tensor, Dict]:
+    ) -> tuple[Tensor, Tensor, ExecutionPathsResult]:
         """
         Get execution paths for the algorithm.
 
@@ -54,7 +63,7 @@ class Algorithm(XoptBaseModel, ABC):
 
         Returns
         -------
-        Tuple[Tensor, Tensor, Dict]
+        tuple[Tensor, Tensor, ExecutionPathsResult]
             The execution paths, their corresponding values, and additional results.
         """
         pass
@@ -66,7 +75,7 @@ class Algorithm(XoptBaseModel, ABC):
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
-        tkwargs: dict = None,
+        tkwargs: dict[str, Any] | None = None,
     ) -> Tensor:
         """
         Evaluate the virtual objective at the given inputs.
@@ -81,7 +90,7 @@ class Algorithm(XoptBaseModel, ABC):
             The bounds for the optimization.
         n_samples : int
             The number of samples to generate.
-        tkwargs : dict, optional
+        tkwargs : dict[str, Any], optional
             Additional keyword arguments for the evaluation.
 
         Returns
@@ -109,7 +118,7 @@ class GridScanAlgorithm(Algorithm, ABC):
         Create a mesh for evaluating posteriors on.
     """
 
-    name = "grid_scan_algorithm"
+    name: str = Field(default="grid_scan", frozen=True)
     n_mesh_points: PositiveInt = Field(
         default=10, description="number of mesh points along each axis"
     )
@@ -161,13 +170,14 @@ class GridOptimize(GridScanAlgorithm):
 
     Methods
     -------
-    get_execution_paths(self, model: Model, bounds: Tensor) -> Tuple[Tensor, Tensor, Dict]
+    get_execution_paths(self, model: Model, bounds: Tensor) -> tuple[Tensor, Tensor, ExecutionPathsResult]
         Get execution paths that minimize the objective function.
-    evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
+    evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict[str, Any] | None = None) -> Tensor
         Evaluate the virtual objective (samples).
     """
 
-    observable_names_ordered: List[str] = Field(
+    name: str = Field(default="grid_optimize", frozen=True)
+    observable_names_ordered: list[str] = Field(
         default=["y1"],
         description="names of observable/objective models used in this algorithm",
     )
@@ -175,7 +185,7 @@ class GridOptimize(GridScanAlgorithm):
 
     def get_execution_paths(
         self, model: Model, bounds: Tensor
-    ) -> Tuple[Tensor, Tensor, Dict]:
+    ) -> tuple[Tensor, Tensor, ExecutionPathsResult]:
         """
         Get execution paths that minimize the objective function.
 
@@ -188,11 +198,11 @@ class GridOptimize(GridScanAlgorithm):
 
         Returns
         -------
-        Tuple[Tensor, Tensor, Dict]
+        tuple[Tensor, Tensor, ExecutionPathsResult]
             The execution paths, their corresponding values, and additional results.
         """
         # build evaluation mesh
-        test_points = self.create_mesh(bounds)
+        test_points: Tensor = self.create_mesh(bounds)
         if isinstance(model, ModelList):
             test_points = test_points.to(model.models[0].train_targets)
         else:
@@ -218,13 +228,13 @@ class GridOptimize(GridScanAlgorithm):
         solution_entropy = float(torch.log(x_opt.std(dim=0) ** 2).sum())
 
         # collect secondary results in a dict
-        results_dict = {
-            "test_points": test_points,
-            "posterior_samples": posterior_samples,
-            "execution_paths": torch.hstack((x_opt, y_opt)),
-            "solution_center": solution_center,
-            "solution_entropy": solution_entropy,
-        }
+        results_dict = ExecutionPathsResult(
+            test_points=test_points,
+            posterior_samples=posterior_samples,
+            execution_paths=torch.hstack((x_opt, y_opt)),
+            solution_center=solution_center,
+            solution_entropy=solution_entropy,
+        )
 
         # return execution paths
         return x_opt.unsqueeze(-2), y_opt.unsqueeze(-2), results_dict
@@ -235,7 +245,7 @@ class GridOptimize(GridScanAlgorithm):
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
-        tkwargs: dict = None,
+        tkwargs: dict[str, Any] | None = None,
     ) -> Tensor:
         """
         Evaluate the virtual objective (samples).
@@ -289,7 +299,7 @@ class CurvatureGridOptimize(GridOptimize):
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
-        tkwargs: dict = None,
+        tkwargs: dict[str, Any] | None = None,
     ) -> Tensor:
         """
         Evaluate the virtual objective (samples) with curvature.

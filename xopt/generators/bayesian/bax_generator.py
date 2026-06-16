@@ -1,10 +1,11 @@
-from copy import deepcopy
 import importlib
 import logging
 import pickle
-from typing import Dict, List, Optional
+from copy import deepcopy
+from typing import Any, Hashable, Optional, cast
 
 from botorch.models import ModelListGP, SingleTaskGP
+from gpytorch import Module
 from pydantic import (
     Field,
     SerializeAsAny,
@@ -12,13 +13,18 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-
+from pydantic.fields import ModelPrivateAttr, PrivateAttr
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm, GridOptimize
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
-from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
+from xopt.generators.bayesian.turbo import (
+    EntropyTurboController,
+    SafetyTurboController,
+    TurboController,
+)
 from xopt.generators.bayesian.utils import validate_turbo_controller_center
+from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 
@@ -54,26 +60,30 @@ class BaxGenerator(BayesianGenerator):
 
     name = "bax"
     supports_constraints: bool = True
+
     supports_discrete_variables: bool = False
     algorithm: SerializeAsAny[Algorithm] = Field(
-        description="algorithm evaluated in the BAX process"
+        default=GridOptimize(), description="algorithm evaluated in the BAX process"
     )
-    algorithm_results: Optional[Dict] = Field(
+    algorithm_results: Optional[dict] = Field(
         None, description="dictionary results from algorithm", exclude=True
     )
     algorithm_results_file: Optional[str] = Field(
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0
-    _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
+    _compatible_turbo_controllers: list[type[TurboController]] = PrivateAttr(
+        default=[EntropyTurboController, SafetyTurboController]
+    )
 
     # NOTE: this is meant for use in Badger, TODO: add it to Xopt
-    _compatible_algorithms = [GridOptimize]
+    _compatible_algorithms: list[type[Algorithm]] = PrivateAttr(default=[GridOptimize])
 
     @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info: ValidationInfo):
+    @classmethod
+    def validate_vocs(cls, v: VOCS, info: ValidationInfo) -> VOCS:
         # Preserve inherited Bayesian VOCS validation behavior.
-        v = super().validate_vocs(v, info)
+        # v = super().validate_vocs(v, info)
 
         # assert that the generator had no objectives
         if not v.n_objectives == 0:
@@ -81,15 +91,9 @@ class BaxGenerator(BayesianGenerator):
 
         return v
 
-    @model_validator(mode="after")
-    def validate_model_after(self):
-        # validate turbo controller center if it exists
-        validate_turbo_controller_center(self)
-
-        return self
-
     @field_validator("algorithm", mode="before")
-    def validate_algorithm(cls, v, info: ValidationInfo):
+    @classmethod
+    def validate_algorithm(cls, v: Any, info: ValidationInfo) -> Any:
         if isinstance(v, dict):
             try:
                 class_path = v.pop("class_path")
@@ -108,7 +112,22 @@ class BaxGenerator(BayesianGenerator):
 
         return v
 
-    def generate(self, n_candidates: int) -> List[Dict]:
+    @model_validator(mode="after")
+    def validate_model_after(self) -> "BaxGenerator":
+        # validate turbo controller center if it exists
+        validate_turbo_controller_center(self)
+
+        return self
+
+    @classmethod
+    def get_compatible_algorithms(cls) -> list[type[Algorithm]]:
+        compatible = cls._compatible_algorithms
+        compatible_list: list[type[Algorithm]] = []
+        if isinstance(compatible, ModelPrivateAttr):
+            compatible_list = cast(list[type[Algorithm]], compatible.get_default())
+        return compatible_list
+
+    def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
         """
         Generate a specified number of candidate samples.
 
@@ -119,19 +138,19 @@ class BaxGenerator(BayesianGenerator):
 
         Returns
         -------
-        List[Dict]
+        list[dict[Hashable, Any]]
             A list of dictionaries containing the generated samples.
         """
         self._n_calls += 1
         return super().generate(n_candidates)
 
-    def _get_acquisition(self, model) -> ModelListExpectedInformationGain:
+    def _get_acquisition(self, model: Module) -> ModelListExpectedInformationGain:
         """
         Get the acquisition function.
 
         Parameters
         ----------
-        model : Model
+        model : Module
             The model to use for the acquisition function.
 
         Returns
