@@ -10,6 +10,7 @@ from xopt.generators import (
     get_generator_defaults,
     list_available_generators,
 )
+from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.resources.testing import TEST_VOCS_BASE
 from gest_api.vocs import VOCS
 
@@ -93,6 +94,14 @@ class TestGenerator:
         elif name in ["bayesian_exploration", "latin_hypercube"]:
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.objectives = {"f": "EXPLORE"}
+            json.dumps(gen_config)
+
+            gen_class(vocs=test_vocs, **gen_config)
+        elif name in ["bax"]:
+            test_vocs = deepcopy(TEST_VOCS_BASE)
+            test_vocs.objectives = {}
+            test_vocs.observables = ["y1"]
+            gen_config["algorithm"] = GridOptimize().model_dump()
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)

@@ -28,6 +28,10 @@ class PatchBAXGeneratorNoConstraints(BaxGenerator):
     supports_constraints: bool = False
 
 
+class PatchBAXGeneratorSupportsSingleObjective(BaxGenerator):
+    supports_single_objective: bool = True
+
+
 class TestBaxGenerator:
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_init(self):
@@ -331,6 +335,43 @@ class TestBaxGenerator:
         with pytest.raises(VOCSError):
             BaxGenerator(vocs=test_vocs, algorithm=alg)
 
+    def test_vocs_validation_rejects_single_objective(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {"y1": "MINIMIZE"}
+        test_vocs.observables = []
+        test_vocs.constraints = {}
+        alg = GridOptimize()
+
+        with pytest.raises(
+            VOCSError, match="only supports problems with no objectives"
+        ):
+            PatchBAXGeneratorSupportsSingleObjective(vocs=test_vocs, algorithm=alg)
+
+    def test_algorithm_validation_requires_class_path(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        test_vocs.constraints = {}
+
+        with pytest.raises(
+            ValueError, match="Algorithm dictionary must contain 'class_path' key"
+        ):
+            BaxGenerator(vocs=test_vocs, algorithm={"n_samples": 4})
+
+    def test_algorithm_validation_rejects_unknown_module(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        test_vocs.constraints = {}
+
+        with pytest.raises(
+            ValueError, match="Cannot import 'fake.module.GridOptimize'"
+        ):
+            BaxGenerator(
+                vocs=test_vocs,
+                algorithm={"class_path": "fake.module.GridOptimize", "n_samples": 4},
+            )
+
     def test_curvature_grid_optimize_virtual_objective(self):
         ndim = 2
         bounds = torch.stack([torch.zeros(ndim), torch.ones(ndim)])
@@ -372,6 +413,23 @@ class TestBaxGenerator:
         # Edge values should be zero
         assert torch.all(result[:, 0] == 0)
         assert torch.all(result[:, -1] == 0)
+
+    def test_bax_serialization(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        alg = GridOptimize()
+        gen = BaxGenerator(vocs=test_vocs, algorithm=alg, n_monte_carlo_samples=10)
+        gen.numerical_optimizer.n_restarts = 1
+
+        serialized_gen = gen.model_dump()
+        deserialized_gen = BaxGenerator.model_validate(serialized_gen)
+        assert isinstance(deserialized_gen, BaxGenerator)
+        assert deserialized_gen.algorithm.n_samples == gen.algorithm.n_samples
+        assert deserialized_gen.algorithm.class_path == gen.algorithm.class_path
+
+        deserialized_gen.add_data(TEST_VOCS_DATA)
+        deserialized_gen.generate(1)
 
     def test_visualization(self):
         evaluator = Evaluator(function=xtest_callable)
