@@ -35,13 +35,8 @@ class Algorithm(XoptBaseModel, ABC):
 
     @computed_field
     @property
-    def class_name(self) -> str:
-        return self.__class__.__name__
-
-    @computed_field
-    @property
-    def module_name(self) -> str:
-        return self.__class__.__module__
+    def class_path(self) -> str:
+        return f"{self.__class__.__module__}.{self.__class__.__name__}"
 
     @abstractmethod
     def get_execution_paths(

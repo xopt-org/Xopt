@@ -385,7 +385,7 @@ class TestBaxGenerator:
         deserialized_gen = BaxGenerator.model_validate(serialized_gen)
         assert isinstance(deserialized_gen, BaxGenerator)
         assert deserialized_gen.algorithm.n_samples == gen.algorithm.n_samples
-        assert deserialized_gen.algorithm.class_name == gen.algorithm.class_name
+        assert deserialized_gen.algorithm.class_path == gen.algorithm.class_path
 
         deserialized_gen.add_data(TEST_VOCS_DATA)
         deserialized_gen.generate(1)

@@ -23,7 +23,7 @@ all_generator_names = {
         "time_dependent_upper_confidence_bound",
         "expected_improvement",
         "multi_fidelity",
-        "BAX",
+        "bax",
     },
     "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},

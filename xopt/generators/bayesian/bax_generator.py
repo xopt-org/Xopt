@@ -1,3 +1,4 @@
+from copy import deepcopy
 import importlib
 import logging
 import pickle
@@ -51,7 +52,7 @@ class BaxGenerator(BayesianGenerator):
         Get the acquisition function.
     """
 
-    name = "BAX"
+    name = "bax"
     supports_constraints: bool = True
     supports_discrete_variables: bool = False
     algorithm: SerializeAsAny[Algorithm] = Field(
@@ -90,10 +91,21 @@ class BaxGenerator(BayesianGenerator):
     @field_validator("algorithm", mode="before")
     def validate_algorithm(cls, v, info: ValidationInfo):
         if isinstance(v, dict):
-            name = v.pop("class_name")
-            module = v.pop("module_name")
-            algorithm_class = getattr(importlib.import_module(module), name)
+            try:
+                class_path = v.pop("class_path")
+                module_name, class_name = class_path.rsplit(".", 1)
+            except KeyError:
+                raise ValueError("Algorithm dictionary must contain 'class_path' key")
+
+            try:
+                algorithm_class = getattr(
+                    importlib.import_module(module_name), class_name
+                )
+            except ModuleNotFoundError:
+                raise ValueError(f"Cannot import '{module_name}.{class_name}'")
+
             v = algorithm_class.model_validate(v)
+
         return v
 
     def generate(self, n_candidates: int) -> List[Dict]:
@@ -141,13 +153,11 @@ class BaxGenerator(BayesianGenerator):
         )
         self.algorithm_results = eig.algorithm_results
         if self.algorithm_results_file is not None:
-            # results = deepcopy(self.algorithm_results)
+            results = deepcopy(self.algorithm_results)
 
             with open(
                 f"{self.algorithm_results_file}_{self._n_calls}.pkl", "wb"
             ) as outfile:
-                pickle.dump(
-                    self.algorithm_results, outfile, protocol=pickle.HIGHEST_PROTOCOL
-                )
+                pickle.dump(results, outfile, protocol=pickle.HIGHEST_PROTOCOL)
 
         return eig
