@@ -12,8 +12,10 @@ from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
+from botorch.optim.closures import get_loss_closure_with_grads
 from botorch.optim import ExpMAStoppingCriterion
 from botorch.optim.fit import fit_gpytorch_mll_scipy, fit_gpytorch_mll_torch
+from botorch.optim.utils import get_parameters
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
@@ -34,6 +36,37 @@ DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 # TODO: make custom stopping criterion that checks lengthscales
+
+
+def _get_non_degenerate_normalize_bounds(
+    input_names: list[str],
+    input_bounds: dict[str, list] | None,
+    tkwargs: dict | None = None,
+) -> torch.Tensor | None:
+    """Build bounds tensor for Normalize, expanding zero-width dimensions."""
+    if input_bounds is None:
+        return None
+
+    tensor_kwargs = tkwargs or {}
+    bounds = torch.vstack(
+        [torch.tensor(input_bounds[name], **tensor_kwargs) for name in input_names]
+    ).T
+
+    widths = bounds[1] - bounds[0]
+    zero_width_mask = torch.isclose(
+        widths,
+        torch.zeros_like(widths),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    if zero_width_mask.any():
+        # Singleton dimensions (e.g., one-value discrete sets) need finite width for Normalize.
+        bounds = bounds.clone()
+        centers = 0.5 * (bounds[0, zero_width_mask] + bounds[1, zero_width_mask])
+        bounds[0, zero_width_mask] = centers - 0.5
+        bounds[1, zero_width_mask] = centers + 0.5
+
+    return bounds
 
 
 class ExpMAStoppingCriterionModel(XoptBaseModel):
@@ -84,7 +117,8 @@ class StandardModelConstructor(ModelConstructor):
         Covariance modules for GP models.
 
     mean_modules : Dict[str, Module]
-        Prior mean modules for GP models.
+        Prior mean modules for GP models.A mean function should reduce a
+        (batch) x n x d-dimensional input into a (batch) x n dimensional output.
 
     trainable_mean_keys : List[str]
         List of prior mean modules that can be trained.
@@ -444,9 +478,39 @@ class StandardModelConstructor(ModelConstructor):
             )
             if "options" not in tr_kwargs["optimizer_kwargs"]:
                 tr_kwargs["optimizer_kwargs"]["options"] = {}
-            tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
-            tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
-            tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
+            options = tr_kwargs["optimizer_kwargs"]["options"]
+            options["maxiter"] = cfg_lbfgs.maxiter
+            options["gtol"] = cfg_lbfgs.gtol
+            options["ftol"] = cfg_lbfgs.ftol
+
+            batch_shape = getattr(model, "_aug_batch_shape", None)
+            if batch_shape is None:
+                batch_shape = getattr(model, "batch_shape", torch.Size())
+            is_batched = len(batch_shape) > 0
+            if is_batched:
+                # Batched scipy optimizer in newer botorch/scipy combinations can
+                # assert when both ftol and default factr are active.
+                options["factr"] = None
+
+            # Shared (non-batched) parameters in batched models are incompatible
+            # with botorch's independent scipy batching path. Use an explicit
+            # closure to preserve single-sum-loss behavior while keeping scipy.
+            has_unbatched_trainable_params = is_batched and any(
+                p.requires_grad
+                and (
+                    p.ndim < len(batch_shape)
+                    or tuple(p.shape[: len(batch_shape)]) != tuple(batch_shape)
+                )
+                for p in model.parameters()
+            )
+
+            if has_unbatched_trainable_params:
+                params = get_parameters(mll, requires_grad=True)
+                tr_kwargs["closure"] = get_loss_closure_with_grads(
+                    mll, parameters=params
+                )
+                tr_kwargs["optimizer_kwargs"].pop("closure", None)
+
             optimizer = fit_gpytorch_mll_scipy
 
         try:
@@ -528,12 +592,9 @@ class StandardModelConstructor(ModelConstructor):
 
         """
         # get input bounds
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(
+            input_names, input_bounds, tkwargs
+        )
 
         # create transform
         input_transform = Normalize(len(input_names), bounds=bounds)
@@ -583,12 +644,7 @@ class BatchedModelConstructor(StandardModelConstructor):
         input_bounds,
         batch_shape: torch.Size = torch.Size(),
     ) -> Optional[Normalize]:
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name]) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(input_names, input_bounds)
 
         input_transform = Normalize(
             len(input_names),

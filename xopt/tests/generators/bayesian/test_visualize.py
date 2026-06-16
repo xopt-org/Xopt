@@ -67,6 +67,28 @@ def data(vocs):
     )
 
 
+@pytest.fixture
+def vocs_mixed_discrete():
+    return VOCS(
+        variables={"x": [0, 1], "y": {0.0, 5.0, 10.0}, "w": [0, 1]},
+        objectives={"z": "MAXIMIZE"},
+        constraints={},
+        observables=["z"],
+    )
+
+
+@pytest.fixture
+def data_mixed_discrete(vocs_mixed_discrete):
+    return pd.DataFrame(
+        {
+            "x": [0.0, 0.5, 1.0, 0.25, 0.75],
+            "y": [0.0, 5.0, 10.0, 5.0, 0.0],
+            "w": [0.2, 0.2, 0.2, 0.2, 0.2],
+            "z": [0.0, 0.4, 0.8, 0.2, 0.6],
+        }
+    )
+
+
 @pytest.mark.parametrize("show_acquisition", [True, False])
 @pytest.mark.parametrize("variable_names", [["x"], ["x", "y"]])
 def test_visualize_model(vocs, data, variable_names, show_acquisition):
@@ -99,6 +121,51 @@ def test_visualize_model(vocs, data, variable_names, show_acquisition):
     )
 
 
+def test_visualize_model_reference_title_visibility(vocs, data):
+    generator = UpperConfidenceBoundGenerator(vocs=vocs)
+    generator.add_data(data)
+    generator.train_model()
+
+    fig, _ = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x"],
+        n_grid=5,
+        show_acquisition=False,
+    )
+    assert fig._suptitle is not None
+    assert fig._suptitle.get_text().startswith("Reference point:\n")
+
+    fig, ax = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x", "y"],
+        n_grid=5,
+        show_acquisition=False,
+    )
+    assert fig._suptitle is None
+
+    fig.suptitle("Temporary title")
+    fig, _ = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x", "y"],
+        n_grid=5,
+        show_acquisition=False,
+        axes=ax,
+    )
+    assert fig._suptitle is None
+
+
 def test_plot_model_prediction_1d(vocs, data):
     model = DummyModel()
     ax = visualize.plot_model_prediction(
@@ -125,6 +192,105 @@ def test_plot_model_prediction_2d(vocs, data):
         n_grid=5,
     )
     assert ax is not None
+
+
+def test_generate_input_mesh_mixed_discrete_shape_and_reference(vocs_mixed_discrete):
+    mesh = visualize._generate_input_mesh(
+        vocs=vocs_mixed_discrete,
+        variable_names=["x", "y"],
+        reference_point={"w": 0.2},
+        n_grid=5,
+        tkwargs={},
+    )
+    # Mixed mesh: 5 continuous points times 3 discrete choices.
+    assert mesh.shape == (15, 3)
+    assert np.allclose(mesh[:, 2].cpu().numpy(), 0.2)
+
+
+def test_plot_model_prediction_1d_discrete_ticks(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    model = DummyModel()
+    ax = visualize.plot_model_prediction(
+        model=model,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        output_name="z",
+        variable_names=["y"],
+        n_grid=5,
+    )
+    assert ax is not None
+    assert set(ax.get_xticks()) == {0.0, 5.0, 10.0}
+    assert np.allclose(ax.get_xticks(), [0.0, 5.0, 10.0])
+
+
+def test_plot_acquisition_function_1d_discrete_ticks(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    acq = DummyAcq()
+    ax = visualize.plot_acquisition_function(
+        acquisition_function=acq,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        variable_names=["y"],
+        n_grid=5,
+    )
+    assert ax is not None
+    assert set(ax.get_xticks()) == {0.0, 5.0, 10.0}
+    assert np.allclose(ax.get_xticks(), [0.0, 5.0, 10.0])
+
+
+def test_plot_acquisition_function_2d_mixed_discrete(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    acq = DummyAcq()
+    ax = visualize.plot_acquisition_function(
+        acquisition_function=acq,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        variable_names=["x", "y"],
+        n_grid=5,
+    )
+    assert ax is not None
+
+
+def test_visualize_model_with_fixed_variable_reference_point(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    model = DummyModel()
+    fig, ax = visualize.visualize_model(
+        model=model,
+        vocs=vocs_mixed_discrete,
+        data=data_mixed_discrete,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=["x", "y"],
+        reference_point={"w": 0.2},
+        show_acquisition=False,
+        n_grid=5,
+    )
+    assert fig is not None
+    assert ax is not None
+
+
+def test_visualize_model_requires_variable_selection_for_higher_dim(
+    vocs_mixed_discrete, data_mixed_discrete
+):
+    model = DummyModel()
+    with pytest.raises(ValueError):
+        visualize.visualize_model(
+            model=model,
+            vocs=vocs_mixed_discrete,
+            data=data_mixed_discrete,
+            tkwargs={},
+            output_names=["z"],
+            variable_names=None,
+            show_acquisition=False,
+            n_grid=5,
+        )
 
 
 def test_plot_acquisition_function_1d(vocs, data):
@@ -219,6 +385,120 @@ def test_validate_names(vocs):
 def test_get_reference_point(vocs, data):
     ref = visualize._get_reference_point(None, vocs, data)
     assert isinstance(ref, dict)
+    assert ref == {"x": 1.0, "y": 1.0}
+
+
+def test_get_reference_point_returns_explicit_reference(vocs, data):
+    explicit = {"x": 0.123, "y": 0.456}
+    ref = visualize._get_reference_point(explicit, vocs, data)
+    assert ref == explicit
+
+
+def test_get_reference_point_falls_back_to_idx_for_multi_objective():
+    vocs = VOCS(
+        variables={"x": [0, 1], "y": [0, 1]},
+        objectives={"obj1": "MAXIMIZE", "obj2": "MINIMIZE"},
+        constraints={},
+        observables=["obj1", "obj2"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": [0.1, 0.9],
+            "y": [0.2, 0.8],
+            "obj1": [1.0, 0.0],
+            "obj2": [1.0, 0.0],
+        }
+    )
+
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.1, "y": 0.2}
+
+
+def test_get_reference_point_falls_back_to_idx_for_explore_objective():
+    vocs = VOCS(
+        variables={"x": [0, 1], "y": [0, 1]},
+        objectives={"z": "EXPLORE"},
+        constraints={},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": [0.1, 0.9],
+            "y": [0.2, 0.8],
+            "z": [1.0, 0.0],
+        }
+    )
+
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.1, "y": 0.2}
+
+
+def test_get_reference_point_falls_back_to_idx_for_no_feasible_points():
+    vocs = VOCS(
+        variables={"x": [0, 1], "y": [0, 1]},
+        objectives={"z": "MAXIMIZE"},
+        constraints={"z": ["LESS_THAN", -10.0]},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": [0.2, 0.8],
+            "y": [0.3, 0.9],
+            "z": [0.1, 0.2],
+        }
+    )
+
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.2, "y": 0.3}
+
+
+def test_get_reference_point_falls_back_to_idx_for_runtime_error(
+    vocs, data, monkeypatch
+):
+    def raise_runtime_error(*args, **kwargs):
+        raise RuntimeError("synthetic select_best failure")
+
+    monkeypatch.setattr(visualize, "select_best", raise_runtime_error)
+    ref = visualize._get_reference_point(None, vocs, data, idx=0)
+    assert ref == {"x": 0.0, "y": 0.0}
+
+
+def test_format_reference_point_title_wraps_long_text():
+    reference_point = {
+        "SIOC:SYS1:ML00:AO551": 0.59,
+        "SIOC:SYS1:ML00:AO556": -1.2,
+        "SIOC:SYS1:ML00:AO501": 0.48,
+        "SIOC:SYS1:ML00:AO506": 0.42,
+    }
+    title = visualize._format_reference_point_title(
+        reference_point,
+        list(reference_point.keys()),
+        max_line_length=45,
+    )
+
+    assert title.startswith("Reference point:\n")
+    assert title.count("\n") > 1
+
+
+def test_format_reference_point_title_empty_without_names():
+    title = visualize._format_reference_point_title({}, [])
+    assert title == "Reference point"
+
+
+def test_format_reference_point_title_handles_empty_wrap_result(monkeypatch):
+    reference_point = {"x": 0.25}
+
+    def empty_wrap(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(visualize.textwrap, "wrap", empty_wrap)
+    title = visualize._format_reference_point_title(
+        reference_point,
+        ["x"],
+        max_line_length=1,
+    )
+    assert title.startswith("Reference point:\n")
+    assert "x: 0.25" in title
 
 
 def test_verify_axes():

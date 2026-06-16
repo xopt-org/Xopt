@@ -24,11 +24,10 @@ jobs:
           pip install
           build
           --user
-      - name: Build a source tarball
+      - name: Build a source tarball and wheel
         run: >-
           python -m
           build
-          --sdist
           --outdir dist/
           .
       - name: Publish distribution to PyPI

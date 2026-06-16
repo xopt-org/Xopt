@@ -45,6 +45,8 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     """
 
     name = "time_dependent_bayesian_generator"
+    supports_single_objective: bool = True
+    supports_constraints: bool = True
     target_prediction_time: Optional[PositiveFloat] = Field(None)
     added_time: PositiveFloat = Field(
         0.1,
@@ -61,6 +63,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
+        v = super().validate_vocs(v, info)
         if v.n_objectives != 1:
             raise ValueError("this generator only supports vocs with 1 objective")
         return v
