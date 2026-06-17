@@ -242,13 +242,6 @@ class BayesianGenerator(Generator, ABC):
     @classmethod
     def validate_torch_modules(cls, value: Any) -> Any:
         if isinstance(value, str):
-            null_options = [
-                "",
-                "none",
-                "null",
-            ]
-            if value.lower() in null_options:
-                return None
             if value.startswith("base64:"):
                 value = decode_torch_module(value)
             elif os.path.exists(value):

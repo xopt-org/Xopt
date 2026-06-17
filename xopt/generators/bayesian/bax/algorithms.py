@@ -42,8 +42,8 @@ class Algorithm(XoptBaseModel, ABC):
         default=20, description="number of execution paths to generate"
     )
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
-    @computed_field
     def class_path(self) -> str:
         return f"{self.__class__.__module__}.{self.__class__.__name__}"
 

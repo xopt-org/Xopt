@@ -95,18 +95,35 @@ class BaxGenerator(BayesianGenerator):
     @classmethod
     def validate_algorithm(cls, v: Any, info: ValidationInfo) -> Any:
         if isinstance(v, dict):
-            try:
+            if "class_path" in v:
                 class_path = v.pop("class_path")
                 module_name, class_name = class_path.rsplit(".", 1)
-            except KeyError:
-                raise ValueError("Algorithm dictionary must contain 'class_path' key")
-
-            try:
-                algorithm_class = getattr(
-                    importlib.import_module(module_name), class_name
+                try:
+                    algorithm_class = getattr(
+                        importlib.import_module(module_name), class_name
+                    )
+                except ModuleNotFoundError:
+                    raise ValueError(f"Cannot import '{module_name}.{class_name}'")
+            elif "name" in v:
+                name = v["name"]
+                algorithm_class = next(
+                    (
+                        c
+                        for c in cls._compatible_algorithms.default
+                        if c.model_fields["name"].default == name
+                    ),
+                    None,
                 )
-            except ModuleNotFoundError:
-                raise ValueError(f"Cannot import '{module_name}.{class_name}'")
+                if algorithm_class is None:
+                    raise ValueError(
+                        f"Unknown algorithm name '{name}'. "
+                        f"Provide one of {[c.model_fields['name'].default for c in cls._compatible_algorithms.default]} "
+                        f"or supply 'class_path'."
+                    )
+            else:
+                raise ValueError(
+                    "Algorithm dictionary must contain 'class_path' or 'name' key"
+                )
 
             v = algorithm_class.model_validate(v)
 

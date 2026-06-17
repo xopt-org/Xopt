@@ -29,8 +29,8 @@ import yaml
 from pydantic import (
     BaseModel,
     ConfigDict,
-    create_model,
     Field,
+    create_model,
     field_serializer,
     field_validator,
     model_serializer,
@@ -202,7 +202,7 @@ class XoptBaseModel(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_files(cls, data: Any):
+    def validate_files(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         for key, value in data.items():
@@ -222,13 +222,13 @@ class XoptBaseModel(BaseModel):
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
         return orjson_dumps_except_root(self)
 
-    def to_json(self, **kwargs) -> str:
+    def to_json(self, **kwargs: Any) -> str:
         return orjson_dumps(self, **kwargs)
 
-    def json(self, **kwargs):
+    def json(self, **kwargs: Any) -> str:
         return self.to_json(**kwargs)
 
-    def yaml(self, **kwargs):
+    def yaml(self, **kwargs: Any) -> str:
         """serialize first then dump to yaml string"""
         output = json.loads(
             self.to_json(
@@ -238,7 +238,7 @@ class XoptBaseModel(BaseModel):
         return yaml.dump(output)
 
     @classmethod
-    def from_file(cls, filename: str):
+    def from_file(cls, filename: str) -> "XoptBaseModel":
         if not os.path.exists(filename):
             raise OSError(f"file {filename} is not found")
 
@@ -246,11 +246,11 @@ class XoptBaseModel(BaseModel):
             return cls.from_yaml(file)
 
     @classmethod
-    def from_yaml(cls, yaml_obj: [str, TextIO]):
+    def from_yaml(cls, yaml_obj: str | TextIO) -> "XoptBaseModel":
         return cls.model_validate(remove_none_values(yaml.safe_load(yaml_obj)))
 
     @classmethod
-    def from_dict(cls, config: dict):
+    def from_dict(cls, config: dict) -> "XoptBaseModel":
         return cls.model_validate(remove_none_values(config))
 
 
