@@ -52,7 +52,7 @@ class LBFGSOptimizer(NumericalOptimizer):
     n_restarts : PositiveInt
         Number of restarts during acquisition function optimization, default is 20.
     max_iter : PositiveInt
-        Maximum number of iterations for the optimizer, default is 2000.
+        Maximum number of iterations for the optimizer, default is 1000.
     max_time : Optional[PositiveFloat]
         Maximum time allowed for optimization, default is None (no time limit).
 
@@ -83,7 +83,7 @@ class LBFGSOptimizer(NumericalOptimizer):
         20, description="number of restarts during acquisition function optimization"
     )
     max_iter: PositiveInt = Field(
-        2000, description="maximum number of optimization steps"
+        1000, description="maximum number of optimization steps"
     )
     max_time: Optional[PositiveFloat] = Field(
         5.0, description="maximum time for optimization in seconds"
@@ -98,18 +98,6 @@ class LBFGSOptimizer(NumericalOptimizer):
     discrete_max_choices: PositiveInt = Field(
         4096,
         description="maximum number of discrete choices to evaluate directly",
-    )
-    mixed_n_restarts: Optional[PositiveInt] = Field(
-        None,
-        description=(
-            "number of restarts for mixed optimization; defaults to n_restarts"
-        ),
-    )
-    mixed_raw_samples: Optional[PositiveInt] = Field(
-        None,
-        description=(
-            "number of raw samples for mixed optimization; defaults to n_restarts"
-        ),
     )
     discrete_max_batch_size: PositiveInt = Field(
         2048,
@@ -177,16 +165,13 @@ class LBFGSOptimizer(NumericalOptimizer):
                     self.mixed_max_discrete_configurations,
                 )
 
-            mixed_n_restarts = self.mixed_n_restarts or self.n_restarts
-            mixed_raw_samples = self.mixed_raw_samples or self.n_restarts
-
             candidates, _ = optimize_acqf_mixed(
                 acq_function=function,
                 bounds=bounds,
                 q=n_candidates,
-                num_restarts=mixed_n_restarts,
+                num_restarts=self.n_restarts,
                 fixed_features_list=fixed_features_list,
-                raw_samples=mixed_raw_samples,
+                raw_samples=self.n_restarts,
                 timeout_sec=max_time,
                 options={"maxiter": self.max_iter},
                 **kwargs,
