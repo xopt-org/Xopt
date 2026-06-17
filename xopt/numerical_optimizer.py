@@ -52,7 +52,7 @@ class LBFGSOptimizer(NumericalOptimizer):
     n_restarts : PositiveInt
         Number of restarts during acquisition function optimization, default is 20.
     max_iter : PositiveInt
-        Maximum number of iterations for the optimizer, default is 2000.
+        Maximum number of iterations for the optimizer, default is 1000.
     max_time : Optional[PositiveFloat]
         Maximum time allowed for optimization, default is None (no time limit).
 
@@ -83,7 +83,7 @@ class LBFGSOptimizer(NumericalOptimizer):
         20, description="number of restarts during acquisition function optimization"
     )
     max_iter: PositiveInt = Field(
-        2000, description="maximum number of optimization steps"
+        1000, description="maximum number of optimization steps"
     )
     max_time: Optional[PositiveFloat] = Field(
         5.0, description="maximum time for optimization in seconds"
