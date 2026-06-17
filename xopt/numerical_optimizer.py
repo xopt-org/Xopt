@@ -99,18 +99,6 @@ class LBFGSOptimizer(NumericalOptimizer):
         4096,
         description="maximum number of discrete choices to evaluate directly",
     )
-    mixed_n_restarts: Optional[PositiveInt] = Field(
-        None,
-        description=(
-            "number of restarts for mixed optimization; defaults to n_restarts"
-        ),
-    )
-    mixed_raw_samples: Optional[PositiveInt] = Field(
-        None,
-        description=(
-            "number of raw samples for mixed optimization; defaults to n_restarts"
-        ),
-    )
     discrete_max_batch_size: PositiveInt = Field(
         2048,
         description="maximum batch size used by botorch discrete optimization",
@@ -177,16 +165,13 @@ class LBFGSOptimizer(NumericalOptimizer):
                     self.mixed_max_discrete_configurations,
                 )
 
-            mixed_n_restarts = self.mixed_n_restarts or self.n_restarts
-            mixed_raw_samples = self.mixed_raw_samples or self.n_restarts
-
             candidates, _ = optimize_acqf_mixed(
                 acq_function=function,
                 bounds=bounds,
                 q=n_candidates,
-                num_restarts=mixed_n_restarts,
+                num_restarts=self.n_restarts,
                 fixed_features_list=fixed_features_list,
-                raw_samples=mixed_raw_samples,
+                raw_samples=self.n_restarts,
                 timeout_sec=max_time,
                 options={"maxiter": self.max_iter},
                 **kwargs,
