@@ -2,7 +2,7 @@ import torch
 from botorch.acquisition.multi_objective.analytic import (
     MultiObjectiveAnalyticAcquisitionFunction,
 )
-from botorch.models.model import Model, ModelList
+from botorch.models.model import ModelList
 from botorch.utils.transforms import t_batch_mode_transform
 from torch import Tensor
 
@@ -21,7 +21,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
             The output execution paths.
     """
 
-    def __init__(self, model: Model, xs_exe: Tensor, ys_exe: Tensor) -> None:
+    def __init__(self, model: ModelList, xs_exe: Tensor, ys_exe: Tensor) -> None:
         super().__init__(model=model)
         self.xs_exe = xs_exe
         self.ys_exe = ys_exe

@@ -10,19 +10,44 @@ from xopt.pydantic import XoptBaseModel
 
 
 class AlgorithmResult(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
-    input_execution_paths: Tensor
-    output_execution_paths: Tensor
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    input_execution_paths: Tensor = Field(
+        description="The algorithm execution paths in input space."
+    )
+    output_execution_paths: Tensor = Field(
+        description="The algorithm execution paths in output space."
+    )
 
 
 class OptimizationAlgorithmResult(AlgorithmResult):
-    best_inputs: Tensor
-    best_objective: Tensor
+    best_inputs: Tensor = Field(
+        description="The optimal inputs from the sample-wise optimization of the virtual objective."
+    )
+    best_objective: Tensor = Field(
+        description="The optimal objective values from the sample-wise optimization of the virtual objective."
+    )
+    solution_center: Tensor = Field(
+        None,
+        description="The mean of the distribution of optimal inputs from the sample-wise optimization of the virtual objective.",
+    )
+    solution_entropy: float = Field(
+        None,
+        description="The entropy of the distribution of optimal inputs from the sample-wise optimization of the virtual objective.",
+    )
+
+
+class GridOptimizeResult(OptimizationAlgorithmResult):
+    test_points: Tensor = Field(description="The inputs evaluated by the grid scan.")
+    posterior_samples: Tensor = Field(
+        description="The objective values evaluated at the grid inputs by the grid scan."
+    )
 
 
 class VirtualMeasurementResult(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
-    objective: Tensor
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    objective: Tensor = Field(
+        description="The objective value as evaluated by the virtual measurement."
+    )
 
 
 class Algorithm(XoptBaseModel, ABC):
@@ -38,9 +63,9 @@ class Algorithm(XoptBaseModel, ABC):
 
     Methods
     -------
-    get_execution_paths(self, model: Model, bounds: Tensor) -> Tuple[Tensor, Tensor, Dict]
-        Get execution paths for the algorithm.
-    perform_virtual_measurement(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
+    execute(self, model: Model, bounds: Tensor) -> AlgorithmResult
+        Draw samples from the model, execute the algorithm on the samples, and return algorithm results.
+    perform_virtual_measurement(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> VirtualMeasurementResult
         Perform the virtual measurement and calculate objective values at the given inputs.
     """
 
@@ -57,7 +82,7 @@ class Algorithm(XoptBaseModel, ABC):
     @abstractmethod
     def execute(self, model: Model, bounds: Tensor) -> AlgorithmResult:
         """
-        Execute the algorithm on samples and return results.
+        Draw samples from the model, execute the algorithm on the samples, and return results.
 
         Parameters
         ----------
@@ -71,7 +96,7 @@ class Algorithm(XoptBaseModel, ABC):
         AlgorithmResult
             The algorithm result with input and output execution paths.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def perform_virtual_measurement(
@@ -103,7 +128,7 @@ class Algorithm(XoptBaseModel, ABC):
         VirtualMeasurementResult
             The virtual measurement result with computed objective values.
         """
-        pass  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
 
 class GridScanAlgorithm(Algorithm, ABC):
@@ -182,12 +207,11 @@ class GridOptimize(GridScanAlgorithm):
     """
 
     observable_names_ordered: List[str] = Field(
-        default=["y1"],
         description="names of observable/objective models used in this algorithm",
     )
     minimize: bool = True
 
-    def execute(self, model: Model, bounds: Tensor) -> AlgorithmResult:
+    def execute(self, model: Model, bounds: Tensor) -> GridOptimizeResult:
         """
         Execute the algorithm on samples and collect the results of the optimization.
 
@@ -200,7 +224,7 @@ class GridOptimize(GridScanAlgorithm):
 
         Returns
         -------
-        OptimizationAlgorithmResult
+        GridOptimizeResult
             Contains best_inputs, best_objective, input_execution_paths, output_execution_paths, and additional results.
         """
         # build evaluation mesh
@@ -227,15 +251,14 @@ class GridOptimize(GridScanAlgorithm):
 
         # get the solution_center and solution_entropy for Turbo
         # note: the entropy calc here drops a constant scaling factor
-        solution_center = x_opt.mean(dim=0).numpy()
+        solution_center = x_opt.mean(dim=0)
         solution_entropy = float(torch.log(x_opt.std(dim=0) ** 2).sum())
 
-        algorithm_result = OptimizationAlgorithmResult(
+        algorithm_result = GridOptimizeResult(
             best_inputs=x_opt,
             best_objective=y_opt,
             input_execution_paths=x_opt.unsqueeze(-2),
             output_execution_paths=y_opt.unsqueeze(-2),
-            execution_paths=torch.hstack((x_opt, y_opt)),
             test_points=test_points,
             posterior_samples=posterior_samples,
             solution_center=solution_center,
