@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Tuple
+from typing import ClassVar, List
 
 import torch
 from botorch.models.model import Model, ModelList
@@ -7,8 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
-
-from pydantic import BaseModel
 
 
 class AlgorithmResult(BaseModel):

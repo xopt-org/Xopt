@@ -6,8 +6,6 @@ from botorch.models.model import Model, ModelList
 from botorch.utils.transforms import t_batch_mode_transform
 from torch import Tensor
 
-from xopt.generators.bayesian.bax.algorithms import Algorithm
-
 
 class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction):
     r"""Single-outcome expected information gain for independent
