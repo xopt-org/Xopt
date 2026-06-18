@@ -101,7 +101,9 @@ class TestGenerator:
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.objectives = {}
             test_vocs.observables = ["y1"]
-            gen_config["algorithm"] = GridOptimize().model_dump()
+            gen_config["algorithm"] = GridOptimize(
+                observable_names_ordered=["y1"]
+            ).model_dump()
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
