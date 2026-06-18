@@ -3,10 +3,28 @@ from typing import ClassVar, Dict, List, Tuple
 
 import torch
 from botorch.models.model import Model, ModelList
-from pydantic import Field, PositiveInt, computed_field
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
+
+from pydantic import BaseModel
+
+
+class AlgorithmResult(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+    input_execution_paths: Tensor
+    output_execution_paths: Tensor
+
+
+class OptimizationAlgorithmResult(AlgorithmResult):
+    best_inputs: Tensor
+    best_objective: Tensor
+
+
+class VirtualMeasurementResult(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+    objective: Tensor
 
 
 class Algorithm(XoptBaseModel, ABC):
@@ -24,8 +42,8 @@ class Algorithm(XoptBaseModel, ABC):
     -------
     get_execution_paths(self, model: Model, bounds: Tensor) -> Tuple[Tensor, Tensor, Dict]
         Get execution paths for the algorithm.
-    evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
-        Evaluate the virtual objective at the given inputs.
+    perform_virtual_measurement(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
+        Perform the virtual measurement and calculate objective values at the given inputs.
     """
 
     name: ClassVar[str] = "base_algorithm"
@@ -39,11 +57,9 @@ class Algorithm(XoptBaseModel, ABC):
         return f"{self.__class__.__module__}.{self.__class__.__name__}"
 
     @abstractmethod
-    def get_execution_paths(
-        self, model: Model, bounds: Tensor
-    ) -> Tuple[Tensor, Tensor, Dict]:
+    def execute(self, model: Model, bounds: Tensor) -> AlgorithmResult:
         """
-        Get execution paths for the algorithm.
+        Execute the algorithm on samples and return results.
 
         Parameters
         ----------
@@ -54,20 +70,20 @@ class Algorithm(XoptBaseModel, ABC):
 
         Returns
         -------
-        Tuple[Tensor, Tensor, Dict]
-            The execution paths, their corresponding values, and additional results.
+        AlgorithmResult
+            The algorithm result with input and output execution paths.
         """
         pass
 
     @abstractmethod
-    def evaluate_virtual_objective(
+    def perform_virtual_measurement(
         self,
         model: Model,
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
         tkwargs: dict = None,
-    ) -> Tensor:
+    ) -> VirtualMeasurementResult:
         """
         Evaluate the virtual objective at the given inputs.
 
@@ -86,8 +102,8 @@ class Algorithm(XoptBaseModel, ABC):
 
         Returns
         -------
-        Tensor
-            The evaluated virtual objective values.
+        VirtualMeasurementResult
+            The virtual measurement result with computed objective values.
         """
         pass  # pragma: no cover
 
@@ -163,8 +179,8 @@ class GridOptimize(GridScanAlgorithm):
     -------
     get_execution_paths(self, model: Model, bounds: Tensor) -> Tuple[Tensor, Tensor, Dict]
         Get execution paths that minimize the objective function.
-    evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
-        Evaluate the virtual objective (samples).
+    perform_virtual_measurement(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> VirtualMeasurementResult
+        Evaluate the virtual measurement and calculate objective values (samples).
     """
 
     observable_names_ordered: List[str] = Field(
@@ -173,11 +189,9 @@ class GridOptimize(GridScanAlgorithm):
     )
     minimize: bool = True
 
-    def get_execution_paths(
-        self, model: Model, bounds: Tensor
-    ) -> Tuple[Tensor, Tensor, Dict]:
+    def execute(self, model: Model, bounds: Tensor) -> AlgorithmResult:
         """
-        Get execution paths that minimize the objective function.
+        Execute the algorithm on samples and collect the results of the optimization.
 
         Parameters
         ----------
@@ -188,8 +202,8 @@ class GridOptimize(GridScanAlgorithm):
 
         Returns
         -------
-        Tuple[Tensor, Tensor, Dict]
-            The execution paths, their corresponding values, and additional results.
+        OptimizationAlgorithmResult
+            Contains best_inputs, best_objective, input_execution_paths, output_execution_paths, and additional results.
         """
         # build evaluation mesh
         test_points = self.create_mesh(bounds)
@@ -199,10 +213,11 @@ class GridOptimize(GridScanAlgorithm):
             test_points = test_points.to(model.train_targets)
 
         # get samples of the model posterior at mesh points
-        posterior_samples = self.evaluate_virtual_objective(
+        result = self.perform_virtual_measurement(
             model, test_points, bounds, self.n_samples
         )
 
+        posterior_samples = result.objective
         # get points that minimize each sample (execution paths)
         if self.minimize:
             y_opt, opt_idx = torch.min(posterior_samples, dim=-2)
@@ -217,28 +232,30 @@ class GridOptimize(GridScanAlgorithm):
         solution_center = x_opt.mean(dim=0).numpy()
         solution_entropy = float(torch.log(x_opt.std(dim=0) ** 2).sum())
 
-        # collect secondary results in a dict
-        results_dict = {
-            "test_points": test_points,
-            "posterior_samples": posterior_samples,
-            "execution_paths": torch.hstack((x_opt, y_opt)),
-            "solution_center": solution_center,
-            "solution_entropy": solution_entropy,
-        }
+        algorithm_result = OptimizationAlgorithmResult(
+            best_inputs=x_opt,
+            best_objective=y_opt,
+            input_execution_paths=x_opt.unsqueeze(-2),
+            output_execution_paths=y_opt.unsqueeze(-2),
+            execution_paths=torch.hstack((x_opt, y_opt)),
+            test_points=test_points,
+            posterior_samples=posterior_samples,
+            solution_center=solution_center,
+            solution_entropy=solution_entropy,
+        )
+        # return algorithm result
+        return algorithm_result
 
-        # return execution paths
-        return x_opt.unsqueeze(-2), y_opt.unsqueeze(-2), results_dict
-
-    def evaluate_virtual_objective(
+    def perform_virtual_measurement(
         self,
         model: Model,
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
         tkwargs: dict = None,
-    ) -> Tensor:
+    ) -> VirtualMeasurementResult:
         """
-        Evaluate the virtual objective (samples).
+        Perform the virtual measurement (samples).
 
         Parameters
         ----------
@@ -255,15 +272,14 @@ class GridOptimize(GridScanAlgorithm):
 
         Returns
         -------
-        Tensor
-            The evaluated virtual objective values.
+        VirtualMeasurementResult
+            The virtual measurement result with calculated virtual objective values.
         """
-        # get samples of the model posterior at inputs given by x
         with torch.no_grad():
             post = model.posterior(x)
             objective_values = post.rsample(torch.Size([n_samples]))
 
-        return objective_values
+        return VirtualMeasurementResult(objective=objective_values)
 
 
 class CurvatureGridOptimize(GridOptimize):
@@ -277,20 +293,20 @@ class CurvatureGridOptimize(GridOptimize):
 
     Methods
     -------
-    evaluate_virtual_objective(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> Tensor
-        Evaluate the virtual objective (samples) with curvature.
+    perform_virtual_measurement(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> VirtualMeasurementResult
+        Perform the virtual measurement (samples) with curvature.
     """
 
     use_mean: bool = False
 
-    def evaluate_virtual_objective(
+    def perform_virtual_measurement(
         self,
         model: Model,
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
         tkwargs: dict = None,
-    ) -> Tensor:
+    ) -> VirtualMeasurementResult:
         """
         Evaluate the virtual objective (samples) with curvature.
 
@@ -309,8 +325,8 @@ class CurvatureGridOptimize(GridOptimize):
 
         Returns
         -------
-        Tensor
-            The evaluated virtual objective values with curvature.
+        VirtualMeasurementResult
+            The virtual measurement result with calculated virtual objective values with curvature.
         """
         # get samples of the model posterior at inputs given by x
         with torch.no_grad():
@@ -330,4 +346,4 @@ class CurvatureGridOptimize(GridOptimize):
         objective_values[:, 0] = 0
         objective_values[:, -1] = 0
 
-        return objective_values
+        return VirtualMeasurementResult(objective=objective_values)

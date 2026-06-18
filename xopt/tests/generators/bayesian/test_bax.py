@@ -86,18 +86,18 @@ class TestBaxGenerator:
         with pytest.raises(ValueError, match=r"bounds must have the shape \[2, ndim\]"):
             alg.create_mesh(invalid_bounds)
 
-    def test_algorithm_get_execution_paths_not_implemented(self):
+    def test_algorithm_execute_not_implemented(self):
         class DummyAlgorithm(Algorithm):
-            def evaluate_virtual_objective(
+            def perform_virtual_measurement(
                 self, model, x, bounds, n_samples, tkwargs=None
             ):
                 return torch.zeros(1)
 
-            def get_execution_paths(self, model, bounds):
-                return super().get_execution_paths(model, bounds)
+            def execute(self, model, bounds):
+                return super().execute(model, bounds)
 
         alg = DummyAlgorithm()
-        alg.get_execution_paths(None, None)
+        alg.execute(None, None)
 
     def test_grid_minimize(self):
         # test grid scan minimize
@@ -118,7 +118,9 @@ class TestBaxGenerator:
                 )
             )
 
-            x_exe, y_exe, results = alg.get_execution_paths(model, bounds)
+            algorithm_result = alg.execute(model, bounds)
+            x_exe = algorithm_result.input_execution_paths
+            y_exe = algorithm_result.output_execution_paths
 
             # execution paths should be able to be transformed and used in
             # `condition_on_observations` method
@@ -160,9 +162,12 @@ class TestBaxGenerator:
                 outcome_transform=Standardize(1),
             )
             alg = GridOptimize(minimize=False)
-            x_exe, y_exe, results = alg.get_execution_paths(model, bounds)
+            algorithm_result = alg.execute(model, bounds)
+            x_exe = algorithm_result.input_execution_paths
+            y_exe = algorithm_result.output_execution_paths
+
             # Should select the maximum value from posterior_samples
-            posterior_samples = results["posterior_samples"]
+            posterior_samples = algorithm_result.posterior_samples
             y_max, idx_max = torch.max(posterior_samples, dim=-2)
             assert torch.allclose(y_exe.squeeze(-2), y_max)
             assert x_exe.shape[0] == alg.n_samples
@@ -385,13 +390,16 @@ class TestBaxGenerator:
         )
         alg = CurvatureGridOptimize(n_samples=3, use_mean=False)
         mesh = alg.create_mesh(bounds)
-        result = alg.evaluate_virtual_objective(model, mesh, bounds, n_samples=3)
+        measurement_result = alg.perform_virtual_measurement(
+            model, mesh, bounds, n_samples=3
+        )
+        objective = measurement_result.objective
         # Should have shape [n_samples, mesh_points, 1]
-        assert result.shape[0] == 3
-        assert result.shape[1] == mesh.shape[0]
+        assert objective.shape[0] == 3
+        assert objective.shape[1] == mesh.shape[0]
         # Edge values should be zero
-        assert torch.all(result[:, 0] == 0)
-        assert torch.all(result[:, -1] == 0)
+        assert torch.all(objective[:, 0] == 0)
+        assert torch.all(objective[:, -1] == 0)
 
     def test_curvature_grid_optimize_use_mean(self):
         ndim = 1
@@ -406,13 +414,16 @@ class TestBaxGenerator:
         )
         alg = CurvatureGridOptimize(n_samples=2, use_mean=True)
         mesh = alg.create_mesh(bounds)
-        result = alg.evaluate_virtual_objective(model, mesh, bounds, n_samples=2)
+        measurement_result = alg.perform_virtual_measurement(
+            model, mesh, bounds, n_samples=2
+        )
+        objective = measurement_result.objective
         # Should have shape [1, mesh_points, 1] since use_mean=True
-        assert result.shape[0] == 1
-        assert result.shape[1] == mesh.shape[0]
+        assert objective.shape[0] == 1
+        assert objective.shape[1] == mesh.shape[0]
         # Edge values should be zero
-        assert torch.all(result[:, 0] == 0)
-        assert torch.all(result[:, -1] == 0)
+        assert torch.all(objective[:, 0] == 0)
+        assert torch.all(objective[:, -1] == 0)
 
     def test_bax_serialization(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
