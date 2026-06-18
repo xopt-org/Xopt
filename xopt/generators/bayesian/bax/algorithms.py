@@ -264,7 +264,7 @@ class GridOptimize(GridScanAlgorithm):
             solution_center=solution_center,
             solution_entropy=solution_entropy,
         )
-        # return algorithm result
+
         return algorithm_result
 
     def perform_virtual_measurement(
