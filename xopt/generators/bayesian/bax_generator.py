@@ -63,7 +63,8 @@ class BaxGenerator(BayesianGenerator):
 
     supports_discrete_variables: bool = False
     algorithm: SerializeAsAny[Algorithm] = Field(
-        default=GridOptimize(), description="algorithm evaluated in the BAX process"
+        default=GridOptimize(observable_names_ordered=[]),
+        description="algorithm evaluated in the BAX process",
     )
     algorithm_results: Optional[dict] = Field(
         None, description="dictionary results from algorithm", exclude=True
@@ -184,10 +185,17 @@ class BaxGenerator(BayesianGenerator):
         if isinstance(bax_model, SingleTaskGP):
             bax_model = ModelListGP(bax_model)
 
-        eig = ModelListExpectedInformationGain(
-            bax_model, self.algorithm, self._get_optimization_bounds()
-        )
-        self.algorithm_results = eig.algorithm_results
+        # get sample-wise algorithm execution (BAX) results
+        algorithm_results = self.algorithm.execute(
+            bax_model, self._get_optimization_bounds()
+        ).model_dump()
+
+        self.algorithm_results = algorithm_results
+        xs_exe = algorithm_results["input_execution_paths"]
+        ys_exe = algorithm_results["output_execution_paths"]
+
+        eig = ModelListExpectedInformationGain(bax_model, xs_exe, ys_exe)
+
         if self.algorithm_results_file is not None:
             results = deepcopy(self.algorithm_results)
 
