@@ -104,7 +104,7 @@ class Algorithm(XoptBaseModel, ABC):
         x: Tensor,
         bounds: Tensor,
         n_samples: int,
-        tkwargs: dict = None,
+        tkwargs: dict[str, Any] | None = None,
     ) -> VirtualMeasurementResult:
         """
         Evaluate the virtual objective at the given inputs.
@@ -119,7 +119,7 @@ class Algorithm(XoptBaseModel, ABC):
             The bounds for the optimization.
         n_samples : int
             The number of samples to generate.
-        tkwargs : dict[str, Any], optional
+        tkwargs : dict[str, Any] | None, optional
             Additional keyword arguments for the evaluation.
 
         Returns
