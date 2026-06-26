@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import argparse
 import logging
 import os
+import pandas as pd
 import sys
 import yaml
 
@@ -127,6 +128,12 @@ def main():
         default=[],
     )
     parser.add_argument(
+        "--initial_data",
+        help="CSV file with initial data to seed the generator before running",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )
     args = parser.parse_args()
@@ -190,6 +197,11 @@ def main():
         # Handle max_worker override
         if args.max_workers is not None:
             my_xopt.evaluator.max_workers = args.max_workers
+
+        # Seed the generator with initial data if provided
+        if args.initial_data is not None:
+            logger.info(f"Loading initial data from {args.initial_data}")
+            my_xopt.add_data(pd.read_csv(args.initial_data))
 
         # Run Xopt
         my_xopt.run()
