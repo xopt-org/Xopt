@@ -12,6 +12,7 @@ class RandomGenerator(Generator):
     supports_multi_objective: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
+    supports_discrete_variables: bool = True
 
     def generate(self, n_candidates) -> list[dict]:
         """generate uniform random data points"""

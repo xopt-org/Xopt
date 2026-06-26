@@ -7,7 +7,7 @@ from botorch.acquisition import (
     MCAcquisitionObjective,
 )
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
-from botorch.sampling import get_sampler
+from botorch.sampling.get_sampler import get_sampler
 from torch import Tensor
 from functools import partial
 from gest_api.vocs import LessThanConstraint

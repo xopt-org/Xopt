@@ -1,13 +1,17 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 import torch
 from botorch.acquisition import AcquisitionFunction
-from botorch.optim import optimize_acqf
+from botorch.optim import optimize_acqf, optimize_acqf_discrete, optimize_acqf_mixed
 from pydantic import Field, PositiveFloat, PositiveInt
 from torch import Tensor
 
 from xopt.pydantic import XoptBaseModel
+
+
+logger = logging.getLogger(__name__)
 
 
 class NumericalOptimizer(XoptBaseModel, ABC):
@@ -48,7 +52,7 @@ class LBFGSOptimizer(NumericalOptimizer):
     n_restarts : PositiveInt
         Number of restarts during acquisition function optimization, default is 20.
     max_iter : PositiveInt
-        Maximum number of iterations for the optimizer, default is 2000.
+        Maximum number of iterations for the optimizer, default is 1000.
     max_time : Optional[PositiveFloat]
         Maximum time allowed for optimization, default is None (no time limit).
 
@@ -79,10 +83,25 @@ class LBFGSOptimizer(NumericalOptimizer):
         20, description="number of restarts during acquisition function optimization"
     )
     max_iter: PositiveInt = Field(
-        2000, description="maximum number of optimization steps"
+        1000, description="maximum number of optimization steps"
     )
     max_time: Optional[PositiveFloat] = Field(
         5.0, description="maximum time for optimization in seconds"
+    )
+    mixed_max_discrete_configurations: PositiveInt = Field(
+        512,
+        description=(
+            "maximum number of discrete configurations to enumerate in mixed"
+            " optimization"
+        ),
+    )
+    discrete_max_choices: PositiveInt = Field(
+        4096,
+        description="maximum number of discrete choices to evaluate directly",
+    )
+    discrete_max_batch_size: PositiveInt = Field(
+        2048,
+        description="maximum batch size used by botorch discrete optimization",
     )
 
     def optimize(
@@ -116,12 +135,75 @@ class LBFGSOptimizer(NumericalOptimizer):
         if len(bounds) != 2:
             raise ValueError("bounds must have the shape [2, ndim]")
 
-        # emperical testing showed that the max time is overrun slightly on the botorch side
-        # fix by slightly reducing the max time passed to this function
+        # empirical testing showed that max time is overrun slightly on the botorch side
+        # fix by reducing the max time passed to botorch
         if self.max_time is not None:
             max_time = self.max_time * 0.8 - 0.01
         else:
             max_time = None
+
+        fixed_features_list = kwargs.pop("fixed_features_list", None)
+        discrete_choices = kwargs.pop("discrete_choices", None)
+
+        if fixed_features_list is not None and discrete_choices is not None:
+            raise ValueError(
+                "cannot specify both fixed_features_list and discrete_choices"
+            )
+
+        if fixed_features_list is not None:
+            original_count = len(fixed_features_list)
+            fixed_features_list = fixed_features_list[
+                : self.mixed_max_discrete_configurations
+            ]
+            if len(fixed_features_list) == 0:
+                raise ValueError("fixed_features_list cannot be empty")
+
+            if original_count > self.mixed_max_discrete_configurations:
+                logger.warning(
+                    "truncating mixed discrete configurations from %d to %d",
+                    original_count,
+                    self.mixed_max_discrete_configurations,
+                )
+
+            candidates, _ = optimize_acqf_mixed(
+                acq_function=function,
+                bounds=bounds,
+                q=n_candidates,
+                num_restarts=self.n_restarts,
+                fixed_features_list=fixed_features_list,
+                raw_samples=self.n_restarts,
+                timeout_sec=max_time,
+                options={"maxiter": self.max_iter},
+                **kwargs,
+            )
+            return candidates
+
+        if discrete_choices is not None:
+            if "batch_initial_conditions" in kwargs:
+                logger.warning(
+                    "batch_initial_conditions are not used by optimize_acqf_discrete"
+                )
+                kwargs.pop("batch_initial_conditions", None)
+
+            if discrete_choices.shape[0] > self.discrete_max_choices:
+                logger.warning(
+                    "truncating discrete choices from %d to %d",
+                    discrete_choices.shape[0],
+                    self.discrete_max_choices,
+                )
+                discrete_choices = discrete_choices[: self.discrete_max_choices]
+
+            # if the user does not set unique, set it to False if we want more than 1 candidate
+            unique = kwargs.pop("unique", n_candidates == 1)
+            candidates, _ = optimize_acqf_discrete(
+                acq_function=function,
+                q=n_candidates,
+                choices=discrete_choices,
+                max_batch_size=self.discrete_max_batch_size,
+                unique=unique,
+                **kwargs,
+            )
+            return candidates
 
         candidates, _ = optimize_acqf(
             acq_function=function,

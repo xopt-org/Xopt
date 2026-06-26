@@ -12,8 +12,10 @@ from botorch import fit_gpytorch_mll
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
+from botorch.optim.closures import get_loss_closure_with_grads
 from botorch.optim import ExpMAStoppingCriterion
 from botorch.optim.fit import fit_gpytorch_mll_scipy, fit_gpytorch_mll_torch
+from botorch.optim.utils import get_parameters
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
@@ -34,6 +36,37 @@ DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 # TODO: make custom stopping criterion that checks lengthscales
+
+
+def _get_non_degenerate_normalize_bounds(
+    input_names: list[str],
+    input_bounds: dict[str, list] | None,
+    tkwargs: dict | None = None,
+) -> torch.Tensor | None:
+    """Build bounds tensor for Normalize, expanding zero-width dimensions."""
+    if input_bounds is None:
+        return None
+
+    tensor_kwargs = tkwargs or {}
+    bounds = torch.vstack(
+        [torch.tensor(input_bounds[name], **tensor_kwargs) for name in input_names]
+    ).T
+
+    widths = bounds[1] - bounds[0]
+    zero_width_mask = torch.isclose(
+        widths,
+        torch.zeros_like(widths),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    if zero_width_mask.any():
+        # Singleton dimensions (e.g., one-value discrete sets) need finite width for Normalize.
+        bounds = bounds.clone()
+        centers = 0.5 * (bounds[0, zero_width_mask] + bounds[1, zero_width_mask])
+        bounds[0, zero_width_mask] = centers - 0.5
+        bounds[1, zero_width_mask] = centers + 0.5
+
+    return bounds
 
 
 class ExpMAStoppingCriterionModel(XoptBaseModel):
@@ -84,7 +117,8 @@ class StandardModelConstructor(ModelConstructor):
         Covariance modules for GP models.
 
     mean_modules : Dict[str, Module]
-        Prior mean modules for GP models.
+        Prior mean modules for GP models.A mean function should reduce a
+        (batch) x n x d-dimensional input into a (batch) x n dimensional output.
 
     trainable_mean_keys : List[str]
         List of prior mean modules that can be trained.
@@ -359,14 +393,16 @@ class StandardModelConstructor(ModelConstructor):
                     )
                 )
         # check all specified modules were added to the model
+        # covar_modules / mean_modules are popped from the dict as they are used,
+        # so if any remain, they were not added to the model
         if covar_modules:
             warnings.warn(
-                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"Covariance modules for output names {[k for k, v in covar_modules.items()]} "
                 f"could not be added to the model."
             )
         if mean_modules:
             warnings.warn(
-                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"Mean modules for output names {[k for k, v in mean_modules.items()]} "
                 f"could not be added to the model."
             )
 
@@ -381,51 +417,106 @@ class StandardModelConstructor(ModelConstructor):
             full_model.load_state_dict(store)
 
         if self.train_model:
-            full_model = self._train_model(full_model)
+            trained_models = []
+            models = (
+                full_model.models
+                if isinstance(full_model, ModelListGP)
+                else [full_model]
+            )
+            for m in models:
+                mll = ExactMarginalLogLikelihood(m.likelihood, m)
+                trained_models.append(self._train_model(m, mll))
+
+            # add the trained models to a ModelListGP if training was performed
+            full_model = ModelListGP(*trained_models)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
         return full_model.to(**tkwargs)
 
-    def _train_model(self, model):
-        models = model.models if isinstance(model, ModelListGP) else [model]
-        for m in models:
-            mll = ExactMarginalLogLikelihood(m.likelihood, m)
-            tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
-            if "optimizer_kwargs" not in tr_kwargs:
-                tr_kwargs["optimizer_kwargs"] = {}
-            if self.train_config is not None and self.train_config.timeout is not None:
-                tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
-            if self.train_method == "adam":
-                cfg_adam: AdamNumericalOptimizerConfig = (
-                    self.train_config or AdamNumericalOptimizerConfig()
-                )
-                sc = ExpMAStoppingCriterion(
-                    maxiter=cfg_adam.stopping_criterion.maxiter,
-                    n_window=cfg_adam.stopping_criterion.n_window,
-                    eta=cfg_adam.stopping_criterion.eta,
-                    rel_tol=cfg_adam.stopping_criterion.rel_tol,
-                )
-                opt = partial(Adam, lr=cfg_adam.lr)
-                tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
-                tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
-                optimizer = fit_gpytorch_mll_torch
-            else:
-                cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
-                    self.train_config or LBFGSNumericalOptimizerConfig()
-                )
-                if "options" not in tr_kwargs["optimizer_kwargs"]:
-                    tr_kwargs["optimizer_kwargs"]["options"] = {}
-                tr_kwargs["optimizer_kwargs"]["options"]["maxiter"] = cfg_lbfgs.maxiter
-                tr_kwargs["optimizer_kwargs"]["options"]["gtol"] = cfg_lbfgs.gtol
-                tr_kwargs["optimizer_kwargs"]["options"]["ftol"] = cfg_lbfgs.ftol
-                optimizer = fit_gpytorch_mll_scipy
+    def _train_model(self, model, mll):
+        """
+        Train a single GP model using the specified training method and configuration.
 
-            try:
-                fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
-            except ModelFittingError:
-                warnings.warn("Model fitting failed. Returning untrained model.")
+        Parameters
+        ----------
+        model : gpytorch.module.Module
+            The model to be trained.
+        mll : gpytorch.mll.MarginalLogLikelihood
+            The marginal log likelihood for the model.
+
+        Returns
+        -------
+        gpytorch.module.Module
+            The trained model.
+
+        """
+
+        tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
+        if "optimizer_kwargs" not in tr_kwargs:
+            tr_kwargs["optimizer_kwargs"] = {}
+        if self.train_config is not None and self.train_config.timeout is not None:
+            tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
+        if self.train_method == "adam":
+            cfg_adam: AdamNumericalOptimizerConfig = (
+                self.train_config or AdamNumericalOptimizerConfig()
+            )
+            sc = ExpMAStoppingCriterion(
+                maxiter=cfg_adam.stopping_criterion.maxiter,
+                n_window=cfg_adam.stopping_criterion.n_window,
+                eta=cfg_adam.stopping_criterion.eta,
+                rel_tol=cfg_adam.stopping_criterion.rel_tol,
+            )
+            opt = partial(Adam, lr=cfg_adam.lr)
+            tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
+            tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
+            optimizer = fit_gpytorch_mll_torch
+        else:
+            cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
+                self.train_config or LBFGSNumericalOptimizerConfig()
+            )
+            if "options" not in tr_kwargs["optimizer_kwargs"]:
+                tr_kwargs["optimizer_kwargs"]["options"] = {}
+            options = tr_kwargs["optimizer_kwargs"]["options"]
+            options["maxiter"] = cfg_lbfgs.maxiter
+            options["gtol"] = cfg_lbfgs.gtol
+            options["ftol"] = cfg_lbfgs.ftol
+
+            batch_shape = getattr(model, "_aug_batch_shape", None)
+            if batch_shape is None:
+                batch_shape = getattr(model, "batch_shape", torch.Size())
+            is_batched = len(batch_shape) > 0
+            if is_batched:
+                # Batched scipy optimizer in newer botorch/scipy combinations can
+                # assert when both ftol and default factr are active.
+                options["factr"] = None
+
+            # Shared (non-batched) parameters in batched models are incompatible
+            # with botorch's independent scipy batching path. Use an explicit
+            # closure to preserve single-sum-loss behavior while keeping scipy.
+            has_unbatched_trainable_params = is_batched and any(
+                p.requires_grad
+                and (
+                    p.ndim < len(batch_shape)
+                    or tuple(p.shape[: len(batch_shape)]) != tuple(batch_shape)
+                )
+                for p in model.parameters()
+            )
+
+            if has_unbatched_trainable_params:
+                params = get_parameters(mll, requires_grad=True)
+                tr_kwargs["closure"] = get_loss_closure_with_grads(
+                    mll, parameters=params
+                )
+                tr_kwargs["optimizer_kwargs"].pop("closure", None)
+
+            optimizer = fit_gpytorch_mll_scipy
+
+        try:
+            fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+        except ModelFittingError:
+            warnings.warn("Model fitting failed. Returning untrained model.")
         return model
 
     def build_mean_module(
@@ -438,7 +529,7 @@ class StandardModelConstructor(ModelConstructor):
         ----------
         name : str
             The name of the output.
-        mean_modules: dict
+        mean_modules: dict[str, Module]
             The dictionary of mean modules.
         input_transform : InputTransform
             Transform for input variables.
@@ -501,12 +592,9 @@ class StandardModelConstructor(ModelConstructor):
 
         """
         # get input bounds
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(
+            input_names, input_bounds, tkwargs
+        )
 
         # create transform
         input_transform = Normalize(len(input_names), bounds=bounds)
@@ -547,6 +635,8 @@ class BatchedModelConstructor(StandardModelConstructor):
     See benchmarking docs on how to run tests for your specific hardware.
     """
 
+    name: str = Field("batched", frozen=True)
+
     def _get_input_transform(
         self,
         outcome_names: list[str],
@@ -554,12 +644,7 @@ class BatchedModelConstructor(StandardModelConstructor):
         input_bounds,
         batch_shape: torch.Size = torch.Size(),
     ) -> Optional[Normalize]:
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name]) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(input_names, input_bounds)
 
         input_transform = Normalize(
             len(input_names),
@@ -674,7 +759,8 @@ class BatchedModelConstructor(StandardModelConstructor):
             full_model.load_state_dict(store)
 
         if self.train_model:
-            full_model = self._train_model(full_model)
+            mll = ExactMarginalLogLikelihood(full_model.likelihood, full_model)
+            full_model = self._train_model(full_model, mll)
 
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()

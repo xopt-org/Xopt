@@ -10,6 +10,7 @@ from xopt.generators import (
     get_generator_defaults,
     list_available_generators,
 )
+from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.resources.testing import TEST_VOCS_BASE
 from gest_api.vocs import VOCS
 
@@ -30,6 +31,14 @@ class PatchGenerator(Generator):
 
 class PatchGeneratorNoConstraints(Generator):
     supports_constraints: bool = False
+
+    def generate(self, n_candidates) -> list[dict]:
+        pass
+
+
+class PatchGeneratorSupportsDiscrete(Generator):
+    supports_single_objective: bool = True
+    supports_discrete_variables: bool = True
 
     def generate(self, n_candidates) -> list[dict]:
         pass
@@ -88,6 +97,16 @@ class TestGenerator:
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
+        elif name in ["bax"]:
+            test_vocs = deepcopy(TEST_VOCS_BASE)
+            test_vocs.objectives = {}
+            test_vocs.observables = ["y1"]
+            gen_config["algorithm"] = GridOptimize(
+                observable_names_ordered=["y1"]
+            ).model_dump()
+            json.dumps(gen_config)
+
+            gen_class(vocs=test_vocs, **gen_config)
         else:
             test_vocs = deepcopy(TEST_VOCS_BASE)
             test_vocs.constraints = {}
@@ -106,6 +125,19 @@ class TestGenerator:
             VOCSError, match="this generator does not support constraints"
         ):
             PatchGeneratorNoConstraints(vocs=vocs_with_constraints)
+
+    def test_generator_discrete_validation(self):
+        vocs_with_discrete = VOCS(
+            variables={"x1": [0, 1], "x2": {0.0, 0.5, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+
+        with pytest.raises(
+            VOCSError, match="this generator does not support discrete variables"
+        ):
+            PatchGenerator(vocs=vocs_with_discrete)
+
+        PatchGeneratorSupportsDiscrete(vocs=vocs_with_discrete)
 
     def test_data_validator_indexerror(self):
         data_dict = {"x1": 1.0, "x2": 2.0}

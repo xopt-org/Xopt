@@ -9,20 +9,23 @@ from typing import (
     TypedDict,
     Union,
 )
+import textwrap
 
 import gpytorch
 import numpy as np
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
+from gest_api.vocs import DiscreteVariable
 from pandas import DataFrame
 
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import FormatStrFormatter
 
+from xopt.errors import FeasibilityError
 from xopt.generator import Generator
-from xopt.vocs import VOCS, get_feasibility_data
+from xopt.vocs import VOCS, get_feasibility_data, select_best
 
 from .objectives import feasibility
 from .utils import torch_compile_gp_model, torch_trace_gp_model
@@ -34,6 +37,14 @@ DType = TypeVar("DType")
 class Array(np.ndarray, Generic[DType]):
     def __getitem__(self, key) -> DType:
         return super().__getitem__(key)
+
+
+def _is_discrete_variable(variable: Any) -> bool:
+    return isinstance(variable, DiscreteVariable)
+
+
+def _get_discrete_values(variable: DiscreteVariable) -> list[float]:
+    return sorted(float(value) for value in variable.values)
 
 
 def visualize_generator_model(
@@ -147,10 +158,12 @@ def visualize_model(
         Defaults to vocs.variable_names.
     idx : int
         Index of the last sample to use. This also selects the point of reference in
-        higher dimensions unless an explicit reference_point is given.
+        higher dimensions when the reference point cannot be inferred from
+        :func:`xopt.vocs.select_best` and no explicit reference_point is given.
     reference_point : dict
         Reference point determining the value of variables in vocs.variable_names, but not in variable_names
-        (slice plots in higher dimensions). Defaults to last used sample.
+        (slice plots in higher dimensions). Defaults to the current best feasible point
+        from :func:`xopt.vocs.select_best` when available, otherwise to the sample at idx.
     show_samples : bool, optional
         Whether samples are shown.
     show_prior_mean : bool, optional
@@ -187,6 +200,7 @@ def visualize_model(
         show_acquisition = False
 
     dim_x, dim_y = len(variable_names), len(output_names)
+
     # plot configuration
     figure_config = _get_figure_config(
         min_ncols=dim_x,
@@ -200,7 +214,6 @@ def visualize_model(
         from matplotlib import pyplot as plt  # lazy import
 
         plots = plt.subplots(**figure_config, squeeze=False)
-
     else:
         plots = _get_figure_from_axes(axes), axes
     fig, ax = plots
@@ -209,10 +222,16 @@ def visualize_model(
 
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
 
-    figure_title = "Reference point: " + " ".join(
-        [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
-    )
-    fig.suptitle(figure_title)
+    if reference_point_names:
+        figure_title = _format_reference_point_title(
+            reference_point,
+            reference_point_names,
+        )
+        fig.suptitle(figure_title)
+    elif fig._suptitle is not None:
+        # Clear existing title when reusing axes for full-dimensional plots.
+        fig._suptitle.remove()
+        fig._suptitle = None
 
     # create plot
     if dim_x == 1:
@@ -464,11 +483,11 @@ def plot_model_prediction(
         include_prior_mean=show_prior_mean or requires_prior_mean,
     )
     if len(variable_names) == 1:
-        x_axis = (
-            input_mesh[:, vocs.variable_names.index(variable_names[0])]
-            .squeeze()
-            .numpy()
-        )
+        var_name = variable_names[0]
+        var = vocs.variables[var_name]
+        x_axis = input_mesh[:, vocs.variable_names.index(var_name)].squeeze().numpy()
+        # Helper to detect discrete variables
+        is_discrete = _is_discrete_variable(var)
         if output_name in vocs.constraint_names:
             axis.axhline(
                 y=vocs.constraints[output_name].value,
@@ -476,25 +495,44 @@ def plot_model_prediction(
                 linestyle=":",
                 label="Constraint Threshold",
             )
-        if show_prior_mean:
-            axis.plot(
-                x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean"
+        if is_discrete:
+            # Discrete: use scatter for mean, error bars for std, and set categorical ticks
+            axis.errorbar(
+                x_axis,
+                posterior_mean,
+                yerr=2 * posterior_std,
+                fmt="o",
+                color=color,
+                label="Posterior Mean ± 2σ",
             )
-        axis.plot(
-            x_axis,
-            posterior_mean,
-            color=color,
-            linestyle="-",
-            label="Posterior Mean",
-        )
-        c = axis.fill_between(
-            x=x_axis,
-            y1=posterior_mean - 2 * posterior_std,
-            y2=posterior_mean + 2 * posterior_std,
-            color=color,
-            alpha=0.25,
-            label="",
-        )
+            if show_prior_mean:
+                axis.scatter(
+                    x_axis, prior_mean, color=color, marker="x", label="Prior Mean"
+                )
+            discrete_values = _get_discrete_values(var)
+            axis.set_xticks(discrete_values)
+            axis.set_xticklabels([str(v) for v in discrete_values])
+        else:
+            # Continuous: use line and fill
+            if show_prior_mean:
+                axis.plot(
+                    x_axis, prior_mean, color=color, linestyle="--", label="Prior Mean"
+                )
+            axis.plot(
+                x_axis,
+                posterior_mean,
+                color=color,
+                linestyle="-",
+                label="Posterior Mean",
+            )
+            c = axis.fill_between(
+                x=x_axis,
+                y1=posterior_mean - 2 * posterior_std,
+                y2=posterior_mean + 2 * posterior_std,
+                color=color,
+                alpha=0.25,
+                label="",
+            )
         if show_samples:
             plot_samples(
                 variable_names=variable_names,
@@ -506,23 +544,27 @@ def plot_model_prediction(
                 interactive=interactive,
             )
         # labels and legend
-        axis.set_xlabel(variable_names[0])
+        axis.set_xlabel(var_name)
         axis.set_ylabel(output_name)
         if show_legend:
             handles, labels = _combine_legend_entries_for_samples(
                 *axis.get_legend_handles_labels()
             )
-            for j in range(len(labels)):
-                if labels[j] == "Posterior Mean":
-                    labels[j] = r"Posterior Mean $\pm 2\,\sigma$"
-                    handles[j] = (handles[j], c)
-            from matplotlib.legend_handler import HandlerTuple  # lazy import
+            # Only patch the legend for continuous (fill_between) case
+            if not is_discrete:
+                for j in range(len(labels)):
+                    if labels[j] == "Posterior Mean":
+                        labels[j] = r"Posterior Mean $\pm 2\,\sigma$"
+                        handles[j] = (handles[j], c)
+                from matplotlib.legend_handler import HandlerTuple  # lazy import
 
-            axis.legend(
-                labels=labels,
-                handles=handles,
-                handler_map={list: HandlerTuple(ndivide=None)},
-            )
+                axis.legend(
+                    labels=labels,
+                    handles=handles,
+                    handler_map={list: HandlerTuple(ndivide=None)},
+                )
+            else:
+                axis.legend(labels=labels, handles=handles)
     else:
         prediction_type = (
             "posterior mean" if prediction_type is None else prediction_type
@@ -659,10 +701,11 @@ def plot_acquisition_function(
         y_label = r"$\alpha$"
 
     if len(variable_names) == 1:
+        variable_name = variable_names[0]
+        var = vocs.variables[variable_name]
+        is_discrete = _is_discrete_variable(var)
         x_axis = (
-            input_mesh[:, vocs.variable_names.index(variable_names[0])]
-            .squeeze()
-            .numpy()
+            input_mesh[:, vocs.variable_names.index(variable_name)].squeeze().numpy()
         )
         base_acq = None
         if hasattr(acquisition_function, "base_acquisition"):
@@ -678,11 +721,24 @@ def plot_acquisition_function(
             acq = np.exp(acq)
 
         if base_acq is None:
-            axis.plot(x_axis, acq, "C0-")
+            if is_discrete:
+                axis.scatter(x_axis, acq, color="C0")
+            else:
+                axis.plot(x_axis, acq, "C0-")
         else:
-            axis.plot(x_axis, base_acq, "C0--", label="Base Acq. Function")
+            if is_discrete:
+                axis.scatter(
+                    x_axis, base_acq, color="C0", marker="x", label="Base Acq. Function"
+                )
+            else:
+                axis.plot(x_axis, base_acq, "C0--", label="Base Acq. Function")
             if not only_base_acq:
-                axis.plot(x_axis, acq, "C0-", label="Constrained Acq. Function")
+                if is_discrete:
+                    axis.scatter(
+                        x_axis, acq, color="C0", label="Constrained Acq. Function"
+                    )
+                else:
+                    axis.plot(x_axis, acq, "C0-", label="Constrained Acq. Function")
             if show_samples:
                 axis = plot_samples(
                     axis=axis,
@@ -694,7 +750,11 @@ def plot_acquisition_function(
                 )
             if show_legend:
                 axis.legend()
-        axis.set_xlabel(variable_names[0])
+        if is_discrete:
+            discrete_values = _get_discrete_values(var)
+            axis.set_xticks(discrete_values)
+            axis.set_xticklabels([str(v) for v in discrete_values])
+        axis.set_xlabel(variable_name)
 
         axis.set_ylabel(y_label)
     else:
@@ -811,14 +871,23 @@ def plot_feasibility(
         .numpy()
     )
     if len(variable_names) == 1:
+        variable_name = variable_names[0]
+        var = vocs.variables[variable_name]
+        is_discrete = _is_discrete_variable(var)
         x_axis = (
-            input_mesh[:, vocs.variable_names.index(variable_names[0])]
+            input_mesh[:, vocs.variable_names.index(variable_name)]
             .squeeze()
             .cpu()
             .numpy()
         )
-        axis.plot(x_axis, feas, "C0-")
-        axis.set_xlabel(variable_names[0])
+        if is_discrete:
+            axis.scatter(x_axis, feas, color="C0")
+            discrete_values = _get_discrete_values(var)
+            axis.set_xticks(discrete_values)
+            axis.set_xticklabels([str(v) for v in discrete_values])
+        else:
+            axis.plot(x_axis, feas, "C0-")
+        axis.set_xlabel(variable_name)
         axis.set_ylabel("Feasibility")
     else:
         axis = _plot2d_prediction(
@@ -981,16 +1050,36 @@ def _plot2d_prediction(
     """
     axis = _get_axis(axis, dim=len(variable_names))
     axis.locator_params(axis="both", nbins=5)
+
+    def _centers_to_edges(values: np.ndarray) -> np.ndarray:
+        values = np.asarray(values, dtype=float)
+        if values.size == 1:
+            return np.array([values[0] - 0.5, values[0] + 0.5], dtype=float)
+        mids = 0.5 * (values[:-1] + values[1:])
+        first_edge = values[0] - (mids[0] - values[0])
+        last_edge = values[-1] + (values[-1] - mids[-1])
+        return np.concatenate(([first_edge], mids, [last_edge]))
+
+    x_index = vocs.variable_names.index(variable_names[0])
+    y_index = vocs.variable_names.index(variable_names[1])
+    x_values = input_mesh[:, x_index].detach().cpu().numpy()
+    y_values = input_mesh[:, y_index].detach().cpu().numpy()
+    nx = np.unique(x_values).size
+    ny = np.unique(y_values).size
+
+    x_centers = np.unique(x_values)
+    y_centers = np.unique(y_values)
+    prediction_grid = prediction.reshape(nx, ny).T
+
+    x_edges = _centers_to_edges(x_centers)
+    y_edges = _centers_to_edges(y_centers)
+    x_edge_grid, y_edge_grid = np.meshgrid(x_edges, y_edges)
+
     pcm = axis.pcolormesh(
-        input_mesh[:, vocs.variable_names.index(variable_names[0])]
-        .reshape(n_grid, n_grid)
-        .cpu()
-        .numpy(),
-        input_mesh[:, vocs.variable_names.index(variable_names[1])]
-        .reshape(n_grid, n_grid)
-        .cpu()
-        .numpy(),
-        prediction.reshape(n_grid, n_grid),
+        x_edge_grid,
+        y_edge_grid,
+        prediction_grid,
+        shading="flat",
         rasterized=True,
     )
     from mpl_toolkits.axes_grid1 import make_axes_locatable  # lazy import
@@ -1001,6 +1090,18 @@ def _plot2d_prediction(
 
     cbar = plt.colorbar(pcm, cax=cax)
     axis.set_title(title)
+    # Set categorical ticks for discrete variables
+    for i, var_name in enumerate(variable_names[:2]):
+        var = vocs.variables[var_name]
+        is_discrete = _is_discrete_variable(var)
+        if is_discrete:
+            ticks = _get_discrete_values(var)
+            if i == 0:
+                axis.set_xticks(ticks)
+                axis.set_xticklabels([str(v) for v in ticks])
+            else:
+                axis.set_yticks(ticks)
+                axis.set_yticklabels([str(v) for v in ticks])
     axis.set_xlabel(variable_names[0])
     axis.set_ylabel(variable_names[1])
 
@@ -1060,16 +1161,29 @@ def _generate_input_mesh(
     torch.Tensor
         The input mesh for visualization.
     """
-    x_lim = torch.tensor([vocs.variables[k].domain for k in variable_names])
-    x_i = [torch.linspace(*x_lim[i], n_grid) for i in range(x_lim.shape[0])]
-    x_mesh = torch.meshgrid(*x_i, indexing="ij")
-    x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh]).double()
+    mesh_axes = []
+    for k in variable_names:
+        var = vocs.variables[k]
+        if _is_discrete_variable(var):
+            mesh_axes.append(
+                torch.tensor(_get_discrete_values(var), dtype=torch.float64)
+            )
+        else:
+            mesh_axes.append(
+                torch.linspace(
+                    var.domain[0], var.domain[1], n_grid, dtype=torch.float64
+                )
+            )
+
+    x_mesh = torch.meshgrid(*mesh_axes, indexing="ij")
+    x_v = torch.hstack([ele.reshape(-1, 1) for ele in x_mesh])
+    # For each variable in vocs.variable_names, fill with mesh if in variable_names, else with reference_point
     x = torch.stack(
         [
             (
                 x_v[:, variable_names.index(k)]
                 if k in variable_names
-                else reference_point[k] * torch.ones(x_v.shape[0])
+                else reference_point[k] * torch.ones(x_v.shape[0], dtype=torch.float64)
             )
             for k in vocs.variable_names
         ],
@@ -1087,7 +1201,10 @@ def _get_reference_point(
 ) -> dict[str, Any]:
     """Returns a valid reference point.
 
-    If the given reference point is None, the data sample corresponding to the given index is used.
+    If the given reference point is None, the best feasible point from
+    :func:`xopt.vocs.select_best` is used when available. If this is not possible
+    (e.g., multi-objective problem or no feasible points), the data sample
+    corresponding to the given index is used.
 
     Parameters
     ----------
@@ -1098,7 +1215,7 @@ def _get_reference_point(
     data : DataFrame
         Data used to select a reference point.
     idx : int, optional
-        Index of the sample to use as a reference point.
+        Index of the sample to use as a fallback reference point.
 
     Returns
     -------
@@ -1107,8 +1224,53 @@ def _get_reference_point(
     """
     if reference_point is not None:
         return reference_point
-    else:
+
+    try:
+        _, _, best_point = select_best(vocs, data)
+        return best_point
+    except (FeasibilityError, NotImplementedError, RuntimeError):
         return data[vocs.variable_names].iloc[idx].to_dict()
+
+
+def _format_reference_point_title(
+    reference_point: dict[str, Any],
+    reference_point_names: list[str],
+    max_line_length: int = 90,
+) -> str:
+    """Formats reference-point values into a readable, wrapped figure title."""
+    if not reference_point_names:
+        return "Reference point"
+
+    entries = [f"{name}: {reference_point[name]:.2}" for name in reference_point_names]
+    lines: list[str] = []
+    current_line = ""
+
+    for entry in entries:
+        candidate = entry if not current_line else f"{current_line}, {entry}"
+        if len(candidate) <= max_line_length:
+            current_line = candidate
+            continue
+
+        if current_line:
+            lines.append(current_line)
+
+        # Keep very long variable labels readable instead of letting them overflow.
+        wrapped_entry = textwrap.wrap(
+            entry,
+            width=max_line_length,
+            break_long_words=True,
+            break_on_hyphens=False,
+        )
+        if wrapped_entry:
+            lines.extend(wrapped_entry[:-1])
+            current_line = wrapped_entry[-1]
+        else:
+            current_line = entry
+
+    if current_line:
+        lines.append(current_line)
+
+    return "Reference point:\n" + "\n".join(lines)
 
 
 def _get_model_predictions(

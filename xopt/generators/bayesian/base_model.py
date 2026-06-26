@@ -6,9 +6,10 @@ from botorch.exceptions import ModelFittingError
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_mll
-from botorch.models import ModelListGP, SingleTaskGP
+from botorch.models import ModelListGP, SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.model import Model
 from gpytorch import ExactMarginalLogLikelihood
+from gpytorch.mlls import VariationalELBO
 from pydantic import ConfigDict
 from torch import Tensor
 
@@ -17,6 +18,7 @@ from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
 )
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import VOCS
+from gest_api.vocs import DiscreteVariable
 
 
 class ModelConstructor(XoptBaseModel, ABC):
@@ -96,7 +98,7 @@ class ModelConstructor(XoptBaseModel, ABC):
         data: pd.DataFrame,
         dtype: torch.dtype = torch.double,
         device: Union[torch.device, str] = "cpu",
-    ):
+    ) -> ModelListGP:
         """
         Convenience wrapper around `build_model` for use with VOCS (Variables,
         Objectives, Constraints, Statics).
@@ -119,7 +121,13 @@ class ModelConstructor(XoptBaseModel, ABC):
             The trained botorch model.
 
         """
-        variable_bounds = {name: ele.domain for name, ele in vocs.variables.items()}
+        variable_bounds = {}
+        for name, variable in vocs.variables.items():
+            if isinstance(variable, DiscreteVariable):
+                values = sorted(float(v) for v in variable.values)
+                variable_bounds[name] = [values[0], values[-1]]
+            else:
+                variable_bounds[name] = variable.domain
 
         return self.build_model(
             vocs.variable_names, vocs.output_names, data, variable_bounds, dtype, device
@@ -211,4 +219,38 @@ class ModelConstructor(XoptBaseModel, ABC):
                 warnings.warn(
                     "Model fitting failed for heteroskedastic GP. Returning untrained model."
                 )
+        return model
+
+    @staticmethod
+    def build_approximate_gp(
+        X: Tensor, Y: Tensor, train: bool = True, **kwargs
+    ) -> Model:
+        """
+        Utility method for creating variational SingleTaskGP models.
+
+        Parameters
+        ----------
+        X : Tensor
+            Training data for input variables.
+        Y : Tensor
+            Training data for outcome variables.
+        train : bool, True
+            Flag to specify if hyperparameter training should take place.
+        **kwargs
+            Additional keyword arguments for model configuration.
+
+        Returns
+        -------
+        Model
+            The variational SingleTaskGP model.
+
+        """
+        if X.shape[0] == 0 or Y.shape[0] == 0:
+            raise ValueError("no data found to train model!")
+        model = SingleTaskVariationalGP(X, Y, **kwargs)
+
+        if train:
+            mll = VariationalELBO(model.likelihood, model.model, num_data=X.shape[-2])
+            fit_gpytorch_mll(mll)
+
         return model

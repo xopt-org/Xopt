@@ -6,7 +6,21 @@ on:
     branches-ignore:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
+  delete-cancelled-runs:
+    permissions:
+      actions: write
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
+        with:
+          workflow-file: 'test-notebooks.yml'
+          max-deletions: 4
+
   test-notebooks:
     runs-on: ubuntu-latest
     strategy:
@@ -41,7 +55,7 @@ jobs:
           SMOKE_TEST: "True"
         run: |
           set +e  # Don't exit on first error
-          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*')
+          NOTEBOOKS=$(find . -type f -name "*.ipynb" -not -path '*/.*' | sort)
           NOTEBOOK_ARRAY=($NOTEBOOKS)
 
           # Create temp directory for tracking

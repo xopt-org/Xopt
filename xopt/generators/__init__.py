@@ -23,6 +23,7 @@ all_generator_names = {
         "time_dependent_upper_confidence_bound",
         "expected_improvement",
         "multi_fidelity",
+        "bax",
     },
     "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
@@ -86,6 +87,7 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             TDUpperConfidenceBoundGenerator,
             UpperConfidenceBoundGenerator,
         )
+        from xopt.generators.bayesian.bax_generator import BaxGenerator
 
         registered_generators: list[type[Generator]] = [
             UpperConfidenceBoundGenerator,
@@ -94,6 +96,7 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             TDUpperConfidenceBoundGenerator,
             ExpectedImprovementGenerator,
             MultiFidelityGenerator,
+            BaxGenerator,
         ]
         for gen in registered_generators:
             generators[gen.name] = gen
@@ -145,6 +148,7 @@ def get_generator_defaults(
             "supports_multi_objective",
             "supports_single_objective",
             "supports_constraints",
+            "supports_discrete_variables",
         ]:
             continue
 

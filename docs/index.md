@@ -37,6 +37,7 @@ Currenty **Xopt** provides:
       - Trust region BO
       - Heteroskedastic noise specification
       - Multiple acquisition function optimization stratigies
+      - Approximate GP model building
   - `extremum_seeking` Extremum seeking time-dependent optimization
   - `rcds` Robust Conjugate Direction Search (RCDS)
   - `neldermead` Nelder-Mead Simplex
