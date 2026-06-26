@@ -20,7 +20,8 @@ Currenty **Xopt** provides:
 
 - Optimization algorithms:
   - Genetic algorithms
-    - [`cnsga`](examples\ga\cnsga_tnk.ipynb) Continuous NSGA-II with constraints
+    - [`NSGA-II`](examples\ga\nsga2\index.md) Implementation of NSGA-II: Non-dominated sorting genetic algorithm
+    - [`cnsga`](examples\ga\cnsga_tnk.ipynb) NSGA-II adapted for use with "continuous generators"
   - Bayesian optimization (BO) algorithms:
     - [`upper_confidence_bound`](examples\single_objective_bayes_opt\upper_confidence_bound.ipynb) BO using Upper Confidence Bound acquisition function
       (w/ or w/o constraints, serial or parallel)
