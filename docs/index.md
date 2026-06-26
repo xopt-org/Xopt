@@ -19,35 +19,35 @@ support for multi-threaded or MPI-enabled execution.
 Currenty **Xopt** provides:
 
 - Optimization algorithms:
-  - Genetic algorithms
-    - [`NSGA-II`](examples/ga/nsga2/index.md) Implementation of NSGA-II: Non-dominated sorting genetic algorithm
-    - [`cnsga`](examples/ga/cnsga_tnk.ipynb) NSGA-II adapted for use with "continuous generators"
-  - Bayesian optimization (BO) algorithms:
-    - [`upper_confidence_bound`](examples/single_objective_bayes_opt/upper_confidence_bound.ipynb) BO using Upper Confidence Bound acquisition function
-      (w/ or w/o constraints, serial or parallel)
-    - [`expected_improvement`](examples/single_objective_bayes_opt/bo_tutorial.ipynb) BO using Expected Improvement acquisition function
-      (w/ or w/o constraints, serial or parallel)
-    - [`mobo`](examples/multi_objective_bayes_opt/mobo.ipynb) Multi-objective BO (w/ or w/o constraints, serial or parallel)
-    - [`bayesian_exploration`](examples/bayes_exp/bayesian_exploration.ipynb) Autonomous function characterization using Bayesian
-      Exploration
-    - [`mggpo`](examples/multi_objective_bayes_opt/mggpo.ipynb) Parallelized hybrid Multi-Generation Multi-Objective Bayesian
-      optimization
-    - [`multi_fidelity`](examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb) Multi-fidelity single or multi objective optimization
-    - [`BAX`](examples/single_objective_bayes_opt/bax_tutorial.ipynb) Bayesian algorithm execution using virtual measurements
-    - BO customization:
-      - [Trust region BO](examples/trust_region_bo/turbo_basics.ipynb)
-      - [Heteroskedastic noise specification](examples/single_objective_bayes_opt/heteroskedastic_noise_tutorial.ipynb)
-      - Multiple acquisition function optimization stratigies
-      - [Approximate GP model building](examples/gp_model_creation/approximate.ipynb)
-  - [`extremum_seeking`](examples/sequential/extremum_seeking.ipynb) Extremum seeking time-dependent optimization
-  - [`rcds`](examples/sequential/rcds.ipynb) Robust Conjugate Direction Search (RCDS)
-  - [`neldermead`](examples/sequential/neldermead.ipynb) Nelder-Mead Simplex
+    - Genetic algorithms
+        - [`NSGA-II`](examples/ga/nsga2/index.md) Implementation of NSGA-II: Non-dominated sorting genetic algorithm
+        - [`cnsga`](examples/ga/cnsga_tnk.ipynb) NSGA-II adapted for use with "continuous generators"
+    - Bayesian optimization (BO) algorithms:
+        - [`upper_confidence_bound`](examples/single_objective_bayes_opt/upper_confidence_bound.ipynb) BO using Upper Confidence Bound acquisition function
+          (w/ or w/o constraints, serial or parallel)
+        - [`expected_improvement`](examples/single_objective_bayes_opt/bo_tutorial.ipynb) BO using Expected Improvement acquisition function
+          (w/ or w/o constraints, serial or parallel)
+        - [`mobo`](examples/multi_objective_bayes_opt/mobo.ipynb) Multi-objective BO (w/ or w/o constraints, serial or parallel)
+        - [`bayesian_exploration`](examples/bayes_exp/bayesian_exploration.ipynb) Autonomous function characterization using Bayesian
+          Exploration
+        - [`mggpo`](examples/multi_objective_bayes_opt/mggpo.ipynb) Parallelized hybrid Multi-Generation Multi-Objective Bayesian
+          optimization
+        - [`multi_fidelity`](examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb) Multi-fidelity single or multi objective optimization
+        - [`BAX`](examples/single_objective_bayes_opt/bax_tutorial.ipynb) Bayesian algorithm execution using virtual measurements
+        - BO customization:
+            - [Trust region BO](examples/trust_region_bo/turbo_basics.ipynb)
+            - [Heteroskedastic noise specification](examples/single_objective_bayes_opt/heteroskedastic_noise_tutorial.ipynb)
+            - Multiple acquisition function optimization stratigies
+            - [Approximate GP model building](examples/gp_model_creation/approximate.ipynb)
+    - [`extremum_seeking`](examples/sequential/extremum_seeking.ipynb) Extremum seeking time-dependent optimization
+    - [`rcds`](examples/sequential/rcds.ipynb) Robust Conjugate Direction Search (RCDS)
+    - [`neldermead`](examples/sequential/neldermead.ipynb) Nelder-Mead Simplex
 - Sampling algorithms:
-  - `random` Uniform random sampling
+    - `random` Uniform random sampling
 - Convenient YAML/JSON based input format
 - Driver programs:
-  - [`xopt-run`](examples/basic/xopt_cli.md) Run Xopt from the command line using a YAML config file
-  - `xopt.mpi.run` Parallel MPI execution using this input format
+    - [`xopt-run`](examples/basic/xopt_cli.md) Run Xopt from the command line using a YAML config file
+    - `xopt.mpi.run` Parallel MPI execution using this input format
 
  **Xopt** does **not** provide:
 - your custom simulation via an `evaluate` function.
