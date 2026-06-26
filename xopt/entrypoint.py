@@ -13,6 +13,49 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+_XOPT_INITIAL_COLS = ["xopt_candidate_idx", "xopt_runtime", "xopt_error"]
+
+
+def normalize_initial_data(df: pd.DataFrame, vocs) -> pd.DataFrame:
+    """
+    Validate and normalize a user-supplied initial-data DataFrame before
+    passing it to Xopt.add_data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Raw DataFrame loaded from the user's CSV.
+    vocs : VOCS
+        The VOCS object from the Xopt instance.
+
+    Returns
+    -------
+    pd.DataFrame
+        Normalized DataFrame with required VOCS columns present, xopt metadata
+        columns filled with defaults if absent, and unrecognized columns dropped.
+    """
+    missing = set(vocs.all_names) - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Initial data is missing required VOCS columns: {sorted(missing)}"
+        )
+
+    df = df.copy()
+    if "xopt_candidate_idx" not in df.columns:
+        df["xopt_candidate_idx"] = range(len(df))
+    if "xopt_runtime" not in df.columns:
+        df["xopt_runtime"] = 0.0
+    if "xopt_error" not in df.columns:
+        df["xopt_error"] = False
+
+    keep = list(vocs.all_names) + _XOPT_INITIAL_COLS
+    if "xopt_error_str" in df.columns:
+        keep = keep + ["xopt_error_str"]
+    extra = sorted(set(df.columns) - set(keep))
+    if extra:
+        logger.warning(f"Dropping unrecognized columns from initial data: {extra}")
+    return df[[c for c in keep if c in df.columns]]
+
 
 @contextmanager
 def get_executor(name, max_workers=1):
@@ -201,7 +244,10 @@ def main():
         # Seed the generator with initial data if provided
         if args.initial_data is not None:
             logger.info(f"Loading initial data from {args.initial_data}")
-            my_xopt.add_data(pd.read_csv(args.initial_data))
+            initial_df = normalize_initial_data(
+                pd.read_csv(args.initial_data), my_xopt.vocs
+            )
+            my_xopt.add_data(initial_df)
 
         # Run Xopt
         my_xopt.run()

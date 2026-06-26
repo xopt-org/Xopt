@@ -1,8 +1,26 @@
+import numpy as np
+import pandas as pd
 import pytest
 import sys
 import yaml
 from unittest import mock
 from xopt import entrypoint
+from xopt.entrypoint import normalize_initial_data
+from xopt.resources.test_functions.tnk import tnk_vocs
+
+
+def _tnk_df(n=3):
+    return pd.DataFrame(
+        {
+            "x1": np.random.uniform(0, np.pi, n),
+            "x2": np.random.uniform(0, np.pi, n),
+            "y1": np.random.uniform(0, 1, n),
+            "y2": np.random.uniform(0, 1, n),
+            "c1": np.random.uniform(-1, 1, n),
+            "c2": np.random.uniform(0, 0.5, n),
+            "a": [1.0] * n,
+        }
+    )
 
 
 class TestEntryPointScript:
@@ -57,3 +75,21 @@ class TestEntryPointScript:
         with pytest.raises(ValueError, match="Unknown executor: bad"):
             with entrypoint.get_executor("bad"):
                 pass
+
+    def test_normalize_initial_data_missing_cols(self):
+        df = _tnk_df().drop(columns=["y2"])
+        with pytest.raises(ValueError, match="y2"):
+            normalize_initial_data(df, tnk_vocs)
+
+    def test_normalize_initial_data_adds_xopt_defaults(self):
+        df = _tnk_df()
+        result = normalize_initial_data(df, tnk_vocs)
+        assert list(result["xopt_candidate_idx"]) == list(range(len(df)))
+        assert (result["xopt_runtime"] == 0.0).all()
+        assert (result["xopt_error"] == False).all()  # noqa: E712
+
+    def test_normalize_initial_data_drops_extra_cols(self):
+        df = _tnk_df()
+        df["extra_col"] = 999
+        result = normalize_initial_data(df, tnk_vocs)
+        assert "extra_col" not in result.columns
