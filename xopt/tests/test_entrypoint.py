@@ -93,3 +93,9 @@ class TestEntryPointScript:
         df["extra_col"] = 999
         result = normalize_initial_data(df, tnk_vocs)
         assert "extra_col" not in result.columns
+
+    def test_normalize_initial_data_keeps_xopt_error_str(self):
+        df = _tnk_df()
+        df["xopt_error_str"] = "some error"
+        result = normalize_initial_data(df, tnk_vocs)
+        assert "xopt_error_str" in result.columns
