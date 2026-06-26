@@ -99,3 +99,13 @@ class TestEntryPointScript:
         df["xopt_error_str"] = "some error"
         result = normalize_initial_data(df, tnk_vocs)
         assert "xopt_error_str" in result.columns
+
+    def test_normalize_initial_data_preserves_existing_xopt_cols(self):
+        df = _tnk_df(n=3)
+        df["xopt_candidate_idx"] = [10, 20, 30]
+        df["xopt_runtime"] = [1.1, 2.2, 3.3]
+        df["xopt_error"] = [True, False, True]
+        result = normalize_initial_data(df, tnk_vocs)
+        assert list(result["xopt_candidate_idx"]) == [10, 20, 30]
+        assert list(result["xopt_runtime"]) == [1.1, 2.2, 3.3]
+        assert list(result["xopt_error"]) == [True, False, True]
