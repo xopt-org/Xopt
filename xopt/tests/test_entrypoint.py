@@ -100,6 +100,35 @@ class TestEntryPointScript:
         result = normalize_initial_data(df, tnk_vocs)
         assert "xopt_error_str" in result.columns
 
+    @mock.patch("xopt.entrypoint.normalize_initial_data")
+    @mock.patch("xopt.entrypoint.pd.read_csv")
+    @mock.patch("xopt.entrypoint.remove_none_values", side_effect=lambda x: x)
+    @mock.patch("xopt.entrypoint.Xopt")
+    def test_main_with_initial_data(
+        self, mock_Xopt, mock_remove_none, mock_read_csv, mock_normalize, tmp_path
+    ):
+        config_path, config = self.make_config(tmp_path)
+        csv_path = str(tmp_path / "initial.csv")
+
+        sentinel_df = pd.DataFrame({"x1": [1.0]})
+        mock_read_csv.return_value = sentinel_df
+        mock_normalize.return_value = sentinel_df
+
+        mock_xopt_instance = mock.Mock()
+        mock_Xopt.model_validate.return_value = mock_xopt_instance
+        mock_xopt_instance.run.return_value = None
+
+        sys_argv = ["entrypoint.py", config_path, "--initial_data", csv_path]
+        with mock.patch.object(sys, "argv", sys_argv):
+            with mock.patch(
+                "builtins.open", mock.mock_open(read_data=yaml.dump(config))
+            ):
+                entrypoint.main()
+
+        mock_read_csv.assert_called_once_with(csv_path)
+        mock_normalize.assert_called_once_with(sentinel_df, mock_xopt_instance.vocs)
+        mock_xopt_instance.add_data.assert_called_once_with(sentinel_df)
+
     def test_normalize_initial_data_preserves_existing_xopt_cols(self):
         df = _tnk_df(n=3)
         df["xopt_candidate_idx"] = [10, 20, 30]
