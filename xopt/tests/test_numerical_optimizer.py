@@ -205,7 +205,7 @@ class TestNumericalOptimizers:
         X = Xopt(generator=generator, evaluator=evaluator)
 
         X.evaluate_data(
-            pd.DataFrame({"x1": [1.0, 0.75, 3.14, 0], "x2": [0.7, 0.95, 0, 3.14]})
+            pd.DataFrame({"x1": [3.14, 3.14, 0], "x2": [3.14, 0, 3.14]})
         )
 
         X.step()
