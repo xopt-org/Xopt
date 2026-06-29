@@ -530,6 +530,53 @@ def get_feasibility_data(
     return fdata
 
 
+def get_local_region(vocs: VOCS, center_point: dict, fraction: float = 0.1) -> dict:
+    """
+    Calculates the bounds of a local region around a center point with side lengths
+    equal to a fixed fraction of the input space for each variable
+
+    Parameters
+    ----------
+    vocs : VOCS
+        The variable-objective-constraint space (VOCS) defining the problem.
+    center_point : dict
+        A dictionary representing the center point of the local region. The keys should match the variable names in the VOCS, and the values should be the corresponding values for each variable.
+    fraction : float, optional
+        The fraction of the input space to define the local region. Defaults to 0.1 (10%).
+
+    Returns
+    -------
+    dict
+        A dictionary containing the bounds of the local region for each variable.
+
+    """
+    if not center_point.keys() == set(vocs.variable_names):
+        raise KeyError("Center point keys must match vocs variable names")
+
+    bounds = {}
+    widths = {
+        ele: vocs.variables[ele].domain[1] - vocs.variables[ele].domain[0]
+        for ele in vocs.variable_names
+    }
+
+    for name in vocs.variable_names:
+        bounds[name] = [
+            np.max(
+                (
+                    center_point[name] - widths[name] * fraction,
+                    vocs.variables[name].domain[0],
+                )
+            ),
+            np.min(
+                (
+                    center_point[name] + widths[name] * fraction,
+                    vocs.variables[name].domain[1],
+                )
+            ),
+        ]
+
+    return bounds
+
 def normalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize input data (transform data into the range [0,1]) based on the
