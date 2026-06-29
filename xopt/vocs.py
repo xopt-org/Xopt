@@ -577,6 +577,7 @@ def get_local_region(vocs: VOCS, center_point: dict, fraction: float = 0.1) -> d
 
     return bounds
 
+
 def normalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize input data (transform data into the range [0,1]) based on the
