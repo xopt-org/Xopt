@@ -986,3 +986,37 @@ def test_nsga2_vocs_not_present_in_add_data():
     # Try with strict=False
     X.strict = False
     X.add_data(pd.DataFrame({"x1": [0], "y2": [0], "c1": [0]}))
+
+
+def test_generate_candidates_in_bounds_unsorted_vocs():
+    """
+    Test for Github issue #437. Confirm that variables out of alphabetic order are generated in unpermuted order.
+    """
+    population_size = 6
+
+    vocs = VOCS(
+        variables={
+            "z": [100.0, 101.0],
+            "a": [0.0, 1.0],
+        },
+        objectives={"f": "MINIMIZE"},
+    )
+
+    def evaluate(inputs):
+        return {"f": inputs["z"] + inputs["a"]}
+
+    X = Xopt(
+        generator=NSGA2Generator(vocs=vocs, population_size=population_size),
+        evaluator=Evaluator(function=evaluate),
+    )
+
+    for _ in range(population_size):
+        X.step()
+
+    candidates = X.generator._generate(20)
+
+    for cand in candidates:
+        z_lo, z_hi = vocs.variables["z"].domain
+        a_lo, a_hi = vocs.variables["a"].domain
+        assert z_lo <= cand["z"] <= z_hi, f"z={cand['z']!r} out of [{z_lo}, {z_hi}]"
+        assert a_lo <= cand["a"] <= a_hi, f"a={cand['a']!r} out of [{a_lo}, {a_hi}]"
