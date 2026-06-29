@@ -28,6 +28,10 @@ class PatchBAXGeneratorNoConstraints(BaxGenerator):
     supports_constraints: bool = False
 
 
+class PatchBAXGeneratorSupportsSingleObjective(BaxGenerator):
+    supports_single_objective: bool = True
+
+
 class TestBaxGenerator:
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_init(self):
@@ -82,24 +86,26 @@ class TestBaxGenerator:
         with pytest.raises(ValueError, match=r"bounds must have the shape \[2, ndim\]"):
             alg.create_mesh(invalid_bounds)
 
-    def test_algorithm_get_execution_paths_not_implemented(self):
+    def test_algorithm_execute_not_implemented(self):
         class DummyAlgorithm(Algorithm):
-            def evaluate_virtual_objective(
+            def perform_virtual_measurement(
                 self, model, x, bounds, n_samples, tkwargs=None
             ):
                 return torch.zeros(1)
 
-            def get_execution_paths(self, model, bounds):
-                return super().get_execution_paths(model, bounds)
+            def execute(self, model, bounds):
+                return super().execute(model, bounds)
 
         alg = DummyAlgorithm()
-        alg.get_execution_paths(None, None)
+
+        with pytest.raises(NotImplementedError):
+            alg.execute(None, None)
 
     def test_grid_minimize(self):
         # test grid scan minimize
         for ndim in [1, 3]:
             bounds = torch.stack([torch.zeros(ndim), torch.ones(ndim)])
-            alg = GridOptimize()
+            alg = GridOptimize(observable_names_ordered=["y1"])
 
             # create a ModelList with a single output
             train_X = torch.rand(10, ndim, dtype=torch.float64)
@@ -114,7 +120,9 @@ class TestBaxGenerator:
                 )
             )
 
-            x_exe, y_exe, results = alg.get_execution_paths(model, bounds)
+            algorithm_result = alg.execute(model, bounds)
+            x_exe = algorithm_result.input_execution_paths
+            y_exe = algorithm_result.output_execution_paths
 
             # execution paths should be able to be transformed and used in
             # `condition_on_observations` method
@@ -155,10 +163,13 @@ class TestBaxGenerator:
                 input_transform=Normalize(ndim),
                 outcome_transform=Standardize(1),
             )
-            alg = GridOptimize(minimize=False)
-            x_exe, y_exe, results = alg.get_execution_paths(model, bounds)
+            alg = GridOptimize(observable_names_ordered=["y1"], minimize=False)
+            algorithm_result = alg.execute(model, bounds)
+            x_exe = algorithm_result.input_execution_paths
+            y_exe = algorithm_result.output_execution_paths
+
             # Should select the maximum value from posterior_samples
-            posterior_samples = results["posterior_samples"]
+            posterior_samples = algorithm_result.posterior_samples
             y_max, idx_max = torch.max(posterior_samples, dim=-2)
             assert torch.allclose(y_exe.squeeze(-2), y_max)
             assert x_exe.shape[0] == alg.n_samples
@@ -166,7 +177,7 @@ class TestBaxGenerator:
     def test_acquisition_func(self):
         torch.manual_seed(1)
 
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         # test w/o constraints
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -226,7 +237,7 @@ class TestBaxGenerator:
         assert torch.allclose(acqf_vals, test_acqf_vals, atol=1e-4)
 
     def test_generate(self):
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         # test w/o constraints
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -259,7 +270,7 @@ class TestBaxGenerator:
         assert len(candidate) == 1
 
     def test_cuda(self):
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
         test_vocs.observables = ["y1"]
@@ -277,7 +288,7 @@ class TestBaxGenerator:
 
     def test_in_xopt(self):
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
@@ -296,7 +307,7 @@ class TestBaxGenerator:
 
     def test_file_saving(self):
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
@@ -315,9 +326,12 @@ class TestBaxGenerator:
         with open("test_2.pkl", "rb") as handle:
             result = pickle.load(handle)
 
+        assert isinstance(result["input_execution_paths"], torch.Tensor)
+        assert isinstance(result["output_execution_paths"], torch.Tensor)
+        assert isinstance(result["best_inputs"], torch.Tensor)
+        assert isinstance(result["best_objective"], torch.Tensor)
         assert isinstance(result["test_points"], torch.Tensor)
         assert isinstance(result["posterior_samples"], torch.Tensor)
-        assert isinstance(result["execution_paths"], torch.Tensor)
 
         import os
 
@@ -326,10 +340,47 @@ class TestBaxGenerator:
 
     def test_vocs_validation(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         with pytest.raises(VOCSError):
             BaxGenerator(vocs=test_vocs, algorithm=alg)
+
+    def test_vocs_validation_rejects_single_objective(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {"y1": "MINIMIZE"}
+        test_vocs.observables = []
+        test_vocs.constraints = {}
+        alg = GridOptimize(observable_names_ordered=["y1"])
+
+        with pytest.raises(
+            VOCSError, match="only supports problems with no objectives"
+        ):
+            PatchBAXGeneratorSupportsSingleObjective(vocs=test_vocs, algorithm=alg)
+
+    def test_algorithm_validation_requires_class_path(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        test_vocs.constraints = {}
+
+        with pytest.raises(
+            ValueError, match="Algorithm dictionary must contain 'class_path' key"
+        ):
+            BaxGenerator(vocs=test_vocs, algorithm={"n_samples": 4})
+
+    def test_algorithm_validation_rejects_unknown_module(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        test_vocs.constraints = {}
+
+        with pytest.raises(
+            ValueError, match="Cannot import 'fake.module.GridOptimize'"
+        ):
+            BaxGenerator(
+                vocs=test_vocs,
+                algorithm={"class_path": "fake.module.GridOptimize", "n_samples": 4},
+            )
 
     def test_curvature_grid_optimize_virtual_objective(self):
         ndim = 2
@@ -342,15 +393,20 @@ class TestBaxGenerator:
             input_transform=Normalize(ndim),
             outcome_transform=Standardize(1),
         )
-        alg = CurvatureGridOptimize(n_samples=3, use_mean=False)
+        alg = CurvatureGridOptimize(
+            observable_names_ordered=["y1"], n_samples=3, use_mean=False
+        )
         mesh = alg.create_mesh(bounds)
-        result = alg.evaluate_virtual_objective(model, mesh, bounds, n_samples=3)
+        measurement_result = alg.perform_virtual_measurement(
+            model, mesh, bounds, n_samples=3
+        )
+        objective = measurement_result.objective
         # Should have shape [n_samples, mesh_points, 1]
-        assert result.shape[0] == 3
-        assert result.shape[1] == mesh.shape[0]
+        assert objective.shape[0] == 3
+        assert objective.shape[1] == mesh.shape[0]
         # Edge values should be zero
-        assert torch.all(result[:, 0] == 0)
-        assert torch.all(result[:, -1] == 0)
+        assert torch.all(objective[:, 0] == 0)
+        assert torch.all(objective[:, -1] == 0)
 
     def test_curvature_grid_optimize_use_mean(self):
         ndim = 1
@@ -363,19 +419,41 @@ class TestBaxGenerator:
             input_transform=Normalize(ndim),
             outcome_transform=Standardize(1),
         )
-        alg = CurvatureGridOptimize(n_samples=2, use_mean=True)
+        alg = CurvatureGridOptimize(
+            observable_names_ordered=["y1"], n_samples=2, use_mean=True
+        )
         mesh = alg.create_mesh(bounds)
-        result = alg.evaluate_virtual_objective(model, mesh, bounds, n_samples=2)
+        measurement_result = alg.perform_virtual_measurement(
+            model, mesh, bounds, n_samples=2
+        )
+        objective = measurement_result.objective
         # Should have shape [1, mesh_points, 1] since use_mean=True
-        assert result.shape[0] == 1
-        assert result.shape[1] == mesh.shape[0]
+        assert objective.shape[0] == 1
+        assert objective.shape[1] == mesh.shape[0]
         # Edge values should be zero
-        assert torch.all(result[:, 0] == 0)
-        assert torch.all(result[:, -1] == 0)
+        assert torch.all(objective[:, 0] == 0)
+        assert torch.all(objective[:, -1] == 0)
+
+    def test_bax_serialization(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        alg = GridOptimize(observable_names_ordered=["y1"])
+        gen = BaxGenerator(vocs=test_vocs, algorithm=alg, n_monte_carlo_samples=10)
+        gen.numerical_optimizer.n_restarts = 1
+
+        serialized_gen = gen.model_dump()
+        deserialized_gen = BaxGenerator.model_validate(serialized_gen)
+        assert isinstance(deserialized_gen, BaxGenerator)
+        assert deserialized_gen.algorithm.n_samples == gen.algorithm.n_samples
+        assert deserialized_gen.algorithm.class_path == gen.algorithm.class_path
+
+        deserialized_gen.add_data(TEST_VOCS_DATA)
+        deserialized_gen.generate(1)
 
     def test_visualization(self):
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}

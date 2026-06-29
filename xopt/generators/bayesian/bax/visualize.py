@@ -104,9 +104,10 @@ def visualize_virtual_objective(
     # get virtual objective (sample) values
     bounds = generator._get_optimization_bounds()
     kwargs = kwargs if kwargs else {}
-    objective_values = generator.algorithm.evaluate_virtual_objective(
+    measurement_result = generator.algorithm.perform_virtual_measurement(
         bax_model, x, bounds, tkwargs=tkwargs, n_samples=n_samples, **kwargs
     )
+    objective_values = measurement_result.objective
 
     # get sample stats
     objective_med = objective_values.nanmedian(dim=0)[0].flatten()

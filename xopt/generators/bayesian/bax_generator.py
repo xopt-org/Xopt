@@ -1,11 +1,13 @@
+from copy import deepcopy
+import importlib
 import logging
 import pickle
-from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from botorch.models import ModelListGP, SingleTaskGP
 from pydantic import (
     Field,
+    SerializeAsAny,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -13,7 +15,7 @@ from pydantic import (
 
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
-from xopt.generators.bayesian.bax.algorithms import Algorithm
+from xopt.generators.bayesian.bax.algorithms import Algorithm, GridOptimize
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.turbo import EntropyTurboController, SafetyTurboController
 from xopt.generators.bayesian.utils import validate_turbo_controller_center
@@ -50,18 +52,23 @@ class BaxGenerator(BayesianGenerator):
         Get the acquisition function.
     """
 
-    name = "BAX"
+    name = "bax"
     supports_constraints: bool = True
     supports_discrete_variables: bool = False
-    algorithm: Algorithm = Field(description="algorithm evaluated in the BAX process")
-    algorithm_results: Dict = Field(
+    algorithm: SerializeAsAny[Algorithm] = Field(
+        description="algorithm evaluated in the BAX process"
+    )
+    algorithm_results: Optional[Dict] = Field(
         None, description="dictionary results from algorithm", exclude=True
     )
-    algorithm_results_file: str = Field(
+    algorithm_results_file: Optional[str] = Field(
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0
     _compatible_turbo_controllers = [EntropyTurboController, SafetyTurboController]
+
+    # NOTE: this is meant for use in Badger, TODO: add it to Xopt
+    _compatible_algorithms = [GridOptimize]
 
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
@@ -80,6 +87,26 @@ class BaxGenerator(BayesianGenerator):
         validate_turbo_controller_center(self)
 
         return self
+
+    @field_validator("algorithm", mode="before")
+    def validate_algorithm(cls, v, info: ValidationInfo):
+        if isinstance(v, dict):
+            try:
+                class_path = v.pop("class_path")
+                module_name, class_name = class_path.rsplit(".", 1)
+            except KeyError:
+                raise ValueError("Algorithm dictionary must contain 'class_path' key")
+
+            try:
+                algorithm_class = getattr(
+                    importlib.import_module(module_name), class_name
+                )
+            except ModuleNotFoundError:
+                raise ValueError(f"Cannot import '{module_name}.{class_name}'")
+
+            v = algorithm_class.model_validate(v)
+
+        return v
 
     def generate(self, n_candidates: int) -> List[Dict]:
         """
@@ -121,10 +148,17 @@ class BaxGenerator(BayesianGenerator):
         if isinstance(bax_model, SingleTaskGP):
             bax_model = ModelListGP(bax_model)
 
-        eig = ModelListExpectedInformationGain(
-            bax_model, self.algorithm, self._get_optimization_bounds()
-        )
-        self.algorithm_results = eig.algorithm_results
+        # get sample-wise algorithm execution (BAX) results
+        algorithm_results = self.algorithm.execute(
+            bax_model, self._get_optimization_bounds()
+        ).model_dump()
+
+        self.algorithm_results = algorithm_results
+        xs_exe = algorithm_results["input_execution_paths"]
+        ys_exe = algorithm_results["output_execution_paths"]
+
+        eig = ModelListExpectedInformationGain(bax_model, xs_exe, ys_exe)
+
         if self.algorithm_results_file is not None:
             results = deepcopy(self.algorithm_results)
 

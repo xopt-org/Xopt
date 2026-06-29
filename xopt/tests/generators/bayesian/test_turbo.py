@@ -518,7 +518,9 @@ class TestTurbo(TestCase):
             return {"y1": np.sin(input_dict["x"])}
 
         # Prepare BAX algorithm and generator options
-        algorithm = GridOptimize(n_mesh_points=10)  # NOTE: default is to minimize
+        algorithm = GridOptimize(
+            observable_names_ordered=["y1"], n_mesh_points=10
+        )  # NOTE: default is to minimize
 
         # construct BAX generator
         generator = BaxGenerator(
