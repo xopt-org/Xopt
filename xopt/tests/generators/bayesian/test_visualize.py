@@ -386,6 +386,34 @@ def test_visualize_model_with_contextual_axis_shows_acquisition_warning():
     plt.close(fig)
 
 
+def test_plot_model_prediction_contextual_axis_uses_explicit_domain_without_data_column():
+    vocs = VOCS(
+        variables={"x": [0, 1], "context": ContextualVariable(domain=[2.0, 3.0])},
+        objectives={"z": "MAXIMIZE"},
+        constraints={},
+        observables=["z"],
+    )
+    data = pd.DataFrame(
+        {
+            "x": np.linspace(0, 1, 5),
+            "z": np.linspace(0.0, 1.0, 5),
+        }
+    )
+
+    ax = visualize.plot_model_prediction(
+        model=DummyModel(),
+        vocs=vocs,
+        output_name="z",
+        data=data,
+        tkwargs={},
+        variable_names=["context"],
+        reference_point={"x": 0.5, "context": 2.5},
+        n_grid=5,
+        show_samples=False,
+    )
+    assert ax is not None
+
+
 # @pytest.fixture(autouse=True)
 # def patch_get_sampler():
 #     with patch("xopt.generators.bayesian.visualize.get_sampler") as mock_get_sampler:

@@ -24,6 +24,7 @@ from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
 from xopt.errors import FeasibilityError
 from xopt.vocs import (
+    ContextualVariable,
     get_feasibility_data,
     get_variable_bounds_array,
     get_variable_data,
@@ -218,7 +219,15 @@ class TurboController(XoptBaseModel, ABC):
 
         """
         model = generator.model
-        bounds = torch.tensor(get_variable_bounds_array(self.vocs), dtype=torch.double)
+        active_variable_names = [
+            name
+            for name in self.vocs.variable_names
+            if not isinstance(self.vocs.variables[name], ContextualVariable)
+        ]
+        bounds = torch.tensor(
+            get_variable_bounds_array(self.vocs, variable_names=active_variable_names),
+            dtype=torch.double,
+        )
 
         if self.center_x is not None:
             # get bounds width
@@ -226,7 +235,7 @@ class TurboController(XoptBaseModel, ABC):
 
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
-                [self.center_x[ele] for ele in self.vocs.variable_names],
+                [self.center_x[ele] for ele in active_variable_names],
             ).unsqueeze(dim=0)
 
             # default weights are 1 (if there is no model or a model without

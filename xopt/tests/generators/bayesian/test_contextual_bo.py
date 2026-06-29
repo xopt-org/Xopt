@@ -119,6 +119,34 @@ class TestContextualBO:
         assert np.isclose(bounds["x2"][0], 0.3 - padding)
         assert np.isclose(bounds["x2"][1], 0.7 + padding)
 
+    def test_contextual_variable_explicit_domain_overrides_data(self):
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(domain=[0.2, 0.4])},
+            objectives={"y": "MAXIMIZE"},
+        )
+        generator = UpperConfidenceBoundGenerator(vocs=vocs)
+
+        data = pd.DataFrame(
+            {
+                "x1": np.linspace(0, 1, 5),
+                "x2": np.array([0.3, 0.4, 0.5, 0.6, 0.7]),
+                "y": np.ones(5),
+            }
+        )
+        bounds = generator.get_model_input_bounds(data)
+        assert np.allclose(bounds["x2"], [0.2, 0.4])
+
+    def test_contextual_variable_explicit_domain_does_not_require_data_column(self):
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(domain=[-1.0, 1.0])},
+            objectives={"y": "MAXIMIZE"},
+        )
+        generator = UpperConfidenceBoundGenerator(vocs=vocs)
+
+        data = pd.DataFrame({"x1": np.linspace(0, 1, 5), "y": np.ones(5)})
+        bounds = generator.get_model_input_bounds(data)
+        assert np.allclose(bounds["x2"], [-1.0, 1.0])
+
     def test_visualize_model_with_contextual_axis_warns(self):
         generator = UpperConfidenceBoundGenerator(vocs=self.vocs)
         xopt = Xopt(generator=generator, evaluator=self.evaluator)

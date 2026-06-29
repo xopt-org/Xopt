@@ -15,6 +15,7 @@ import traceback
 import yaml
 
 from gest_api.vocs import VOCS, GreaterThanConstraint
+from xopt.vocs import ContextualVariable
 
 from .generator import Generator
 from .pydantic import get_descriptions_defaults
@@ -254,16 +255,22 @@ def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> d
     equal to a fixed fraction of the input space for each variable
 
     """
-    if not center_point.keys() == set(vocs.variable_names):
-        raise KeyError("Center point keys must match vocs variable names")
+    local_region_variables = [
+        name
+        for name in vocs.variable_names
+        if not isinstance(vocs.variables[name], ContextualVariable)
+    ]
+    missing_names = [name for name in local_region_variables if name not in center_point]
+    if missing_names:
+        raise KeyError("Center point keys must include all non-contextual variables")
 
     bounds = {}
     widths = {
         ele: vocs.variables[ele].domain[1] - vocs.variables[ele].domain[0]
-        for ele in vocs.variable_names
+        for ele in local_region_variables
     }
 
-    for name in vocs.variable_names:
+    for name in local_region_variables:
         bounds[name] = [
             np.max(
                 (

@@ -14,6 +14,7 @@ from xopt.vocs import (
     convert_dataframe_to_inputs,
     cumulative_optimum,
     denormalize_inputs,
+    get_variable_bounds,
     get_variable_data,
     normalize_inputs,
     random_inputs,
@@ -278,14 +279,39 @@ class TestVOCS(object):
         assert grid.shape == (2 * 2, 2)
         assert np.allclose(sorted(grid["d"].unique()), [0.8, 1.6])
 
-        # Custom bounds with no discrete values should raise.
-        with pytest.raises(ValueError, match="no discrete values"):
-            grid_inputs(
-                vocs,
-                n={"x": 2},
-                custom_bounds={"d": [0.81, 1.59]},
-                include_constants=False,
-            )
+    def test_get_variable_bounds_contextual_requires_data_when_unbounded(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "context": ContextualVariable()},
+            objectives={"f": "MINIMIZE"},
+        )
+
+        with pytest.raises(KeyError, match="requires data"):
+            get_variable_bounds(vocs)
+
+    def test_get_variable_bounds_contextual_inferred_when_requested(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "context": ContextualVariable()},
+            objectives={"f": "MINIMIZE"},
+        )
+        data = pd.DataFrame({"x": [0.1, 0.2], "context": [0.3, 0.7]})
+
+        bounds = get_variable_bounds(vocs, data=data)
+        width = 0.7 - 0.3
+        padding = 0.05 * width
+        assert np.isclose(bounds["context"][0], 0.3 - padding)
+        assert np.isclose(bounds["context"][1], 0.7 + padding)
+
+    def test_get_variable_bounds_contextual_explicit_domain_when_requested(self):
+        vocs = VOCS(
+            variables={
+                "x": [0.0, 1.0],
+                "context": ContextualVariable(domain=[2.0, 4.0]),
+            },
+            objectives={"f": "MINIMIZE"},
+        )
+
+        bounds = get_variable_bounds(vocs)
+        assert bounds["context"] == (2.0, 4.0)
 
     def test_random_sampling_custom_bounds(self):
         vocs = deepcopy(TEST_VOCS_BASE)

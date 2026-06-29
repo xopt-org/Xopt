@@ -26,7 +26,13 @@ from matplotlib.ticker import FormatStrFormatter
 
 from xopt.errors import FeasibilityError
 from xopt.generator import Generator
-from xopt.vocs import ContextualVariable, VOCS, get_feasibility_data, select_best
+from xopt.vocs import (
+    ContextualVariable,
+    VOCS,
+    get_feasibility_data,
+    resolve_contextual_variable_bounds,
+    select_best,
+)
 
 from .objectives import feasibility
 from .utils import torch_compile_gp_model, torch_trace_gp_model
@@ -1193,22 +1199,8 @@ def _generate_input_mesh(
     for name in variable_names:
         variable = vocs.variables[name]
         if isinstance(variable, ContextualVariable):
-            if name not in data:
-                raise KeyError(
-                    f"Missing contextual variable `{name}` in data required for visualization."
-                )
-
-            lower = float(data[name].min())
-            upper = float(data[name].max())
-            if not np.isfinite(lower) or not np.isfinite(upper):
-                raise ValueError(
-                    f"Contextual variable `{name}` has non-finite bounds in data."
-                )
-
-            width = upper - lower
-            padding = max(0.05 * width, 1e-8)
-            lower = lower - padding
-            upper = upper + padding
+            series = data[name] if name in data else None
+            lower, upper = resolve_contextual_variable_bounds(variable, series, name)
 
             mesh_axes.append(torch.linspace(lower, upper, n_grid, dtype=torch.float64))
         elif isinstance(variable, DiscreteVariable):
