@@ -195,18 +195,14 @@ class TestNumericalOptimizers:
 
         # can only explore one objective
         vocs.objectives = {"y1": "EXPLORE"}
-
         generator = BayesianExplorationGenerator(
             vocs=vocs, numerical_optimizer=GridOptimizer(n_grid_points=2)
         )
-
         evaluator = Evaluator(function=evaluate_TNK)
-
         X = Xopt(generator=generator, evaluator=evaluator)
 
-        X.evaluate_data(
-            pd.DataFrame({"x1": [3.14, 3.14, 0], "x2": [3.14, 0, 3.14]})
-        )
+        # sample at corners of the design space except for the origin
+        X.evaluate_data(pd.DataFrame({"x1": [3.14, 3.14, 0], "x2": [3.14, 0, 3.14]}))
 
         X.step()
         assert np.allclose(
