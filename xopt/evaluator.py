@@ -156,6 +156,8 @@ class Evaluator(XoptBaseModel):
         result = pd.concat(
             [input_data, DataFrame(output_data, index=input_data.index)], axis=1
         )
+
+        # Remove columns with identical name coming from pd.concat, raising if data differs
         if not result.columns.is_unique:
             dup_cols = result.columns[result.columns.duplicated(keep=False)].unique()
             for col in dup_cols:
