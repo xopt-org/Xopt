@@ -156,6 +156,7 @@ class BayesianGenerator(Generator, ABC):
 
     name = "base_bayesian_generator"
     supports_discrete_variables: bool = True
+    supports_contextual_variables: bool = True
     model: Optional[Model] = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
@@ -206,6 +207,12 @@ class BayesianGenerator(Generator, ABC):
 
         if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
             raise VOCSError("this generator does not support discrete variables")
+
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
 
         # assertion that at least one objective exists is done in model_validator below
         if v.n_objectives == 1:

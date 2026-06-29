@@ -260,7 +260,9 @@ def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> d
         for name in vocs.variable_names
         if not isinstance(vocs.variables[name], ContextualVariable)
     ]
-    missing_names = [name for name in local_region_variables if name not in center_point]
+    missing_names = [
+        name for name in local_region_variables if name not in center_point
+    ]
     if missing_names:
         raise KeyError("Center point keys must include all non-contextual variables")
 

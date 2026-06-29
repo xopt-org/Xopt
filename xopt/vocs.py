@@ -962,8 +962,8 @@ def clip_variable_bounds(
     vocs: VOCS, custom_bounds: dict[str, list[float]] | None = None
 ) -> dict[str, tuple[float, float]]:
     """
-    Return new bounds as intersection of bounds provided by VOCS and custom bounds. 
-    Note that this function only considers non-contextual variables, as 
+    Return new bounds as intersection of bounds provided by VOCS and custom bounds.
+    Note that this function only considers non-contextual variables, as
     contextual variable bounds are not optimized over.
 
     Parameters
@@ -989,7 +989,9 @@ def clip_variable_bounds(
     elif not isinstance(custom_bounds, dict):
         raise TypeError("specified `custom_bounds` must be a dict")
     else:
-        variable_bounds = get_variable_bounds(vocs, variable_names=active_variable_names)
+        variable_bounds = get_variable_bounds(
+            vocs, variable_names=active_variable_names
+        )
 
         try:
             validate_variable_bounds(custom_bounds)
