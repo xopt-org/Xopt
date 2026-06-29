@@ -46,11 +46,45 @@ def resolve_contextual_variable_bounds(
     padding_fraction: float = 0.05,
     minimum_padding: float = 1e-8,
 ) -> tuple[float, float]:
-    """
-    Resolve contextual variable bounds.
+    """Resolve finite bounds for a contextual variable.
 
-    Explicit finite domains always take precedence. If the contextual domain is
-    unbounded, bounds are inferred from data with optional padding.
+    This utility applies the contextual bound resolution policy used throughout Xopt:
+    explicit finite domains take precedence over data-derived bounds. If the
+    contextual domain is unbounded, finite bounds are inferred from observed data
+    and expanded by a small padding.
+
+    Parameters
+    ----------
+    variable : ContextualVariable
+        Contextual variable whose effective bounds are being resolved.
+    data : pd.Series or None
+        Observed values for the contextual variable. Required only when
+        ``variable.domain`` is not finite.
+    variable_name : str
+        Variable name used to construct informative error messages.
+    padding_fraction : float, optional
+        Fraction of inferred data width to add on each side of the interval.
+        Default is ``0.05``.
+    minimum_padding : float, optional
+        Minimum absolute padding used when inferred data width is very small.
+        Default is ``1e-8``.
+
+    Returns
+    -------
+    tuple[float, float]
+        Resolved lower and upper bounds.
+
+    Raises
+    ------
+    KeyError
+        If the contextual domain is unbounded and no data is provided.
+    ValueError
+        If inferred bounds from data are non-finite.
+
+    Notes
+    -----
+    If ``variable.domain`` is finite, data is ignored and domain bounds are
+    returned directly.
     """
     lower = float(variable.domain[0])
     upper = float(variable.domain[1])
