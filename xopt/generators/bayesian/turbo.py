@@ -219,11 +219,7 @@ class TurboController(XoptBaseModel, ABC):
 
         """
         model = generator.model
-        active_variable_names = [
-            name
-            for name in self.vocs.variable_names
-            if not isinstance(self.vocs.variables[name], ContextualVariable)
-        ]
+        active_variable_names = self._get_trust_region_variable_names(generator)
         bounds = torch.tensor(
             get_variable_bounds_array(self.vocs, variable_names=active_variable_names),
             dtype=torch.double,
@@ -248,8 +244,23 @@ class TurboController(XoptBaseModel, ABC):
                         model.models[0].covar_module.lengthscale.detach().cpu()
                     )
 
+                    # Restrict lengthscales to the trust-region dimensions.
+                    if lengthscales.ndim > 1:
+                        lengthscales = lengthscales.reshape(-1)
+                    input_names = list(generator.model_input_names)
+                    active_indices = [
+                        input_names.index(name)
+                        for name in active_variable_names
+                        if name in input_names
+                    ]
+                    if active_indices:
+                        lengthscales = lengthscales[active_indices]
+
                     # calculate the ratios of lengthscales for each axis
-                    weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+                    active_dim = len(active_variable_names)
+                    weights = lengthscales / torch.prod(lengthscales) ** (
+                        1 / active_dim
+                    )
 
             # calculate the tr bounding box
             tr_lb = torch.clamp(
@@ -261,6 +272,25 @@ class TurboController(XoptBaseModel, ABC):
             return torch.cat((tr_lb, tr_ub), dim=0)
         else:
             return bounds
+
+    def _get_trust_region_variable_names(
+        self, generator: "BayesianGenerator"
+    ) -> list[str]:
+        """Return variable names used by the trust region.
+
+        Prefer generator candidate variables so trust-region filtering and
+        optimization use the same dimensionality. Fall back to non-contextual
+        VOCS variables if candidate names are unavailable.
+        """
+        candidate_names = getattr(generator, "_candidate_names", None)
+        if candidate_names is not None:
+            return list(candidate_names)
+
+        return [
+            name
+            for name in self.vocs.variable_names
+            if not isinstance(self.vocs.variables[name], ContextualVariable)
+        ]
 
     def update_trust_region(self):
         """
@@ -291,7 +321,8 @@ class TurboController(XoptBaseModel, ABC):
         pd.DataFrame
             The subset of data within the trust region.
         """
-        variable_data = torch.tensor(get_variable_data(self.vocs, data).to_numpy())
+        active_variable_names = self._get_trust_region_variable_names(generator)
+        variable_data = torch.tensor(data[active_variable_names].to_numpy())
 
         bounds = self.get_trust_region(generator)
 

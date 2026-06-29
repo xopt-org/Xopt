@@ -528,17 +528,6 @@ class BayesianGenerator(Generator, ABC):
         # get input bounds
         variable_bounds = self.get_model_input_bounds(data)
 
-        # if turbo restrict points is true then set the bounds to the trust region
-        # bounds
-        if self.turbo_controller is not None:
-            if self.turbo_controller.restrict_model_data:
-                variable_bounds = dict(
-                    zip(
-                        self.vocs.variable_names,
-                        self.turbo_controller.get_trust_region(self).numpy().T,
-                    )
-                )
-
         _model = self.gp_constructor.build_model(
             self.model_input_names,
             self.model_output_names,
@@ -947,16 +936,9 @@ class BayesianGenerator(Generator, ABC):
         # bounds
         if self.turbo_controller is not None:
             if self.turbo_controller.restrict_model_data:
-                variable_bounds = dict(
-                    zip(
-                        [
-                            name
-                            for name in self.vocs.variable_names
-                            if name not in self.contextual_variables
-                        ],
-                        self.turbo_controller.get_trust_region(self).numpy().T,
-                    )
-                )
+                trust_region_bounds = self.turbo_controller.get_trust_region(self)
+                for idx, name in enumerate(self._candidate_names):
+                    variable_bounds[name] = trust_region_bounds[:, idx].numpy()
 
         # add fixed feature bounds if requested
         if self.fixed_features is not None:

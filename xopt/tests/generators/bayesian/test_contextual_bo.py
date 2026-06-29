@@ -7,6 +7,7 @@ from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
+from xopt.generators.bayesian.turbo import OptimizeTurboController
 from xopt.vocs import VOCS, ContextualVariable, convert_dataframe_to_inputs
 import pytest
 import torch
@@ -197,6 +198,44 @@ class TestContextualBO:
         assert bounds.shape == (2, 1)
         assert torch.allclose(bounds, torch.tensor([[0.0], [1.0]]).double())
 
+    @pytest.mark.parametrize(
+        "generator_class",
+        [ExpectedImprovementGenerator, UpperConfidenceBoundGenerator],
+    )
+    def test_generate_with_contextual_and_fixed_features(self, generator_class):
+        """Generated candidates should omit contextual variables and respect fixed
+        feature values."""
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(), "x3": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        generator = generator_class(vocs=vocs, fixed_features={"x3": 0.25})
+
+        data = pd.DataFrame(
+            {
+                "x1": np.linspace(0.0, 1.0, 8),
+                "x2": np.linspace(0.2, 0.8, 8),
+                "x3": np.linspace(0.0, 1.0, 8),
+                "y": np.sin(2 * np.pi * np.linspace(0.0, 1.0, 8)),
+            }
+        )
+        generator.add_data(data)
+        generator.train_model()
+
+        candidates = generator.generate(2)
+        if isinstance(candidates, list):
+            assert all("x1" in candidate for candidate in candidates)
+            assert all("x2" not in candidate for candidate in candidates)
+            assert all("x3" in candidate for candidate in candidates)
+            assert all(np.isclose(candidate["x3"], 0.25) for candidate in candidates)
+            assert all(0.0 <= candidate["x1"] <= 1.0 for candidate in candidates)
+        else:
+            assert "x1" in candidates.columns
+            assert "x2" not in candidates.columns
+            assert "x3" in candidates.columns
+            assert np.allclose(candidates["x3"].to_numpy(), 0.25)
+            assert candidates["x1"].between(0.0, 1.0).all()
+
     def test_convert_dataframe_to_inputs_error_message_contextual(self):
         """The error message when input columns mismatch must mention non-contextual
         variables so users are not confused by contextual variables being absent."""
@@ -210,3 +249,38 @@ class TestContextualBO:
             match="non-contextual",
         ):
             convert_dataframe_to_inputs(vocs, pd.DataFrame({"x2": [0.5]}))
+
+    def test_contextual_variable_with_turbo_controller(self):
+        """Contextual variables and TuRBO should work together, with TuRBO operating
+        over controllable variables only."""
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
+            objectives={"y": "MAXIMIZE"},
+        )
+        turbo = OptimizeTurboController(vocs=vocs)
+        generator = UpperConfidenceBoundGenerator(vocs=vocs, turbo_controller=turbo)
+
+        data = pd.DataFrame(
+            {
+                "x1": np.linspace(0.0, 1.0, 8),
+                "x2": np.linspace(0.2, 0.8, 8),
+                "y": np.sin(2 * np.pi * np.linspace(0.0, 1.0, 8)),
+            }
+        )
+        generator.add_data(data)
+        generator.train_model()
+
+        # TuRBO trust region should stay in controllable dimensions only.
+        tr = generator.turbo_controller.get_trust_region(generator)
+        assert tr.shape == (2, 1)
+
+        # Optimization bounds should likewise be 1D (x1 only).
+        opt_bounds = generator._get_optimization_bounds()
+        assert opt_bounds.shape == (2, 1)
+
+        # Candidate generation should exclude contextual variables.
+        candidates = generator.generate(1)
+        if isinstance(candidates, list):
+            assert all("x2" not in candidate for candidate in candidates)
+        else:
+            assert "x2" not in candidates.columns
