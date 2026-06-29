@@ -624,7 +624,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Get runtime information for the children used in this population
             rt = [x["xopt_runtime"] for x in self.child[: self.population_size]]
-            perf_message = f"{np.mean(rt):.3f}s ({np.std(rt):.3f}s)"
+            perf_message = f"{np.mean(rt):.3f}s (+/- {np.std(rt):.3f}s)"
 
             # Generate logging message
             n_feasible = np.sum(
