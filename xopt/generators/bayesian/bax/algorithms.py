@@ -318,6 +318,7 @@ class CurvatureGridOptimize(GridOptimize):
         Perform the virtual measurement (samples) with curvature.
     """
 
+    name: str = Field(default="curvature_grid_optimize", frozen=True)
     use_mean: bool = False
 
     def perform_virtual_measurement(
