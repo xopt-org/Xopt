@@ -52,9 +52,8 @@ def custom_pydantic_encoder(type_encoders, obj):
         except KeyError:
             continue
         return encoder(obj)
-    raise TypeError(
-        f"Object of type {type(obj).__name__!r} is not JSON serializable"
-    )
+    raise TypeError(f"Object of type {type(obj).__name__!r} is not JSON serializable")
+
 
 JSON_ENCODERS = {
     # function/method type distinguished for class members
