@@ -2,7 +2,7 @@ import array
 import logging
 import os
 import random
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
@@ -88,6 +88,8 @@ class CNSGAGenerator(Generator):
     )
     _children: List[Dict] = PrivateAttr([])
     _offspring: Optional[pd.DataFrame] = PrivateAttr(None)
+    _loaded_population: Optional[pd.DataFrame] = PrivateAttr(None)
+    _toolbox: Any = PrivateAttr(None)
     population: Optional[pd.DataFrame] = Field(None)
 
     model_config = ConfigDict(extra="allow")
