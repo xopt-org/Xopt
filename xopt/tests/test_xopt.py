@@ -31,8 +31,12 @@ class DummyGenerator(Generator, ABC):
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
-    def generate(self, n_candidates) -> pd.DataFrame:
-        pass
+    def generate(self, n_candidates) -> list:
+        bounds = np.array(self.vocs.bounds)
+        midpoints = dict(
+            zip(self.vocs.variable_names, (bounds[:, 0] + bounds[:, 1]) / 2)
+        )
+        return [midpoints.copy() for _ in range(n_candidates)]
 
     def default_options(self):
         pass
@@ -573,3 +577,70 @@ class TestXopt:
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
+
+    def test_add_data_duplicate_columns(self):
+        """
+        Reproduction of Github issue #434 (Duplicate Columns in xopt.data When User-Provided Eval Function Returns Inputs).
+        This is an issue with the Evaluator where duplicate columns are produced when user-provided eval function returns
+        either variable or constant data.
+        """
+        vocs = VOCS(
+            variables={"x1": [0, 3.14159], "x2": [0, 3.14159]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
+            constants={"a": 1.0},
+        )
+
+        def evaluate_returns_constant(inputs):
+            x1, x2 = inputs["x1"], inputs["x2"]
+            return {
+                "y1": x1,
+                "c1": x1**2 + x2**2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
+                "c2": (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2,
+                "a": inputs[
+                    "a"
+                ],  # returning the constant 'a' back creates duplicate column
+            }
+
+        n_rows = 5
+        initial_df = pd.DataFrame(
+            {
+                "x1": np.random.uniform(0, np.pi, n_rows),
+                "x2": np.random.uniform(0, np.pi, n_rows),
+                "y1": np.random.uniform(0, 1, n_rows),
+                "y2": np.random.uniform(0, 1, n_rows),
+                "c1": np.random.uniform(-1, 1, n_rows),
+                "c2": np.random.uniform(0, 0.5, n_rows),
+            }
+        )
+
+        X = Xopt(
+            generator=DummyGenerator(vocs=vocs),
+            evaluator=Evaluator(function=evaluate_returns_constant),
+        )
+        X.add_data(initial_df)
+        X.step()
+
+    def test_add_data_duplicate_columns_different_values(self):
+        vocs = VOCS(
+            variables={"x1": [0, 3.14159], "x2": [0, 3.14159]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
+            constants={"a": 1.0},
+        )
+
+        def evaluate_returns_different_value(inputs):
+            x1, x2 = inputs["x1"], inputs["x2"]
+            return {
+                "y1": x1,
+                "c1": x1**2 + x2**2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
+                "c2": (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2,
+                "a": inputs["a"] + 1.0,  # different value -- should raise
+            }
+
+        X = Xopt(
+            generator=DummyGenerator(vocs=vocs),
+            evaluator=Evaluator(function=evaluate_returns_different_value),
+        )
+        with pytest.raises(ValueError):
+            X.step()

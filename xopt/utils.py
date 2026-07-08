@@ -249,48 +249,6 @@ def has_device_field(module: torch.nn.Module, device: torch.device) -> bool:
     return False
 
 
-def get_local_region(center_point: dict, vocs: VOCS, fraction: float = 0.1) -> dict:
-    """
-    calculates the bounds of a local region around a center point with side lengths
-    equal to a fixed fraction of the input space for each variable
-
-    """
-    local_region_variables = [
-        name
-        for name in vocs.variable_names
-        if not isinstance(vocs.variables[name], ContextualVariable)
-    ]
-    missing_names = [
-        name for name in local_region_variables if name not in center_point
-    ]
-    if missing_names:
-        raise KeyError("Center point keys must include all non-contextual variables")
-
-    bounds = {}
-    widths = {
-        ele: vocs.variables[ele].domain[1] - vocs.variables[ele].domain[0]
-        for ele in local_region_variables
-    }
-
-    for name in local_region_variables:
-        bounds[name] = [
-            np.max(
-                (
-                    center_point[name] - widths[name] * fraction,
-                    vocs.variables[name].domain[0],
-                )
-            ),
-            np.min(
-                (
-                    center_point[name] + widths[name] * fraction,
-                    vocs.variables[name].domain[1],
-                )
-            ),
-        ]
-
-    return bounds
-
-
 ########################################################################################################################
 # Data processing
 ########################################################################################################################

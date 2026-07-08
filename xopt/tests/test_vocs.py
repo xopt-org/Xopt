@@ -15,6 +15,7 @@ from xopt.vocs import (
     cumulative_optimum,
     denormalize_inputs,
     get_variable_bounds,
+    get_constraint_data,
     get_variable_data,
     normalize_inputs,
     random_inputs,
@@ -403,6 +404,32 @@ class TestVOCS(object):
         # test using object type inside test data
         test_data["y2"] = test_data["y2"].astype(np.dtype(object))
         get_objective_data(vocs, test_data)
+
+    def test_constraint_data(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0]},
+            objectives={"f": "MINIMIZE"},
+            constraints={
+                "c1": ["LESS_THAN", 0.5],
+                "c2": ["GREATER_THAN", 2.0],
+            },
+        )
+
+        test_data = pd.DataFrame(
+            {
+                "x": [0.5, 0.5],
+                "c1": [0.2, 0.8],  # 0.2 satisfies c1 < 0.5, 0.8 violates it
+                "c2": [3.0, 1.0],  # 3.0 satisfies c2 > 2.0, 1.0 violates it
+            }
+        )
+
+        result = get_constraint_data(vocs, test_data)
+
+        # Satisfied constraints produce g < 0, violated produce g > 0
+        # LESS_THAN 0.5: g = c1 - 0.5
+        np.testing.assert_allclose(result["constraint_c1"].to_numpy(), [-0.3, 0.3])
+        # GREATER_THAN 2.0: g = -(c2 - 2.0)
+        np.testing.assert_allclose(result["constraint_c2"].to_numpy(), [-1.0, 1.0])
 
     def test_convert_dataframe_to_inputs(self):
         vocs = deepcopy(TEST_VOCS_BASE)

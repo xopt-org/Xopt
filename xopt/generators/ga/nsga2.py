@@ -255,6 +255,58 @@ def cull_population(
     return crowded_comparison_argsort(pop_f, pop_g)[-population_size:]
 
 
+def generate_candidates_from_population(
+    pop: list[dict],
+    vocs: VOCS,
+    n_candidates: int,
+    mutation_operator: MutationOperator,
+    crossover_operator: CrossoverOperator,
+) -> list[dict]:
+    """
+    Generate offspring from an existing population using binary tournament selection,
+    crossover, and mutation.
+
+    Parameters
+    ----------
+    pop : list[dict]
+        Current population individuals.
+    vocs : VOCS
+        VOCS object defining variables, objectives, and constraints.
+    n_candidates : int
+        Number of offspring to produce.
+    mutation_operator : MutationOperator
+        Mutation operator to apply.
+    crossover_operator : CrossoverOperator
+        Crossover operator to apply.
+
+    Returns
+    -------
+    list[dict]
+        Generated candidates with variable name keys.
+    """
+    var_names = list(vocs.variable_names)
+    pop_x = pd.DataFrame(pop)[var_names].to_numpy()
+    pop_f = get_objective_data(vocs, pop).to_numpy()
+    pop_g = vocs_data_to_arr(get_constraint_data(vocs, pop).to_numpy())
+    fitness = get_fitness(pop_f, pop_g)
+    bounds = np.array([vocs.variables[name].domain for name in var_names]).T
+
+    candidates = []
+    for _ in range(n_candidates):
+        child = generate_child_binary_tournament(
+            pop_x,
+            pop_f,
+            pop_g,
+            bounds,
+            mutate=mutation_operator,
+            crossover=crossover_operator,
+            fitness=fitness,
+        )
+        candidates.append(dict(zip(var_names, child)))
+
+    return candidates
+
+
 ########################################################################################################################
 # Optimizer class
 ########################################################################################################################
@@ -495,36 +547,13 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
         # If we have a population create children, otherwise generate randomly sampled points
         if self.pop:
-            # Get the variables
-            var_names = sorted(self.vocs.variable_names)
-
-            # Generate candidates one by one
-            candidates = []
-            pop_x = get_variable_data(self.vocs, self.pop).to_numpy()
-            pop_f = get_objective_data(self.vocs, self.pop).to_numpy()
-            pop_g = vocs_data_to_arr(
-                get_constraint_data(self.vocs, self.pop).to_numpy()
+            candidates = generate_candidates_from_population(
+                self.pop,
+                self.vocs,
+                n_candidates,
+                self.mutation_operator,
+                self.crossover_operator,
             )
-            fitness = get_fitness(pop_f, pop_g)
-            bounds = np.array(self.vocs.bounds).T
-            for _ in range(n_candidates):
-                candidates.append(
-                    {
-                        k: v
-                        for k, v in zip(
-                            var_names,
-                            generate_child_binary_tournament(
-                                pop_x,
-                                pop_f,
-                                pop_g,
-                                bounds,
-                                mutate=self.mutation_operator,
-                                crossover=self.crossover_operator,
-                                fitness=fitness,
-                            ),
-                        )
-                    }
-                )
             self._logger.debug(
                 f"generated {n_candidates} candidates from generation {self.n_generations} "
                 f"in {1000 * (time.perf_counter() - start_t):.2f}ms"
@@ -595,7 +624,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Get runtime information for the children used in this population
             rt = [x["xopt_runtime"] for x in self.child[: self.population_size]]
-            perf_message = f"{np.mean(rt):.3f}s ({np.std(rt):.3f}s)"
+            perf_message = f"{np.mean(rt):.3f}s (+/- {np.std(rt):.3f}s)"
 
             # Generate logging message
             n_feasible = np.sum(

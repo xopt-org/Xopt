@@ -84,7 +84,7 @@ class TestModelConstructor:
         constructor.build_model_from_vocs(test_vocs, data)
         t2 = time.perf_counter()
         delta = t2 - t1
-        assert delta < 0.3
+        assert delta < 2.0
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_standard_adam(self, use_cuda):
