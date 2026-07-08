@@ -15,7 +15,6 @@ import traceback
 import yaml
 
 from gest_api.vocs import VOCS, GreaterThanConstraint
-from xopt.vocs import ContextualVariable
 
 from .generator import Generator
 from .pydantic import get_descriptions_defaults
