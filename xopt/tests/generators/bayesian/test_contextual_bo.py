@@ -8,6 +8,8 @@ from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
 from xopt.generators.bayesian.turbo import OptimizeTurboController
+from xopt.generators.bayesian.utils import validate_turbo_controller_center
+from xopt.errors import VOCSError
 from xopt.vocs import VOCS, ContextualVariable, convert_dataframe_to_inputs
 import pytest
 import torch
@@ -284,3 +286,92 @@ class TestContextualBO:
             assert all("x2" not in candidate for candidate in candidates)
         else:
             assert "x2" not in candidates.columns
+
+    def test_bayesian_generator_contextual_support_flag(self):
+        """Bayesian generators must reject contextual variables when support is disabled."""
+
+        class NoContextUCBGenerator(UpperConfidenceBoundGenerator):
+            supports_contextual_variables: bool = False
+
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
+            objectives={"y": "MAXIMIZE"},
+        )
+
+        with pytest.raises(
+            VOCSError, match="this generator does not support contextual variables"
+        ):
+            NoContextUCBGenerator(vocs=vocs)
+
+    def test_turbo_fallback_variable_names_exclude_contextual(self):
+        """TuRBO should fall back to non-contextual VOCS variables when candidate
+        names are unavailable."""
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(), "x3": [-1, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        turbo = OptimizeTurboController(vocs=vocs)
+
+        dummy_generator = type("DummyGenerator", (), {})()
+        dummy_generator.vocs = vocs
+
+        assert turbo._get_trust_region_variable_names(dummy_generator) == ["x1", "x3"]
+
+    def test_turbo_center_x_with_contextual_and_fixed_features(self):
+        """TuRBO center validation and data filtering should operate over active
+        candidate dimensions only."""
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable(), "x3": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+        turbo = OptimizeTurboController(
+            vocs=vocs,
+            center_x={"x1": 0.5, "x2": 10.0, "x3": 10.0},
+            length=0.5,
+        )
+        generator = UpperConfidenceBoundGenerator(
+            vocs=vocs,
+            fixed_features={"x3": 0.25},
+            turbo_controller=turbo,
+        )
+
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.4, 0.6, 0.9],
+                "x2": [0.2, 0.4, 0.6, 0.8],
+                "x3": [0.25, 0.25, 0.25, 0.25],
+                "y": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+
+        filtered = generator.get_training_data(data)
+        assert not filtered.empty
+        assert filtered["x1"].between(0.25, 0.75).all()
+
+    def test_turbo_center_validation_skips_missing_candidate_key(self):
+        """Center validation should skip candidate dimensions absent from center_x."""
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": [0, 1]},
+            objectives={"y": "MAXIMIZE"},
+        )
+
+        class DummyTurboController(OptimizeTurboController):
+            def get_trust_region(self, generator):
+                return torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.double)
+
+        turbo = DummyTurboController(
+            vocs=vocs,
+            center_x={"x1": 0.5, "x2": 0.5},
+        )
+
+        class DummyGenerator:
+            def __init__(self, vocs, turbo_controller):
+                self.vocs = vocs
+                self.turbo_controller = turbo_controller
+
+            @property
+            def _candidate_names(self):
+                return ["x1", "missing_feature"]
+
+        generator = DummyGenerator(vocs, turbo)
+        validate_turbo_controller_center(generator)
