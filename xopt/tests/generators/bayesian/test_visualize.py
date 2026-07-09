@@ -386,6 +386,44 @@ def test_visualize_model_with_contextual_axis_shows_acquisition_warning():
     plt.close(fig)
 
 
+def test_visualize_model_contextual_slice_plots_acquisition():
+    vocs = VOCS(
+        variables={"x": [0, 1], "context": ContextualVariable()},
+        objectives={"z": "MAXIMIZE"},
+        constraints={},
+        observables=["z"],
+    )
+    x = np.linspace(0.05, 0.95, 8)
+    context = np.linspace(0.1, 0.9, 8)
+    data = pd.DataFrame(
+        {
+            "x": x,
+            "context": context,
+            "z": -((x - context) ** 2),
+        }
+    )
+
+    generator = UpperConfidenceBoundGenerator(vocs=vocs)
+    generator.add_data(data)
+    generator.train_model()
+
+    fig, ax = generator.visualize_model(
+        output_names=["z"],
+        variable_names=["x"],
+        n_grid=5,
+        show_samples=False,
+        show_acquisition=True,
+    )
+
+    acquisition_axis = ax[1, 0]
+    assert not any(
+        "Acquisition plot unavailable" in text.get_text()
+        for text in acquisition_axis.texts
+    )
+    assert acquisition_axis.has_data()
+    plt.close(fig)
+
+
 def test_plot_model_prediction_contextual_axis_uses_explicit_domain_without_data_column():
     vocs = VOCS(
         variables={"x": [0, 1], "context": ContextualVariable(domain=[2.0, 3.0])},

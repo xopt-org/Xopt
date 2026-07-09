@@ -16,6 +16,7 @@ import gpytorch
 import numpy as np
 import torch
 from botorch.acquisition import AcquisitionFunction
+from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.models import ModelListGP
 from gest_api.vocs import DiscreteVariable
 from pandas import DataFrame
@@ -724,6 +725,10 @@ def plot_acquisition_function(
         data=data,
         tkwargs=tkwargs,
     )
+    acquisition_input_mesh = _get_acquisition_input_mesh(
+        acquisition_function=acquisition_function,
+        input_mesh=input_mesh,
+    )
 
     if exponentiate:
         y_label = r"$\exp[ \alpha]$"
@@ -740,12 +745,19 @@ def plot_acquisition_function(
         base_acq = None
         if hasattr(acquisition_function, "base_acquisition"):
             base_acq = (
-                acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
+                acquisition_function.base_acquisition(
+                    acquisition_input_mesh.unsqueeze(1)
+                )
                 .detach()
                 .squeeze()
                 .numpy()
             )
-        acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+        acq = (
+            acquisition_function(acquisition_input_mesh.unsqueeze(1))
+            .detach()
+            .squeeze()
+            .numpy()
+        )
 
         if exponentiate:
             acq = np.exp(acq)
@@ -794,7 +806,9 @@ def plot_acquisition_function(
                     "Given acquisition function doesn't have a base_acquisition attribute."
                 )
             acq = (
-                acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
+                acquisition_function.base_acquisition(
+                    acquisition_input_mesh.unsqueeze(1)
+                )
                 .detach()
                 .squeeze()
                 .cpu()
@@ -802,7 +816,7 @@ def plot_acquisition_function(
             )
         else:
             acq = (
-                acquisition_function(input_mesh.unsqueeze(1))
+                acquisition_function(acquisition_input_mesh.unsqueeze(1))
                 .detach()
                 .squeeze()
                 .cpu()
@@ -1239,6 +1253,43 @@ def _get_contextual_axes(variable_names: list[str], vocs: VOCS) -> list[str]:
         for name in variable_names
         if isinstance(vocs.variables.get(name), ContextualVariable)
     ]
+
+
+def _get_acquisition_input_mesh(
+    acquisition_function: AcquisitionFunction,
+    input_mesh: torch.Tensor,
+) -> torch.Tensor:
+    """Project full input mesh onto unfixed dimensions for fixed-feature acquisition."""
+    if not isinstance(acquisition_function, FixedFeatureAcquisitionFunction):
+        return input_mesh
+
+    full_dim = int(acquisition_function.d)
+
+    fixed_columns = getattr(acquisition_function, "columns", None)
+    if fixed_columns is not None:
+        fixed_column_indices = sorted(int(column) for column in fixed_columns)
+        free_columns = [
+            column for column in range(full_dim) if column not in fixed_column_indices
+        ]
+    else:
+        selector = getattr(acquisition_function, "_selector", None)
+        values = getattr(acquisition_function, "values", None)
+        if selector is None or values is None:
+            return input_mesh
+
+        n_fixed = int(values.shape[-1])
+        input_dim = full_dim - n_fixed
+        free_columns = [
+            output_column
+            for output_column, source_column in enumerate(selector)
+            if int(source_column) < input_dim
+        ]
+
+    if input_mesh.shape[-1] == len(free_columns):
+        return input_mesh
+    if input_mesh.shape[-1] != full_dim:
+        return input_mesh
+    return input_mesh[..., free_columns]
 
 
 def _plot_acquisition_warning(axis: Axes, contextual_axes: list[str]) -> Axes:
