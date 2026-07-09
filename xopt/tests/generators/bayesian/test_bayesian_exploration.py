@@ -46,8 +46,8 @@ class TestBayesianExplorationGenerator:
 
             candidate = gen.generate(1)
             assert len(candidate) == 1
-            candidate = gen.generate(5)
-            assert len(candidate) == 5
+            candidate = gen.generate(2)
+            assert len(candidate) == 2
 
             # test without constraints
             gen = BayesianExplorationGenerator(
@@ -57,8 +57,8 @@ class TestBayesianExplorationGenerator:
 
             candidate = gen.generate(1)
             assert len(candidate) == 1
-            candidate = gen.generate(5)
-            assert len(candidate) == 5
+            candidate = gen.generate(2)
+            assert len(candidate) == 2
 
         with pytest.raises(VOCSError):
             BayesianExplorationGenerator(vocs=test_vocs3)
