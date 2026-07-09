@@ -197,27 +197,6 @@ class BayesianGenerator(Generator, ABC):
         default=[LBFGSOptimizer, GridOptimizer]
     )
 
-    @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info: ValidationInfo):
-        if v.n_constraints > 0 and not info.data["supports_constraints"]:
-            raise VOCSError("this generator does not support constraints")
-
-        if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
-            raise VOCSError("this generator does not support discrete variables")
-
-        # assertion that at least one objective exists is done in model_validator below
-
-        if v.n_objectives == 1:
-            if not info.data["supports_single_objective"]:
-                raise VOCSError(
-                    "this generator does not support single objective optimization"
-                )
-        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
-            raise VOCSError(
-                "this generator does not support multi-objective optimization"
-            )
-
-        return v
 
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
