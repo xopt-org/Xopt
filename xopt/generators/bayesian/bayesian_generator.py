@@ -154,6 +154,9 @@ class BayesianGenerator(Generator, ABC):
 
     name = "base_bayesian_generator"
     supports_discrete_variables: bool = True
+    supports_no_objective: bool = (
+        True  # note: only supports if custom objective is provided
+    )
     model: Optional[Model] = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
@@ -196,7 +199,6 @@ class BayesianGenerator(Generator, ABC):
     _compatible_numerical_optimizers: list[type[NumericalOptimizer]] = PrivateAttr(
         default=[LBFGSOptimizer, GridOptimizer]
     )
-
 
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
