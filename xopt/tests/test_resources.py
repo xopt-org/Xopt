@@ -268,7 +268,9 @@ def test_check_dict_allclose_paths():
         )
 
     with pytest.raises(ValueError):
-        testing_utils.check_dict_allclose({"n": np.array([1.0])}, {"n": np.array([2.0])})
+        testing_utils.check_dict_allclose(
+            {"n": np.array([1.0])}, {"n": np.array([2.0])}
+        )
 
     with pytest.raises(ValueError):
         testing_utils.check_dict_allclose({"s": "a"}, {"s": "b"})
