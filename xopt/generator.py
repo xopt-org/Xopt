@@ -49,16 +49,22 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         frozen=True,
         exclude=True,
     )
-    supports_multi_objective: bool = Field(
+    supports_no_objective: bool = Field(
         default=False,
-        description="flag that describes if this generator can solve multi-objective "
-        "problems",
+        description="flag that describes if this generator can solve problems with no objectives",
         frozen=True,
         exclude=True,
     )
     supports_single_objective: bool = Field(
         default=False,
         description="flag that describes if this generator can solve single-objective "
+        "problems",
+        frozen=True,
+        exclude=True,
+    )
+    supports_multi_objective: bool = Field(
+        default=False,
+        description="flag that describes if this generator can solve multi-objective "
         "problems",
         frozen=True,
         exclude=True,
@@ -127,15 +133,15 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         ):
             raise VOCSError("this generator does not support contextual variables")
 
-        # assert that the generator needs at least one objective
-        if v.n_objectives == 0:
-            raise VOCSError("the generator must have at least one objective")
-
-        if v.n_objectives == 1:
-            if not info.data["supports_single_objective"]:
-                raise VOCSError(
-                    "this generator does not support single objective optimization"
-                )
+        # check objective support
+        if v.n_objectives == 0 and not info.data["supports_no_objective"]:
+            raise VOCSError(
+                "this generator does not support problems with no objectives"
+            )
+        elif v.n_objectives == 1 and not info.data["supports_single_objective"]:
+            raise VOCSError(
+                "this generator does not support single objective optimization"
+            )
         elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
             raise VOCSError(
                 "this generator does not support multi-objective optimization"

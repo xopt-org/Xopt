@@ -13,7 +13,6 @@ from pydantic import (
     model_validator,
 )
 
-from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm, GridOptimize
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
@@ -54,6 +53,7 @@ class BaxGenerator(BayesianGenerator):
 
     name = "bax"
     supports_constraints: bool = True
+    supports_no_objective: bool = True
     supports_discrete_variables: bool = False
     algorithm: SerializeAsAny[Algorithm] = Field(
         description="algorithm evaluated in the BAX process"
@@ -69,17 +69,6 @@ class BaxGenerator(BayesianGenerator):
 
     # NOTE: this is meant for use in Badger, TODO: add it to Xopt
     _compatible_algorithms = [GridOptimize]
-
-    @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info: ValidationInfo):
-        # Preserve inherited Bayesian VOCS validation behavior.
-        v = super().validate_vocs(v, info)
-
-        # assert that the generator had no objectives
-        if not v.n_objectives == 0:
-            raise VOCSError("BAX generator only supports problems with no objectives")
-
-        return v
 
     @model_validator(mode="after")
     def validate_model_after(self):
