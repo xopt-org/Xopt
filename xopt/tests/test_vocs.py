@@ -787,7 +787,9 @@ class TestVOCS(object):
         missing = get_constraint_data(vocs, pd.DataFrame({"x": [0.2]}))
         assert np.isinf(missing["constraint_c1"]).all()
 
-        fake_bounds = SimpleNamespace(constraints={"c1": BoundsConstraint(range=[0.0, 1.0])})
+        fake_bounds = SimpleNamespace(
+            constraints={"c1": BoundsConstraint(range=[0.0, 1.0])}
+        )
         with pytest.raises(NotImplementedError, match="BoundsConstraint"):
             get_constraint_data(fake_bounds, pd.DataFrame({"c1": [0.5]}))
 
