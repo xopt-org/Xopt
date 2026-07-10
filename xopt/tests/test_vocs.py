@@ -1,5 +1,6 @@
 import warnings
 from copy import deepcopy
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -7,8 +8,12 @@ import pytest
 from pydantic import ValidationError
 import yaml
 
+from xopt.errors import FeasibilityError
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import (
+    resolve_contextual_variable_bounds,
+    get_variable_bounds_array,
+    has_discrete_variables,
     ContextualVariable,
     convert_numpy_to_inputs,
     convert_dataframe_to_inputs,
@@ -21,6 +26,8 @@ from xopt.vocs import (
     random_inputs,
     select_best,
     grid_inputs,
+    get_observable_data,
+    get_local_region,
     get_objective_data,
     validate_input_data,
     extract_data,
@@ -32,6 +39,7 @@ from gest_api.vocs import (
     MinimizeObjective,
     ExploreObjective,
     LessThanConstraint,
+    BoundsConstraint,
 )
 
 
@@ -696,3 +704,190 @@ class TestVOCS(object):
         assert list(result2.columns) == ["z", "a"]
         assert result2["z"].iloc[0] == 5.0
         assert result2["a"].iloc[0] == 0.5
+
+    def test_contextual_bounds_reject_non_finite_inferred_data(self):
+        variable = ContextualVariable()
+        data = pd.Series([np.inf, np.nan])
+
+        with pytest.raises(ValueError, match="non-finite bounds"):
+            resolve_contextual_variable_bounds(variable, data, "ctx")
+
+    def test_variable_bounds_array_and_discrete_detection(self):
+        with_discrete = VOCS(
+            variables={"x": [0.0, 1.0], "d": {0.0, 1.0}},
+            objectives={"y": "MINIMIZE"},
+        )
+        bounds = get_variable_bounds_array(with_discrete)
+        assert bounds.shape == (2, 2)
+        assert has_discrete_variables(with_discrete)
+
+        no_discrete = VOCS(
+            variables={"x": [0.0, 1.0]},
+            objectives={"y": "MINIMIZE"},
+        )
+        assert not has_discrete_variables(no_discrete)
+
+    def test_random_and_grid_inputs_raise_when_no_discrete_values_in_bounds(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {0.0, 0.8}},
+            objectives={"y": "MINIMIZE"},
+        )
+
+        with pytest.raises(ValueError, match="no discrete values"):
+            random_inputs(vocs, 3, custom_bounds={"d": [0.1, 0.7]})
+
+        with pytest.raises(ValueError, match="no discrete values"):
+            grid_inputs(vocs, n=3, custom_bounds={"d": [0.1, 0.7]})
+
+    def test_grid_inputs_requires_count_for_each_continuous_variable(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0], "d": {0.0, 0.8}},
+            objectives={"y": "MINIMIZE"},
+        )
+
+        with pytest.raises(ValueError, match="Number of points for variable"):
+            grid_inputs(vocs, n={"d": 4})
+
+    def test_get_variable_data_empty_variables_and_list_input(self):
+        fake_empty = SimpleNamespace(variables={})
+        assert get_variable_data(fake_empty, [{"x": 1.0}]).empty
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        data = [{"x1": 0.2, "x2": 0.3, "constant1": 1.0}]
+        result = get_variable_data(vocs, data)
+        assert list(result.columns) == ["x1", "x2"]
+
+    def test_get_objective_data_edge_cases(self):
+        fake_no_objective = SimpleNamespace(objectives={})
+        assert get_objective_data(fake_no_objective, [{"y": 1.0}]).empty
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        result = get_objective_data(vocs, [{"y1": 0.2}])
+        assert list(result.columns) == ["objective_y1"]
+
+        class UnknownObjective:
+            pass
+
+        fake_unknown_full = SimpleNamespace(objectives={"y1": UnknownObjective()})
+        with pytest.raises(ValueError, match="Unknown objective operator"):
+            get_objective_data(fake_unknown_full, pd.DataFrame({"y1": [0.1]}))
+
+        fake_unknown_missing = SimpleNamespace(
+            objectives={"y1": UnknownObjective(), "y2": MinimizeObjective()}
+        )
+        with pytest.raises(ValueError, match="Unknown objective operator"):
+            get_objective_data(fake_unknown_missing, pd.DataFrame({"y1": [0.1]}))
+
+    def test_get_constraint_data_missing_and_unknown_constraint_types(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0]},
+            objectives={"f": "MINIMIZE"},
+            constraints={"c1": ["LESS_THAN", 0.5]},
+        )
+        missing = get_constraint_data(vocs, pd.DataFrame({"x": [0.2]}))
+        assert np.isinf(missing["constraint_c1"]).all()
+
+        fake_bounds = SimpleNamespace(constraints={"c1": BoundsConstraint(range=[0.0, 1.0])})
+        with pytest.raises(NotImplementedError, match="BoundsConstraint"):
+            get_constraint_data(fake_bounds, pd.DataFrame({"c1": [0.5]}))
+
+        fake_unknown = SimpleNamespace(constraints={"c1": object()})
+        with pytest.raises(ValueError, match="Unknown constraint operator"):
+            get_constraint_data(fake_unknown, pd.DataFrame({"c1": [0.5]}))
+
+    def test_get_observable_data_missing_and_nan(self):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0]},
+            objectives={"y": "MINIMIZE"},
+            observables=["o1", "o2"],
+        )
+
+        obs = get_observable_data(vocs, pd.DataFrame({"o1": [np.nan, 2.0]}))
+        assert np.isinf(obs["observable_o1"].iloc[0])
+        assert obs["observable_o1"].iloc[1] == 2.0
+        assert np.isinf(obs["observable_o2"]).all()
+
+    def test_get_local_region_success_and_key_error(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": [0.0, 2.0]},
+            objectives={"y": "MINIMIZE"},
+        )
+
+        with pytest.raises(KeyError, match="Center point keys"):
+            get_local_region(vocs, {"x1": 0.5})
+
+        region = get_local_region(vocs, {"x1": 0.2, "x2": 1.8}, fraction=0.5)
+        assert region["x1"] == [0.0, 0.7]
+        assert region["x2"] == [0.8, 2.0]
+
+    def test_normalize_and_denormalize_return_empty_when_no_input_variables(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        data = pd.DataFrame({"other": [1.0, 2.0]})
+
+        assert normalize_inputs(vocs, data).empty
+        assert denormalize_inputs(vocs, data).empty
+
+    def test_validate_input_data_with_contextual_variable_explicit_domain(self):
+        vocs = VOCS(
+            variables={
+                "x": [0.0, 1.0],
+                "ctx": ContextualVariable(domain=[0.0, 1.0]),
+            },
+            objectives={"y": "MINIMIZE"},
+        )
+
+        validate_input_data(vocs, pd.DataFrame({"x": [0.2, 0.8], "ctx": [np.nan, 0.5]}))
+
+        with pytest.raises(ValueError, match="not valid"):
+            validate_input_data(vocs, pd.DataFrame({"x": [0.2], "ctx": [np.inf]}))
+
+        with pytest.raises(ValueError, match="not valid"):
+            validate_input_data(vocs, pd.DataFrame({"x": [0.2], "ctx": [2.0]}))
+
+        # Unbounded contextual variables are intentionally not range-validated.
+        vocs_unbounded = VOCS(
+            variables={"x": [0.0, 1.0], "ctx": ContextualVariable()},
+            objectives={"y": "MINIMIZE"},
+        )
+        validate_input_data(
+            vocs_unbounded,
+            pd.DataFrame({"x": [0.2], "ctx": [np.inf]}),
+        )
+
+    def test_select_best_additional_error_paths(self):
+        vocs = deepcopy(TEST_VOCS_BASE)
+        data = pd.DataFrame(
+            {
+                "x1": [0.1, 0.2],
+                "x2": [0.3, 0.4],
+                "c1": [0.0, 0.1],
+                "y1": [1.0, 2.0],
+            }
+        )
+
+        with pytest.raises(FeasibilityError):
+            select_best(vocs, data)
+
+        class UnknownObjective:
+            pass
+
+        fake_vocs = SimpleNamespace(
+            n_objectives=1,
+            objective_names=["y"],
+            objectives={"y": UnknownObjective()},
+            constraints={},
+        )
+        with pytest.raises(NotImplementedError, match="objective type"):
+            select_best(fake_vocs, pd.DataFrame({"y": [1.0]}))
+
+    def test_validate_variable_bounds_error_paths(self):
+        from xopt.vocs import validate_variable_bounds
+
+        with pytest.raises(ValueError, match="must be a list"):
+            validate_variable_bounds({"x": 1.0})
+
+        with pytest.raises(ValueError, match="length 2"):
+            validate_variable_bounds({"x": [0.0, 1.0, 2.0]})
+
+        with pytest.raises(ValueError, match=r"value\[1\] > value\[0\]"):
+            validate_variable_bounds({"x": [1.0, 1.0]})
