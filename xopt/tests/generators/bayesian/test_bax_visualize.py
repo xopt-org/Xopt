@@ -16,7 +16,7 @@ class TestVisualizeBax:
     @pytest.fixture
     def bax_generator(self):
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.objectives = {}
@@ -64,7 +64,7 @@ class TestVisualizeBax:
     def test_unsupported_dim_x(self, bax_generator):
         # Add a third variable to VOCS for this test
         evaluator = Evaluator(function=xtest_callable)
-        alg = GridOptimize()
+        alg = GridOptimize(observable_names_ordered=["y1"])
 
         test_vocs = deepcopy(TEST_VOCS_BASE)
         test_vocs.variable_names.append("x3")

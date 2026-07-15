@@ -2,39 +2,29 @@ import torch
 from botorch.acquisition.multi_objective.analytic import (
     MultiObjectiveAnalyticAcquisitionFunction,
 )
-from botorch.models.model import Model, ModelList
+from botorch.models.model import ModelList
 from botorch.utils.transforms import t_batch_mode_transform
 from torch import Tensor
-
-from xopt.generators.bayesian.bax.algorithms import Algorithm
 
 
 class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction):
     r"""Single-outcome expected information gain for independent
-        multi-output (ModelListGP) models.
+    multi-output (ModelListGP) models.
 
-    Example:
-        >>> model1 = SingleTaskGP(train_X, train_Y1)
-        >>> model2 = SingleTaskGP(train_X, train_Y2)
-        >>> model = ModelList(model1, model2)
-        >>> EIG = ExpectedInformationGain(model, algo)
-        >>> eig = EIG(test_X)
-
-        Parameters
-        ----------
-            model: A fitted independent multi-output (ModelList) model.
+    Parameters
+    ----------
+        model: ModelList
+            A fitted independent multi-output (ModelList) model.
+        xs_exe: Tensor
+            The input execution paths.
+        ys_exe: Tensor
+            The output execution paths.
     """
 
-    def __init__(self, model: Model, algorithm: Algorithm, bounds: Tensor) -> None:
+    def __init__(self, model: ModelList, xs_exe: Tensor, ys_exe: Tensor) -> None:
         super().__init__(model=model)
-        self.algorithm = algorithm
-
-        # get sample-wise algorithm execution (BAX) results
-        (
-            self.xs_exe,
-            self.ys_exe,
-            self.algorithm_results,
-        ) = self.algorithm.get_execution_paths(self.model, bounds)
+        self.xs_exe = xs_exe
+        self.ys_exe = ys_exe
 
         # Need to call the model on some data before we can condition_on_observations
         self.model.posterior(self.xs_exe[:1, 0:1, 0:])
