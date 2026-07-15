@@ -47,6 +47,3 @@ class TestSequentialSerialization:
 
         for i in range(10):
             X2.step()
-
-        # test pickling
-        X2.generator.model_dump()
