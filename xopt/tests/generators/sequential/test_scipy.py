@@ -1,3 +1,4 @@
+import copy
 import json
 from unittest.mock import patch
 
@@ -9,7 +10,11 @@ from scipy.optimize import minimize
 
 from xopt import Xopt
 from xopt.errors import SeqGeneratorError
-from xopt.generators.sequential.scipy import ScipyGenerator, BOUNDED_METHODS
+from xopt.generators.sequential.scipy import (
+    BOUNDED_METHODS,
+    ScipyGenerator,
+    _StopSession,
+)
 from xopt.vocs import VOCS
 
 
@@ -274,6 +279,81 @@ class TestScipyGenerator:
         ):
             ScipyGenerator(vocs=vocs, initial_point={})
 
+    def test_deepcopy_with_data_copies_outcome_and_cache(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(vocs=vocs, method="Powell")
+        data = pd.DataFrame(
+            [{"x0": 0.2, "x1": -0.3, "y": 0.13}, {"x0": -0.1, "x1": 0.4, "y": 0.17}]
+        )
+        gen._set_data(data)
+
+        copied = copy.deepcopy(gen)
+
+        assert copied is not gen
+        assert copied.data is not gen.data
+        assert copied._last_outcome == pytest.approx(gen._last_outcome)
+        assert copied._cache == copied._build_cache()
+
+    def test_state_roundtrip_rebuilds_runtime_state_and_last_outcome(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(vocs=vocs, method="Powell")
+        data = pd.DataFrame(
+            [{"x0": 0.2, "x1": -0.3, "y": 0.13}, {"x0": -0.1, "x1": 0.4, "y": 0.17}]
+        )
+        gen._set_data(data)
+
+        state = gen.__getstate__()
+        restored = ScipyGenerator.model_validate(gen.model_dump())
+        restored.__setstate__(state)
+
+        assert restored._cache == restored._build_cache()
+        assert restored._last_outcome == pytest.approx(0.17)
+
+    def test_raise_session_error_maps_unknown_solver(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(vocs=vocs, method="Powell")
+        gen._session_exception = ValueError("Unknown solver foo")
+
+        with pytest.raises(
+            RuntimeError,
+            match="scipy method 'Powell' is not available in this environment",
+        ):
+            gen._raise_session_error_if_present()
+
+    def test_raise_session_error_maps_cannot_handle_bounds(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(vocs=vocs, method="Powell")
+        gen._session_exception = ValueError("Method Powell cannot handle bounds")
+
+        with pytest.raises(
+            RuntimeError,
+            match="does not support bounds",
+        ):
+            gen._raise_session_error_if_present()
+
+    def test_objective_raises_stop_session_when_stop_event_set(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(vocs=vocs, method="Powell")
+        gen._stop_event.set()
+
+        with pytest.raises(_StopSession):
+            gen._objective(np.array([0.0, 0.0]))
+
     def test_add_data_empty_dataframe(self):
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
@@ -361,6 +441,22 @@ class TestScipyGenerator:
 
         assert result is not None
         assert "c" in result[0]
+
+    def test_convergence_path_without_data_raises_runtime_error(self):
+        """Convergence without queued requests and without data raises an error."""
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(
+            vocs=vocs, method="Powell", initial_point={"x0": 0.5, "x1": -0.5}
+        )
+
+        with patch("xopt.generators.sequential.scipy.minimize", return_value=None):
+            with pytest.raises(
+                RuntimeError, match="scipy minimize converged without available data"
+            ):
+                gen._generate()
 
     def test_generate_with_constants(self):
         """Constants are included in generated candidates."""
