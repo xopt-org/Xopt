@@ -157,9 +157,13 @@ class ScipyGenerator(SequentialGenerator):
     def x0(self) -> np.ndarray:
         """Return the optimization start point from config or from the latest dataset row."""
         if self.initial_point is not None:
-            missing = [k for k in self.vocs.variable_names if k not in self.initial_point]
+            missing = [
+                k for k in self.vocs.variable_names if k not in self.initial_point
+            ]
             if missing:
-                raise ValueError(f"initial_point is missing values for variables: {missing}")
+                raise ValueError(
+                    f"initial_point is missing values for variables: {missing}"
+                )
             return np.array(
                 [self.initial_point[k] for k in self.vocs.variable_names], dtype=float
             )
