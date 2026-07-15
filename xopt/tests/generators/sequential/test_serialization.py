@@ -1,5 +1,3 @@
-import pickle
-
 import numpy as np
 import pytest
 from xopt.generators.sequential import (
@@ -51,4 +49,4 @@ class TestSequentialSerialization:
             X2.step()
 
         # test pickling
-        pickle.dumps(X2.generator)
+        X2.generator.model_dump()
