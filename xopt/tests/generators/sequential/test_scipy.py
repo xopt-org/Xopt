@@ -3,29 +3,18 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
 import pytest
 from scipy.optimize import minimize
 
 from xopt import Xopt
 from xopt.errors import SeqGeneratorError
-from xopt.generators.sequential.scipy import ScipyGenerator
+from xopt.generators.sequential.scipy import ScipyGenerator, BOUNDED_METHODS
 from xopt.vocs import VOCS
 
 
 def sphere(input_dict):
     return {"y": float(sum(v**2 for v in input_dict.values()))}
-
-
-BOUNDED_METHODS = [
-    "Nelder-Mead",
-    "Powell",
-    "L-BFGS-B",
-    "TNC",
-    "SLSQP",
-    "trust-constr",
-    "COBYLA",
-    "COBYQA",
-]
 
 
 def _direct_scipy_sequence(vocs: VOCS, method: str, maxiter: int = 30):
@@ -269,7 +258,10 @@ class TestScipyGenerator:
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
         )
-        with pytest.raises(ValueError, match="method cannot be empty"):
+        with pytest.raises(
+            ValueError,
+            match="scipy method '' is not supported; choose one of .*",
+        ):
             ScipyGenerator(vocs=vocs, method="   ")
 
     def test_validate_initial_point_empty_dict(self):
@@ -292,7 +284,7 @@ class TestScipyGenerator:
         gen._add_data(pd.DataFrame())
         assert gen._last_outcome is None
 
-    def test_unknown_solver_raises_runtime_error(self):
+    def test_unknown_solver_raises_validation_error(self):
         YAML = """
         generator:
             name: scipy
@@ -306,9 +298,11 @@ class TestScipyGenerator:
         evaluator:
             function: xopt.tests.generators.sequential.test_scipy.sphere
         """
-        X = Xopt.from_yaml(YAML)
-        with pytest.raises(RuntimeError, match="scipy method .* is not available"):
-            X.generator.generate(1)
+        with pytest.raises(
+            ValidationError,
+            match="scipy method .* is not supported; choose one of .*",
+        ):
+            Xopt.from_yaml(YAML)
 
     def test_non_solver_value_error_reraises(self):
         """A ValueError that doesn't mention 'unknown solver' should propagate."""

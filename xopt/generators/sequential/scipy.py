@@ -10,6 +10,17 @@ from scipy.optimize import minimize
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.vocs import get_objective_data, get_variable_data
 
+BOUNDED_METHODS = [
+    "Nelder-Mead",
+    "Powell",
+    "L-BFGS-B",
+    "TNC",
+    "SLSQP",
+    "trust-constr",
+    "COBYLA",
+    "COBYQA",
+]
+
 
 class _StopSession(Exception):
     """Internal exception used to terminate the persistent minimize session."""
@@ -89,8 +100,10 @@ class ScipyGenerator(SequentialGenerator):
     def validate_method(cls, v: str):
         """Ensure scipy method names are not empty after whitespace normalization."""
         value = v.strip()
-        if not value:
-            raise ValueError("method cannot be empty")
+        if value not in BOUNDED_METHODS:
+            raise ValueError(
+                f"scipy method '{value}' is not supported; choose one of {BOUNDED_METHODS}"
+            )
         return value
 
     @field_validator("initial_point")
