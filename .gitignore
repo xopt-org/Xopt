@@ -43,11 +43,6 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Test output files
-all_sequential_tests.txt
-test_results.txt
-test_serialization_results.txt
-
 # Unit test / coverage reports
 htmlcov/
 .tox/
