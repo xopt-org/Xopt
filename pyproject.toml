@@ -31,7 +31,7 @@ dependencies = [
   "tqdm",
   "orjson",
   "matplotlib",
-  "gest-api"
+  "gest-api>=0.2"
 ]
 description = "Flexible optimization of arbitrary problems in Python."
 dynamic = [ "version" ]
