@@ -54,7 +54,7 @@ dev = [
   "pygments",
   "dask[distributed]",
   "mpi4py",
-  "libensemble",
+  "libensemble>=1.6.0",
   "nbconvert",
   "pre-commit",
 ]
