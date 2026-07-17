@@ -17,26 +17,13 @@ import pandas as pd
 from xopt.errors import FeasibilityError
 from gest_api.vocs import (
     VOCS,
-    ContinuousVariable,
     GreaterThanConstraint,
     LessThanConstraint,
     BoundsConstraint,
     DiscreteVariable,
     MaximizeObjective,
+    ContextualVariable,
 )
-
-
-class ContextualVariable(ContinuousVariable):
-    """
-    A variable that is not optimized over, but rather is observed and can be conditioned on.
-
-    By default, contextual variables are unbounded. In contexts that require finite bounds,
-    bounds are inferred from the currently available data.
-    """
-
-    def __init__(self, **kwargs):
-        kwargs.setdefault("domain", [-float("inf"), float("inf")])
-        super().__init__(**kwargs)
 
 
 def resolve_contextual_variable_bounds(
