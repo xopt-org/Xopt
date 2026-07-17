@@ -17,7 +17,7 @@ import numpy as np
 
 
 def _contextual_eval_for_yaml_roundtrip(inputs):
-    pass # pragma: no cover
+    pass  # pragma: no cover
 
 
 class TestContextualBO:
@@ -85,7 +85,6 @@ class TestContextualBO:
         # Generated candidates should only include controllable variables.
         candidates = xopt.generator.generate(1)
         assert all("x2" not in candidate for candidate in candidates)
-
 
         # Evaluation should succeed without requiring contextual inputs.
         xopt.evaluate_data(candidates)
@@ -246,7 +245,6 @@ class TestContextualBO:
         assert all("x3" in candidate for candidate in candidates)
         assert all(np.isclose(candidate["x3"], 0.25) for candidate in candidates)
         assert all(0.0 <= candidate["x1"] <= 1.0 for candidate in candidates)
-
 
     def test_convert_dataframe_to_inputs_error_message_contextual(self):
         """The error message when input columns mismatch must mention non-contextual
