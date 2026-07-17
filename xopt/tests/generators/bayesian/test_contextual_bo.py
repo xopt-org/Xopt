@@ -16,6 +16,13 @@ import torch
 import numpy as np
 
 
+def _contextual_eval_for_yaml_roundtrip(inputs):
+    x1 = torch.tensor(inputs["x1"])
+    x2 = torch.tensor(0.5)
+    y = torch.sin(2 * 3.14 * x1) * torch.cos(2 * 3.14 * x2)
+    return {"y": y, "x2": x2}
+
+
 class TestContextualBO:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -88,6 +95,20 @@ class TestContextualBO:
         # Evaluation should succeed without requiring contextual inputs.
         xopt.evaluate_data(candidates)
         assert "x2" in xopt.data.columns
+
+    def test_xopt_yaml_roundtrip_with_contextual_variable(self):
+        vocs = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
+            objectives={"y": "MAXIMIZE"},
+        )
+        xopt = Xopt(
+            generator=UpperConfidenceBoundGenerator(vocs=vocs),
+            evaluator=Evaluator(function=_contextual_eval_for_yaml_roundtrip),
+        )
+
+        reloaded = Xopt.from_yaml(xopt.yaml())
+
+        assert isinstance(reloaded.vocs.variables["x2"], ContextualVariable)
 
     def test_get_optimum_with_contextual_variable(self):
         """Test that get_optimum works correctly when contextual variables are present."""
