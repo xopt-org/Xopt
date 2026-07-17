@@ -12,7 +12,7 @@ pytestmark = pytest.mark.xfail(
 )
 
 
-def six_hump_camel_func(x):
+def six_hump_camel_func(x):  # pragma: no cover
     """Six-Hump Camel function definition"""
     x1 = x[0]
     x2 = x[1]
@@ -23,22 +23,22 @@ def six_hump_camel_func(x):
     return term1 + term2 + term3
 
 
-def evaluator_function(inputs):
+def evaluator_function(inputs):  # pragma: no cover
     return {"f": six_hump_camel_func([inputs["x0"], inputs["x1"]])}
 
 
 @pytest.fixture
-def evaluator():
+def evaluator():  # pragma: no cover
     return Evaluator(function=evaluator_function)
 
 
 @pytest.fixture
-def max_evaluations():
+def max_evaluations():  # pragma: no cover
     return MaxEvaluationsCondition(max_evaluations=45)
 
 
 @pytest.fixture
-def vocs():
+def vocs():  # pragma: no cover
     return VOCS(
         variables={
             "x0": [-2.0, 2.0],
@@ -51,7 +51,7 @@ def vocs():
 
 
 @pytest.fixture
-def mapping():
+def mapping():  # pragma: no cover
     return {
         "x": ["x0", "x1"],
         "x_on_cube": ["x0_on_cube", "x1_on_cube"],
@@ -59,13 +59,13 @@ def mapping():
 
 
 @pytest.fixture
-def aposmm_cls():
+def aposmm_cls():  # pragma: no cover
     from libensemble.gen_classes.aposmm import APOSMM
 
     return APOSMM
 
 
-class TestXoptPlusAPOSMM:
+class TestXoptPlusAPOSMM:  # pragma: no cover
     def test_init(self, vocs, evaluator, max_evaluations, mapping, aposmm_cls):
         gen = aposmm_cls(
             vocs=vocs,
