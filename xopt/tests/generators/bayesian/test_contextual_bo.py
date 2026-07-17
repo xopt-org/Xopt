@@ -137,6 +137,23 @@ class TestContextualBO:
         assert np.isclose(bounds["x2"][0], 0.3 - padding)
         assert np.isclose(bounds["x2"][1], 0.7 + padding)
 
+    def test_contextual_variable_nan_in_last_row_raises(self):
+        generator = UpperConfidenceBoundGenerator(vocs=self.vocs)
+        data = pd.DataFrame(
+            {
+                "x1": np.linspace(0.0, 1.0, 5),
+                "x2": np.array([0.3, 0.4, 0.5, 0.6, np.nan]),
+                "y": np.ones(5),
+            }
+        )
+        generator.add_data(data)
+
+        with pytest.raises(
+            ValueError,
+            match="latest row contains NaN in contextual variable columns",
+        ):
+            generator.generate(1)
+
     def test_contextual_variable_explicit_domain_overrides_data(self):
         vocs = VOCS(
             variables={"x1": [0, 1], "x2": ContextualVariable(domain=[0.2, 0.4])},
