@@ -411,9 +411,12 @@ class BayesianGenerator(Generator, ABC):
             # dict to track runtimes
             timing_results = {}
 
+            training_data = self.get_training_data(self.data)
+            self._validate_contextual_variables_no_nan(training_data)
+
             # update internal model with internal data
             start_time = time.perf_counter()
-            model = self.train_model(self.get_training_data(self.data))
+            model = self.train_model(training_data)
             timing_results["training"] = time.perf_counter() - start_time
 
             # propose candidates given model
@@ -934,6 +937,22 @@ class BayesianGenerator(Generator, ABC):
                     variable_bounds[key] = bounds
 
         return variable_bounds
+
+    def _validate_contextual_variables_no_nan(self, data: pd.DataFrame):
+        if data.empty:
+            return
+
+        last_row = data.iloc[-1]
+        contextual_with_nan = [
+            name
+            for name in self.contextual_variables
+            if name in data.columns and pd.isna(last_row[name])
+        ]
+        if contextual_with_nan:
+            raise ValueError(
+                "latest row contains NaN in contextual variable columns: "
+                + ", ".join(contextual_with_nan)
+            )
 
     @property
     def _candidate_names(self):
