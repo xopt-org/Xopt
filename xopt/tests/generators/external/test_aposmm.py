@@ -1,10 +1,15 @@
 import numpy as np
-from libensemble.gen_classes.aposmm import APOSMM
 from xopt import Xopt
 from xopt import Evaluator
 from xopt.stopping_conditions import MaxEvaluationsCondition
 from gest_api.vocs import VOCS
 import pytest
+
+
+pytestmark = pytest.mark.xfail(
+    reason="APOSMM is temporarily xfailed until libensemble is updated",
+    strict=False,
+)
 
 
 def six_hump_camel_func(x):
@@ -53,9 +58,16 @@ def mapping():
     }
 
 
+@pytest.fixture
+def aposmm_cls():
+    from libensemble.gen_classes.aposmm import APOSMM
+
+    return APOSMM
+
+
 class TestXoptPlusAPOSMM:
-    def test_init(self, vocs, evaluator, max_evaluations, mapping):
-        gen = APOSMM(
+    def test_init(self, vocs, evaluator, max_evaluations, mapping, aposmm_cls):
+        gen = aposmm_cls(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
@@ -67,8 +79,8 @@ class TestXoptPlusAPOSMM:
             stopping_condition=max_evaluations,
         )
 
-    def test_run(self, vocs, evaluator, max_evaluations, mapping):
-        gen = APOSMM(
+    def test_run(self, vocs, evaluator, max_evaluations, mapping, aposmm_cls):
+        gen = aposmm_cls(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
@@ -85,8 +97,10 @@ class TestXoptPlusAPOSMM:
             "last 5 points should be local_pt, as communicated by APOSMM"
         )
 
-    def test_random_evaluate(self, vocs, evaluator, max_evaluations, mapping):
-        gen = APOSMM(
+    def test_random_evaluate(
+        self, vocs, evaluator, max_evaluations, mapping, aposmm_cls
+    ):
+        gen = aposmm_cls(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
@@ -114,8 +128,8 @@ class TestXoptPlusAPOSMM:
             "last point should be local_pt, as communicated by APOSMM"
         )
 
-    def test_step(self, vocs, evaluator, max_evaluations, mapping):
-        gen = APOSMM(
+    def test_step(self, vocs, evaluator, max_evaluations, mapping, aposmm_cls):
+        gen = aposmm_cls(
             vocs=vocs,
             max_active_runs=1,
             initial_sample_size=40,
