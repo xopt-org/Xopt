@@ -12,6 +12,7 @@ from xopt.generators import (
 )
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.vocs import ContextualVariable
 from gest_api.vocs import VOCS
 
 
@@ -39,6 +40,14 @@ class PatchGeneratorNoConstraints(Generator):
 class PatchGeneratorSupportsDiscrete(Generator):
     supports_single_objective: bool = True
     supports_discrete_variables: bool = True
+
+    def generate(self, n_candidates) -> list[dict]:
+        pass
+
+
+class PatchGeneratorSupportsContextual(Generator):
+    supports_single_objective: bool = True
+    supports_contextual_variables: bool = True
 
     def generate(self, n_candidates) -> list[dict]:
         pass
@@ -138,6 +147,19 @@ class TestGenerator:
             PatchGenerator(vocs=vocs_with_discrete)
 
         PatchGeneratorSupportsDiscrete(vocs=vocs_with_discrete)
+
+    def test_generator_contextual_validation(self):
+        vocs_with_contextual = VOCS(
+            variables={"x1": [0, 1], "x2": ContextualVariable()},
+            objectives={"y1": "MINIMIZE"},
+        )
+
+        with pytest.raises(
+            VOCSError, match="this generator does not support contextual variables"
+        ):
+            PatchGenerator(vocs=vocs_with_contextual)
+
+        PatchGeneratorSupportsContextual(vocs=vocs_with_contextual)
 
     def test_data_validator_indexerror(self):
         data_dict = {"x1": 1.0, "x2": 2.0}

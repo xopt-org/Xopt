@@ -149,6 +149,7 @@ def get_generator_defaults(
             "supports_single_objective",
             "supports_constraints",
             "supports_discrete_variables",
+            "supports_contextual_variables",
         ]:
             continue
 

@@ -22,25 +22,114 @@ from gest_api.vocs import (
     BoundsConstraint,
     DiscreteVariable,
     MaximizeObjective,
+    ContextualVariable,
 )
 
 
-def get_variable_bounds(vocs: VOCS) -> dict[str, tuple[float, float]]:
-    """Return [min, max] bounds for all variables, including discrete variables."""
+def resolve_contextual_variable_bounds(
+    variable: ContextualVariable,
+    data: pd.Series | None,
+    variable_name: str,
+    padding_fraction: float = 0.05,
+    minimum_padding: float = 1e-8,
+) -> tuple[float, float]:
+    """Resolve finite bounds for a contextual variable.
+
+    This utility applies the contextual bound resolution policy used throughout Xopt:
+    explicit finite domains take precedence over data-derived bounds. If the
+    contextual domain is unbounded, finite bounds are inferred from observed data
+    and expanded by a small padding.
+
+    Parameters
+    ----------
+    variable : ContextualVariable
+        Contextual variable whose effective bounds are being resolved.
+    data : pd.Series or None
+        Observed values for the contextual variable. Required only when
+        ``variable.domain`` is not finite.
+    variable_name : str
+        Variable name used to construct informative error messages.
+    padding_fraction : float, optional
+        Fraction of inferred data width to add on each side of the interval.
+        Default is ``0.05``.
+    minimum_padding : float, optional
+        Minimum absolute padding used when inferred data width is very small.
+        Default is ``1e-8``.
+
+    Returns
+    -------
+    tuple[float, float]
+        Resolved lower and upper bounds.
+
+    Raises
+    ------
+    KeyError
+        If the contextual domain is unbounded and no data is provided.
+    ValueError
+        If inferred bounds from data are non-finite.
+
+    Notes
+    -----
+    If ``variable.domain`` is finite, data is ignored and domain bounds are
+    returned directly.
+    """
+    lower = float(variable.domain[0])
+    upper = float(variable.domain[1])
+
+    if np.isfinite(lower) and np.isfinite(upper):
+        return lower, upper
+
+    if data is None:
+        raise KeyError(
+            f"contextual variable `{variable_name}` requires data to infer finite bounds"
+        )
+
+    lower = float(data.min())
+    upper = float(data.max())
+    if not np.isfinite(lower) or not np.isfinite(upper):
+        raise ValueError(
+            f"contextual variable `{variable_name}` has non-finite bounds in data"
+        )
+
+    width = upper - lower
+    padding = max(padding_fraction * width, minimum_padding)
+    return lower - padding, upper + padding
+
+
+def get_variable_bounds(
+    vocs: VOCS,
+    data: pd.DataFrame | None = None,
+    variable_names: list[str] | None = None,
+) -> dict[str, tuple[float, float]]:
+    """Return [min, max] bounds for variables.
+
+    Contextual variable bounds are always resolved with explicit-or-inferred
+    behavior: explicit finite domains take precedence; unbounded domains are
+    inferred from provided data.
+    """
     bounds = {}
-    for name in vocs.variable_names:
+    names = variable_names if variable_names is not None else vocs.variable_names
+    for name in names:
         variable = vocs.variables[name]
         if isinstance(variable, DiscreteVariable):
             values = sorted(float(v) for v in variable.values)
             bounds[name] = (values[0], values[-1])
+        elif isinstance(variable, ContextualVariable):
+            series = data[name] if data is not None and name in data else None
+            lower, upper = resolve_contextual_variable_bounds(variable, series, name)
+            bounds[name] = (lower, upper)
         else:
             bounds[name] = (float(variable.domain[0]), float(variable.domain[1]))
     return bounds
 
 
-def get_variable_bounds_array(vocs: VOCS) -> np.ndarray:
+def get_variable_bounds_array(
+    vocs: VOCS,
+    data: pd.DataFrame | None = None,
+    variable_names: list[str] | None = None,
+) -> np.ndarray:
     """Return bounds for all variables as a 2 x d numpy array."""
-    bounds = get_variable_bounds(vocs)
+    bounds = get_variable_bounds(vocs, data=data, variable_names=variable_names)
     return np.array(list(bounds.values())).T
 
 
@@ -244,8 +333,15 @@ def convert_dataframe_to_inputs(
         A dataframe containing the extracted inputs.
     """
     # make sure that the df keys only contain vocs variables
-    if not set(vocs.variable_names) == set(data.keys()):
-        raise ValueError("input dataframe column set must equal set of vocs variables")
+    non_contextual_variable_names = [
+        name
+        for name in vocs.variable_names
+        if not isinstance(vocs.variables[name], ContextualVariable)
+    ]
+    if not set(non_contextual_variable_names) == set(data.keys()):
+        raise ValueError(
+            "input dataframe column set must equal set of non-contextual vocs variables"
+        )
 
     # only keep the variables
     inner_copy = data.copy()
@@ -265,15 +361,18 @@ def convert_numpy_to_inputs(
 ) -> pd.DataFrame:
     """
     Convert 2D numpy array to list of dicts (inputs) for evaluation.
-    Assumes that the columns of the array match correspond to
-    `sorted(vocs.variables.keys())`
+    Assumes that the columns of the array correspond to the non-contextual
+    variables in `vocs.variable_names` order (contextual variables excluded).
+    The number of columns in `inputs` must equal the number of non-contextual
+    variables in the VOCS.
 
     Parameters
     ----------
     vocs: VOCS
         The variable-objective-constraint space (VOCS) defining the problem.
     inputs : np.ndarray
-        The 2D numpy array to convert.
+        The 2D numpy array to convert. Must have shape (n, k) where k is the
+        number of non-contextual variables in vocs.
     include_constants : bool, optional
         Whether to include constants in the inputs. Defaults to True.
 
@@ -282,7 +381,12 @@ def convert_numpy_to_inputs(
     pd.DataFrame
         A dataframe containing the converted inputs.
     """
-    df = pd.DataFrame(inputs, columns=vocs.variable_names)
+    non_contextual_variable_names = [
+        name
+        for name in vocs.variable_names
+        if not isinstance(vocs.variables[name], ContextualVariable)
+    ]
+    df = pd.DataFrame(inputs, columns=non_contextual_variable_names)
     return convert_dataframe_to_inputs(vocs, df, include_constants)
 
 
@@ -607,7 +711,14 @@ def normalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
 
     """
     normed_data = {}
-    variable_bounds = get_variable_bounds(vocs)
+    present_variable_names = [
+        name for name in vocs.variable_names if name in input_points.columns
+    ]
+    variable_bounds = get_variable_bounds(
+        vocs,
+        data=input_points,
+        variable_names=present_variable_names,
+    )
     for name in vocs.variable_names:
         if name in input_points.columns:
             lb, ub = variable_bounds[name]
@@ -650,7 +761,14 @@ def denormalize_inputs(vocs: VOCS, input_points: pd.DataFrame) -> pd.DataFrame:
 
     """
     denormed_data = {}
-    variable_bounds = get_variable_bounds(vocs)
+    present_variable_names = [
+        name for name in vocs.variable_names if name in input_points.columns
+    ]
+    variable_bounds = get_variable_bounds(
+        vocs,
+        data=input_points,
+        variable_names=present_variable_names,
+    )
     for name in vocs.variable_names:
         if name in input_points.columns:
             lb, ub = variable_bounds[name]
@@ -686,8 +804,8 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
     ------
         ValueError: if input data does not satisfy requirements.
     """
+
     variable_data = input_points.loc[:, vocs.variable_names]
-    variable_bounds = get_variable_bounds(vocs)
     bad_mask = np.zeros((len(variable_data), len(vocs.variable_names)), dtype=bool)
 
     for idx, name in enumerate(vocs.variable_names):
@@ -700,8 +818,25 @@ def validate_input_data(vocs: VOCS, input_points: pd.DataFrame) -> None:
                 values[:, None], allowed[None, :], rtol=0.0, atol=1e-12
             ).any(axis=1)
             bad_mask[:, idx] = ~is_allowed
+        elif isinstance(variable, ContextualVariable):
+            # Validate contextual variables only when they have explicit finite
+            # domains and values are present.
+            if np.isfinite(variable.domain[0]) and np.isfinite(variable.domain[1]):
+                present = ~np.isnan(values)
+                finite = np.isfinite(values)
+                lb = float(variable.domain[0])
+                ub = float(variable.domain[1])
+
+                bad_present = np.logical_and(
+                    present,
+                    np.logical_or(~finite, np.logical_or(values < lb, values > ub)),
+                )
+                bad_mask[:, idx] = bad_present
+            else:
+                continue
         else:
-            lb, ub = variable_bounds[name]
+            lb = float(variable.domain[0])
+            ub = float(variable.domain[1])
             bad_mask[:, idx] = np.logical_or(values < lb, values > ub)
 
     if bad_mask.any():
@@ -730,7 +865,7 @@ def extract_data(vocs: VOCS, data: pd.DataFrame, return_raw=False, return_valid=
     return_raw : bool, optional
         If True, return untransformed objective data
     return_valid : bool, optional
-        If True, only return data that satisfies all of the contraint
+        If True, only return data that satisfies all of the constraint
         conditions.
 
     Returns
@@ -898,7 +1033,9 @@ def clip_variable_bounds(
     vocs: VOCS, custom_bounds: dict[str, list[float]] | None = None
 ) -> dict[str, tuple[float, float]]:
     """
-    Return new bounds as intersection of vocs and custom bounds
+    Return new bounds as intersection of bounds provided by VOCS and custom bounds.
+    Note that this function only considers non-contextual variables, as
+    contextual variable bounds are not optimized over.
 
     Parameters
     ----------
@@ -912,12 +1049,20 @@ def clip_variable_bounds(
     dict[str, list[float]]
         The final bounds after clipping custom bounds with vocs bounds.
     """
+    active_variable_names = [
+        name
+        for name in vocs.variable_names
+        if not isinstance(vocs.variables[name], ContextualVariable)
+    ]
+
     if custom_bounds is None:
-        final_bounds = get_variable_bounds(vocs)
+        final_bounds = get_variable_bounds(vocs, variable_names=active_variable_names)
     elif not isinstance(custom_bounds, dict):
         raise TypeError("specified `custom_bounds` must be a dict")
     else:
-        variable_bounds = get_variable_bounds(vocs)
+        variable_bounds = get_variable_bounds(
+            vocs, variable_names=active_variable_names
+        )
 
         try:
             validate_variable_bounds(custom_bounds)
