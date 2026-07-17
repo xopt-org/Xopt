@@ -939,9 +939,7 @@ class BayesianGenerator(Generator, ABC):
         return variable_bounds
 
     def _validate_contextual_variables_no_nan(self, data: pd.DataFrame):
-        if data.empty:
-            return
-
+        """check to make sure that the last row of data does not contain NaN in any of the contextual variable columns"""
         last_row = data.iloc[-1]
         contextual_with_nan = [
             name
