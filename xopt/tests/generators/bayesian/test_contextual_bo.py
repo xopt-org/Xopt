@@ -17,10 +17,7 @@ import numpy as np
 
 
 def _contextual_eval_for_yaml_roundtrip(inputs):
-    x1 = torch.tensor(inputs["x1"])
-    x2 = torch.tensor(0.5)
-    y = torch.sin(2 * 3.14 * x1) * torch.cos(2 * 3.14 * x2)
-    return {"y": y, "x2": x2}
+    pass # pragma: no cover
 
 
 class TestContextualBO:
@@ -87,10 +84,8 @@ class TestContextualBO:
 
         # Generated candidates should only include controllable variables.
         candidates = xopt.generator.generate(1)
-        if isinstance(candidates, list):
-            assert all("x2" not in candidate for candidate in candidates)
-        else:
-            assert "x2" not in candidates.columns
+        assert all("x2" not in candidate for candidate in candidates)
+
 
         # Evaluation should succeed without requiring contextual inputs.
         xopt.evaluate_data(candidates)
@@ -246,18 +241,12 @@ class TestContextualBO:
         generator.train_model()
 
         candidates = generator.generate(2)
-        if isinstance(candidates, list):
-            assert all("x1" in candidate for candidate in candidates)
-            assert all("x2" not in candidate for candidate in candidates)
-            assert all("x3" in candidate for candidate in candidates)
-            assert all(np.isclose(candidate["x3"], 0.25) for candidate in candidates)
-            assert all(0.0 <= candidate["x1"] <= 1.0 for candidate in candidates)
-        else:
-            assert "x1" in candidates.columns
-            assert "x2" not in candidates.columns
-            assert "x3" in candidates.columns
-            assert np.allclose(candidates["x3"].to_numpy(), 0.25)
-            assert candidates["x1"].between(0.0, 1.0).all()
+        assert all("x1" in candidate for candidate in candidates)
+        assert all("x2" not in candidate for candidate in candidates)
+        assert all("x3" in candidate for candidate in candidates)
+        assert all(np.isclose(candidate["x3"], 0.25) for candidate in candidates)
+        assert all(0.0 <= candidate["x1"] <= 1.0 for candidate in candidates)
+
 
     def test_convert_dataframe_to_inputs_error_message_contextual(self):
         """The error message when input columns mismatch must mention non-contextual
@@ -303,10 +292,7 @@ class TestContextualBO:
 
         # Candidate generation should exclude contextual variables.
         candidates = generator.generate(1)
-        if isinstance(candidates, list):
-            assert all("x2" not in candidate for candidate in candidates)
-        else:
-            assert "x2" not in candidates.columns
+        assert all("x2" not in candidate for candidate in candidates)
 
     def test_bayesian_generator_contextual_support_flag(self):
         """Bayesian generators must reject contextual variables when support is disabled."""
