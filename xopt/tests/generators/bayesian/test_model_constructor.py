@@ -2,6 +2,7 @@ import json
 import os
 import time
 from copy import deepcopy
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ from botorch.models.utils.inducing_point_allocators import GreedyVarianceReducti
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.means import ConstantMean
+from gpytorch.means import ConstantMean, LinearMean
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
 
@@ -832,6 +833,30 @@ class TestModelConstructor:
         )
         assert isinstance(model_approx, SingleTaskVariationalGP)
 
+    def test_build_map_saas_gp(self):
+        torch.manual_seed(0)
+        X = torch.randn(10, 2)
+        Y = torch.randn(10, 1)
+        Yvar = torch.ones(10, 1) * 0.1
+
+        with pytest.raises(ValueError, match="no data found to train model!"):
+            StandardModelConstructor.build_map_saas_gp(
+                torch.empty(0, 2), torch.empty(0, 1), torch.empty(0, 1)
+            )
+
+        with patch(
+            "xopt.generators.bayesian.base_model.fit_gpytorch_mll",
+            side_effect=ModelFittingError("fitting failed"),
+        ):
+            with pytest.warns(
+                UserWarning,
+                match="Model fitting failed for MAP SAAS GP. Returning untrained model.",
+            ):
+                model = StandardModelConstructor.build_map_saas_gp(
+                    X, Y, Yvar, train=True
+                )
+            assert isinstance(model, SingleTaskGP)
+
     def test_approximate_gp(self):
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
@@ -1245,3 +1270,49 @@ class TestBatchedModelConstructor:
         constructor = BatchedModelConstructor()
         with pytest.raises(ValueError, match="no data found"):
             constructor.build_model_from_vocs(test_vocs, empty_data)
+
+    def test_saas_model_constructor(self):
+        test_vocs = deepcopy(TEST_VOCS)
+        test_data = deepcopy(TEST_DATA)
+
+        constructor = StandardModelConstructor(
+            saas_outputs=["y1"],
+            covar_modules={"y1": ScaleKernel(PeriodicKernel())},
+            mean_modules={"y1": LinearMean(TEST_VOCS.n_variables)},
+        )
+        with (
+            patch.object(
+                StandardModelConstructor,
+                "build_map_saas_gp",
+                wraps=StandardModelConstructor.build_map_saas_gp,
+            ) as mock_build_map_saas_gp,
+            pytest.warns(
+                UserWarning, match="will be overwritten by SAAS model construction"
+            ) as warning_records,
+        ):
+            model = constructor.build_model_from_vocs(test_vocs, test_data)
+
+        warning_messages = {str(record.message) for record in warning_records}
+        expected_warning_messages = {
+            "Covariance module specified for output y1 will be overwritten by SAAS model construction.",
+            "Mean module specified for output y1 will be overwritten by SAAS model construction.",
+        }
+        assert expected_warning_messages.issubset(warning_messages)
+        assert mock_build_map_saas_gp.call_count == 1
+        assert isinstance(model.models[0], SingleTaskGP)
+        assert isinstance(model.models[0].covar_module, ScaleKernel)
+        assert isinstance(model.models[0].mean_module, ConstantMean)
+        assert hasattr(model.models[0].covar_module.base_kernel, "lengthscale")
+        assert not isinstance(model.models[0].covar_module.base_kernel, PeriodicKernel)
+        assert not isinstance(model.models[0].mean_module, LinearMean)
+        assert isinstance(model, ModelListGP)
+
+        constructor_multi = StandardModelConstructor(saas_outputs=["y1", "c1"])
+        with patch.object(
+            StandardModelConstructor,
+            "build_map_saas_gp",
+            wraps=StandardModelConstructor.build_map_saas_gp,
+        ) as mock_build_map_saas_gp_multi:
+            model_multi = constructor_multi.build_model_from_vocs(test_vocs, test_data)
+        assert mock_build_map_saas_gp_multi.call_count == 2
+        assert isinstance(model_multi, ModelListGP)
