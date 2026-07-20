@@ -1,6 +1,6 @@
 from datetime import datetime
 from itertools import chain
-from pydantic import Field, Discriminator, model_validator
+from pydantic import Field, Discriminator, field_validator, model_validator
 from typing import Annotated
 import json
 import logging
@@ -332,7 +332,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     mutation_operator : PolynomialMutation or DummyMutation, default=PolynomialMutation()
         Operator used to perform mutation on offspring solutions.
     output_dir : str, optional
-        Directory to save algorithm state and population history.
+        Directory to save algorithm state and population history. Accepts a ``str`` or
+        ``os.PathLike`` (e.g. ``pathlib.Path``); ``~`` and environment variables such as
+        ``$SCRATCH`` are expanded.
     checkpoint_freq : int, default=1
         Frequency (in generations) at which to save checkpoints.
     checkpoint_file : str, optional
@@ -393,7 +395,14 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     ] = PolynomialMutation()
 
     # Output options
-    output_dir: str | None = None
+    output_dir: str | None = Field(
+        None,
+        description=(
+            "Directory to save algorithm state and population history. Accepts a "
+            "str or os.PathLike (e.g. pathlib.Path); '~' and environment variables "
+            "such as $SCRATCH are expanded."
+        ),
+    )
     checkpoint_freq: int = Field(
         1,
         description="How often (in generations) to save checkpoints (set to -1 to disable)",
@@ -435,6 +444,18 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
+
+    @field_validator("output_dir", mode="before")
+    @classmethod
+    def _expand_output_dir(cls, value):
+        """
+        Accept a str or os.PathLike (e.g. pathlib.Path) and expand ``~`` and
+        environment variables so paths like ``$SCRATCH/run`` resolve correctly.
+        """
+        if value is None:
+            return None
+        value = os.fspath(value)  # accepts str or os.PathLike
+        return os.path.expanduser(os.path.expandvars(value))
 
     @staticmethod
     def _load_checkpoint_data(fname: str) -> dict:
