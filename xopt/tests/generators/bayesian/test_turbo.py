@@ -7,6 +7,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 import yaml
 
 from gest_api.vocs import VOCS
@@ -159,6 +160,29 @@ class TestTurbo(TestCase):
 
         assert np.all(tr[0].numpy() >= np.array(test_vocs.bounds).T[0])
         assert np.all(tr[1].numpy() <= np.array(test_vocs.bounds).T[1])
+
+    def test_get_trust_region_extreme_lengthscales(self):
+        # extreme lengthscales must not overflow the geometric-mean
+        # normalization: with the naive prod(ls) ** (1 / d) form the product
+        # overflows to inf, the weights collapse to 0 and the trust region
+        # silently degenerates to a single point
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+        gen.add_data(TEST_VOCS_DATA)
+        gen.train_model()
+
+        gen.model.models[0].covar_module.lengthscale = torch.tensor(
+            [[1.0e200, 1.0e200]], dtype=torch.double
+        )
+
+        turbo_state = OptimizeTurboController(vocs=gen.vocs)
+        turbo_state.update_state(gen)
+        tr = turbo_state.get_trust_region(gen)
+
+        assert torch.all(torch.isfinite(tr))
+        # equal lengthscales normalize to unit weights, so the region keeps
+        # its nominal width instead of collapsing to the center point
+        assert torch.all(tr[1] - tr[0] > 0.0)
 
     def test_sign_conventions(self):
         # 2D minimization
