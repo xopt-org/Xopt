@@ -256,10 +256,13 @@ class TurboController(XoptBaseModel, ABC):
                     if active_indices:
                         lengthscales = lengthscales[active_indices]
 
-                    # calculate the ratios of lengthscales for each axis
+                    # calculate the ratios of lengthscales for each axis,
+                    # taking the per-element root before multiplying so the
+                    # product cannot overflow/underflow for extreme
+                    # lengthscales (e.g. degenerate fits in high dimensions)
                     active_dim = len(active_variable_names)
-                    weights = lengthscales / torch.prod(lengthscales) ** (
-                        1 / active_dim
+                    weights = lengthscales / torch.prod(
+                        lengthscales ** (1 / active_dim)
                     )
 
             # calculate the tr bounding box
