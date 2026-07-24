@@ -70,6 +70,12 @@ def recursive_torch_device_scan(
         if verbose:
             print(f"{'    ' * depth}skipping basic type {type(obj)}")
         return
+    # mark before recursing so reference cycles terminate
+    if id(obj) in visited:
+        if verbose:
+            print(f"{'    ' * depth}already visited {type(obj)} at {id(obj)}")
+        return
+    visited |= {id(obj)}
     if verbose:
         print(f"{'----' * depth}scanning {type(obj)} at {id(obj)}")
     # attrs_and_slots = {
