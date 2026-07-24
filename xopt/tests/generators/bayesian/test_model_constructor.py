@@ -995,7 +995,7 @@ class TestBatchedModelConstructor:
         for i in range(test_vocs.n_outputs):
             assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=5e-3)
 
-    def test_train_model_batch_compare_adam(self):
+    def test_train_model_batch_compare_training(self):
         test_vocs = deepcopy(TEST_VOCS)
         test_data = deepcopy(TEST_DATA)
 
@@ -1020,17 +1020,48 @@ class TestBatchedModelConstructor:
         batch_ls = model_single.covar_module.raw_lengthscale
         for i in range(test_vocs.n_outputs):
             assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
-        print([(p, p.shape) for p in model_list.parameters()])
-        print("------------------------------")
-        print([(p, p.shape) for p in model_single.parameters()])
 
-        optimizer_single = torch.optim.Adam(model_single.parameters(), lr=0.1)
         mll = ExactMarginalLogLikelihood(model_single.likelihood, model_single)
-        optimizer_list = []
-        mll_list = []
-        for ml in model_list.models:
-            optimizer_list.append(torch.optim.Adam(ml.parameters(), lr=0.1))
-            mll_list.append(ExactMarginalLogLikelihood(ml.likelihood, ml))
+        mll_list = [
+            ExactMarginalLogLikelihood(ml.likelihood, ml) for ml in model_list.models
+        ]
+
+        # The batched MLL decouples exactly across outputs, so before any
+        # optimizer step the loss and gradients must match tightly
+        model_single.zero_grad()
+        loss = -mll(
+            model_single(model_single.train_inputs[0]), model_single.train_targets
+        ).sum()
+        loss.backward()
+        single_loss = float(loss.item())
+
+        total_list_loss = 0.0
+        for j, ml in enumerate(model_list.models):
+            ml.zero_grad()
+            list_loss = -mll_list[j](ml(ml.train_inputs[0]), ml.train_targets)
+            list_loss.backward()
+            total_list_loss += list_loss.item()
+        assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-9)
+
+        batch_params = dict(model_single.named_parameters())
+        for j, ml in enumerate(model_list.models):
+            for name, p_list in ml.named_parameters():
+                grad_batch = batch_params[name].grad
+                if grad_batch.shape != p_list.grad.shape:
+                    assert grad_batch.shape[0] == test_vocs.n_outputs, name
+                    grad_batch = grad_batch[j]
+                assert torch.allclose(grad_batch, p_list.grad, rtol=0, atol=1e-9), name
+
+        # Compare training trajectories with SGD: unlike Adam, whose per-step
+        # normalization chaotically amplifies floating-point reduction-order
+        # differences between batched and per-model kernels, plain SGD stays
+        # at float64 noise level for this step/lr budget (larger budgets can
+        # leave the well-conditioned region and go NotPSD - recheck tolerances
+        # before increasing them)
+        optimizer_single = torch.optim.SGD(model_single.parameters(), lr=0.1)
+        optimizer_list = [
+            torch.optim.SGD(ml.parameters(), lr=0.1) for ml in model_list.models
+        ]
 
         for i in range(10):
             optimizer_single.zero_grad()
@@ -1039,7 +1070,6 @@ class TestBatchedModelConstructor:
             loss.backward()
             optimizer_single.step()
             single_loss = float(loss.item())
-            print(f"Single: {loss.item()}")
             total_list_loss = 0.0
             for j, ml in enumerate(model_list.models):
                 optimizer_list[j].zero_grad()
@@ -1047,17 +1077,15 @@ class TestBatchedModelConstructor:
                 loss = -mll_list[j](output, ml.train_targets)
                 loss.backward()
                 optimizer_list[j].step()
-                print(f"List {j}: {loss.item()}")
                 total_list_loss += loss.item()
-            print(f"List total: {total_list_loss}")
-            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-5)
+            assert np.isclose(total_list_loss, single_loss, rtol=0.0, atol=1e-8)
         list_ls = [
             model_list.models[i].covar_module.raw_lengthscale
             for i in range(test_vocs.n_outputs)
         ]
         batch_ls = model_single.covar_module.raw_lengthscale
         for i in range(test_vocs.n_outputs):
-            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-3)
+            assert torch.allclose(list_ls[i], batch_ls[i, ...], rtol=0, atol=1e-8)
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_batched_basic(self, use_cuda):
