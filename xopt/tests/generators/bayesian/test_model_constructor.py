@@ -1026,8 +1026,9 @@ class TestBatchedModelConstructor:
             ExactMarginalLogLikelihood(ml.likelihood, ml) for ml in model_list.models
         ]
 
-        # The batched MLL decouples exactly across outputs, so before any
-        # optimizer step the loss and gradients must match tightly
+        # For independent outputs, the batched MLL is mathematically the sum of
+        # the per-model MLLs. Compare losses and parameter gradients before
+        # optimizer state can amplify numerical differences.
         model_single.zero_grad()
         loss = -mll(
             model_single(model_single.train_inputs[0]), model_single.train_targets
@@ -1052,12 +1053,11 @@ class TestBatchedModelConstructor:
                     grad_batch = grad_batch[j]
                 assert torch.allclose(grad_batch, p_list.grad, rtol=0, atol=1e-9), name
 
-        # Compare training trajectories with SGD: unlike Adam, whose per-step
-        # normalization chaotically amplifies floating-point reduction-order
-        # differences between batched and per-model kernels, plain SGD stays
-        # at float64 noise level for this step/lr budget (larger budgets can
-        # leave the well-conditioned region and go NotPSD - recheck tolerances
-        # before increasing them)
+        # Use SGD for the trajectory check so batched-vs-per-model rounding
+        # differences remain proportional to the gradient differences. Adam can
+        # amplify near-zero differences through its adaptive denominator.
+        # Keep the step count and learning rate small to avoid ill-conditioned
+        # covariance matrices.
         optimizer_single = torch.optim.SGD(model_single.parameters(), lr=0.1)
         optimizer_list = [
             torch.optim.SGD(ml.parameters(), lr=0.1) for ml in model_list.models
