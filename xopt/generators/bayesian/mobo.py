@@ -83,7 +83,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         acq = self._get_acquisition(model)
 
         # apply fixed features if specified in the generator
-        acq = self._apply_fixed_features(acq)
+        acq = self._apply_fixed_features_and_contextual_variables(acq)
 
         acq = acq.to(**self.tkwargs)
         return acq

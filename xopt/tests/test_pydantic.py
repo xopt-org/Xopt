@@ -449,6 +449,15 @@ def test_orjson_dumps_and_loads():
     assert isinstance(d, dict)
 
 
+def test_orjson_dumps_preserves_non_finite_floats():
+    class NonFiniteModel(XoptBaseModel):
+        values: list[float] = [-float("inf"), float("inf")]
+
+    m = NonFiniteModel()
+    loaded = json.loads(orjson_dumps(m))
+    assert loaded["values"] == ["-inf", "inf"]
+
+
 def test_process_and_encode_decode_torch_module():
     mod = DummyTorchModule()
     with tempfile.TemporaryDirectory() as tmpdir:

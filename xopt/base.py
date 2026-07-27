@@ -23,7 +23,12 @@ from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.utils import explode_all_columns, get_generator_name
-from xopt.vocs import validate_input_data, random_inputs, grid_inputs
+from xopt.vocs import (
+    ContextualVariable,
+    validate_input_data,
+    random_inputs,
+    grid_inputs,
+)
 from gest_api.vocs import VOCS
 from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
@@ -374,7 +379,8 @@ class Xopt(XoptBaseModel):
         for name, ele in self.vocs.constants.items():
             inputs[name] = ele.value
 
-        validate_input_data(self.vocs, DataFrame(inputs, index=[0]))
+        validation_data = self._prepare_validation_data(DataFrame(inputs, index=[0]))
+        validate_input_data(self.vocs, validation_data)
         return self.evaluator.evaluate(input_dict)
 
     def evaluate_data(
@@ -412,7 +418,8 @@ class Xopt(XoptBaseModel):
                 input_data = DataFrame(deepcopy(input_data), index=[0])
 
         logger.debug(f"Evaluating {len(input_data)} inputs")
-        validate_input_data(self.vocs, input_data)
+        validation_data = self._prepare_validation_data(input_data)
+        validate_input_data(self.vocs, validation_data)
 
         # add constants to input data
         for name, const in self.vocs.constants.items():
@@ -438,6 +445,25 @@ class Xopt(XoptBaseModel):
             self.dump()
 
         return output_data
+
+    def _prepare_validation_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prepare candidate data for VOCS validation.
+
+        Contextual variables are observed, not controlled, so generated candidates
+        are allowed to omit them. For bounds validation we add missing contextual
+        variable columns to a temporary copy.
+        """
+        validation_data = input_data.copy()
+
+        for name, var in self.vocs.variables.items():
+            if (
+                isinstance(var, ContextualVariable)
+                and name not in validation_data.columns
+            ):
+                validation_data[name] = np.nan
+
+        return validation_data
 
     def add_data(self, new_data: pd.DataFrame):
         """

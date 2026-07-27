@@ -986,3 +986,55 @@ def test_nsga2_vocs_not_present_in_add_data():
     # Try with strict=False
     X.strict = False
     X.add_data(pd.DataFrame({"x1": [0], "y2": [0], "c1": [0]}))
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_generate_candidates_in_bounds_unsorted_vocs(seed):
+    """
+    Test for Github issue #437. Confirm that variables out of alphabetic order are generated in unpermuted order.
+    """
+    np.random.seed(seed)
+
+    population_size = 8
+    n_vars = 32
+
+    # Shuffle variable names into non-alphabetical insertion order
+    var_names = [f"var_{i:02d}" for i in range(n_vars)]
+    np.random.shuffle(var_names)
+
+    # Assign non-overlapping bounds [k+1, k+1.5] to the k-th name in shuffled order
+    variables = {
+        name: [float(k + 1), float(k + 1) + 0.5] for k, name in enumerate(var_names)
+    }
+
+    vocs = VOCS(
+        variables=variables,
+        objectives={"f": "MINIMIZE"},
+    )
+
+    def evaluate(inputs):
+        return {"f": sum(inputs[name] for name in var_names)}
+
+    X = Xopt(
+        generator=NSGA2Generator(vocs=vocs, population_size=population_size),
+        evaluator=Evaluator(function=evaluate),
+    )
+
+    # Test for initial random sampling
+    candidates = X.generator._generate(20)
+    for cand in candidates:
+        for k, name in enumerate(var_names):
+            lo = float(k + 1)
+            hi = lo + 0.5
+            assert lo <= cand[name] <= hi, f"{name}={cand[name]!r} out of [{lo}, {hi}]"
+
+    for _ in range(2 * population_size):
+        X.step()
+
+    # Test for crossover / mutation
+    candidates = X.generator._generate(20)
+    for cand in candidates:
+        for k, name in enumerate(var_names):
+            lo = float(k + 1)
+            hi = lo + 0.5
+            assert lo <= cand[name] <= hi, f"{name}={cand[name]!r} out of [{lo}, {hi}]"

@@ -59,6 +59,46 @@ JSON_ENCODERS = {
 }
 
 
+def _serialize_non_finite_float(value: float | np.floating) -> str:
+    value = float(value)
+    if np.isnan(value):
+        return "nan"
+    if value > 0:
+        return "inf"
+    return "-inf"
+
+
+def _serialize_list(values, base_key="", serialize_torch=False, serialize_inline=False):
+    serialized_values = []
+    for i, item in enumerate(values):
+        list_key = f"{base_key}_{i}" if base_key else str(i)
+
+        if isinstance(item, dict):
+            item = recursive_serialize(
+                item, list_key, serialize_torch, serialize_inline
+            )
+        elif isinstance(item, list):
+            item = _serialize_list(item, list_key, serialize_torch, serialize_inline)
+        elif isinstance(item, (float, np.floating)) and not np.isfinite(float(item)):
+            item = _serialize_non_finite_float(item)
+        else:
+            for _type, func in JSON_ENCODERS.items():
+                if isinstance(item, _type):
+                    item = func(item)
+
+            if isinstance(item, (float, np.floating)) and not np.isfinite(float(item)):
+                item = _serialize_non_finite_float(item)
+
+        try:
+            json.dumps(item)
+        except (TypeError, OverflowError):
+            item = f"{item.__module__}.{item.__class__.__qualname__}"
+
+        serialized_values.append(item)
+
+    return serialized_values
+
+
 # The problem with v2 serialization is that model_serialize_json() does not accept kwargs
 # meaning whichever model method is decorated with @model_serializer cant adjust for 'base_key'
 # and other similar options - it renders native whole v2 scheme quite useless. We can still try
@@ -80,6 +120,8 @@ def recursive_serialize(
     for key in list(v):
         if isinstance(v[key], dict):
             v[key] = recursive_serialize(v[key], key, serialize_torch, serialize_inline)
+        elif isinstance(v[key], list):
+            v[key] = _serialize_list(v[key], key, serialize_torch, serialize_inline)
         elif isinstance(v[key], torch.nn.Module):
             if serialize_torch:
                 if serialize_inline:
@@ -96,10 +138,19 @@ def recursive_serialize(
             v[key] = json.loads(v[key].to_json())
         elif isinstance(v[key], set):
             v[key] = list(v[key])
+        elif isinstance(v[key], (float, np.floating)) and not np.isfinite(
+            float(v[key])
+        ):
+            v[key] = _serialize_non_finite_float(v[key])
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(v[key], _type):
                     v[key] = func(v[key])
+
+            if isinstance(v[key], (float, np.floating)) and not np.isfinite(
+                float(v[key])
+            ):
+                v[key] = _serialize_non_finite_float(v[key])
 
         # check to make sure object has been serialized,
         # if not use a generic serializer

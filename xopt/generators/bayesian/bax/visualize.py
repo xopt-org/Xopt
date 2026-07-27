@@ -82,7 +82,9 @@ def visualize_virtual_objective(
             f"which are not in generator.vocs.variable_names."
         )
     tkwargs = generator.tkwargs
-    x = _generate_input_mesh(vocs, variable_names, reference_point, n_grid, tkwargs)
+    x = _generate_input_mesh(
+        vocs, variable_names, data, reference_point, n_grid, tkwargs
+    )
 
     # verify model exists
     if generator.model is None:

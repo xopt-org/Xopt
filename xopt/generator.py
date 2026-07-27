@@ -9,6 +9,7 @@ from pydantic_core.core_schema import ValidationInfo
 
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
+from xopt.vocs import ContextualVariable
 
 from gest_api.vocs import VOCS, DiscreteVariable
 from gest_api.generator import Generator as BaseGenerator
@@ -48,16 +49,22 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         frozen=True,
         exclude=True,
     )
-    supports_multi_objective: bool = Field(
+    supports_no_objective: bool = Field(
         default=False,
-        description="flag that describes if this generator can solve multi-objective "
-        "problems",
+        description="flag that describes if this generator can solve problems with no objectives",
         frozen=True,
         exclude=True,
     )
     supports_single_objective: bool = Field(
         default=False,
         description="flag that describes if this generator can solve single-objective "
+        "problems",
+        frozen=True,
+        exclude=True,
+    )
+    supports_multi_objective: bool = Field(
+        default=False,
+        description="flag that describes if this generator can solve multi-objective "
         "problems",
         frozen=True,
         exclude=True,
@@ -73,6 +80,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         default=False,
         description="flag that describes if this generator can optimize discrete "
         "input variables",
+        frozen=True,
+        exclude=True,
+    )
+    supports_contextual_variables: bool = Field(
+        default=False,
+        description="flag that describes if this generator can use contextual input "
+        "variables",
         frozen=True,
         exclude=True,
     )
@@ -95,6 +109,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
             for name in vocs.variable_names
         )
 
+    @staticmethod
+    def _has_contextual_variables(vocs: VOCS) -> bool:
+        return any(
+            isinstance(vocs.variables[name], ContextualVariable)
+            for name in vocs.variable_names
+        )
+
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
@@ -106,15 +127,21 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         ):
             raise VOCSError("this generator does not support discrete variables")
 
-        # assert that the generator needs at least one objective
-        if v.n_objectives == 0:
-            raise VOCSError("the generator must have at least one objective")
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
 
-        if v.n_objectives == 1:
-            if not info.data["supports_single_objective"]:
-                raise VOCSError(
-                    "this generator does not support single objective optimization"
-                )
+        # check objective support
+        if v.n_objectives == 0 and not info.data["supports_no_objective"]:
+            raise VOCSError(
+                "this generator does not support problems with no objectives"
+            )
+        elif v.n_objectives == 1 and not info.data["supports_single_objective"]:
+            raise VOCSError(
+                "this generator does not support single objective optimization"
+            )
         elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
             raise VOCSError(
                 "this generator does not support multi-objective optimization"

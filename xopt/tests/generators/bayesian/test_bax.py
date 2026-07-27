@@ -28,10 +28,6 @@ class PatchBAXGeneratorNoConstraints(BaxGenerator):
     supports_constraints: bool = False
 
 
-class PatchBAXGeneratorSupportsSingleObjective(BaxGenerator):
-    supports_single_objective: bool = True
-
-
 class TestBaxGenerator:
     @patch.multiple(Algorithm, __abstractmethods__=set())
     def test_init(self):
@@ -353,9 +349,10 @@ class TestBaxGenerator:
         alg = GridOptimize(observable_names_ordered=["y1"])
 
         with pytest.raises(
-            VOCSError, match="only supports problems with no objectives"
+            VOCSError,
+            match="this generator does not support single objective optimization",
         ):
-            PatchBAXGeneratorSupportsSingleObjective(vocs=test_vocs, algorithm=alg)
+            PatchBAXGeneratorNoConstraints(vocs=test_vocs, algorithm=alg)
 
     def test_algorithm_validation_requires_class_path(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)

@@ -153,9 +153,24 @@ class Evaluator(XoptBaseModel):
                 kwargs,
             )
 
-        return pd.concat(
+        result = pd.concat(
             [input_data, DataFrame(output_data, index=input_data.index)], axis=1
         )
+
+        # Remove columns with identical name coming from pd.concat, raising if data differs
+        if not result.columns.is_unique:
+            dup_cols = result.columns[result.columns.duplicated(keep=False)].unique()
+            for col in dup_cols:
+                copies = result.loc[:, result.columns == col]
+                first = copies.iloc[:, 0]
+                for i in range(1, copies.shape[1]):
+                    if not first.equals(copies.iloc[:, i]):
+                        raise ValueError(
+                            f"Evaluator output column '{col}' conflicts with input"
+                            f" column '{col}' with different values."
+                        )
+            result = result.loc[:, ~result.columns.duplicated(keep="first")]
+        return result
 
     def safe_function(self, *args, **kwargs) -> Dict:
         """

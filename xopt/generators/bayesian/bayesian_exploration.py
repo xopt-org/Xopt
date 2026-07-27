@@ -33,10 +33,7 @@ class BayesianExplorationGenerator(BayesianGenerator):
     _compatible_turbo_controllers = [SafetyTurboController]
 
     @field_validator("vocs", mode="after")
-    def validate_vocs(cls, v, info):
-        # start by using the superclass validator
-        v = super().validate_vocs(v, info)
-
+    def validate_explore_objectives(cls, v, info):
         # assert that all of the objectives are of type "ExploreObjective"
         for obj in v.objectives.values():
             if not isinstance(obj, ExploreObjective):

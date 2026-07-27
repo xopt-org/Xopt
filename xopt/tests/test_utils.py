@@ -14,11 +14,11 @@ from torch import nn
 
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 import xopt.utils
+from xopt.vocs import get_local_region
 from xopt.utils import (
     add_constraint_information,
     copy_generator,
     explode_all_columns,
-    get_local_region,
     has_device_field,
     read_csv,
     nsga2_to_cnsga_file_format,
@@ -121,7 +121,7 @@ class TestUtils(TestCase):
         vocs = DummyVOCS()
         center_point = {"x": 5.0, "y": 3.0}
         # Normal case
-        bounds = get_local_region(center_point, vocs, fraction=0.2)
+        bounds = get_local_region(vocs, center_point, fraction=0.2)
         assert set(bounds.keys()) == set(["x", "y"])
         # Check bounds are within the variable limits
         assert bounds["x"][0] >= vocs.variables["x"].domain[0]
@@ -130,17 +130,17 @@ class TestUtils(TestCase):
         assert bounds["y"][1] <= vocs.variables["y"].domain[1]
         # Edge case: center at lower bound
         center_point = {"x": 0.0, "y": 1.0}
-        bounds = get_local_region(center_point, vocs, fraction=0.5)
+        bounds = get_local_region(vocs, center_point, fraction=0.5)
         assert bounds["x"][0] == vocs.variables["x"].domain[0]
         assert bounds["y"][0] == vocs.variables["y"].domain[0]
         # Edge case: center at upper bound
         center_point = {"x": 10.0, "y": 5.0}
-        bounds = get_local_region(center_point, vocs, fraction=0.5)
+        bounds = get_local_region(vocs, center_point, fraction=0.5)
         assert bounds["x"][1] == vocs.variables["x"].domain[1]
         assert bounds["y"][1] == vocs.variables["y"].domain[1]
         # Error case: wrong keys
         with pytest.raises(KeyError):
-            get_local_region({"x": 1.0}, vocs)
+            get_local_region(vocs, {"x": 1.0})
 
     def test_read_csv_all_and_last_n_lines(self):
         # Create a temporary CSV file

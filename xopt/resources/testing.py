@@ -80,6 +80,11 @@ def recursive_torch_device_scan(
         if verbose:
             print(f"{'    ' * depth}skipping basic type {type(obj)}")
         return
+    if id(obj) in visited:
+        if verbose:
+            print(f"{'    ' * depth}skipping already-visited {type(obj)} at {id(obj)}")
+        return
+    visited.add(id(obj))
     if verbose:
         print(f"{'----' * depth}scanning {type(obj)} at {id(obj)}")
     # attrs_and_slots = {
@@ -271,6 +276,8 @@ def create_set_options_helper(
         gen.use_cuda = use_cuda
         gen.numerical_optimizer.n_restarts = n_restarts
         gen.n_monte_carlo_samples = n_monte_carlo_samples
+        if hasattr(gen.numerical_optimizer, "max_iter"):
+            gen.numerical_optimizer.max_iter = 1
         if add_data:
             gen.add_data(data)
 

@@ -60,7 +60,7 @@ class BaxGenerator(BayesianGenerator):
 
     name = "bax"
     supports_constraints: bool = True
-
+    supports_no_objective: bool = True
     supports_discrete_variables: bool = False
     algorithm: SerializeAsAny[Algorithm] = Field(
         default=GridOptimize(observable_names_ordered=[]),
@@ -79,6 +79,13 @@ class BaxGenerator(BayesianGenerator):
 
     # NOTE: this is meant for use in Badger, TODO: add it to Xopt
     _compatible_algorithms: list[type[Algorithm]] = PrivateAttr(default=[GridOptimize])
+
+    @model_validator(mode="after")
+    def validate_model_after(self) -> "BaxGenerator":
+        # validate turbo controller center if it exists
+        validate_turbo_controller_center(self)
+
+        return self
 
     @field_validator("vocs", mode="after")
     @classmethod
@@ -129,13 +136,6 @@ class BaxGenerator(BayesianGenerator):
             v = algorithm_class.model_validate(v)
 
         return v
-
-    @model_validator(mode="after")
-    def validate_model_after(self) -> "BaxGenerator":
-        # validate turbo controller center if it exists
-        validate_turbo_controller_center(self)
-
-        return self
 
     @classmethod
     def get_compatible_algorithms(cls) -> list[type[Algorithm]]:
