@@ -91,7 +91,7 @@ class BaxGenerator(BayesianGenerator):
     @classmethod
     def validate_vocs(cls, v: VOCS, info: ValidationInfo) -> VOCS:
         # Preserve inherited Bayesian VOCS validation behavior.
-        # v = super().validate_vocs(v, info)
+        v = super().validate_vocs(v, info)
 
         # assert that the generator had no objectives
         if not v.n_objectives == 0:

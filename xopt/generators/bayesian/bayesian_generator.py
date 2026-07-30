@@ -209,6 +209,12 @@ class BayesianGenerator(Generator, ABC):
         if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
             raise VOCSError("this generator does not support discrete variables")
 
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
+
         # assertion that at least one objective exists is done in model_validator below
 
         if v.n_objectives == 1:

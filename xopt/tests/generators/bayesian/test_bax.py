@@ -3,24 +3,21 @@ from copy import deepcopy
 from unittest.mock import patch
 
 import pytest
-
 import torch
 from botorch.models import SingleTaskGP
 from botorch.models.model import ModelList
 from botorch.models.transforms import Normalize, Standardize
-
-
 from xopt.base import Xopt
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax.algorithms import (
     Algorithm,
+    CurvatureGridOptimize,
     GridOptimize,
     GridScanAlgorithm,
-    CurvatureGridOptimize,
 )
-from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.bax.visualize import visualize_virtual_objective
+from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
@@ -361,7 +358,8 @@ class TestBaxGenerator:
         test_vocs.constraints = {}
 
         with pytest.raises(
-            ValueError, match="Algorithm dictionary must contain 'class_path' key"
+            ValueError,
+            match="Algorithm dictionary must contain 'class_path' or 'name' key",
         ):
             BaxGenerator(vocs=test_vocs, algorithm={"n_samples": 4})
 
