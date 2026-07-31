@@ -199,8 +199,8 @@ class GridOptimize(GridScanAlgorithm):
 
     Methods
     -------
-    get_execution_paths(self, model: Model, bounds: Tensor) -> tuple[Tensor, Tensor, ExecutionPathsResult]
-        Get execution paths that minimize the objective function.
+    execute(self, model: Model, bounds: Tensor) -> GridOptimizeResult
+        Draw samples from the model, compute the sample virtual objective at grid points, and return sample optima.
     perform_virtual_measurement(self, model: Model, x: Tensor, bounds: Tensor, n_samples: int, tkwargs: dict = None) -> VirtualMeasurementResult
         Evaluate the virtual measurement and calculate objective values (samples).
     """
