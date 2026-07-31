@@ -3,29 +3,30 @@ from copy import deepcopy
 from unittest.mock import patch
 
 import pytest
-
 import torch
 from botorch.models import SingleTaskGP
 from botorch.models.model import ModelList
 from botorch.models.transforms import Normalize, Standardize
-
-
 from xopt.base import Xopt
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax.algorithms import (
     Algorithm,
+    CurvatureGridOptimize,
     GridOptimize,
     GridScanAlgorithm,
-    CurvatureGridOptimize,
 )
-from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.bax.visualize import visualize_virtual_objective
+from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA, xtest_callable
 
 
 class PatchBAXGeneratorNoConstraints(BaxGenerator):
     supports_constraints: bool = False
+
+
+class PatchBAXGeneratorSupportsSingleObjective(BaxGenerator):
+    supports_single_objective: bool = True
 
 
 class TestBaxGenerator:
@@ -361,9 +362,55 @@ class TestBaxGenerator:
         test_vocs.constraints = {}
 
         with pytest.raises(
-            ValueError, match="Algorithm dictionary must contain 'class_path' key"
+            ValueError,
+            match="Algorithm dictionary must contain 'class_path' or 'name' key",
         ):
             BaxGenerator(vocs=test_vocs, algorithm={"n_samples": 4})
+
+    def test_algorithm_validation_accepts_name(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        test_vocs.constraints = {}
+
+        gen = BaxGenerator(
+            vocs=test_vocs,
+            algorithm={"name": "grid_optimize", "observable_names_ordered": ["y1"]},
+        )
+        assert isinstance(gen.algorithm, GridOptimize)
+
+    def test_algorithm_validation_rejects_unknown_name(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {}
+        test_vocs.observables = ["y1"]
+        test_vocs.constraints = {}
+
+        with pytest.raises(
+            ValueError, match="Unknown algorithm name 'not_an_algorithm'"
+        ):
+            BaxGenerator(
+                vocs=test_vocs,
+                algorithm={"name": "not_an_algorithm"},
+            )
+
+    def test_get_compatible_algorithms(self):
+        compatible = BaxGenerator.get_compatible_algorithms()
+        assert GridOptimize in compatible
+
+    def test_vocs_validation_rejects_objectives(self):
+        # objective support is enabled so the inherited validation passes, exercising
+        # the BAX-specific no-objective check
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives = {"y1": "MINIMIZE"}
+        test_vocs.observables = []
+        test_vocs.constraints = {}
+        alg = GridOptimize(observable_names_ordered=["y1"])
+
+        with pytest.raises(
+            VOCSError,
+            match="BAX generator only supports problems with no objectives",
+        ):
+            PatchBAXGeneratorSupportsSingleObjective(vocs=test_vocs, algorithm=alg)
 
     def test_algorithm_validation_rejects_unknown_module(self):
         test_vocs = deepcopy(TEST_VOCS_BASE)

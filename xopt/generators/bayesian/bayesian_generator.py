@@ -1,39 +1,37 @@
 import logging
-from math import prod
 import os
 import time
 import warnings
-from copy import deepcopy
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from itertools import islice, product
-from typing import Any, Dict, List, Optional, Union, cast
+from math import prod
+from typing import Any, Dict, Hashable, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
 import torch
 from botorch.acquisition import (
-    FixedFeatureAcquisitionFunction,
-    qUpperConfidenceBound,
     AcquisitionFunction,
+    FixedFeatureAcquisitionFunction,
     MCAcquisitionObjective,
+    qUpperConfidenceBound,
 )
 from botorch.models.model import Model
 from botorch.sampling.get_sampler import get_sampler
+from gest_api.vocs import VOCS, DiscreteVariable, MaximizeObjective, MinimizeObjective
 from gpytorch import Module
 from pydantic import (
     Field,
-    field_validator,
     PositiveInt,
     SerializeAsAny,
+    field_validator,
     model_validator,
 )
-from pydantic.fields import PrivateAttr, ModelPrivateAttr
+from pydantic.fields import ModelPrivateAttr, PrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
-
-from gest_api.vocs import DiscreteVariable, MinimizeObjective, MaximizeObjective
-
-from xopt.errors import VOCSError, XoptError, FeasibilityError
+from xopt.errors import FeasibilityError, VOCSError, XoptError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -49,19 +47,19 @@ from xopt.generators.bayesian.models.standard import (
 )
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 from xopt.generators.bayesian.objectives import (
+    CustomXoptObjective,
     create_constraint_callables,
     create_mc_objective,
-    CustomXoptObjective,
 )
 from xopt.generators.bayesian.turbo import (
     TurboController,
 )
 from xopt.generators.bayesian.utils import (
+    compute_hypervolume_and_pf,
     interpolate_points,
     rectilinear_domain_union,
     set_botorch_weights,
     validate_turbo_controller_base,
-    compute_hypervolume_and_pf,
     validate_turbo_controller_center,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
@@ -75,7 +73,6 @@ from xopt.vocs import (
     get_variable_bounds_array,
     has_discrete_variables,
 )
-
 
 logger = logging.getLogger()
 
@@ -203,6 +200,35 @@ class BayesianGenerator(Generator, ABC):
         default=[LBFGSOptimizer, GridOptimizer]
     )
 
+    @field_validator("vocs", mode="after")
+    @classmethod
+    def validate_vocs(cls, v: VOCS, info: ValidationInfo) -> VOCS:
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+            raise VOCSError("this generator does not support constraints")
+
+        if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
+            raise VOCSError("this generator does not support discrete variables")
+
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
+
+        # assertion that at least one objective exists is done in model_validator below
+
+        if v.n_objectives == 1:
+            if not info.data["supports_single_objective"]:
+                raise VOCSError(
+                    "this generator does not support single objective optimization"
+                )
+        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+            raise VOCSError(
+                "this generator does not support multi-objective optimization"
+            )
+
+        return v
+
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
@@ -226,7 +252,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("model", mode="before")
     @classmethod
-    def validate_torch_modules(cls, value: Any):
+    def validate_torch_modules(cls, value: Any) -> Any:
         if isinstance(value, str):
             if value.startswith("base64:"):
                 value = decode_torch_module(value)
@@ -238,7 +264,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("gp_constructor", mode="before")
     @classmethod
-    def validate_gp_constructor(cls, value: Any):
+    def validate_gp_constructor(cls, value: Any) -> Any:
         constructor_dict = {
             "standard": StandardModelConstructor,
             "batched": BatchedModelConstructor,
@@ -266,7 +292,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("numerical_optimizer", mode="before")
     @classmethod
-    def validate_numerical_optimizer(cls, value: Any):
+    def validate_numerical_optimizer(cls, value: Any) -> Any:
         optimizer_dict: dict[str, type[NumericalOptimizer]] = {
             "grid": GridOptimizer,
             "LBFGS": LBFGSOptimizer,
@@ -293,7 +319,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("turbo_controller", mode="before")
     @classmethod
-    def validate_turbo_controller(cls, value: Any, info: ValidationInfo):
+    def validate_turbo_controller(cls, value: Any, info: ValidationInfo) -> Any:
         """note default behavior is no use of turbo"""
         if value is None:
             return value
@@ -313,7 +339,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("computation_time", mode="before")
     @classmethod
-    def validate_computation_time(cls, value: Any):
+    def validate_computation_time(cls, value: Any) -> Any:
         if value is None:
             return value
         elif isinstance(value, pd.DataFrame):
@@ -328,7 +354,7 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @model_validator(mode="after")
-    def validate_model_after(self):
+    def validate_model_after(self) -> "BayesianGenerator":
         # validate turbo controller center if it exists
         validate_turbo_controller_center(self)
 
@@ -346,7 +372,7 @@ class BayesianGenerator(Generator, ABC):
 
         return self
 
-    def add_data(self, new_data: pd.DataFrame):
+    def add_data(self, new_data: pd.DataFrame) -> None:
         """
         Add new data to the generator for Bayesian Optimization.
 
@@ -361,7 +387,7 @@ class BayesianGenerator(Generator, ABC):
         """
         self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
 
-    def generate(self, n_candidates: int):
+    def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
         """
         Generate candidates using Bayesian Optimization.
 
@@ -372,7 +398,7 @@ class BayesianGenerator(Generator, ABC):
 
         Returns
         -------
-        List[Dict]
+        list[dict[Hashable, Any]]
             A list of dictionaries containing the generated candidates.
 
         Raises

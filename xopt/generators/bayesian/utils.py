@@ -5,23 +5,22 @@ from typing import Any, List, cast
 import gpytorch
 import numpy as np
 import pandas as pd
-from pydantic import ValidationInfo
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.models.utils import multioutput_to_batch_mode_transform
-from botorch.utils.multi_objective import is_non_dominated, Hypervolume
-
-from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
-
+from botorch.utils.multi_objective import Hypervolume, is_non_dominated
+from gest_api.vocs import ExploreObjective, MaximizeObjective, MinimizeObjective
+from pydantic import ValidationInfo
+from xopt.generator import Generator
 from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS, random_inputs
 
 
 def get_training_data(
     input_names: List[str], outcome_name: str, data: pd.DataFrame
-) -> (torch.Tensor, torch.Tensor):
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Creates training data from input data frame.
 
@@ -215,7 +214,7 @@ def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     return out_bounds
 
 
-def interpolate_points(df, num_points=10):
+def interpolate_points(df: pd.DataFrame, num_points: int = 10) -> pd.DataFrame:
     """
     Generates interpolated points between two points specified by a pandas DataFrame.
 
@@ -309,7 +308,7 @@ def validate_turbo_controller_base(
         )
 
 
-def validate_turbo_controller_center(generator):
+def validate_turbo_controller_center(generator: Generator) -> None:
     if generator.turbo_controller is not None:
         # Check that values for center_x are within trust region bounds
         trust_region = generator.turbo_controller.get_trust_region(generator)
