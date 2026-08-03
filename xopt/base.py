@@ -40,6 +40,11 @@ from .errors import DataError
 
 logger = logging.getLogger(__name__)
 
+DUMP_FILE_RENAME_MESSAGE = (
+    "The attribute `dump_file` in `Xopt` has been renamed to `xopt_dump_file`. "
+    "Support for the old name will be removed in later versions of the Xopt library."
+)
+
 
 class Xopt(XoptBaseModel):
     """
@@ -59,9 +64,11 @@ class Xopt(XoptBaseModel):
     strict : bool, optional
         A flag indicating whether exceptions raised during evaluation should stop the
         optimization process.
-    dump_file : str, optional
+    xopt_dump_file : str, optional
         An optional file path for dumping attributes of the xopt object and the
         results of evaluations.
+    data_dump_file : str, optional
+        An optional file path for dumping the evaluation data as a CSV file.
     data : DataFrame, optional
         An optional DataFrame object for storing internal data related to the optimization
         process.
@@ -96,8 +103,8 @@ class Xopt(XoptBaseModel):
         Xopt.
     yaml(**kwargs)
         Serializes the Xopt configuration to a YAML string.
-    dump(file: str = None, **kwargs)
-        Dumps the Xopt configuration to a specified file.
+    dump(file: str = None, data_file: str = None, **kwargs)
+        Dumps the Xopt configuration and/or the evaluation data to the specified files.
     dict(**kwargs) -> dict
         Provides a custom dictionary representation of the Xopt configuration.
     json(**kwargs) -> str
@@ -115,8 +122,11 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if exceptions raised during evaluation "
         "should stop Xopt",
     )
-    dump_file: Optional[str] = Field(
-        None, description="file to dump the results of the evaluations"
+    xopt_dump_file: Optional[str] = Field(
+        None, description="file to dump the serialized Xopt object to"
+    )
+    data_dump_file: Optional[str] = Field(
+        None, description="file to dump the evaluation data to as CSV"
     )
     data: Optional[DataFrame] = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
@@ -242,6 +252,33 @@ class Xopt(XoptBaseModel):
                 max_evaluations=max_evals
             )
         return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def dump_file_legacy(cls, data: Any):
+        """
+        Handle backward compatibility: convert the old dump_file parameter to
+        xopt_dump_file.
+        """
+        if isinstance(data, dict) and "dump_file" in data:
+            warnings.warn(DUMP_FILE_RENAME_MESSAGE, DeprecationWarning, stacklevel=2)
+            if data.get("xopt_dump_file") is not None:
+                raise ValueError(
+                    "Cannot specify both 'dump_file' and 'xopt_dump_file'. "
+                    "Use 'xopt_dump_file' instead."
+                )
+            data["xopt_dump_file"] = data.pop("dump_file")
+        return data
+
+    @property
+    def dump_file(self) -> Optional[str]:
+        warnings.warn(DUMP_FILE_RENAME_MESSAGE, DeprecationWarning, stacklevel=2)
+        return self.xopt_dump_file
+
+    @dump_file.setter
+    def dump_file(self, value: Optional[str]):
+        warnings.warn(DUMP_FILE_RENAME_MESSAGE, DeprecationWarning, stacklevel=2)
+        self.xopt_dump_file = value
 
     @property
     def n_data(self) -> int:
@@ -440,9 +477,8 @@ class Xopt(XoptBaseModel):
 
         self.add_data(output_data)
 
-        # dump data to file if specified
-        if self.dump_file is not None:
-            self.dump()
+        # dump to file(s) if specified
+        self.dump()
 
         return output_data
 
@@ -622,33 +658,37 @@ class Xopt(XoptBaseModel):
         )
         return yaml.dump(output)
 
-    def dump(self, file: str = None, **kwargs):
+    def dump(self, file: str = None, data_file: str = None, **kwargs):
         """
-        Dump data to a file.
+        Dump the Xopt object and/or the evaluation data to file.
+
+        Each target is written only if a path is available for it, either via argument
+        or via the corresponding attribute. If neither is available nothing is written.
 
         Parameters
         ----------
         file : str, optional
-            The path to the file where the Xopt configuration will be dumped.
+            The path to the YAML file where the Xopt configuration will be dumped.
+            Defaults to the `xopt_dump_file` attribute.
+        data_file : str, optional
+            The path to the CSV file where the evaluation data will be dumped.
+            Defaults to the `data_dump_file` attribute.
         **kwargs
-            Additional keyword arguments for customizing the dump.
-
-        Raises
-        ------
-        ValueError
-            If no dump file is specified via argument or in the `dump_file` attribute.
+            Additional keyword arguments for customizing the YAML serialization.
 
         """
-        fname = file if file is not None else self.dump_file
+        fname = file if file is not None else self.xopt_dump_file
+        data_fname = data_file if data_file is not None else self.data_dump_file
 
-        if fname is None:
-            raise ValueError(
-                "no dump file specified via argument or in `dump_file` attribute"
-            )
-        else:
+        if fname is not None:
             with open(fname, "w") as f:
                 f.write(self.yaml(**kwargs))
             logger.debug(f"Dumped state to YAML file: {fname}")
+
+        if data_fname is not None:
+            data = self.data if self.data is not None else pd.DataFrame()
+            data.to_csv(data_fname, index_label="xopt_index")
+            logger.debug(f"Dumped data to CSV file: {data_fname}")
 
     def dict(self, **kwargs) -> dict:
         """
