@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from copy import deepcopy
 from typing import Any, Optional, Union
 
@@ -66,9 +67,10 @@ class Xopt(XoptBaseModel):
         optimization process.
     xopt_dump_file : str, optional
         An optional file path for dumping attributes of the xopt object and the
-        results of evaluations.
+        results of evaluations. Environment variables are expanded when dumping.
     data_dump_file : str, optional
         An optional file path for dumping the evaluation data as a CSV file.
+        Environment variables are expanded when dumping.
     data : DataFrame, optional
         An optional DataFrame object for storing internal data related to the optimization
         process.
@@ -664,6 +666,8 @@ class Xopt(XoptBaseModel):
 
         Each target is written only if a path is available for it, either via argument
         or via the corresponding attribute. If neither is available nothing is written.
+        Environment variables in the paths are expanded here, so the unexpanded paths
+        are the ones stored on the object and written to the serialized configuration.
 
         Parameters
         ----------
@@ -681,11 +685,13 @@ class Xopt(XoptBaseModel):
         data_fname = data_file if data_file is not None else self.data_dump_file
 
         if fname is not None:
+            fname = os.path.expandvars(fname)
             with open(fname, "w") as f:
                 f.write(self.yaml(**kwargs))
             logger.debug(f"Dumped state to YAML file: {fname}")
 
         if data_fname is not None:
+            data_fname = os.path.expandvars(data_fname)
             data = self.data if self.data is not None else pd.DataFrame()
             data.to_csv(data_fname, index_label="xopt_index")
             logger.debug(f"Dumped data to CSV file: {data_fname}")

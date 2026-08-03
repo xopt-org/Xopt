@@ -599,6 +599,22 @@ class TestXopt:
             dumped_data, X.data, check_dtype=False, check_names=False
         )
 
+    def test_dump_file_expandvars(self, tmp_path, monkeypatch):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        monkeypatch.setenv("XOPT_TEST_DUMP_DIR", str(tmp_path))
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file="$XOPT_TEST_DUMP_DIR/dump.yml",
+            data_dump_file="$XOPT_TEST_DUMP_DIR/data.csv",
+        )
+        X.random_evaluate(1)
+
+        assert os.path.exists(tmp_path / "dump.yml")
+        assert os.path.exists(tmp_path / "data.csv")
+
     def test_dump_without_files(self, tmp_path):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
