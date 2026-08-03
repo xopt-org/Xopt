@@ -83,7 +83,7 @@ def test_cnsga_from_yaml():
     stopping_condition:
         name: MaxEvaluationsCondition
         max_evaluations: 10
-    dump_file: null
+    xopt_dump_file: null
     data: null
     generator:
         name: cnsga
@@ -120,7 +120,7 @@ def test_cnsga_no_constraints():
     stopping_condition:
         name: MaxEvaluationsCondition
         max_evaluations: 10
-    dump_file: null
+    xopt_dump_file: null
     data: null
     generator:
         name: cnsga

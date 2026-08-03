@@ -90,7 +90,7 @@ class TestHighLevel:
 
     def test_restart_torch_inline_serialization(self):
         YAML = """
-                dump_file: dump_inline.yml
+                xopt_dump_file: dump_inline.yml
                 serialize_torch: True
                 serialize_inline: True
 
@@ -136,7 +136,7 @@ class TestHighLevel:
 
     def test_restart_torch_serialization(self):
         YAML = """
-                dump_file: dump.yml
+                xopt_dump_file: dump.yml
                 serialize_torch: True
 
                 generator:
@@ -179,7 +179,7 @@ class TestHighLevel:
 
     def test_restart(self):
         YAML = """
-                dump_file: dump.yml
+                xopt_dump_file: dump.yml
                 generator:
                     name: mobo
                     reference_point: {y1: 1.5, y2: 1.5}

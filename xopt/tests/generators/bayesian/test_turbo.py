@@ -489,7 +489,7 @@ class TestTurbo(TestCase):
             X = Xopt(
                 evaluator=evaluator,
                 generator=generator,
-                dump_file="dump.yml",
+                xopt_dump_file="dump.yml",
             )
 
             yaml_str = X.yaml()
