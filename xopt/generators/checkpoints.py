@@ -11,7 +11,9 @@ class CheckpointMixin(BaseModel):
     Mix-in class adding checkpoint saving and loading to a generator.
 
     Checkpoints are written to a "checkpoints" subdirectory of a caller-supplied
-    directory, with the VOCS object written alongside it as "vocs.txt".
+    directory. The VOCS object is serialized into the checkpoint itself. Legacy
+    checkpoints which predate this instead carry the VOCS object in a "vocs.txt"
+    file beside the checkpoint directory and are still supported when loading.
 
     The host class must provide a ``vocs`` attribute and a ``to_json`` method.
     Writing of the checkpoint file is the responsibility of the concrete class
@@ -44,20 +46,23 @@ class CheckpointMixin(BaseModel):
         dict
             Dictionary containing VOCS and checkpoint data
         """
-        # Load the VOCS object
+        # Load the checkpoint
+        with open(fname) as f:
+            checkpoint_data = json.load(f)
+
+        if "vocs" in checkpoint_data:
+            return checkpoint_data
+
+        # Legacy checkpoints w/o VOCS
         vocs_fname = os.path.join(os.path.dirname(fname), "../vocs.txt")
         if not os.path.exists(vocs_fname):
             raise ValueError(
-                f'Could not load VOCS file at "{vocs_fname}". Complete generator '
-                "output directory is required for loading from checkpoint."
+                f'Checkpoint "{fname}" does not contain a VOCS object and no '
+                f'VOCS file was found at "{vocs_fname}".'
             )
 
         with open(vocs_fname) as f:
             vocs = VOCS(**json.load(f))
-
-        # Load the checkpoint
-        with open(fname) as f:
-            checkpoint_data = json.load(f)
 
         return {"vocs": vocs, **checkpoint_data}
 
@@ -83,24 +88,22 @@ class CheckpointMixin(BaseModel):
 
     def _save_checkpoint(self, path: str | os.PathLike) -> str:
         """
-        Write the VOCS object and a checkpoint of the generator state to disk.
+        Write a checkpoint of the generator state to disk.
 
         Parameters
         ----------
         path : str or os.PathLike
-            Directory into which "vocs.txt" and the "checkpoints" subdirectory
-            containing the checkpoint file are written.
+            Directory into which the "checkpoints" subdirectory containing the
+            checkpoint file is written.
 
         Returns
         -------
         str
             Path to the checkpoint file which was written.
         """
-        # Set up the output directory and write the VOCS object needed to reload
+        # Set up the output directory
         checkpoint_dir = os.path.join(path, "checkpoints")
         os.makedirs(checkpoint_dir, exist_ok=True)
-        with open(os.path.join(path, "vocs.txt"), "w") as f:
-            json.dump(self.vocs.model_dump(), f)
 
         # Create a base filename
         base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")

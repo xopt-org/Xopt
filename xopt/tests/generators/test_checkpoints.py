@@ -23,13 +23,25 @@ def parse_checkpoint_filename(filename: str) -> tuple[datetime, int]:
     return datetime.strptime(base, "%Y%m%d_%H%M%S"), int(index.split(".")[0])
 
 
+def make_legacy_checkpoint(checkpoint_path: str) -> None:
+    """Rewrite a checkpoint into the legacy layout with VOCS held in "vocs.txt"."""
+    with open(checkpoint_path) as f:
+        checkpoint_data = json.load(f)
+    vocs = checkpoint_data.pop("vocs")
+
+    with open(checkpoint_path, "w") as f:
+        json.dump(checkpoint_data, f)
+    legacy_dir = os.path.dirname(os.path.dirname(checkpoint_path))
+    with open(os.path.join(legacy_dir, "vocs.txt"), "w") as f:
+        json.dump(vocs, f)
+
+
 def test_save_checkpoint_layout(tmp_path):
     generator = CheckpointingRandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
     checkpoint_path = generator._save_checkpoint(tmp_path)
 
-    # VOCS is written to the parent directory and the checkpoint into "checkpoints"
-    vocs_path = tmp_path / "vocs.txt"
-    assert vocs_path.is_file()
+    # Only the "checkpoints" subdirectory is created, no separate VOCS file
+    assert os.listdir(tmp_path) == ["checkpoints"]
     assert os.path.dirname(checkpoint_path) == str(tmp_path / "checkpoints")
     assert os.listdir(tmp_path / "checkpoints") == [os.path.basename(checkpoint_path)]
 
@@ -37,11 +49,11 @@ def test_save_checkpoint_layout(tmp_path):
     _, index = parse_checkpoint_filename(os.path.basename(checkpoint_path))
     assert index == 1
 
-    # Both files hold valid JSON and the VOCS object round trips
+    # The checkpoint holds valid JSON and carries the VOCS object itself
     with open(checkpoint_path) as f:
-        assert "counter" in json.load(f)
-    with open(vocs_path) as f:
-        assert VOCS(**json.load(f)) == generator.vocs
+        checkpoint_data = json.load(f)
+    assert "counter" in checkpoint_data
+    assert VOCS(**checkpoint_data["vocs"]) == generator.vocs
 
 
 def test_checkpoint_round_trip(tmp_path):
@@ -75,10 +87,36 @@ def test_save_checkpoint_avoids_overwriting(tmp_path):
     assert len(os.listdir(tmp_path / "checkpoints")) == 2
 
 
-def test_load_checkpoint_missing_vocs(tmp_path):
+def test_load_legacy_checkpoint(tmp_path):
+    generator = CheckpointingRandomGenerator(vocs=deepcopy(TEST_VOCS_BASE), counter=17)
+    checkpoint_path = generator._save_checkpoint(tmp_path)
+    make_legacy_checkpoint(checkpoint_path)
+
+    # VOCS is recovered from "vocs.txt" since the checkpoint does not carry it
+    reloaded = CheckpointingRandomGenerator(checkpoint_file=checkpoint_path)
+    assert reloaded.counter == 17
+    assert reloaded.vocs == generator.vocs
+
+
+def test_load_legacy_checkpoint_missing_vocs_file(tmp_path):
     generator = CheckpointingRandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
     checkpoint_path = generator._save_checkpoint(tmp_path)
+    make_legacy_checkpoint(checkpoint_path)
     os.remove(tmp_path / "vocs.txt")
 
-    with pytest.raises(ValueError, match="Could not load VOCS file"):
+    with pytest.raises(ValueError, match="does not contain a VOCS object"):
         CheckpointingRandomGenerator(checkpoint_file=checkpoint_path)
+
+
+def test_embedded_vocs_preferred_over_legacy_file(tmp_path):
+    generator = CheckpointingRandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+    checkpoint_path = generator._save_checkpoint(tmp_path)
+
+    # A stale legacy file beside a modern checkpoint must be ignored
+    stale_vocs = deepcopy(TEST_VOCS_BASE)
+    stale_vocs.variables.pop(next(iter(stale_vocs.variables)))
+    with open(tmp_path / "vocs.txt", "w") as f:
+        json.dump(stale_vocs.model_dump(), f)
+
+    reloaded = CheckpointingRandomGenerator(checkpoint_file=checkpoint_path)
+    assert reloaded.vocs == generator.vocs
