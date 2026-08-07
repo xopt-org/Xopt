@@ -484,7 +484,7 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         )
 
     def _generate(self, n_candidates: int) -> list[dict]:
-        self.ensure_output_dir_setup()
+        self.get_output()
         start_t = time.perf_counter()
 
         # If we have a population create children, otherwise generate randomly sampled points
@@ -525,7 +525,7 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         return candidates
 
     def add_data(self, new_data: pd.DataFrame):
-        self.ensure_output_dir_setup()
+        output = self.get_output()
 
         # Validate data is at least compatible with selection / genetic operators
         vocs_names = (
@@ -587,11 +587,11 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
             self.n_generations += 1
 
             # Save the history file
-            if self.output_dir is not None:
+            if output is not None:
                 save_start_t = time.perf_counter()
 
                 # Write the evaluated data and this population to disk
-                self._outputs.register_generation(
+                output.register_generation(
                     self.n_generations, self.pop, self.data, self.vocs
                 )
 
@@ -604,9 +604,7 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
                 if self.checkpoint_freq > 0 and (
                     self.n_generations % self.checkpoint_freq == 0
                 ):
-                    checkpoint_path = self._save_checkpoint(
-                        self._outputs.checkpoint_dir
-                    )
+                    checkpoint_path = self._save_checkpoint(output.checkpoint_dir)
                     self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
@@ -624,9 +622,15 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def ensure_output_dir_setup(self):
+    def get_output(self) -> GAOutputs | None:
+        """
+        Returns the object handling file output, or None if no output directory was set.
+
+        The output directory is resolved and created on the first call. Note that this
+        means no files are touched until the generator is actually used.
+        """
         if (self.output_dir is None) or (self._outputs is not None):
-            return
+            return self._outputs
 
         # Resolve and create the output directory
         self._outputs = GAOutputs(self.output_dir)
@@ -651,6 +655,8 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         # Add the file handler to the logger
         self._logger.addHandler(file_handler)
         self._logger.info(f"routing log output to file: {log_file_path}")
+
+        return self._outputs
 
     def close_log_file(self):
         """
