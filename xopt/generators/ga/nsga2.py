@@ -3,7 +3,6 @@ from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
 import logging
 import numpy as np
-import os
 import pandas as pd
 import time
 import warnings
@@ -15,6 +14,7 @@ from ...vocs import VOCS
 from ..checkpoints import CheckpointMixin
 from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
+from .outputs import GAOutputs
 from .operators import (
     PolynomialMutation,
     DummyMutation,
@@ -395,8 +395,8 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
     log_level: int = Field(
         logging.INFO, description="Log message level output to log.txt"
     )
-    _output_dir_setup: bool = (
-        False  # Used in initializing the directory. PLEASE DO NOT CHANGE
+    _outputs: GAOutputs | None = (
+        None  # Set once the output directory is resolved. PLEASE DO NOT CHANGE
     )
     _logger: logging.Logger | None = None
 
@@ -590,27 +590,9 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
             if self.output_dir is not None:
                 save_start_t = time.perf_counter()
 
-                # Save all Xopt data
-                self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
-
-                # Construct the DataFrame for this population
-                pop_df = pd.DataFrame(self.pop)
-                pop_df["xopt_generation"] = self.n_generations
-
-                # Normalize the columns in the DataFrame
-                # Avoid schema changing part way through optimization so we can write CSV in append mode
-                columns = self.vocs.all_names + [
-                    "xopt_generation",
-                    "xopt_candidate_idx",
-                    "xopt_runtime",
-                    "xopt_error",
-                ]
-                pop_df = pop_df.reindex(columns=columns)
-
-                # Write population DataFrame to file
-                csv_path = os.path.join(self.output_dir, "populations.csv")
-                pop_df.to_csv(
-                    csv_path, index=False, mode="a", header=not os.path.isfile(csv_path)
+                # Write the evaluated data and this population to disk
+                self._outputs.register_generation(
+                    self.n_generations, self.pop, self.data, self.vocs
                 )
 
                 # Log some things
@@ -623,7 +605,7 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
                     self.n_generations % self.checkpoint_freq == 0
                 ):
                     checkpoint_path = self._save_checkpoint(
-                        os.path.join(self.output_dir, "checkpoints")
+                        self._outputs.checkpoint_dir
                     )
                     self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
@@ -643,29 +625,20 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         return self.__repr__()
 
     def ensure_output_dir_setup(self):
-        if (self.output_dir is None) or self._output_dir_setup:
+        if (self.output_dir is None) or (self._outputs is not None):
             return
 
-        # Check if directory exists and do collision avoidance
-        counter = 2
-        output_dir_dedup = self.output_dir
-        while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
-            output_dir_dedup = f"{self.output_dir}_{counter}"
-            counter += 1
-        self._logger.info(
-            f'detected existing output_dir "{self.output_dir}" and corrected '
-            f'to "{output_dir_dedup}" to avoid overwriting'
-        )
-        self.output_dir = output_dir_dedup
-
-        # We are now setup
-        self._output_dir_setup = True
-
-        # Setup the directory
-        os.makedirs(self.output_dir, exist_ok=True)
+        # Resolve and create the output directory
+        self._outputs = GAOutputs(self.output_dir)
+        if self._outputs.output_dir != self.output_dir:
+            self._logger.info(
+                f'detected existing output_dir "{self.output_dir}" and corrected '
+                f'to "{self._outputs.output_dir}" to avoid overwriting'
+            )
+        self.output_dir = self._outputs.output_dir
 
         # Set up file logging
-        log_file_path = os.path.join(self.output_dir, "log.txt")
+        log_file_path = self._outputs.log_path
         file_handler = logging.FileHandler(log_file_path, mode="w")
         file_handler.setLevel(self.log_level)
 
@@ -683,7 +656,7 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         """
         Closes out the log file (if used)
         """
-        if self.output_dir is not None and self._output_dir_setup:
+        if self._outputs is not None:
             # Remove all handlers from the logger
             for handler in list(self._logger.handlers):
                 if isinstance(handler, logging.FileHandler):
