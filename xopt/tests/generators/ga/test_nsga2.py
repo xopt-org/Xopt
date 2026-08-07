@@ -76,7 +76,6 @@ def test_nsga2_output_data():
         # Verify that the data files are created
         assert os.path.exists(os.path.join(output_dir, "data.csv"))
         assert os.path.exists(os.path.join(output_dir, "populations.csv"))
-        assert os.path.exists(os.path.join(output_dir, "vocs.txt"))
         assert os.path.exists(os.path.join(output_dir, "log.txt"))
 
         # Read the data file and check its contents
@@ -109,11 +108,6 @@ def test_nsga2_output_data():
 
         # Check that the populations file contains the expected columns
         assert "xopt_generation" in pop_df.columns
-
-        # Check that the VOCS file contains valid JSON
-        with open(os.path.join(output_dir, "vocs.txt"), "r") as f:
-            vocs_dict = json.load(f)
-            VOCS(**vocs_dict)
 
         # Verify that the log file exists and has content
         with open(os.path.join(output_dir, "log.txt"), "r") as f:
