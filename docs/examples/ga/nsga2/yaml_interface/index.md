@@ -255,7 +255,7 @@ Navigate to the output directory and observe the files there.
 - `populations.csv`: Each completed population is recorded to this file
 - `data.csv`: Contains all evaluated inviduals
 - `log.txt`: A record of all log messages the genreator emitted during its run
-- `vocs.txt`: A copy of the variable, objectives, and constraints (VOCs) definitions
+- `vocs.txt`: A copy of the variable, objectives, and constraints (VOCs) definitions, written as each checkpoint is emitted.
 - `checkpoints/`:  This directory contains checkpoint files which are used with the `checkpoint_file` key of the generator to restart an optimization.
 
 
