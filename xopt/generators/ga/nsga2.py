@@ -1,7 +1,6 @@
 from itertools import chain
 from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
-import json
 import logging
 import numpy as np
 import os
@@ -593,8 +592,6 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
 
                 # Save all Xopt data
                 self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
-                with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
-                    json.dump(self.vocs.dict(), f)
 
                 # Construct the DataFrame for this population
                 pop_df = pd.DataFrame(self.pop)
