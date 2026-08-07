@@ -1,4 +1,3 @@
-from datetime import datetime
 from itertools import chain
 from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
@@ -14,6 +13,7 @@ from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
 from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
+from ..checkpoints import CheckpointMixin
 from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
 from .operators import (
@@ -312,7 +312,7 @@ def generate_candidates_from_population(
 ########################################################################################################################
 
 
-class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
+class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
     """
     Non-dominated Sorting Genetic Algorithm II (NSGA-II) generator.  Implements the NSGA-II algorithm
     for multi-objective optimization as described in [1]. This generator accomdates user selected mutation
@@ -373,11 +373,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     supports_constraints: bool = True
     supports_single_objective: bool = True
 
-    # Checkpoint loading
-    checkpoint_file: str | None = Field(
-        None, description="Path to checkpoint file to load from", exclude=True
-    )
-
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[
         (
@@ -435,58 +430,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         # Get a unique logger per object
         self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
         self._logger.setLevel(self.log_level)
-
-    @staticmethod
-    def _load_checkpoint_data(fname: str) -> dict:
-        """
-        Internal function to load generator data from checkpoint file as well as VOCS object.
-
-        Parameters
-        ----------
-        fname : str
-            Path to the checkpoint file
-
-        Returns
-        -------
-        dict
-            Dictionary containing VOCS and checkpoint data
-        """
-        # Load the VOCS object
-        vocs_fname = os.path.join(os.path.dirname(fname), "../vocs.txt")
-        if not os.path.exists(vocs_fname):
-            raise ValueError(
-                f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
-                "output directory is required for loading from checkpoint."
-            )
-
-        with open(vocs_fname) as f:
-            vocs = VOCS(**json.load(f))
-
-        # Load the checkpoint
-        with open(fname) as f:
-            checkpoint_data = json.load(f)
-
-        return {"vocs": vocs, **checkpoint_data}
-
-    @model_validator(mode="before")
-    @classmethod
-    def load_from_checkpoint(cls, values):
-        """
-        Load from checkpoint file if checkpoint_file is provided.
-        """
-        # Case when a checkpoint file has been supplied
-        if isinstance(values, dict) and "checkpoint_file" in values:
-            checkpoint_file = values.pop("checkpoint_file")
-            if checkpoint_file is not None:
-                # Load checkpoint data
-                checkpoint_data = cls._load_checkpoint_data(checkpoint_file)
-
-                # Merge with user data precedence
-                merged_data = {**checkpoint_data, **values}
-                return merged_data
-
-        # No checkpoint
-        return values
 
     @model_validator(mode="after")
     def vocs_compatible(self):
@@ -682,37 +625,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
                 if self.checkpoint_freq > 0 and (
                     self.n_generations % self.checkpoint_freq == 0
                 ):
-                    self._save_checkpoint()
-
-    def _save_checkpoint(self):
-        # Confirm we are ready to save checkpoint
-        if self.output_dir is None:
-            raise ValueError("Cannot save checkpoint without an output directory")
-        self.ensure_output_dir_setup()
-
-        # Create a base filename
-        os.makedirs(os.path.join(self.output_dir, "checkpoints"), exist_ok=True)
-        base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
-        checkpoint_path = os.path.join(
-            self.output_dir,
-            "checkpoints",
-            f"{base_checkpoint_filename}_1.txt",
-        )
-
-        # Check if file exists and increment counter until we find a free filename
-        counter = 2
-        while os.path.exists(checkpoint_path):
-            checkpoint_path = os.path.join(
-                self.output_dir,
-                "checkpoints",
-                f"{base_checkpoint_filename}_{counter}.txt",
-            )
-            counter += 1
-
-        # Now we have a unique filename
-        with open(checkpoint_path, "w") as f:
-            f.write(self.to_json())
-        self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
+                    checkpoint_path = self._save_checkpoint(self.output_dir)
+                    self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):
         self.data = data
