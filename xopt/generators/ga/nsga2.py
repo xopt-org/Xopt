@@ -622,7 +622,9 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
                 if self.checkpoint_freq > 0 and (
                     self.n_generations % self.checkpoint_freq == 0
                 ):
-                    checkpoint_path = self._save_checkpoint(self.output_dir)
+                    checkpoint_path = self._save_checkpoint(
+                        os.path.join(self.output_dir, "checkpoints")
+                    )
                     self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
     def set_data(self, data):

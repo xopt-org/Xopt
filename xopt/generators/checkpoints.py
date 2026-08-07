@@ -10,10 +10,10 @@ class CheckpointMixin(BaseModel):
     """
     Mix-in class adding checkpoint saving and loading to a generator.
 
-    Checkpoints are written to a "checkpoints" subdirectory of a caller-supplied
-    directory. The VOCS object is serialized into the checkpoint itself. Legacy
-    checkpoints which predate this instead carry the VOCS object in a "vocs.txt"
-    file beside the checkpoint directory and are still supported when loading.
+    Checkpoints are written to a caller-supplied directory. The VOCS object is
+    serialized into the checkpoint itself. Legacy checkpoints which predate this
+    instead carry the VOCS object in a "vocs.txt" file one level above the
+    directory holding the checkpoints and are still supported when loading.
 
     The host class must provide a ``vocs`` attribute and a ``to_json`` method.
     Writing of the checkpoint file is the responsibility of the concrete class
@@ -93,8 +93,8 @@ class CheckpointMixin(BaseModel):
         Parameters
         ----------
         path : str or os.PathLike
-            Directory into which the "checkpoints" subdirectory containing the
-            checkpoint file is written.
+            Directory into which the checkpoint file is written. Created if it
+            does not already exist.
 
         Returns
         -------
@@ -102,20 +102,17 @@ class CheckpointMixin(BaseModel):
             Path to the checkpoint file which was written.
         """
         # Set up the output directory
-        checkpoint_dir = os.path.join(path, "checkpoints")
-        os.makedirs(checkpoint_dir, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
 
         # Create a base filename
         base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
-        checkpoint_path = os.path.join(
-            checkpoint_dir, f"{base_checkpoint_filename}_1.txt"
-        )
+        checkpoint_path = os.path.join(path, f"{base_checkpoint_filename}_1.txt")
 
         # Check if file exists and increment counter until we find a free filename
         counter = 2
         while os.path.exists(checkpoint_path):
             checkpoint_path = os.path.join(
-                checkpoint_dir, f"{base_checkpoint_filename}_{counter}.txt"
+                path, f"{base_checkpoint_filename}_{counter}.txt"
             )
             counter += 1
 
