@@ -1,7 +1,6 @@
 from itertools import chain
 from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
-import logging
 import numpy as np
 import pandas as pd
 import time
@@ -11,10 +10,8 @@ from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
 from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
-from ..checkpoints import CheckpointMixin
-from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
-from .outputs import GAOutputs
+from .base import GAGeneratorBase
 from .operators import (
     PolynomialMutation,
     DummyMutation,
@@ -311,7 +308,7 @@ def generate_candidates_from_population(
 ########################################################################################################################
 
 
-class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
+class NSGA2Generator(GAGeneratorBase, StateOwner):
     """
     Non-dominated Sorting Genetic Algorithm II (NSGA-II) generator.  Implements the NSGA-II algorithm
     for multi-objective optimization as described in [1]. This generator accomdates user selected mutation
@@ -386,20 +383,6 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         Discriminator("name"),
     ] = PolynomialMutation()
 
-    # Output options
-    output_dir: str | None = None
-    checkpoint_freq: int = Field(
-        1,
-        description="How often (in generations) to save checkpoints (set to -1 to disable)",
-    )
-    log_level: int = Field(
-        logging.INFO, description="Log message level output to log.txt"
-    )
-    _outputs: GAOutputs | None = (
-        None  # Set once the output directory is resolved. PLEASE DO NOT CHANGE
-    )
-    _logger: logging.Logger | None = None
-
     # Metadata
     fevals: int = Field(
         0,
@@ -424,11 +407,6 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
     # The population and returned children
     pop: list[dict] = Field(default=[])
     child: list[dict] = Field(default=[])
-
-    def model_post_init(self, context):
-        # Get a unique logger per object
-        self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
-        self._logger.setLevel(self.log_level)
 
     @model_validator(mode="after")
     def vocs_compatible(self):
@@ -525,7 +503,7 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
         return candidates
 
     def add_data(self, new_data: pd.DataFrame):
-        output = self.get_output()
+        self.get_output()
 
         # Validate data is at least compatible with selection / genetic operators
         vocs_names = (
@@ -586,26 +564,8 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
             self.child = self.child[self.population_size :]
             self.n_generations += 1
 
-            # Save the history file
-            if output is not None:
-                save_start_t = time.perf_counter()
-
-                # Write the evaluated data and this population to disk
-                output.register_generation(
-                    self.n_generations, self.pop, self.data, self.vocs
-                )
-
-                # Log some things
-                self._logger.debug(
-                    f'saved optimization data to "{self.output_dir}" '
-                    f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
-                )
-
-                if self.checkpoint_freq > 0 and (
-                    self.n_generations % self.checkpoint_freq == 0
-                ):
-                    checkpoint_path = self._save_checkpoint(output.checkpoint_dir)
-                    self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
+            # Write output files and save a checkpoint if one is due
+            self.end_generation(self.n_generations, self.pop)
 
     def set_data(self, data):
         self.data = data
@@ -621,50 +581,3 @@ class NSGA2Generator(CheckpointMixin, DeduplicatedGeneratorBase, StateOwner):
 
     def __str__(self) -> str:
         return self.__repr__()
-
-    def get_output(self) -> GAOutputs | None:
-        """
-        Returns the object handling file output, or None if no output directory was set.
-
-        The output directory is resolved and created on the first call. Note that this
-        means no files are touched until the generator is actually used.
-        """
-        if (self.output_dir is None) or (self._outputs is not None):
-            return self._outputs
-
-        # Resolve and create the output directory
-        self._outputs = GAOutputs(self.output_dir)
-        if self._outputs.output_dir != self.output_dir:
-            self._logger.info(
-                f'detected existing output_dir "{self.output_dir}" and corrected '
-                f'to "{self._outputs.output_dir}" to avoid overwriting'
-            )
-        self.output_dir = self._outputs.output_dir
-
-        # Set up file logging
-        log_file_path = self._outputs.log_path
-        file_handler = logging.FileHandler(log_file_path, mode="w")
-        file_handler.setLevel(self.log_level)
-
-        # Use the same format as the default logger
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        file_handler.setFormatter(formatter)
-
-        # Add the file handler to the logger
-        self._logger.addHandler(file_handler)
-        self._logger.info(f"routing log output to file: {log_file_path}")
-
-        return self._outputs
-
-    def close_log_file(self):
-        """
-        Closes out the log file (if used)
-        """
-        if self._outputs is not None:
-            # Remove all handlers from the logger
-            for handler in list(self._logger.handlers):
-                if isinstance(handler, logging.FileHandler):
-                    handler.close()
-                self._logger.removeHandler(handler)

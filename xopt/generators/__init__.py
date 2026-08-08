@@ -171,6 +171,11 @@ def get_generator_defaults(
                     # handles everything else
                     defaults[k] = v.default
 
+    # Computed fields are settable options too (eg. NSGA2Generator's output_dir, which
+    # is owned by a separate object) but carry no declared default
+    for k in generator_class.model_computed_fields:
+        defaults.setdefault(k, None)
+
     return defaults
 
 
