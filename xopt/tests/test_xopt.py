@@ -569,6 +569,25 @@ class TestXopt:
             X = Xopt(YAML)
         assert X.xopt_dump_file == "test_checkpointing.yaml"
 
+    def test_dump_file_legacy_property(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file="test_checkpointing.yaml",
+        )
+
+        # Reading through the old name warns and gives the current value
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            assert X.dump_file == "test_checkpointing.yaml"
+
+        # Assigning through the old name warns and writes through
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X.dump_file = "other_checkpointing.yaml"
+        assert X.xopt_dump_file == "other_checkpointing.yaml"
+
     def test_dump_file_legacy_conflict(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
