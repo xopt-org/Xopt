@@ -1,11 +1,18 @@
-from pydantic import Field, PrivateAttr, computed_field, model_validator
-from typing import Any
+from pydantic import Field
 import logging
+import os
+import pandas as pd
 import time
 
 from ..checkpoints import CheckpointMixin
 from ..deduplicated import DeduplicatedGeneratorBase
-from .outputs import GAOutputs
+
+POPULATION_METADATA_COLUMNS = [
+    "xopt_generation",
+    "xopt_candidate_idx",
+    "xopt_runtime",
+    "xopt_error",
+]
 
 
 class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
@@ -15,6 +22,9 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
     Handles the output directory, log file, and periodic checkpointing on behalf of
     subclasses. Subclasses call `end_generation` once each time a generation is
     completed and everything else is taken care of.
+
+    Nothing is written to disk until the generator is used, so building or
+    deserializing one never touches the filesystem.
 
     Parameters
     ----------
@@ -29,6 +39,7 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
         Level of log messages written to "log.txt".
     """
 
+    output_dir: str | None = None
     checkpoint_freq: int = Field(
         1,
         description="How often (in generations) to save checkpoints (set to -1 to disable)",
@@ -36,61 +47,56 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
     log_level: int = Field(
         logging.INFO, description="Log message level output to log.txt"
     )
-    _outputs: GAOutputs | None = PrivateAttr(default=None)
+    _output_prepared: bool = (
+        False  # Whether the output directory has been resolved and created
+    )
 
-    @model_validator(mode="wrap")
-    @classmethod
-    def _build_outputs(cls, data: Any, handler):
+    def model_post_init(self, context):
+        # Get a unique logger per object. Naming it after the concrete class keeps
+        # records propagating through that class's module logger.
+        self._logger = logging.getLogger(
+            f"{type(self).__module__}.{type(self).__name__}.{id(self)}"
+        )
+        self._logger.setLevel(self.log_level)
+
+    def _prepare_output(self) -> None:
         """
-        Hand ownership of "output_dir" to the GAOutputs object.
+        Resolve and create the output directory and begin logging to file.
 
-        The checkpoint is merged here rather than being left to the inherited
-        "before" validator, which pydantic would run inside this one. Doing it first
-        means "output_dir" is taken from the fully merged data, and consuming
-        "checkpoint_file" leaves the inherited validator with nothing to do.
+        Repeated calls do nothing. If the requested directory already holds data, a
+        number is appended and `output_dir` is updated to the path actually used.
         """
-        output_dir = None
-        if isinstance(data, dict):
-            data = cls.load_from_checkpoint(dict(data))
-            output_dir = data.pop("output_dir", None)
+        if (self.output_dir is None) or self._output_prepared:
+            return
 
-        instance = handler(data)
-
-        # Assigning to any field re-runs this validator, which must not discard the
-        # object already holding the output directory and log file
-        if instance._outputs is None:
-            instance._outputs = GAOutputs(
-                output_dir,
-                f"{type(instance).__module__}.{type(instance).__name__}",
-                instance.log_level,
-            )
-            instance._logger = instance._outputs.logger
-        return instance
-
-    @computed_field
-    @property
-    def output_dir(self) -> str | None:
-        """Directory output is written to, or None if output is disabled."""
-        return self._outputs.output_dir
-
-    @output_dir.setter
-    def output_dir(self, value: str | None) -> None:
-        self._outputs.output_dir = value
-
-    def get_output(self) -> GAOutputs:
-        """
-        Returns the object handling file output and logging.
-
-        The output directory is created on the first call, so nothing is written to
-        disk until the generator is actually used.
-        """
-        requested = self._outputs.prepare()
-        if requested is not None:
+        # Check if directory exists and do collision avoidance. Resolve into a local
+        # so the field is only assigned once, since assignment revalidates the model.
+        requested = self.output_dir
+        counter = 2
+        output_dir = requested
+        while os.path.exists(output_dir) and os.listdir(output_dir):
+            output_dir = f"{requested}_{counter}"
+            counter += 1
+        if output_dir != requested:
             self._logger.info(
                 f'detected existing output_dir "{requested}" and corrected '
-                f'to "{self._outputs.output_dir}" to avoid overwriting'
+                f'to "{output_dir}" to avoid overwriting'
             )
-        return self._outputs
+        self.output_dir = output_dir
+
+        # We are now setup
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._output_prepared = True
+
+        # Set up file logging
+        log_file_path = os.path.join(self.output_dir, "log.txt")
+        file_handler = logging.FileHandler(log_file_path, mode="w")
+        file_handler.setLevel(self.log_level)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        self._logger.addHandler(file_handler)
+        self._logger.info(f"routing log output to file: {log_file_path}")
 
     def end_generation(self, generation_index: int, population: list[dict]) -> None:
         """
@@ -103,25 +109,46 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
         population : list of dict
             The individuals making up the completed population.
         """
-        output = self.get_output()
-        if not output.enabled:
+        self._prepare_output()
+        if self.output_dir is None:
             return
-
-        # Write the evaluated data and this population to disk
         save_start_t = time.perf_counter()
-        output.register_generation(generation_index, population, self.data, self.vocs)
+
+        # Save all Xopt data
+        self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
+
+        # Construct the DataFrame for this population
+        pop_df = pd.DataFrame(population)
+        pop_df["xopt_generation"] = generation_index
+
+        # Normalize the columns in the DataFrame
+        # Avoid schema changing part way through optimization so we can write CSV in append mode
+        pop_df = pop_df.reindex(
+            columns=self.vocs.all_names + POPULATION_METADATA_COLUMNS
+        )
+
+        # Write population DataFrame to file
+        csv_path = os.path.join(self.output_dir, "populations.csv")
+        pop_df.to_csv(
+            csv_path, index=False, mode="a", header=not os.path.isfile(csv_path)
+        )
         self._logger.debug(
-            f'saved optimization data to "{output.output_dir}" '
+            f'saved optimization data to "{self.output_dir}" '
             f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
         )
 
         # Save a checkpoint if one is due
         if self.checkpoint_freq > 0 and (generation_index % self.checkpoint_freq == 0):
-            checkpoint_path = self._save_checkpoint(output.checkpoint_dir)
+            checkpoint_path = self._save_checkpoint(
+                os.path.join(self.output_dir, "checkpoints")
+            )
             self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
 
     def close_log_file(self):
         """
         Closes out the log file (if used)
         """
-        self._outputs.close_log()
+        for handler in list(self._logger.handlers):
+            if isinstance(handler, logging.FileHandler):
+                handler.close()
+            self._logger.removeHandler(handler)

@@ -218,7 +218,7 @@ def nsga2_optimization_with_checkpoint():
         )
 
         # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
-        generator.get_output()
+        generator._prepare_output()
         generator.close_log_file()
 
         # Run a few optimization steps
@@ -888,7 +888,7 @@ def test_nsga2_output_inhomogenous_data():
         )
 
         # Hack to avoid log error on windows: "The process cannot access the file because it is being used by another process"
-        generator.get_output()
+        generator._prepare_output()
         generator.close_log_file()
 
         # Run a few optimization steps

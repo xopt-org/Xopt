@@ -462,7 +462,7 @@ class NSGA2Generator(GAGeneratorBase, StateOwner):
         )
 
     def _generate(self, n_candidates: int) -> list[dict]:
-        self.get_output()
+        self._prepare_output()
         start_t = time.perf_counter()
 
         # If we have a population create children, otherwise generate randomly sampled points
@@ -503,7 +503,7 @@ class NSGA2Generator(GAGeneratorBase, StateOwner):
         return candidates
 
     def add_data(self, new_data: pd.DataFrame):
-        self.get_output()
+        self._prepare_output()
 
         # Validate data is at least compatible with selection / genetic operators
         vocs_names = (
