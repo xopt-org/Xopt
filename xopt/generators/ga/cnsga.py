@@ -88,7 +88,7 @@ class CNSGAGenerator(Generator):
     )
     _children: List[Dict] = PrivateAttr([])
     _offspring: Optional[pd.DataFrame] = PrivateAttr(None)
-    _loaded_population: Optional[pd.DataFrame] = PrivateAttr(None)
+    _loaded_population: pd.DataFrame | None = PrivateAttr(None)
     _toolbox: Any = PrivateAttr(None)
     population: Optional[pd.DataFrame] = Field(None)
 
