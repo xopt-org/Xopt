@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, field_validator
 import logging
 import os
 import pandas as pd
@@ -28,10 +28,10 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
 
     Parameters
     ----------
-    output_dir : str, optional
+    output_dir : str or os.PathLike, optional
         Directory to save algorithm state and population history, or None to write
-        nothing. If the directory already contains data, a number is appended to
-        avoid overwriting it.
+        nothing. Stored as a string. If the directory already contains data, a number
+        is appended to avoid overwriting it.
     checkpoint_freq : int, default=1
         Frequency (in generations) at which checkpoints are saved. Set to -1 to
         disable checkpointing.
@@ -50,6 +50,14 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
     _output_prepared: bool = (
         False  # Whether the output directory has been resolved and created
     )
+
+    @field_validator("output_dir", mode="before")
+    @classmethod
+    def validate_output_dir(cls, value):
+        """Accept any os.PathLike, storing it as a string."""
+        if isinstance(value, os.PathLike):
+            return os.fspath(value)
+        return value
 
     def model_post_init(self, context):
         # Get a unique logger per object. Naming it after the concrete class keeps

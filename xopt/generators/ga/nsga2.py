@@ -327,7 +327,7 @@ class NSGA2Generator(GAGeneratorBase, StateOwner):
         Operator used to perform crossover between parent solutions.
     mutation_operator : PolynomialMutation or DummyMutation, default=PolynomialMutation()
         Operator used to perform mutation on offspring solutions.
-    output_dir : str, optional
+    output_dir : str or os.PathLike, optional
         Directory to save algorithm state and population history.
     checkpoint_freq : int, default=1
         Frequency (in generations) at which to save checkpoints.
