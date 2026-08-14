@@ -29,11 +29,14 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        mpi: [openmpi]
         include:
           - os: macos-latest
             python-version: "3.13"
+            mpi: openmpi
           - os: windows-latest
             python-version: "3.13"
+            mpi: msmpi
 
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     steps:
@@ -52,6 +55,8 @@ jobs:
 
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1.4.4
+        with:
+          mpi: ${{ matrix.mpi }}
 
       - name: Install dependencies
         run: uv sync --extra dev
