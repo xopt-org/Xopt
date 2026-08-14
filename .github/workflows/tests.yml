@@ -23,13 +23,19 @@ jobs:
           max-deletions: 3
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: macos-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
 
-    name: Python ${{ matrix.python-version }}
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,8 +50,23 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install system dependencies
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install open-mpi
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install msmpi --yes --no-progress
+          "MSMPI_BIN=C:\Program Files\Microsoft MPI\Bin" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "C:\Program Files\Microsoft MPI\Bin" |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install dependencies
         run: uv sync --extra dev
@@ -54,6 +75,8 @@ jobs:
         run: uv pip list
 
       - name: Run tests
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
         run: uv run pytest -n auto --cov --cov-branch --cov-report=xml
 
       - name: Upload coverage to Codecov
