@@ -597,51 +597,24 @@ class TestTurbo(TestCase):
                 os.remove(f)
 
 
-# Lives outside TestTurbo because pytest cannot parametrize unittest.TestCase
-# methods -- parametrization is fixture-driven and TestCase methods take no
-# fixtures, so the decorator would leave the argument unfilled at call time.
 @pytest.mark.parametrize(
     "lengthscale",
     [pytest.param(1.0e200, id="overflow"), pytest.param(1.0e-200, id="underflow")],
 )
 def test_get_trust_region_extreme_lengthscales(lengthscale):
-    # The geometric-mean normalization must survive lengthscales at both
-    # extremes. With the naive prod(ls) ** (1 / d) form the raw product is
-    # unrepresentable in either direction, and the trust region degenerates
-    # silently -- no warning, no NaN, no exception:
-    #   huge ls -> prod overflows to inf -> weights 0   -> region collapses
-    #                                                      to the center point
-    #   tiny ls -> prod underflows to 0  -> weights inf -> region is clamped
-    #                                                      out to the whole domain
-    # The underflow case is why "finite, with nonzero width" does not pin this
-    # on its own: a region spanning the entire domain satisfies both.
     test_vocs = deepcopy(TEST_VOCS_BASE)
     gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
     gen.add_data(TEST_VOCS_DATA)
     gen.train_model()
 
-    gen.model.models[0].covar_module.lengthscale = torch.tensor(
-        [[lengthscale, lengthscale]], dtype=torch.double
-    )
-
     turbo_state = OptimizeTurboController(vocs=gen.vocs)
     turbo_state.update_state(gen)
-    tr = turbo_state.get_trust_region(gen)
 
-    assert torch.all(torch.isfinite(tr))
+    covar_module = gen.model.models[0].covar_module
+    covar_module.lengthscale = torch.ones_like(covar_module.lengthscale)
+    expected = turbo_state.get_trust_region(gen)
 
-    # Equal lengthscales normalize to unit weights, so the region spans at most
-    # `length` of each dimension's full width. Bounding rather than pinning the
-    # width keeps this robust to the clamp in get_trust_region, which
-    # legitimately narrows a side when the incumbent sits near a bound.
-    bounds = torch.tensor(np.array(test_vocs.bounds).T, dtype=torch.double)
-    widths = tr[1] - tr[0]
-    max_widths = turbo_state.length * (bounds[1] - bounds[0])
+    covar_module.lengthscale = torch.full_like(covar_module.lengthscale, lengthscale)
+    actual = turbo_state.get_trust_region(gen)
 
-    assert torch.all(widths > 0.0), (
-        f"region collapsed to a point, widths {widths.tolist()}"
-    )
-    assert torch.all(widths <= max_widths + 1e-12), (
-        f"region blown out past the trust region, widths "
-        f"{widths.tolist()} exceed {max_widths.tolist()}"
-    )
+    torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)
