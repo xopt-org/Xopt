@@ -7,6 +7,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 import yaml
 
 from gest_api.vocs import VOCS
@@ -594,3 +595,26 @@ class TestTurbo(TestCase):
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
+
+
+@pytest.mark.parametrize(
+    "lengthscale",
+    [pytest.param(1.0e200, id="overflow"), pytest.param(1.0e-200, id="underflow")],
+)
+def test_get_trust_region_extreme_lengthscales(lengthscale):
+    test_vocs = deepcopy(TEST_VOCS_BASE)
+    gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+    gen.add_data(TEST_VOCS_DATA)
+    gen.train_model()
+
+    turbo_state = OptimizeTurboController(vocs=gen.vocs)
+    turbo_state.update_state(gen)
+
+    covar_module = gen.model.models[0].covar_module
+    covar_module.lengthscale = torch.ones_like(covar_module.lengthscale)
+    expected = turbo_state.get_trust_region(gen)
+
+    covar_module.lengthscale = torch.full_like(covar_module.lengthscale, lengthscale)
+    actual = turbo_state.get_trust_region(gen)
+
+    torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)
