@@ -123,6 +123,12 @@ class GAGeneratorBase(CheckpointMixin, DeduplicatedGeneratorBase):
         self._logger.addHandler(file_handler)
         self._logger.info(f"routing log output to file: {log_file_path}")
 
+        # Record the problem definition alongside the data
+        # Note: this is necessary to include in output for users running analysis on the results
+        # ie to plot Pareto front, you need to know the names and direction of the objectives
+        with open(os.path.join(self.expanded_output_dir, "vocs.txt"), "w") as f:
+            f.write(self.vocs.model_dump_json())
+
     def end_generation(self, generation_index: int, population: list[dict]) -> None:
         """
         Record a completed generation, writing output and checkpoints as configured.
