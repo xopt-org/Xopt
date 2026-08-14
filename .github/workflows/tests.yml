@@ -37,12 +37,12 @@ jobs:
 
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.0.0
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -51,7 +51,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Set up MPI
-        uses: mpi4py/setup-mpi@v1
+        uses: mpi4py/setup-mpi@v1.4.4
 
       - name: Install dependencies
         run: uv sync --extra dev
