@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Set up Python 3.11
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: 3.11
       - name: Install pypa/build
@@ -31,6 +31,6 @@ jobs:
           --outdir dist/
           .
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}

@@ -36,6 +36,7 @@ def test_set_handler_with_logger_file():
         logger.info("file test message")
         handler.flush()
         logger.removeHandler(handler)
+        handler.close()
         with open(tmp.name) as f:
             contents = f.read()
         assert "file test message" in contents

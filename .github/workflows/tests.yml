@@ -23,20 +23,29 @@ jobs:
           max-deletions: 3
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        mpi: [openmpi]
+        include:
+          - os: macos-latest
+            python-version: "3.13"
+            mpi: openmpi
+          - os: windows-latest
+            python-version: "3.13"
+            mpi: msmpi
 
-    name: Python ${{ matrix.python-version }}
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.0
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -44,8 +53,10 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1.4.4
+        with:
+          mpi: ${{ matrix.mpi }}
 
       - name: Install dependencies
         run: uv sync --extra dev
@@ -53,10 +64,34 @@ jobs:
       - name: List Python package versions
         run: uv pip list
 
-      - name: Run tests
+      - name: Run tests (Linux and macOS)
+        if: runner.os != 'Windows'
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
         run: uv run pytest -n auto --cov --cov-branch --cov-report=xml
 
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+
+          if (-not $vsPath) {
+            throw "MSVC installation not found"
+          }
+
+          $devShell = Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1"
+          & $devShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+          Get-Command cl -ErrorAction Stop
+
+          uv run pytest -n auto --cov --cov-branch --cov-report=xml
+
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
