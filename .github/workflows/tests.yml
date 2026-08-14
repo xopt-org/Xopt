@@ -64,10 +64,32 @@ jobs:
       - name: List Python package versions
         run: uv pip list
 
-      - name: Run tests
+      - name: Run tests (Linux and macOS)
+        if: runner.os != 'Windows'
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
         run: uv run pytest -n auto --cov --cov-branch --cov-report=xml
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+
+          if (-not $vsPath) {
+            throw "MSVC installation not found"
+          }
+
+          $devShell = Join-Path $vsPath "Common7\Tools\Launch-VsDevShell.ps1"
+          & $devShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+          Get-Command cl -ErrorAction Stop
+
+          uv run pytest -n auto --cov --cov-branch --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
