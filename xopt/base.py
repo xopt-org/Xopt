@@ -105,8 +105,10 @@ class Xopt(XoptBaseModel):
         Xopt.
     yaml(**kwargs)
         Serializes the Xopt configuration to a YAML string.
-    dump(file: str = None, data_file: str = None, **kwargs)
-        Dumps the Xopt configuration and/or the evaluation data to the specified files.
+    dump(file: str = None, **kwargs)
+        Dumps the Xopt configuration to a specified file.
+    dump_data()
+        Dumps the evaluation data to the file given by `data_dump_file`.
     dict(**kwargs) -> dict
         Provides a custom dictionary representation of the Xopt configuration.
     json(**kwargs) -> str
@@ -482,7 +484,10 @@ class Xopt(XoptBaseModel):
         self.add_data(output_data)
 
         # dump to file(s) if specified
-        self.dump()
+        if self.xopt_dump_file is not None:
+            self.dump()
+        if self.data_dump_file is not None:
+            self.dump_data()
 
         return output_data
 
@@ -662,41 +667,62 @@ class Xopt(XoptBaseModel):
         )
         return yaml.dump(output)
 
-    def dump(self, file: str = None, data_file: str = None, **kwargs):
+    def dump(self, file: str = None, **kwargs):
         """
-        Dump the Xopt object and/or the evaluation data to file.
+        Dump the Xopt configuration and data to a YAML file.
 
-        Each target is written only if a path is available for it, either via argument
-        or via the corresponding attribute. If neither is available nothing is written.
-        Environment variables in the paths are expanded here, so the unexpanded paths
-        are the ones stored on the object and written to the serialized configuration.
+        Environment variables in the path are expanded here, so the unexpanded path
+        is the one stored on the object and written to the serialized configuration.
 
         Parameters
         ----------
         file : str, optional
-            The path to the YAML file where the Xopt configuration will be dumped.
+            The path to the file where the Xopt configuration will be dumped.
             Defaults to the `xopt_dump_file` attribute.
-        data_file : str, optional
-            The path to the CSV file where the evaluation data will be dumped.
-            Defaults to the `data_dump_file` attribute.
         **kwargs
-            Additional keyword arguments for customizing the YAML serialization.
+            Additional keyword arguments for customizing the dump.
+
+        Raises
+        ------
+        ValueError
+            If no dump file is specified via argument or in the `xopt_dump_file`
+            attribute.
 
         """
         fname = file if file is not None else self.xopt_dump_file
-        data_fname = data_file if data_file is not None else self.data_dump_file
 
-        if fname is not None:
-            fname = os.path.expandvars(fname)
-            with open(fname, "w") as f:
-                f.write(self.yaml(**kwargs))
-            logger.debug(f"Dumped state to YAML file: {fname}")
+        if fname is None:
+            raise ValueError(
+                "no dump file specified via argument or in `xopt_dump_file` attribute"
+            )
 
-        if data_fname is not None:
-            data_fname = os.path.expandvars(data_fname)
-            data = self.data if self.data is not None else pd.DataFrame()
-            data.to_csv(data_fname, index_label="xopt_index")
-            logger.debug(f"Dumped data to CSV file: {data_fname}")
+        fname = os.path.expandvars(fname)
+        with open(fname, "w") as f:
+            f.write(self.yaml(**kwargs))
+        logger.debug(f"Dumped state to YAML file: {fname}")
+
+    def dump_data(self):
+        """
+        Dump the evaluation data to the CSV file given by `data_dump_file`.
+
+        Environment variables in the path are expanded here, so the unexpanded path
+        is the one stored on the object and written to the serialized configuration.
+
+        Raises
+        ------
+        ValueError
+            If no data dump file is specified in the `data_dump_file` attribute.
+
+        """
+        if self.data_dump_file is None:
+            raise ValueError(
+                "no data dump file specified in `data_dump_file` attribute"
+            )
+
+        fname = os.path.expandvars(self.data_dump_file)
+        data = self.data if self.data is not None else pd.DataFrame()
+        data.to_csv(fname, index_label="xopt_index")
+        logger.debug(f"Dumped data to CSV file: {fname}")
 
     def dict(self, **kwargs) -> dict:
         """

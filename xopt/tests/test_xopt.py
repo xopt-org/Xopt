@@ -618,6 +618,14 @@ class TestXopt:
             dumped_data, X.data, check_dtype=False, check_names=False
         )
 
+        # dumping directly writes the same data
+        os.remove(data_dump_file)
+        X.dump_data()
+        dumped_data = pd.read_csv(data_dump_file, index_col="xopt_index")
+        pd.testing.assert_frame_equal(
+            dumped_data, X.data, check_dtype=False, check_names=False
+        )
+
     def test_dump_file_expandvars(self, tmp_path, monkeypatch):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
@@ -639,11 +647,17 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(generator=generator, evaluator=evaluator)
-        X.random_evaluate(1)
 
-        # no dump files specified, nothing should be written and no error raised
-        X.dump()
+        # no dump files specified, evaluation should not write anything or raise
+        X.random_evaluate(1)
         assert not list(tmp_path.iterdir())
+
+        # dumping explicitly requires a destination
+        with pytest.raises(ValueError):
+            X.dump()
+
+        with pytest.raises(ValueError):
+            X.dump_data()
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
