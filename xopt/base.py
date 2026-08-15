@@ -67,10 +67,11 @@ class Xopt(XoptBaseModel):
         optimization process.
     xopt_dump_file : str, optional
         An optional file path for dumping attributes of the xopt object and the
-        results of evaluations. Environment variables are expanded when dumping.
+        results of evaluations. Environment variables and `~` are expanded when
+        dumping.
     data_dump_file : str, optional
         An optional file path for dumping the evaluation data as a CSV file.
-        Environment variables are expanded when dumping.
+        Environment variables and `~` are expanded when dumping.
     data : DataFrame, optional
         An optional DataFrame object for storing internal data related to the optimization
         process.
@@ -671,8 +672,7 @@ class Xopt(XoptBaseModel):
         """
         Dump the Xopt configuration and data to a YAML file.
 
-        Environment variables in the path are expanded here, so the unexpanded path
-        is the one stored on the object and written to the serialized configuration.
+        Environment variables and `~` in the path are expanded.
 
         Parameters
         ----------
@@ -696,7 +696,7 @@ class Xopt(XoptBaseModel):
                 "no dump file specified via argument or in `xopt_dump_file` attribute"
             )
 
-        fname = os.path.expandvars(fname)
+        fname = os.path.expanduser(os.path.expandvars(fname))
         with open(fname, "w") as f:
             f.write(self.yaml(**kwargs))
         logger.debug(f"Dumped state to YAML file: {fname}")
@@ -705,8 +705,7 @@ class Xopt(XoptBaseModel):
         """
         Dump the evaluation data to the CSV file given by `data_dump_file`.
 
-        Environment variables in the path are expanded here, so the unexpanded path
-        is the one stored on the object and written to the serialized configuration.
+        Environment variables and `~` in the path are expanded.
 
         Raises
         ------
@@ -719,7 +718,7 @@ class Xopt(XoptBaseModel):
                 "no data dump file specified in `data_dump_file` attribute"
             )
 
-        fname = os.path.expandvars(self.data_dump_file)
+        fname = os.path.expanduser(os.path.expandvars(self.data_dump_file))
         data = self.data if self.data is not None else pd.DataFrame()
         data.to_csv(fname, index_label="xopt_index")
         logger.debug(f"Dumped data to CSV file: {fname}")
