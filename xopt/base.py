@@ -264,12 +264,14 @@ class Xopt(XoptBaseModel):
         """
         if isinstance(data, dict) and "dump_file" in data:
             warnings.warn(DUMP_FILE_RENAME_MESSAGE, DeprecationWarning, stacklevel=2)
-            if data.get("xopt_dump_file") is not None:
-                raise ValueError(
-                    "Cannot specify both 'dump_file' and 'xopt_dump_file'. "
-                    "Use 'xopt_dump_file' instead."
-                )
-            data["xopt_dump_file"] = data.pop("dump_file")
+            dump_file = data.pop("dump_file")
+            if dump_file is not None:
+                if data.get("xopt_dump_file") is not None:
+                    raise ValueError(
+                        "Cannot specify both 'dump_file' and 'xopt_dump_file'. "
+                        "Use 'xopt_dump_file' instead."
+                    )
+                data["xopt_dump_file"] = dump_file
         return data
 
     @property
