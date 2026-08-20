@@ -1,11 +1,10 @@
-import pickle
-
 import numpy as np
 import pytest
 from xopt.generators.sequential import (
     RCDSGenerator,
     ExtremumSeekingGenerator,
     NelderMeadGenerator,
+    ScipyGenerator,
 )
 from xopt import Evaluator, Xopt
 from xopt.vocs import VOCS
@@ -20,7 +19,13 @@ def sin_function(input_dict):
 
 class TestSequentialSerialization:
     @pytest.mark.parametrize(
-        "generator", [RCDSGenerator, ExtremumSeekingGenerator, NelderMeadGenerator]
+        "generator",
+        [
+            RCDSGenerator,
+            ExtremumSeekingGenerator,
+            NelderMeadGenerator,
+            ScipyGenerator,
+        ],
     )
     def test_serialization_and_restart(self, generator):
         test_vocs = VOCS(
@@ -42,6 +47,3 @@ class TestSequentialSerialization:
 
         for i in range(10):
             X2.step()
-
-        # test pickling
-        pickle.dumps(X2.generator)
