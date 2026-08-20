@@ -1,3 +1,4 @@
+import time
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -119,6 +120,31 @@ def test_visualize_model(vocs, data, variable_names, show_acquisition):
         show_acquisition=show_acquisition,
         axes=ax,
     )
+
+
+@pytest.mark.parametrize("variable_names", [["x"], ["x", "y"]])
+def test_visualize_model_compile_inductor(vocs, data, variable_names):
+    generator = UpperConfidenceBoundGenerator(vocs=vocs)
+    generator.add_data(data)
+    generator.train_model()
+
+    t1 = time.perf_counter()
+    fig, ax = visualize.visualize_model(
+        model=generator.model,
+        vocs=vocs,
+        data=data,
+        tkwargs={},
+        output_names=["z"],
+        variable_names=variable_names,
+        n_grid=5,
+        show_acquisition=False,
+        model_compile_mode="inductor",
+    )
+    t2 = time.perf_counter()
+    print(
+        f"visualize_model ({len(variable_names)}D) with inductor compile: {t2 - t1:.2f} s"
+    )
+    assert ax is not None
 
 
 def test_visualize_model_reference_title_visibility(vocs, data):

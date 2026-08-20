@@ -270,6 +270,7 @@ def visualize_model(
                 n_grid=n_grid,
                 idx=idx,
                 interactive=interactive,
+                model_compile_mode=model_compile_mode,
             )
             ax[i, 0].set_xlabel(None)
         if show_acquisition:
@@ -439,6 +440,7 @@ def plot_model_prediction(
     color: str = "C0",
     axis: Optional[Axes] = None,
     interactive: bool = False,
+    model_compile_mode: Optional[str] = None,
 ) -> Axes:
     """Displays the GP model prediction for the selected output.
 
@@ -477,6 +479,8 @@ def plot_model_prediction(
         Whether to enable picker functionality for samples in the subplots.
     emit_warning : bool, optional
         Whether to emit a Python warning when acquisition evaluation is skipped for contextual axes.
+    model_compile_mode : str, optional
+        See eponymous parameter of :func:`visualize_model`.
 
     Returns
     -------
@@ -505,6 +509,7 @@ def plot_model_prediction(
         model=model,
         vocs=vocs,
         include_prior_mean=show_prior_mean or requires_prior_mean,
+        model_compile_mode=model_compile_mode,
     )
     if len(variable_names) == 1:
         var_name = variable_names[0]
