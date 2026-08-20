@@ -36,7 +36,7 @@ from xopt.vocs import (
 )
 
 from .objectives import feasibility
-from .utils import torch_compile_gp_model, torch_trace_gp_model
+from .utils import torch_compile_gp_model
 
 # Little helper class, which is only used as a type.
 DType = TypeVar("DType")
@@ -195,7 +195,9 @@ def visualize_model(
     exponentiate : bool, optional
         Flag to exponentiate acquisition function before plotting.
     model_compile_mode : str, optional
-        Compilation mode for the model. If None (default), the model is not compiled.
+        Compilation mode for the model. Use ``"inductor"`` to compile the model
+        with PyTorch's default compiler backend. If None (default), the model is
+        not compiled.
     tkwargs: dict, optional
         kwargs for torch tensor creation
     interactive: bool, optional
@@ -1418,7 +1420,9 @@ def _get_model_predictions(
     include_prior_mean : bool, optional
         Whether to include the prior mean in the predictions.
     model_compile_mode: str, optional
-        Compilation mode for the model. If None (default), the model is not compiled.
+        Compilation mode for the model. Use ``"inductor"`` to compile the model
+        with PyTorch's default compiler backend. If None (default), the model is
+        not compiled.
     _
 
     Returns
@@ -1429,27 +1433,11 @@ def _get_model_predictions(
     gp = model.models[vocs.output_names.index(output_name)]
     # input_mesh = input_mesh.unsqueeze(-2)
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        if model_compile_mode == "trace":
-            if hasattr(model, "_jit"):
-                jitgp = model._jit
-            else:
-                jitgp = torch_trace_gp_model(
-                    gp,
-                    vocs,
-                    {"device": input_mesh.device},
-                    posterior=True,
-                    grad=False,
-                    batch_size=input_mesh.shape[-1],
-                )
-                model._jit = jitgp
-            mean, std = jitgp(input_mesh)
-            posterior_mean = mean.detach().squeeze().cpu().numpy()
-            posterior_std = torch.sqrt(std.detach()).squeeze().cpu().numpy()
-        elif model_compile_mode == "inductor":
-            jitgp = torch_compile_gp_model(
+        if model_compile_mode == "inductor":
+            compiled_gp = torch_compile_gp_model(
                 gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False
             )
-            posterior = jitgp(input_mesh)
+            posterior = compiled_gp(input_mesh)
             posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
             posterior_std = (
                 torch.sqrt(posterior.variance).detach().squeeze().cpu().numpy()
