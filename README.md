@@ -46,6 +46,7 @@ Currenty **Xopt** provides:
       optimization
     - `multi_fidelity` Multi-fidelity single or multi objective optimization
     - `BAX` Bayesian algorithm execution using virtual measurements
+    - `baxus` High-dimensional BO in adaptively expanding random subspaces
     - BO customization:
       - Trust region BO
       - Heteroskedastic noise specification
