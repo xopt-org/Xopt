@@ -139,6 +139,13 @@ class TestUtils:
         t2 = time.perf_counter()
         print(f"Compile AT: {t2 - t1:.4f} seconds")
 
+        t1 = time.perf_counter()
+        model_compile_direct = torch_compile_gp_model(
+            gen.train_model().models[0], gen.vocs, gen.tkwargs, posterior=False
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile direct: {t2 - t1:.4f} seconds")
+
         def fmodel(m, x):
             mvn = m.posterior(x)
             return mvn.mean, mvn.variance
@@ -178,6 +185,17 @@ class TestUtils:
             assert torch.allclose(m1, m2, rtol=0), "Compiled model output mismatch"
             assert torch.allclose(var1, var2, rtol=0), (
                 "Compiled model variance mismatch"
+            )
+
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            model.eval()
+            mvn_eager = model(x_grid)
+            mvn_direct = model_compile_direct(x_grid)
+            assert torch.allclose(mvn_eager.mean, mvn_direct.mean, rtol=0), (
+                "Compiled model direct call output mismatch"
+            )
+            assert torch.allclose(mvn_eager.variance, mvn_direct.variance, rtol=0), (
+                "Compiled model direct call variance mismatch"
             )
 
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
