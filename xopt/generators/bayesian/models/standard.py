@@ -1,14 +1,13 @@
-import os.path
 import warnings
 from copy import deepcopy
 from functools import partial
-from typing import Any, Dict, List, Literal, Optional, Union, cast
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from botorch.exceptions import ModelFittingError
 import botorch.settings
 import pandas as pd
 import torch
 from botorch import fit_gpytorch_mll
+from botorch.exceptions import ModelFittingError
 from botorch.models import ModelListGP, SingleTaskGP
 from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
@@ -22,7 +21,13 @@ from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood, Likelihood
 from gpytorch.likelihoods.gaussian_likelihood import FixedNoiseGaussianLikelihood
 from gpytorch.priors import GammaPrior, Prior
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    SerializeAsAny,
+    field_validator,
+    model_serializer,
+)
 from pydantic_core.core_schema import ValidationInfo
 from torch.nn import Module
 from torch.optim import Adam
@@ -30,9 +35,9 @@ from torch.optim import Adam
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_training_data, get_training_data_batched
-from xopt.pydantic import XoptBaseModel, decode_torch_module
+from xopt.pydantic import XoptBaseModel
+from xopt.types import TorchModuleCodec, get_serialization_options, save_module_sidecar
 
-DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
 # TODO: make custom stopping criterion that checks lengthscales
@@ -150,10 +155,10 @@ class StandardModelConstructor(ModelConstructor):
     use_low_noise_prior: bool = Field(
         False, description="specify if model should assume a low noise environment"
     )
-    covar_modules: Dict[str, Kernel] = Field(
+    covar_modules: Dict[str, Annotated[Kernel, TorchModuleCodec()]] = Field(
         {}, description="covariance modules for GP models"
     )
-    mean_modules: Dict[str, Module] = Field(
+    mean_modules: Dict[str, Annotated[Module, TorchModuleCodec()]] = Field(
         {}, description="prior mean modules for GP models"
     )
     trainable_mean_keys: List[str] = Field(
@@ -164,7 +169,7 @@ class StandardModelConstructor(ModelConstructor):
         description="specify if inputs should be transformed inside the gp "
         "model, can optionally specify a dict of specifications",
     )
-    custom_noise_prior: Optional[Prior] = Field(
+    custom_noise_prior: Optional[Annotated[Prior, TorchModuleCodec()]] = Field(
         None,
         description="specify custom noise prior for the GP likelihood, "
         "overwrites value specified by use_low_noise_prior",
@@ -181,7 +186,7 @@ class StandardModelConstructor(ModelConstructor):
         True,
         description="flag to specify if the model should be trained (fitted to data)",
     )
-    train_config: NumericalOptimizerConfig | None = Field(
+    train_config: SerializeAsAny[NumericalOptimizerConfig] | None = Field(
         None,
         description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy"
         " and fit_gpytorch_mll_torch",
@@ -225,16 +230,22 @@ class StandardModelConstructor(ModelConstructor):
                     )
         return train_kwargs
 
-    @field_validator("train_config")
+    @field_validator("train_config", mode="before")
     def validate_train_config(cls, v, info: ValidationInfo):
         if v is None:
             return v
         if info.data["train_method"] == "adam":
+            if isinstance(v, dict):
+                v = AdamNumericalOptimizerConfig.model_validate(v, context=info.context)
             if not isinstance(v, AdamNumericalOptimizerConfig):
                 raise ValueError(
                     "train_config must be of type AdamOptimizerConfig when method is 'adam'"
                 )
         elif info.data["train_method"] == "lbfgs":
+            if isinstance(v, dict):
+                v = LBFGSNumericalOptimizerConfig.model_validate(
+                    v, context=info.context
+                )
             if not isinstance(v, LBFGSNumericalOptimizerConfig):
                 raise ValueError(
                     "train_config must be of type LBFGSOptimizerConfig when method is 'lbfgs'"
@@ -243,20 +254,30 @@ class StandardModelConstructor(ModelConstructor):
             raise ValueError("method must be either 'adam' or 'lbfgs'")
         return v
 
-    @field_validator("covar_modules", "mean_modules", mode="before")
-    def validate_torch_modules(cls, value: Any):
-        if not isinstance(value, dict):
-            raise ValueError("must be dict")
-        else:
-            value = cast(dict[str, Any], value)
-            for key, val in value.items():
-                if isinstance(val, str):
-                    if val.startswith("base64:"):
-                        value[key] = decode_torch_module(val)
-                    elif os.path.exists(val):
-                        value[key] = torch.load(val, weights_only=False)
-
-        return value
+    @model_serializer(mode="wrap", when_used="json")
+    def serialize_torch_modules(self, handler, info):
+        result = handler(self)
+        options = get_serialization_options(info.context)
+        # only touch fields the handler kept (respect include/exclude)
+        for field_name in ("covar_modules", "mean_modules"):
+            if field_name not in result:
+                continue
+            modules = getattr(self, field_name)
+            if options.module_mode == "drop":
+                result[field_name] = {}
+            elif options.module_mode == "file":
+                result[field_name] = {
+                    key: save_module_sidecar(module, options, f"{field_name}_{key}.pt")
+                    for key, module in modules.items()
+                }
+        if "custom_noise_prior" in result and self.custom_noise_prior is not None:
+            if options.module_mode == "drop":
+                del result["custom_noise_prior"]
+            elif options.module_mode == "file":
+                result["custom_noise_prior"] = save_module_sidecar(
+                    self.custom_noise_prior, options, "custom_noise_prior.pt"
+                )
+        return result
 
     @field_validator("trainable_mean_keys")
     def validate_trainable_mean_keys(cls, value: Any, info: ValidationInfo):

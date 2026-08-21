@@ -7,23 +7,22 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Literal, Annotated, Union
+from typing import Annotated, List, Literal, Union
+
 import pandas as pd
+from gest_api.vocs import VOCS, MinimizeObjective
 from pydantic import (
     ConfigDict,
+    Discriminator,
     Field,
     PositiveFloat,
     PositiveInt,
-    field_serializer,
-    field_validator,
-    Discriminator,
     TypeAdapter,
+    field_validator,
 )
-
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import get_feasibility_data
-from gest_api.vocs import MinimizeObjective, VOCS
 
 
 class StoppingCondition(XoptBaseModel, ABC):
@@ -315,16 +314,6 @@ class CompositeCondition(StoppingCondition):
     logic: str = Field(
         default="or", description="Logic to combine conditions: 'and' or 'or'"
     )
-
-    @field_serializer("conditions")
-    @classmethod
-    def serialize_conditions(cls, v):
-        serialized_conditions = []
-        for condition in v:
-            serialized_conditions.append(
-                condition.model_dump() | {"name": condition.__class__.__name__}
-            )
-        return serialized_conditions
 
     @field_validator("logic")
     @classmethod

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from pydantic import Field, PositiveFloat
 
+from xopt.generator import support_flag
 from xopt.vocs import get_variable_data, get_objective_data
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
@@ -67,7 +68,7 @@ class ExtremumSeekingGenerator(SequentialGenerator):
     k: PositiveFloat = Field(2.0, description="feedback gain")
     oscillation_size: PositiveFloat = Field(0.1, description="oscillation size")
     decay_rate: PositiveFloat = Field(1.0, description="decay rate")
-    supports_single_objective: bool = True
+    supports_single_objective: bool = support_flag(True)
 
     _nES: int = 0
     _wES: np.ndarray = np.array([])

@@ -77,7 +77,7 @@ generator:
     output_path: .
 
 evaluator:
-    function: my_function
+    function: my_module.my_function
     function_kwargs:
       my_arguments: 42
 

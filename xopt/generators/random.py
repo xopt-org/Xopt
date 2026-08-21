@@ -1,4 +1,4 @@
-from xopt.generator import Generator
+from xopt.generator import Generator, support_flag
 from xopt.vocs import random_inputs
 
 
@@ -8,11 +8,11 @@ class RandomGenerator(Generator):
     """
 
     name = "random"
-    supports_batch_generation: bool = True
-    supports_multi_objective: bool = True
-    supports_single_objective: bool = True
-    supports_constraints: bool = True
-    supports_discrete_variables: bool = True
+    supports_batch_generation: bool = support_flag(True)
+    supports_multi_objective: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
+    supports_discrete_variables: bool = support_flag(True)
 
     def generate(self, n_candidates) -> list[dict]:
         """generate uniform random data points"""

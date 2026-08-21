@@ -1,36 +1,37 @@
-from copy import deepcopy
 import os
+import tempfile
+from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-from pydantic import ValidationInfo
 import pytest
 import torch
-from torch.nn import Module
+from botorch.models import SingleTaskGP
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
-
+from pydantic import ValidationInfo
 
 from xopt import VOCS
 from xopt.base import Xopt
-from xopt.errors import VOCSError, XoptError
+from xopt.generator import support_flag
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
-from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
 )
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
 )
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
-from xopt.pydantic import encode_torch_module
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
+from xopt.types import encode_torch_module
 from xopt.vocs import random_inputs
 
 
@@ -87,14 +88,19 @@ class TestBayesianGenerator(TestCase):
             gen.get_acquisition(gen.model)
 
         # test asking for batch generation when not supported
-        gen.supports_batch_generation = False
+        class NoBatchGenerator(PatchBayesianGenerator):
+            supports_batch_generation: bool = support_flag(False)
+
+        gen = NoBatchGenerator(vocs=TEST_VOCS_BASE)
         with pytest.raises(NotImplementedError):
             gen.generate(2)
 
         # test with n_interpolate_points but mutiple candidates
-        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        class BatchGenerator(PatchBayesianGenerator):
+            supports_batch_generation: bool = support_flag(True)
+
+        gen = BatchGenerator(vocs=TEST_VOCS_BASE)
         gen.n_interpolate_points = 5
-        gen.supports_batch_generation = True
         with pytest.raises(RuntimeError):
             gen.generate(2)
 
@@ -162,18 +168,19 @@ class TestBayesianGenerator(TestCase):
         assert CustomBayesianGenerator.get_compatible_turbo_controllers() == [None]
 
     def test_torch_module_validation(self):
-        # test validate torch modules
-        encoded_module = encode_torch_module(torch.nn.Linear(5, 2))
-        exit_val = BayesianGenerator.validate_torch_modules("base64: " + encoded_module)
-        assert isinstance(exit_val, Module)
+        model = SingleTaskGP(torch.rand(3, 1), torch.rand(3, 1))
+        encoded_module = encode_torch_module(model)
+        with patch.multiple(PatchBayesianGenerator, __abstractmethods__=set()):
+            generator = PatchBayesianGenerator(
+                vocs=TEST_VOCS_BASE, model=encoded_module
+            )
+            assert isinstance(generator.model, SingleTaskGP)
 
-        torch.save(torch.nn.Linear(3, 1), "test_module.pt")
-        exit_val = BayesianGenerator.validate_torch_modules("test_module.pt")
-        assert isinstance(exit_val, torch.nn.Linear)
-        os.remove("test_module.pt")
-
-        with pytest.raises(XoptError):
-            BayesianGenerator.validate_torch_modules("invalid_string")
+            with tempfile.TemporaryDirectory() as directory:
+                path = os.path.join(directory, "test_module.pt")
+                torch.save(model, path)
+                generator = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, model=path)
+                assert isinstance(generator.model, SingleTaskGP)
 
     def test_numerical_optimizer_validation(self):
         # test with None
@@ -541,27 +548,29 @@ class TestBayesianGenerator(TestCase):
 
     def test_validate_gp_constructor_none(self):
         # Should return StandardModelConstructor instance
-        result = BayesianGenerator.validate_gp_constructor(None)
+        result = BayesianGenerator.validate_gp_constructor(None, None)
         assert isinstance(result, StandardModelConstructor)
 
     def test_validate_gp_constructor_instance(self):
         dummy = DummyModelConstructor()
-        result = BayesianGenerator.validate_gp_constructor(dummy)
+        result = BayesianGenerator.validate_gp_constructor(dummy, None)
         assert result is dummy
 
     def test_validate_gp_constructor_str(self):
-        result = BayesianGenerator.validate_gp_constructor("standard")
+        result = BayesianGenerator.validate_gp_constructor("standard", None)
         assert isinstance(result, StandardModelConstructor)
         with pytest.raises(ValueError):
-            BayesianGenerator.validate_gp_constructor("not_a_constructor")
+            BayesianGenerator.validate_gp_constructor("not_a_constructor", None)
 
     def test_validate_gp_constructor_dict(self):
         # Valid dict
-        result = BayesianGenerator.validate_gp_constructor({"name": "standard"})
+        result = BayesianGenerator.validate_gp_constructor({"name": "standard"}, None)
         assert isinstance(result, StandardModelConstructor)
         # Invalid dict
         with pytest.raises(ValueError):
-            BayesianGenerator.validate_gp_constructor({"name": "not_a_constructor"})
+            BayesianGenerator.validate_gp_constructor(
+                {"name": "not_a_constructor"}, None
+            )
 
     def test_validate_turbo_controller(self):
         # Should return None

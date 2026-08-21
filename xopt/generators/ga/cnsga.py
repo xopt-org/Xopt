@@ -2,16 +2,19 @@ import array
 import logging
 import os
 import random
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
-from pydantic import ConfigDict, confloat, Field, PrivateAttr
+from deap import algorithms as deap_algorithms
+from deap import base as deap_base
+from deap import tools as deap_tools
+from pydantic import ConfigDict, Field, PrivateAttr, confloat
 
 import xopt.utils
-from xopt.generator import Generator
+from xopt.generator import Generator, support_flag
 from xopt.generators.ga import deap_creator
 from xopt.generators.ga.deap_fitness_with_constraints import FitnessWithConstraints
+from xopt.types import XDataFrame
 from xopt.vocs import (
     VOCS,
     convert_dataframe_to_inputs,
@@ -70,9 +73,9 @@ class CNSGAGenerator(Generator):
     """
 
     name = "cnsga"
-    supports_multi_objective: bool = True
-    supports_constraints: bool = True
-    supports_single_objective: bool = True
+    supports_multi_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
     population_size: int = Field(64, description="Population size")
     crossover_probability: confloat(ge=0, le=1) = Field(
         0.9, description="Crossover probability"
@@ -88,18 +91,17 @@ class CNSGAGenerator(Generator):
     )
     _children: List[Dict] = PrivateAttr([])
     _offspring: Optional[pd.DataFrame] = PrivateAttr(None)
-    population: Optional[pd.DataFrame] = Field(None)
+    # use to generate children until the first pop is made
+    _loaded_population: Optional[pd.DataFrame] = PrivateAttr(None)
+    # DEAP toolbox; must be a declared PrivateAttr or extra="allow" serializes it
+    _toolbox: Any = PrivateAttr(None)
+    population: Optional[XDataFrame] = Field(None)
 
     model_config = ConfigDict(extra="allow")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._loaded_population = (
-            None  # use these to generate children until the first pop is made
-        )
-
-        # DEAP toolbox (internal)
         self._toolbox = cnsga_toolbox(self.vocs, selection="auto")
 
         if self.population_file is not None:
