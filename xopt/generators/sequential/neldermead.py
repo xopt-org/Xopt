@@ -1,14 +1,16 @@
 import logging
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from pydantic import ConfigDict, Field, field_validator
 
+from xopt.generator import support_flag
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
+from xopt.types import NDArray
 from xopt.vocs import (
     VOCS,
     get_objective_data,
@@ -26,16 +28,16 @@ class SimplexState(XoptBaseModel):
     N: Optional[int] = None
     kend: int = 0
     jend: int = 0
-    ind: Optional[np.ndarray] = None
-    sim: Optional[np.ndarray] = None
-    fsim: Optional[np.ndarray] = None
+    ind: Optional[NDArray] = None
+    sim: Optional[NDArray] = None
+    fsim: Optional[NDArray] = None
     fxr: Optional[float] = None
-    x: Optional[np.ndarray] = None
-    xr: Optional[np.ndarray] = None
-    xe: Optional[np.ndarray] = None
-    xc: Optional[np.ndarray] = None
-    xcc: Optional[np.ndarray] = None
-    xbar: Optional[np.ndarray] = None
+    x: Optional[NDArray] = None
+    xr: Optional[NDArray] = None
+    xe: Optional[NDArray] = None
+    xc: Optional[NDArray] = None
+    xcc: Optional[NDArray] = None
+    xbar: Optional[NDArray] = None
     doshrink: int = 0
     ngen: int = 0
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -44,6 +46,9 @@ class SimplexState(XoptBaseModel):
         "ind", "fsim", "sim", "x", "xr", "xe", "xc", "xcc", "xbar", mode="before"
     )
     def to_numpy(cls, v):
+        # strings are decoded downstream by the NDArray codec
+        if v is None or isinstance(v, str):
+            return v
         return np.array(v, dtype=np.float64)
 
 
@@ -104,12 +109,25 @@ class NelderMeadGenerator(SequentialGenerator):
     """
 
     name = "neldermead"
-    supports_single_objective: bool = True
+    supports_single_objective: bool = support_flag(True)
 
     initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
-    initial_simplex: Optional[Dict[str, Union[List[float], np.ndarray]]] = (
+    initial_simplex: Optional[Dict[str, Union[List[float], NDArray]]] = (
         None  # This overrides the use of initial_point
     )
+
+    @field_validator("initial_simplex", mode="before")
+    def check_simplex_entries(cls, v):
+        # the NDArray codec accepts bare scalars (0-d arrays), but a simplex
+        # entry must be one point per vertex
+        if isinstance(v, dict):
+            for key, entry in v.items():
+                if isinstance(entry, (int, float)):
+                    raise ValueError(
+                        f"initial_simplex entry {key!r} must be a list of floats"
+                    )
+        return v
+
     # Same as scipy.optimize._optimize._minimize_neldermead
     adaptive: bool = Field(
         True, description="Change hyperparameters based on dimensionality"
@@ -118,7 +136,7 @@ class NelderMeadGenerator(SequentialGenerator):
     future_state: Optional[SimplexState] = None
 
     # Internal data structures
-    x: Optional[np.ndarray] = None
+    x: Optional[NDArray] = None
     y: Optional[float] = None
     manual_data_cnt: int = Field(
         0, description="How many points are considered manual/not part of simplex run"

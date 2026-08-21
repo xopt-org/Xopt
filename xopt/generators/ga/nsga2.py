@@ -10,6 +10,7 @@ import pandas as pd
 import time
 import warnings
 
+from xopt.generator import support_flag
 from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
 from ...errors import DataError
 from ...generator import StateOwner
@@ -369,9 +370,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     """
 
     name = "nsga2"
-    supports_multi_objective: bool = True
-    supports_constraints: bool = True
-    supports_single_objective: bool = True
+    supports_multi_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
 
     # Checkpoint loading
     checkpoint_file: str | None = Field(

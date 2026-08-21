@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from botorch.models.model import Model, ModelList
@@ -25,11 +25,11 @@ class OptimizationAlgorithmResult(AlgorithmResult):
     best_objective: Tensor = Field(
         description="The optimal objective values from the sample-wise optimization of the virtual objective."
     )
-    solution_center: Tensor = Field(
+    solution_center: Optional[Tensor] = Field(
         None,
         description="The mean of the distribution of optimal inputs from the sample-wise optimization of the virtual objective.",
     )
-    solution_entropy: float = Field(
+    solution_entropy: Optional[float] = Field(
         None,
         description="The entropy of the distribution of optimal inputs from the sample-wise optimization of the virtual objective.",
     )

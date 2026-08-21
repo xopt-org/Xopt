@@ -1,6 +1,5 @@
 from .base import Xopt
 from .evaluator import DummyExecutor
-from .pydantic import remove_none_values
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import contextmanager
 import argparse
@@ -204,9 +203,6 @@ def main():
     with open(args.config) as f:
         # Open file
         config = yaml.safe_load(f)
-
-        # Clean up (replicate behavior of Xopt.from_file)
-        config = remove_none_values(config)
 
         # Apply the overrides to the config dict
         if args.override:

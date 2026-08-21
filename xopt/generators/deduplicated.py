@@ -1,10 +1,11 @@
-import numpy as np
-from pydantic import field_validator
-from typing import Optional
 import logging
 import time
+from typing import Optional
+
+import numpy as np
 
 from xopt.generator import Generator
+from xopt.types import NDArray
 from xopt.vocs import get_variable_data
 
 
@@ -35,7 +36,7 @@ class DeduplicatedGeneratorBase(Generator):
     deduplicate_output: bool = True
 
     # The decision vars seen so far
-    decision_vars_seen: Optional[np.ndarray] = None
+    decision_vars_seen: Optional[NDArray] = None
 
     # For per-object log output in child objects (see eg NSGA2Generator)
     _logger: Optional[logging.Logger] = None
@@ -45,13 +46,6 @@ class DeduplicatedGeneratorBase(Generator):
         self._logger = logging.getLogger(
             f"{__name__}.DeduplicatedGeneratorBase.{id(self)}"
         )
-
-    @field_validator("decision_vars_seen", mode="before")
-    @classmethod
-    def cast_arr(cls, value):
-        if isinstance(value, list):
-            return np.array(value)
-        return value
 
     def generate(self, n_candidates: int) -> list[dict]:
         """
