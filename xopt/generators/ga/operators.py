@@ -1,20 +1,13 @@
+from typing import Annotated, Literal, Optional, Tuple
+
 import numpy as np
-from pydantic import Field, field_validator
-from typing import Optional, Literal, Annotated, Tuple
+from pydantic import Field
 
 from ...pydantic import XoptBaseModel
 
 
 class MutationOperator(XoptBaseModel):
     name: Literal["abstract"] = "abstract"
-
-    @field_validator("name", mode="after")
-    def validate_files(cls, value, info):
-        """
-        Hack to override the wildcard before validator in `XoptBaseModel` for
-        the discriminator field. Before validators are dissallowed in this case.
-        """
-        return value
 
     def __call__(self, parent: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         raise NotImplementedError
@@ -130,14 +123,6 @@ class PolynomialMutation(MutationOperator):
 
 class CrossoverOperator(XoptBaseModel):
     name: Literal["abstract"] = "abstract"
-
-    @field_validator("name", mode="after")
-    def validate_files(cls, value, info):
-        """
-        Hack to override the wildcard before validator in `XoptBaseModel` for
-        the discriminator field. Before validators are dissallowed in this case.
-        """
-        return value
 
     def __call__(
         self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray

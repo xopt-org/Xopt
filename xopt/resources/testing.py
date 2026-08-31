@@ -10,7 +10,6 @@ from botorch.exceptions import OptimizationWarning
 from torch import nn
 
 from xopt import Generator
-from xopt.pydantic import remove_none_values
 from xopt.vocs import VOCS
 
 # TODO: make a config module like gpytorch has
@@ -246,7 +245,7 @@ def reload_gen_from_json(gen):
 def reload_gen_from_yaml(gen):
     assert isinstance(gen, Generator)
     gen_class = gen.__class__
-    gen_new = gen_class(**remove_none_values(yaml.safe_load(gen.yaml())))
+    gen_new = gen_class(**yaml.safe_load(gen.yaml()))
     gen_new.add_data(gen.data.copy())
     return gen_new
 

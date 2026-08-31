@@ -7,6 +7,7 @@ from botorch.acquisition import (
 )
 from gest_api.vocs import MinimizeObjective
 
+from xopt.generator import support_flag
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
@@ -28,9 +29,9 @@ class ExpectedImprovementGenerator(BayesianGenerator):
     """
 
     name = "expected_improvement"
-    supports_batch_generation: bool = True
-    supports_single_objective: bool = True
-    supports_constraints: bool = True
+    supports_batch_generation: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
 
     __doc__ = (
         "Bayesian optimization generator using Expected improvement\n"

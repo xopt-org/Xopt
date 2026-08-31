@@ -9,6 +9,7 @@ from pydantic import field_validator
 from torch import Tensor
 from gest_api.vocs import ExploreObjective
 
+from xopt.generator import support_flag
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -23,10 +24,10 @@ class BayesianExplorationGenerator(BayesianGenerator):
     """
 
     name = "bayesian_exploration"
-    supports_batch_generation: bool = True
-    supports_constraints: bool = True
-    supports_multi_objective: bool = True
-    supports_single_objective: bool = True
+    supports_batch_generation: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
+    supports_multi_objective: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
 
     __doc__ = "Bayesian exploration generator\n" + formatted_base_docstring()
 

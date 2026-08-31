@@ -9,6 +9,7 @@ from botorch.utils import draw_sobol_samples
 from pydantic import Field, field_validator
 from torch import Tensor
 
+from xopt.generator import support_flag
 from xopt.generators.bayesian.bayesian_generator import MultiObjectiveBayesianGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.bayesian.turbo import SafetyTurboController
@@ -33,8 +34,8 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
     """
 
     name = "mobo"
-    supports_batch_generation: bool = True
-    supports_constraints: bool = True
+    supports_batch_generation: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
     use_pf_as_initial_points: bool = Field(
         False,
         description="flag to specify if pareto front points are to be used during "

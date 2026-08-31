@@ -1,12 +1,11 @@
 import logging
-import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from itertools import islice, product
 from math import prod
-from typing import Any, Dict, Hashable, List, Optional, Union, cast
+from typing import Annotated, Any, Dict, Hashable, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -26,13 +25,15 @@ from pydantic import (
     PositiveInt,
     SerializeAsAny,
     field_validator,
+    model_serializer,
     model_validator,
 )
 from pydantic.fields import ModelPrivateAttr, PrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
+
 from xopt.errors import FeasibilityError, VOCSError, XoptError
-from xopt.generator import Generator
+from xopt.generator import Generator, support_flag
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     ConstrainedMCAcquisitionFunction,
@@ -64,7 +65,12 @@ from xopt.generators.bayesian.utils import (
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
-from xopt.pydantic import decode_torch_module
+from xopt.types import (
+    TorchModuleCodec,
+    XDataFrame,
+    get_serialization_options,
+    save_module_sidecar,
+)
 from xopt.vocs import (
     ContextualVariable,
     convert_numpy_to_inputs,
@@ -152,12 +158,11 @@ class BayesianGenerator(Generator, ABC):
     """
 
     name = "base_bayesian_generator"
-    supports_discrete_variables: bool = True
-    supports_contextual_variables: bool = True
-    supports_no_objective: bool = (
-        True  # note: only supports if custom objective is provided
-    )
-    model: Optional[Model] = Field(
+    supports_discrete_variables: bool = support_flag(True)
+    supports_contextual_variables: bool = support_flag(True)
+    # note: no-objective mode is only supported if a custom objective is provided
+    supports_no_objective: bool = support_flag(True)
+    model: Optional[Annotated[Model, TorchModuleCodec()]] = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
     n_monte_carlo_samples: int = Field(
@@ -181,13 +186,15 @@ class BayesianGenerator(Generator, ABC):
     fixed_features: Optional[Dict[str, float]] = Field(
         None, description="fixed features used in Bayesian optimization"
     )
-    computation_time: Optional[pd.DataFrame] = Field(
+    computation_time: Optional[XDataFrame] = Field(
         None,
         description="data frame tracking computation time in seconds",
     )
-    custom_objective: Optional[CustomXoptObjective] = Field(
-        None,
-        description="custom objective for optimization, replaces objective specified by VOCS",
+    custom_objective: Optional[Annotated[CustomXoptObjective, TorchModuleCodec()]] = (
+        Field(
+            None,
+            description="custom objective for optimization, replaces objective specified by VOCS",
+        )
     )
     n_interpolate_points: Optional[PositiveInt] = None
 
@@ -250,21 +257,28 @@ class BayesianGenerator(Generator, ABC):
         compatible = cast(ModelPrivateAttr, cls._compatible_numerical_optimizers)
         return compatible.get_default()
 
-    @field_validator("model", mode="before")
-    @classmethod
-    def validate_torch_modules(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            if value.startswith("base64:"):
-                value = decode_torch_module(value)
-            elif os.path.exists(value):
-                value = torch.load(value, weights_only=False)
-            else:
-                raise XoptError(f"cannot load torch module from {value}")
-        return value
+    @model_serializer(mode="wrap", when_used="json")
+    def serialize_torch_modules(self, handler, info):
+        result = handler(self)
+        options = get_serialization_options(info.context)
+        # only touch fields the handler kept (respect include/exclude)
+        for field_name in ("model", "custom_objective"):
+            if field_name not in result:
+                continue
+            module = getattr(self, field_name)
+            if module is None:
+                continue
+            if options.module_mode == "drop":
+                del result[field_name]
+            elif options.module_mode == "file":
+                result[field_name] = save_module_sidecar(
+                    module, options, f"generator_{field_name}.pt"
+                )
+        return result
 
     @field_validator("gp_constructor", mode="before")
     @classmethod
-    def validate_gp_constructor(cls, value: Any) -> Any:
+    def validate_gp_constructor(cls, value: Any, info: ValidationInfo):
         constructor_dict = {
             "standard": StandardModelConstructor,
             "batched": BatchedModelConstructor,
@@ -281,10 +295,12 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            _value = cast(dict[str, Any], value)
+            _value = dict(cast(dict[str, Any], value))
             name = _value.pop("name", "")
             if name in constructor_dict:
-                value = constructor_dict[name](**_value)
+                value = constructor_dict[name].model_validate(
+                    _value, context=info.context if info is not None else None
+                )
             else:
                 raise ValueError(f"{value} not found")
 
@@ -307,7 +323,7 @@ class BayesianGenerator(Generator, ABC):
             else:
                 raise ValueError(f"{value} not found")
         elif isinstance(value, dict):
-            _value = cast(dict[str, Any], value)
+            _value = dict(cast(dict[str, Any], value))
             name: str = _value.pop("name", "")
             if name in optimizer_dict:
                 value = optimizer_dict[name](**_value)
@@ -346,6 +362,8 @@ class BayesianGenerator(Generator, ABC):
             return value
         elif isinstance(value, dict):
             value = pd.DataFrame(value)
+        elif isinstance(value, str):
+            return value
         else:
             raise ValueError(
                 "computation_time must be a pandas DataFrame, dict, or None"
@@ -1182,17 +1200,19 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         description="dict specifying reference point for multi-objective optimization",
         # validate_default=True,
     )
-    pareto_front_history: Optional[pd.DataFrame] = Field(
+    pareto_front_history: Optional[XDataFrame] = Field(
         None,
         description="history of pareto front statistics every time points are added to the generator",
         exclude=True,
     )
 
-    supports_multi_objective: bool = True
+    supports_multi_objective: bool = support_flag(True)
 
     @field_validator("pareto_front_history", mode="before")
     @classmethod
     def validate_pareto_front_history(cls, value: Any):
+        if isinstance(value, str):
+            return value
         return pd.DataFrame(value) if value is not None else None
 
     @model_validator(mode="after")

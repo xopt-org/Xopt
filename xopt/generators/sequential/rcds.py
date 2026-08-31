@@ -4,11 +4,13 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+from gest_api.vocs import MaximizeObjective, MinimizeObjective
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
-from gest_api.vocs import MinimizeObjective, MaximizeObjective
+from xopt.generator import support_flag
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
+from xopt.types import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -746,8 +748,8 @@ class RCDSGenerator(SequentialGenerator):
     """
 
     name = "rcds"
-    supports_single_objective: bool = True
-    init_mat: Optional[np.ndarray] = Field(None)
+    supports_single_objective: bool = support_flag(True)
+    init_mat: Optional[NDArray] = Field(None)
     noise: PositiveFloat = Field(1e-5)
     step: PositiveFloat = Field(1e-2)
 

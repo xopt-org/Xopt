@@ -29,7 +29,7 @@ dependencies = [
   "pandas",
   "ipywidgets",
   "tqdm",
-  "orjson",
+  "zstandard",
   "matplotlib",
   "gest-api>=0.2"
 ]

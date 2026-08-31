@@ -9,6 +9,7 @@ import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
 from pydantic import Field, ValidationInfo, field_validator, PositiveFloat
 
+from xopt.generator import support_flag
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 
@@ -45,8 +46,8 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     """
 
     name = "time_dependent_bayesian_generator"
-    supports_single_objective: bool = True
-    supports_constraints: bool = True
+    supports_single_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
     target_prediction_time: Optional[PositiveFloat] = Field(None)
     added_time: PositiveFloat = Field(
         0.1,

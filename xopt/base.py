@@ -1,41 +1,42 @@
 import json
 import logging
 import os
+import warnings
 from copy import deepcopy
 from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
 import yaml
+from gest_api.vocs import VOCS
 from pandas import DataFrame
 from pydantic import (
     Field,
     SerializeAsAny,
     ValidationInfo,
+    field_serializer,
     field_validator,
     model_validator,
 )
-import warnings
 
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator, validate_outputs
 from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
-from xopt.pydantic import XoptBaseModel
-from xopt.utils import explode_all_columns, get_generator_name
-from xopt.vocs import (
-    ContextualVariable,
-    validate_input_data,
-    random_inputs,
-    grid_inputs,
-)
-from gest_api.vocs import VOCS
+from xopt.pydantic import XoptBaseModel, serialization_fallback
 from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
     StoppingConditionUnion,
 )
-
+from xopt.types import DataFrameCodec, XDataFrame
+from xopt.utils import explode_all_columns, get_generator_name
+from xopt.vocs import (
+    ContextualVariable,
+    grid_inputs,
+    random_inputs,
+    validate_input_data,
+)
 
 from .errors import DataError
 
@@ -133,7 +134,7 @@ class Xopt(XoptBaseModel):
     data_dump_file: Optional[str] = Field(
         None, description="file to dump the evaluation data to as CSV"
     )
-    data: Optional[DataFrame] = Field(None, description="internal DataFrame object")
+    data: Optional[XDataFrame] = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
         False,
         description="flag to indicate that torch models should be serialized "
@@ -151,7 +152,7 @@ class Xopt(XoptBaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_generator_and_legacy_vocs(cls, data: Any):
+    def validate_generator_and_legacy_vocs(cls, data: Any, info: ValidationInfo):
         """
         Validate the Xopt model by checking the generator and evaluator.
         """
@@ -195,12 +196,44 @@ class Xopt(XoptBaseModel):
             if isinstance(data["generator"], dict):
                 name = data["generator"].pop("name")
                 generator_class = get_generator(name)
-                data["generator"] = generator_class.model_validate(data["generator"])
+                data["generator"] = generator_class.model_validate(
+                    data["generator"], context=info.context
+                )
 
             # make a copy of the generator / vocs objects to avoid modifying the original
             data["generator"] = deepcopy(data["generator"])
 
         return data
+
+    @field_serializer("generator", mode="wrap", when_used="always")
+    def serialize_generator(self, generator, handler, info):
+        # Pydantic currently narrows a field to its annotation when any field
+        # serializer is present, even if the annotation is SerializeAsAny, so
+        # bypass the supplied handler and serialize the runtime model directly
+        # with the same options so subclass fields survive.
+        if not isinstance(generator, Generator):
+            name = getattr(generator, "name", None) or (
+                f"{type(generator).__module__}.{type(generator).__qualname__}"
+            )
+            return {"name": name}
+        serializer = generator.__pydantic_serializer__
+        result = serializer.to_python(
+            generator,
+            mode=info.mode,
+            include=info.include,
+            exclude=info.exclude,
+            by_alias=info.by_alias,
+            exclude_unset=info.exclude_unset,
+            exclude_defaults=info.exclude_defaults,
+            exclude_none=info.exclude_none,
+            round_trip=info.round_trip,
+            fallback=serialization_fallback,
+            serialize_as_any=False,
+            context=info.context,
+        )
+        if not isinstance(result, dict):
+            result = {"name": result}
+        return {"name": get_generator_name(generator)} | result
 
     @field_validator("evaluator", mode="before")
     def validate_evaluator(cls, value):
@@ -211,6 +244,13 @@ class Xopt(XoptBaseModel):
 
     @field_validator("data", mode="before")
     def validate_data(cls, v, info: ValidationInfo):
+        if v is None:
+            # explicit null (dump of an un-evaluated Xopt) is not a frame to propagate
+            return None
+        if isinstance(v, str):
+            # decode encoded forms (e.g. "b64df:") before the generator
+            # propagation below, which needs a real DataFrame
+            v = DataFrameCodec.validate(v, info)
         if isinstance(v, dict):
             try:
                 v = pd.DataFrame(v)
@@ -253,9 +293,11 @@ class Xopt(XoptBaseModel):
                     "Use 'stopping_condition' with MaxEvaluationsCondition instead."
                 )
             max_evals = data.pop("max_evaluations")
-            data["stopping_condition"] = MaxEvaluationsCondition(
-                max_evaluations=max_evals
-            )
+            # 2.x dumps carry an explicit `max_evaluations: null`; treat it as absent
+            if max_evals is not None:
+                data["stopping_condition"] = MaxEvaluationsCondition(
+                    max_evaluations=max_evals
+                )
         return data
 
     @model_validator(mode="before")
@@ -659,14 +701,9 @@ class Xopt(XoptBaseModel):
             The Xopt configuration serialized as a YAML string.
 
         """
-        output = json.loads(
-            self.json(
-                serialize_torch=self.serialize_torch,
-                serialize_inline=self.serialize_inline,
-                **kwargs,
-            )
-        )
-        return yaml.dump(output)
+        kwargs.setdefault("serialize_torch", self.serialize_torch)
+        kwargs.setdefault("serialize_inline", self.serialize_inline)
+        return super().yaml(**kwargs)
 
     def dump(self, file: str = None, **kwargs):
         """
@@ -697,6 +734,8 @@ class Xopt(XoptBaseModel):
             )
 
         fname = os.path.expanduser(os.path.expandvars(fname))
+        # write torch sidecar files next to the dump file by default
+        kwargs.setdefault("file_dir", os.path.dirname(os.path.abspath(fname)))
         with open(fname, "w") as f:
             f.write(self.yaml(**kwargs))
         logger.debug(f"Dumped state to YAML file: {fname}")
@@ -738,13 +777,7 @@ class Xopt(XoptBaseModel):
             A dictionary representation of the Xopt configuration.
 
         """
-        result = super().model_dump(**kwargs)
-        if not isinstance(result["generator"], dict):  # may return as module.path
-            result["generator"] = {"name": result["generator"]}
-        result["generator"] = {"name": get_generator_name(self.generator)} | result[
-            "generator"
-        ]
-        return result
+        return self.model_dump(**kwargs)
 
     def json(self, **kwargs) -> str:
         """
@@ -761,27 +794,9 @@ class Xopt(XoptBaseModel):
             The Xopt configuration serialized as a JSON string.
 
         """
-        result = super().to_json(**kwargs)
-        dict_result = json.loads(result)
-        if not isinstance(dict_result["generator"], dict):  # may return as module.path
-            dict_result["generator"] = {"name": dict_result["generator"]}
-        dict_result["generator"] = {
-            "name": get_generator_name(self.generator)
-        } | dict_result["generator"]
-        dict_result["data"] = (
-            json.loads(self.data.to_json()) if self.data is not None else None
-        )
-
-        if "stopping_condition" in dict_result:
-            if dict_result["stopping_condition"] is not None:
-                dict_result["stopping_condition"] = {
-                    "name": self.stopping_condition.__class__.__name__
-                } | dict_result["stopping_condition"]
-
-        # TODO: implement version checking
-        # dict_result["xopt_version"] = __version__
-
-        return json.dumps(dict_result)
+        kwargs.setdefault("serialize_torch", self.serialize_torch)
+        kwargs.setdefault("serialize_inline", self.serialize_inline)
+        return super().to_json(**kwargs)
 
     def __repr__(self):
         """

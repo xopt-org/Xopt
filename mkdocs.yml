@@ -16,6 +16,7 @@ nav:
             - Working with generators: examples/basic/xopt_generator.ipynb
             - Stopping conditions: examples/basic/xopt_stopping_condition.ipynb
             - Checkpointing and restarts: examples/basic/checkpointing_and_restarts.ipynb
+            - Serialization options: examples/basic/xopt_serialization.ipynb
         - Bayesian:
             - Gaussian Process Model Creation:
                 - Basic example: examples/gp_model_creation/model_creation.ipynb

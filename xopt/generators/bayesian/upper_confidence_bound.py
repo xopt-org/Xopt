@@ -9,6 +9,7 @@ from gpytorch import Module
 from pydantic import Field
 import torch
 
+from xopt.generator import support_flag
 from xopt.errors import GeneratorWarning
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
@@ -52,9 +53,9 @@ class UpperConfidenceBoundGenerator(BayesianGenerator):
         0.0,
         description="Vertical shift applied to the UCB acquisition function for use with constraints",
     )
-    supports_batch_generation: bool = True
-    supports_single_objective: bool = True
-    supports_constraints: bool = True
+    supports_batch_generation: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
     _compatible_turbo_controllers = [OptimizeTurboController, SafetyTurboController]
 
     __doc__ = """Bayesian optimization generator using Upper Confidence Bound

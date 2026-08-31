@@ -14,6 +14,7 @@ from pydantic import (
     model_validator,
 )
 from pydantic.fields import ModelPrivateAttr, PrivateAttr
+from xopt.generator import support_flag
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm, GridOptimize
@@ -59,9 +60,9 @@ class BaxGenerator(BayesianGenerator):
     """
 
     name = "bax"
-    supports_constraints: bool = True
-    supports_no_objective: bool = True
-    supports_discrete_variables: bool = False
+    supports_constraints: bool = support_flag(True)
+    supports_no_objective: bool = support_flag(True)
+    supports_discrete_variables: bool = support_flag(False)
     algorithm: SerializeAsAny[Algorithm] = Field(
         default=GridOptimize(observable_names_ordered=[]),
         description="algorithm evaluated in the BAX process",

@@ -4,7 +4,7 @@ from pydantic import Field, field_validator
 from scipy.stats import qmc
 from typing_extensions import Annotated
 
-from xopt.generator import Generator
+from xopt.generator import Generator, support_flag
 from gest_api.vocs import ExploreObjective
 from xopt.errors import VOCSError
 
@@ -42,10 +42,10 @@ class LatinHypercubeGenerator(Generator):
     """
 
     name = "latin_hypercube"
-    supports_batch_generation: bool = True
-    supports_multi_objective: bool = True
-    supports_single_objective: bool = True
-    supports_constraints: bool = True
+    supports_batch_generation: bool = support_flag(True)
+    supports_multi_objective: bool = support_flag(True)
+    supports_single_objective: bool = support_flag(True)
+    supports_constraints: bool = support_flag(True)
 
     batch_size: Annotated[
         Optional[int],

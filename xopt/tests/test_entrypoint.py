@@ -30,9 +30,8 @@ class TestEntryPointScript:
         config_path.write_text(yaml.dump(config))
         return str(config_path), config
 
-    @mock.patch("xopt.entrypoint.remove_none_values", side_effect=lambda x: x)
     @mock.patch("xopt.entrypoint.Xopt")
-    def test_main_basic(self, mock_Xopt, mock_remove_none, tmp_path):
+    def test_main_basic(self, mock_Xopt, tmp_path):
         config_path, config = self.make_config(tmp_path)
         sys_argv = [
             "entrypoint.py",
@@ -102,10 +101,9 @@ class TestEntryPointScript:
 
     @mock.patch("xopt.entrypoint.normalize_initial_data")
     @mock.patch("xopt.entrypoint.pd.read_csv")
-    @mock.patch("xopt.entrypoint.remove_none_values", side_effect=lambda x: x)
     @mock.patch("xopt.entrypoint.Xopt")
     def test_main_with_initial_data(
-        self, mock_Xopt, mock_remove_none, mock_read_csv, mock_normalize, tmp_path
+        self, mock_Xopt, mock_read_csv, mock_normalize, tmp_path
     ):
         config_path, config = self.make_config(tmp_path)
         csv_path = str(tmp_path / "initial.csv")

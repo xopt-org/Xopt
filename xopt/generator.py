@@ -1,20 +1,29 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Optional, List, Hashable
-
+from typing import Any, ClassVar, Hashable, List, Optional
 
 import pandas as pd
+from gest_api.generator import Generator as BaseGenerator
+from gest_api.vocs import VOCS, DiscreteVariable
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
+from xopt.types import XDataFrame
 from xopt.vocs import ContextualVariable
 
-from gest_api.vocs import VOCS, DiscreteVariable
-from gest_api.generator import Generator as BaseGenerator
-
 logger = logging.getLogger(__name__)
+
+
+def support_flag(default: bool):
+    """Field spec for generator capability flags.
+
+    Subclasses overriding a ``supports_*`` default must use this instead of a
+    bare ``bool = True`` annotation, which would silently drop the base field's
+    ``frozen``/``exclude`` settings (pydantic replaces the whole FieldInfo).
+    """
+    return Field(default=default, frozen=True, exclude=True)
 
 
 class Generator(XoptBaseModel, BaseGenerator, ABC):
@@ -92,9 +101,7 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     )
 
     vocs: VOCS = Field(description="generator VOCS")
-    data: Optional[pd.DataFrame] = Field(
-        None, description="generator data", exclude=True
-    )
+    data: Optional[XDataFrame] = Field(None, description="generator data", exclude=True)
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -199,16 +206,6 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
             self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
         else:
             self.data = new_data
-
-    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        """overwrite model dump to remove faux class attrs"""
-
-        res = super().model_dump(*args, **kwargs)
-
-        res.pop("supports_batch_generation", None)
-        res.pop("supports_multi_objective", None)
-
-        return res
 
 
 class StateOwner:

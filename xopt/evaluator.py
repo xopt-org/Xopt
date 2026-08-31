@@ -11,7 +11,8 @@ from pydantic import ConfigDict, Field, model_validator
 
 from xopt.errors import XoptError
 from xopt.pydantic import NormalExecutor, XoptBaseModel
-from xopt.utils import get_function, get_function_defaults, safe_call
+from xopt.types import CallableRef
+from xopt.utils import get_function_defaults, safe_call
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class Evaluator(XoptBaseModel):
         mapping.
     """
 
-    function: Callable
+    function: CallableRef
     max_workers: int = Field(1, ge=1)
     executor: NormalExecutor = Field(exclude=True)  # Do not serialize
     function_kwargs: dict = Field({})
@@ -65,12 +66,6 @@ class Evaluator(XoptBaseModel):
         dict
             The validated input values.
         """
-        f = get_function(values["function"])
-        kwargs = values.get("function_kwargs", {})
-        kwargs = {**get_function_defaults(f), **kwargs}
-        values["function"] = f
-        values["function_kwargs"] = kwargs
-
         max_workers = values.pop("max_workers", 1)
 
         executor = values.pop("executor", None)
@@ -86,6 +81,14 @@ class Evaluator(XoptBaseModel):
         values["max_workers"] = max_workers
 
         return values
+
+    @model_validator(mode="after")
+    def fill_function_default_kwargs(self):
+        """Fills in place so revalidation (e.g. nesting into Xopt) keeps the
+        dict identity and stays idempotent."""
+        for key, val in get_function_defaults(self.function).items():
+            self.function_kwargs.setdefault(key, val)
+        return self
 
     def evaluate(self, input: Dict, **kwargs) -> Dict:
         """

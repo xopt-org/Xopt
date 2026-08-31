@@ -1,682 +1,636 @@
-import inspect
+import base64
+import gzip
 import io
 import json
-import os
-import tempfile
-from functools import partial
-from types import FunctionType, MethodType
-from typing import Callable, Optional, Union
+from concurrent.futures import Executor
+from typing import Annotated, Any
 
 import numpy as np
 import pandas as pd
 import pytest
 import torch
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, field_validator
-from pydantic.json import custom_pydantic_encoder
+from gpytorch.kernels import RBFKernel
+from pydantic import Field
 
+from xopt.base import Xopt
+from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.objectives import CustomXoptObjective
+from xopt.generators.random import RandomGenerator
 from xopt.pydantic import (
-    JSON_ENCODERS,
     CallableModel,
     NormalExecutor,
     ObjLoader,
-    ObjLoaderMinimal,
-    SignatureModel,
     XoptBaseModel,
-    decode_torch_module,
-    encode_torch_module,
-    get_callable_from_string,
     get_descriptions_defaults,
-    orjson_dumps,
-    orjson_dumps_custom,
-    orjson_dumps_except_root,
-    orjson_loads,
-    process_torch_module,
-    recursive_deserialize,
-    recursive_serialize,
-    remove_none_values,
     validate_and_compose_signature,
+)
+from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.types import (
+    CallableRef,
+    DataFrameCodec,
+    NDArray,
+    NDArrayCodec,
+    SerializationOptions,
+    TorchDType,
+    TorchModuleCodec,
+    TorchTensor,
+    XDataFrame,
+    encode_torch_module,
+    maybe_decompress,
 )
 
 
-def misc_fn(x, y=1, *args, **kwargs):
-    pass
+def misc_fn(x=1, y=2):
+    return x + y
 
 
 class MiscClass:
-    @staticmethod
-    def misc_static_method(x, y=1, *args, **kwargs):
-        return
+    def __init__(self, value=1):
+        self.value = value
 
-    @classmethod
-    def misc_cls_method(cls, x, y=1, *args, **kwargs):
-        return cls
-
-    def misc_method(self, x, y=1, *args, **kwargs):
-        return
+    def misc_method(self, x=1):
+        return self.value + x
 
 
-class TestJsonEncoders:
-    misc_class = MiscClass()
+class DummyExecutor(Executor):
+    def __init__(self, tag="default"):
+        self.tag = tag
 
-    @pytest.mark.parametrize(
-        ("fn",),
-        [
-            (misc_fn,),
-            pytest.param(misc_class.misc_method, marks=pytest.mark.xfail(strict=True)),
-            (misc_class.misc_static_method,),
-            pytest.param(
-                misc_class.misc_cls_method, marks=pytest.mark.xfail(strict=True)
-            ),
-        ],
+    def submit(self, fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    def map(self, fn, *iterables, timeout=None, chunksize=1):
+        return list(map(fn, *iterables))
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        self.was_shutdown = True
+
+
+class CodecModel(XoptBaseModel):
+    array: NDArray
+    tensor: TorchTensor
+    dtype: TorchDType
+    dataframe: XDataFrame
+
+
+@pytest.fixture
+def codec_model():
+    return CodecModel(
+        array=np.array([[1.25, 2.5]], dtype=np.float64),
+        tensor=torch.tensor([[3.0, 4.0]], dtype=torch.float64),
+        dtype=torch.float16,
+        dataframe=pd.DataFrame(
+            {"x": [1.1234567890123, np.nan], "label": ["a", "b"]},
+            index=[3, 7],
+        ),
     )
-    def test_function_type(self, fn):
-        encoder = {FunctionType: JSON_ENCODERS[FunctionType]}
-        json_encoder = partial(custom_pydantic_encoder, encoder)
-
-        serialized = json.dumps(fn, default=json_encoder)
-        loaded = json.loads(serialized)
-        callable_from_str = get_callable_from_string(loaded)
-
-        assert fn == callable_from_str
-
-    @pytest.mark.parametrize(
-        ("fn",),
-        [
-            pytest.param(
-                misc_class.misc_static_method, marks=pytest.mark.xfail(strict=True)
-            ),
-            pytest.param(misc_fn, marks=pytest.mark.xfail(strict=True)),
-            (misc_class.misc_method,),
-            pytest.param(
-                misc_class.misc_cls_method, marks=pytest.mark.xfail(strict=True)
-            ),
-        ],
-    )
-    def test_method_type(self, fn):
-        encoder = {MethodType: JSON_ENCODERS[MethodType]}
-        json_encoder = partial(custom_pydantic_encoder, encoder)
-
-        serialized = json.dumps(fn, default=json_encoder)
-        loaded = json.loads(serialized)
-        callable = get_callable_from_string(loaded, bind=self.misc_class)
-
-        assert fn == callable
-
-    @pytest.mark.parametrize(
-        ("fn",),
-        [
-            (misc_class.misc_static_method,),
-            (misc_fn,),
-            (misc_class.misc_method,),
-            (misc_class.misc_cls_method,),
-        ],
-    )
-    def test_full_encoder(self, fn):
-        json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
-        serialized = json.dumps(fn, default=json_encoder)
-        loaded = json.loads(serialized)
-
-        get_callable_from_string(loaded)
 
 
-class TestSignatureValidateAndCompose:
-    misc_class = MiscClass()
-
-    @pytest.mark.parametrize(
-        ("args", "kwargs"),
-        [
-            pytest.param((5, 2, 1), {"x": 2}, marks=pytest.mark.xfail(strict=True)),
-            pytest.param((), ({"y": 2}), marks=pytest.mark.xfail(strict=True)),
-            pytest.param((2,), ({"x": 2}), marks=pytest.mark.xfail(strict=True)),
-            ((), ({"x": 2})),
-            ((), {}),
-        ],
-    )
-    def test_validate_kwarg_only(self, args, kwargs):
-        def run(*, x: int = 4):
-            pass
-
-        signature_model = validate_and_compose_signature(run, *args, **kwargs)
-        assert all(
-            [kwargs[kwarg] == getattr(signature_model, kwarg) for kwarg in kwargs]
-        )
-        # run
-
-        args, kwargs = signature_model.build()
-
-        run(*args, **kwargs)
-
-    @pytest.mark.parametrize(
-        ("args", "kwargs"),
-        [
-            pytest.param(
-                (
-                    5,
-                    3,
-                    2,
-                ),
-                {"x": 1},
-                marks=pytest.mark.xfail(strict=True),
-            ),
-            ((2, 1, 0), {}),
-            ((), {}),
-        ],
-    )
-    def test_validate_var_positional(self, args, kwargs):
-        def run(*args):
-            pass
-
-        signature_model = validate_and_compose_signature(run, *args, **kwargs)
-        args, kwargs = signature_model.build()
-        assert len(kwargs) == 0
-        assert len(args) == len(args)
-
-        # run
-        run(*args)
-
-    @pytest.mark.parametrize(
-        ("args", "kwargs"),
-        [
-            pytest.param((5,), {"x": 2}, marks=pytest.mark.xfail(strict=True)),
-            ((), {"x": 2, "y": 3}),
-            pytest.param((), {}, marks=pytest.mark.xfail(strict=True)),
-            (
-                (
-                    2,
-                    4,
-                ),
-                {},
-            ),
-            ((2,), {"y": 4, "extra": True}),
-            ((2,), {"y": 4}),
-            ((2,), {"y": 4, "z": 3}),
-        ],
-    )
-    def test_validate_full_sig(self, args, kwargs):
-        def run(x, y, z=4, *args, **kwargs):
-            pass
-
-        signature_model = validate_and_compose_signature(run, *args, **kwargs)
-        args, kwargs = signature_model.build()
-
-        # run
-        run(*args, **kwargs)
-
-    @pytest.mark.parametrize(
-        ("args", "kwargs"),
-        [
-            pytest.param((5, 1), {"y": 2}, marks=pytest.mark.xfail(strict=True)),
-            (
-                (
-                    2,
-                    4,
-                ),
-                {},
-            ),
-            ((5,), {"y": 2}),
-        ],
-    )
-    def test_validate_classmethod(self, args, kwargs):
-        signature_model = validate_and_compose_signature(
-            self.misc_class.misc_cls_method, *args, **kwargs
-        )
-        args, kwargs = signature_model.build()
-        self.misc_class.misc_cls_method(*args, **kwargs)
-
-    @pytest.mark.parametrize(
-        ("args", "kwargs"),
-        [
-            pytest.param((5, 1), {"y": 2}, marks=pytest.mark.xfail(strict=True)),
-            (
-                (
-                    2,
-                    4,
-                ),
-                {},
-            ),
-            ((5,), {"y": 2}),
-        ],
-    )
-    def test_validate_staticmethod(self, args, kwargs):
-        signature_model = validate_and_compose_signature(
-            self.misc_class.misc_static_method, *args, **kwargs
-        )
-        args, kwargs = signature_model.build()
-        self.misc_class.misc_static_method(*args, **kwargs)
-
-    @pytest.mark.parametrize(
-        ("args", "kwargs"),
-        [
-            pytest.param((5, 1), {"y": 2}, marks=pytest.mark.xfail(strict=True)),
-            (
-                (
-                    2,
-                    4,
-                ),
-                {},
-            ),
-            ((5,), {"y": 2}),
-        ],
-    )
-    def test_validate_bound_method(self, args, kwargs):
-        signature_model = validate_and_compose_signature(
-            self.misc_class.misc_method, *args, **kwargs
-        )
-
-        args, kwargs = signature_model.build()
-
-        self.misc_class.misc_method(*args, **kwargs)
-
-
-class TestCallableModel:
-    misc_class = MiscClass()
-
-    @pytest.mark.parametrize(
-        ("fn", "args", "kwargs"),
-        [
-            (misc_fn, (5,), {"y": 2}),
-            (misc_class.misc_cls_method, (5,), {"y": 2}),
-            (misc_class.misc_static_method, (5,), {"y": 2}),
-            pytest.param(
-                misc_class.misc_method,
-                (5,),
-                {"y": 2},
-                marks=pytest.mark.xfail(strict=True),
-            ),
-        ],
-    )
-    def test_construct_callable(self, fn, args, kwargs):
-        json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
-        serialized = json.dumps(fn, default=json_encoder)
-        loaded = json.loads(serialized)
-
-        callable = CallableModel(callable=loaded)
-        callable(*args, **kwargs)
-
-    @pytest.mark.parametrize(
-        ("fn", "args", "kwargs"),
-        [
-            pytest.param(misc_fn, (5,), {"y": 2}, marks=pytest.mark.xfail(strict=True)),
-            pytest.param(
-                misc_class.misc_cls_method,
-                (5,),
-                {"y": 2},
-                marks=pytest.mark.xfail(strict=True),
-            ),
-            pytest.param(
-                misc_class.misc_static_method,
-                (5,),
-                {"y": 2},
-                marks=pytest.mark.xfail(strict=True),
-            ),
-            (misc_class.misc_method, (5,), {"y": 2}),
-        ],
-    )
-    def test_bound_callables(self, fn, args, kwargs):
-        json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
-        serialized = json.dumps(fn, default=json_encoder)
-        loaded = json.loads(serialized)
-
-        callable = CallableModel(callable=loaded, bind=self.misc_class)
-        callable(*args, **kwargs)
-
-
-class TestObjLoader:
-    misc_class_loader_type = ObjLoader[MiscClass]
-
-    def test_class_loader(self):
-        loader = self.misc_class_loader_type()
-        assert loader.object_type == MiscClass
-
-    def test_load_model(self):
-        loader = self.misc_class_loader_type()
-        misc_obj = loader.load()
-        assert isinstance(misc_obj, (MiscClass,))
-
-    def test_serialize_loader(self):
-        loader = self.misc_class_loader_type()
-
-        json_encoder = partial(custom_pydantic_encoder, JSON_ENCODERS)
-        serialized = json.dumps(loader, default=json_encoder)
-
-        # self.misc_class_loader_type.parse_raw(serialized)
-        # This works in 2.2+ as it should
-        self.misc_class_loader_type.model_validate_json(serialized)
-
-
-# tests to verify v2 behavior remains same (for things that changed from v1)
-
-
-class DummyObj:
-    pass
-
-
-class Dummy(BaseModel):
-    default_obj: DummyObj = Field(DummyObj())
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @field_validator("default_obj")
-    def validate_obj(cls, value):
-        assert isinstance(value, DummyObj)
-        return value
-
-
-# Test subclass model resolution order
-# we want behavior like v1 had https://github.com/pydantic/pydantic/issues/1932
-class Parent(BaseModel):
-    a1: str = "a1"
-
-
-class Child1(Parent):
-    name: str = "child1"
-
-
-class Child2(Parent):
-    name: str = "child2"
-
-
-class Container(BaseModel):
-    obj: SerializeAsAny[Optional[Parent]] = Field(None)
-    obj2: SerializeAsAny[Optional[Union[Child1, Child2, Parent]]] = Field(None)
-
-
-class TestPydanticInitialization:
-    def test_object_init(self):
-        d = Dummy()
-        assert isinstance(d.default_obj, DummyObj)
-
-    def test_subclass_init(self):
-        c1 = Container()
-        print("c1", c1.model_dump())
-        c2 = Container(obj=Child2())
-        print("c2", c2.model_dump())
-        # doesn't resolve child1
-        c3 = Container(**{"obj": {"a1": "a1", "name": "child1"}})
-        print(type(c3.obj), type(c3.obj2), c3)
-        # works
-        c4 = Container(**{"obj2": {"a1": "a1", "name": "child1"}})
-        print(type(c4.obj), type(c4.obj2), c4)
-
-
-class DummyModel(BaseModel):
-    a: int = 1
-    b: str = "foo"
-    c: None = None
-
-
-class DummyTorchModule(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.linear = torch.nn.Linear(2, 2)
-
-
-def test_recursive_serialize_and_deserialize():
-    d = {
-        "a": 1,
-        "b": {"c": 2},
-        "d": np.array([1, 2]),
-        "e": set([1, 2]),
-        "f": pd.DataFrame({"x": [1, 2]}),
+def test_codec_default_shapes_and_python_mode(codec_model):
+    dumped = json.loads(codec_model.model_dump_json())
+    assert dumped["array"] == [[1.25, 2.5]]
+    assert dumped["tensor"] == [[3.0, 4.0]]
+    assert dumped["dtype"] == "torch.float16"
+    # to_json's default 10-digit precision applies
+    assert dumped["dataframe"] == {
+        "x": {"3": 1.123456789, "7": None},
+        "label": {"3": "a", "7": "b"},
     }
-    ser = recursive_serialize(d.copy())
-    assert isinstance(ser["d"], list)
-    assert isinstance(ser["e"], list)
-    assert isinstance(ser["f"], dict)
-    # test recursive_deserialize
-    d2 = {"a": 1, "b": {"c": 2}, "dtype": "torch.float32"}
-    deser = recursive_deserialize(d2.copy())
-    assert deser["dtype"] == torch.float32
 
-    ser = recursive_serialize({"float": torch.float32, "unserizable": DummyModel()})
-    assert ser == {
-        "float": "torch.float32",
-        "unserizable": "xopt.tests.test_pydantic.DummyModel",
+    python_dump = codec_model.model_dump(mode="python")
+    assert python_dump["array"] is codec_model.array
+    assert python_dump["tensor"] is codec_model.tensor
+    assert python_dump["dataframe"] is codec_model.dataframe
+
+    loaded = CodecModel.model_validate_json(codec_model.model_dump_json())
+    np.testing.assert_array_equal(loaded.array, codec_model.array)
+    torch.testing.assert_close(loaded.tensor, codec_model.tensor)
+    assert loaded.dtype is torch.float16
+    pd.testing.assert_frame_equal(loaded.dataframe, codec_model.dataframe)
+
+
+@pytest.mark.parametrize("compression", [None, "gzip", "zstd"])
+def test_binary_codec_round_trips(codec_model, compression):
+    dumped = codec_model.model_dump_json(
+        context={
+            "array_mode": "b64",
+            "df_mode": "b64",
+            "compress": compression,
+            "level": 3,
+        }
+    )
+    data = json.loads(dumped)
+    assert data["array"].startswith("b64np:")
+    assert data["tensor"].startswith("b64pt:")
+    assert data["dataframe"].startswith("b64df:")
+
+    raw = base64.b64decode(data["array"].removeprefix("b64np:"))
+    expected_magic = {
+        None: b"\x93NUMPY",
+        "gzip": b"\x1f\x8b",
+        "zstd": b"\x28\xb5\x2f\xfd",
+    }
+    assert raw.startswith(expected_magic[compression])
+
+    loaded = CodecModel.model_validate_json(dumped)
+    np.testing.assert_array_equal(loaded.array, codec_model.array)
+    torch.testing.assert_close(loaded.tensor, codec_model.tensor)
+    # b64df decoding matches dict mode: the integer index is restored
+    pd.testing.assert_frame_equal(
+        loaded.dataframe, codec_model.dataframe, check_exact=False, atol=1e-9
+    )
+
+
+def test_annotation_defaults_and_context_precedence():
+    class ParameterizedModel(XoptBaseModel):
+        array: Annotated[np.ndarray, NDArrayCodec(array_mode="b64")]
+        dataframe: Annotated[pd.DataFrame, DataFrameCodec(df_mode="b64")]
+
+    model = ParameterizedModel(
+        array=np.array([1.0]), dataframe=pd.DataFrame({"x": [1.0]})
+    )
+    annotated = json.loads(model.model_dump_json())
+    assert annotated["array"].startswith("b64np:")
+    assert annotated["dataframe"].startswith("b64df:")
+
+    overridden = json.loads(
+        model.model_dump_json(context={"array_mode": "list", "df_mode": "dict"})
+    )
+    assert overridden == {"array": [1.0], "dataframe": {"x": {"0": 1.0}}}
+
+    options = SerializationOptions(array_mode="b64", df_mode="b64")
+    object_context = json.loads(model.model_dump_json(context=options))
+    assert object_context["array"].startswith("b64np:")
+
+    wrapper_context = json.loads(
+        model.to_json(
+            array_mode="b64",
+            context={"serialization_options": SerializationOptions(array_mode="list")},
+        )
+    )
+    assert wrapper_context["array"] == [1.0]
+
+
+def test_torch_dtype_generalized_validation():
+    class DTypeModel(XoptBaseModel):
+        dtype: TorchDType
+
+    for dtype in (
+        torch.float32,
+        torch.float64,
+        torch.float16,
+        torch.int64,
+        torch.bool,
+    ):
+        loaded = DTypeModel.model_validate({"dtype": str(dtype)})
+        assert loaded.dtype is dtype
+    with pytest.raises(ValueError, match="invalid torch dtype"):
+        DTypeModel.model_validate({"dtype": "torch.not_a_dtype"})
+
+
+def test_module_modes_and_sidecar_sanitization(tmp_path, monkeypatch):
+    constructor = StandardModelConstructor(covar_modules={"y/bad key": RBFKernel()})
+
+    dropped = json.loads(constructor.to_json())
+    assert dropped["covar_modules"] == {}
+
+    inline = json.loads(constructor.to_json(module_mode="inline"))
+    assert inline["covar_modules"]["y/bad key"].startswith("b64pt:")
+    inline_loaded = StandardModelConstructor.model_validate(inline)
+    assert isinstance(inline_loaded.covar_modules["y/bad key"], RBFKernel)
+
+    written = json.loads(constructor.to_json(module_mode="file", file_dir=tmp_path))
+    assert written["covar_modules"] == {"y/bad key": "covar_modules_y_bad_key.pt"}
+    assert (tmp_path / "covar_modules_y_bad_key.pt").is_file()
+    monkeypatch.chdir(tmp_path)
+    file_loaded = StandardModelConstructor.model_validate(written)
+    assert isinstance(file_loaded.covar_modules["y/bad key"], RBFKernel)
+
+
+def test_module_inline_legacy_and_prefix_collision_errors():
+    class ModuleModel(XoptBaseModel):
+        module: Annotated[torch.nn.Module, TorchModuleCodec()]
+
+    legacy = "base64:" + encode_torch_module(torch.nn.Linear(1, 1))[len("b64pt:") :]
+    loaded = ModuleModel.model_validate({"module": legacy})
+    assert isinstance(loaded.module, torch.nn.Linear)
+    with pytest.raises(ValueError, match="invalid b64pt: torch module payload"):
+        ModuleModel.model_validate({"module": "base64:AAAA"})
+    with pytest.raises(ValueError, match="malformed base64"):
+        ModuleModel.model_validate({"module": "b64pt:not-valid!"})
+    with pytest.raises(ValueError, match="cannot load torch module"):
+        ModuleModel.model_validate({"module": "missing-module.pt"})
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("array", "b64np:@@@@", "malformed base64"),
+        ("tensor", "b64pt:@@@@", "malformed base64"),
+        ("dataframe", "b64df:@@@@", "malformed base64"),
+        (
+            "array",
+            "b64np:" + base64.b64encode(b"not a numpy file").decode(),
+            "invalid b64np",
+        ),
+        (
+            "dataframe",
+            "b64df:" + base64.b64encode(b"not json").decode(),
+            "invalid b64df",
+        ),
+    ],
+)
+def test_malformed_binary_payloads(codec_model, field, value, message):
+    data = codec_model.model_dump(mode="python")
+    data[field] = value
+    with pytest.raises(ValueError, match=message):
+        CodecModel.model_validate(data)
+
+
+def test_magic_decompression_and_size_cap():
+    raw = b"payload"
+    assert maybe_decompress(raw) == raw
+    assert maybe_decompress(gzip.compress(raw)) == raw
+
+    import zstandard
+
+    compressed = zstandard.ZstdCompressor().compress(raw)
+    assert maybe_decompress(compressed) == raw
+
+    with pytest.raises(ValueError, match="size limit"):
+        maybe_decompress(gzip.compress(b"x" * 100), max_size=16)
+    with pytest.raises(ValueError, match="size limit"):
+        maybe_decompress(zstandard.ZstdCompressor().compress(b"x" * 100), max_size=16)
+    # the cap applies to decompression only, not raw passthrough
+    assert maybe_decompress(b"x" * 100, max_size=16) == b"x" * 100
+    with pytest.raises(ValueError, match="invalid gzip"):
+        maybe_decompress(b"\x1f\x8btruncated")
+    with pytest.raises(ValueError, match="invalid zstd"):
+        maybe_decompress(b"\x28\xb5\x2f\xfdtruncated")
+
+
+def test_fallback_is_recursive_and_json_native():
+    class AnyModel(XoptBaseModel):
+        values: dict[str, Any]
+
+    class Unknown:
+        pass
+
+    model = AnyModel(
+        values={
+            "np_scalar": np.int64(2),
+            "array": np.array([1, 2]),
+            "dtype": torch.float32,
+            "tensor": torch.tensor([3, 4]),
+            "callable": misc_fn,
+            "type": MiscClass,
+            "exception": RuntimeError("boom"),
+            "unknown": Unknown(),
+        }
+    )
+    dumped = json.loads(model.model_dump_json())
+    assert dumped["values"] == {
+        "np_scalar": 2,
+        "array": [1, 2],
+        "dtype": "torch.float32",
+        "tensor": [3, 4],
+        "callable": f"{__name__}.misc_fn",
+        "type": f"{__name__}.MiscClass",
+        "exception": "boom",
+        "unknown": f"{Unknown.__module__}.{Unknown.__qualname__}",
     }
 
 
-def test_orjson_dumps_and_loads():
-    m = DummyModel()
-    s = orjson_dumps(m)
-    assert isinstance(s, str)
-    loaded = orjson_loads(s)
-    assert loaded["a"] == 1
-    # test custom
-    s2 = orjson_dumps_custom(m, default=lambda x: str(x))
-    assert isinstance(s2, str)
-    # except root
-    d = orjson_dumps_except_root(m)
-    assert isinstance(d, dict)
-
-
-def test_orjson_dumps_preserves_non_finite_floats():
+def test_non_finite_floats_round_trip():
     class NonFiniteModel(XoptBaseModel):
-        values: list[float] = [-float("inf"), float("inf")]
+        values: list[float] = [-float("inf"), float("inf"), float("nan")]
 
-    m = NonFiniteModel()
-    loaded = json.loads(orjson_dumps(m))
-    assert loaded["values"] == ["-inf", "inf"]
-
-
-def test_process_and_encode_decode_torch_module():
-    mod = DummyTorchModule()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = process_torch_module(mod, os.path.join(tmpdir, "testmod"))
-        assert os.path.exists(path)
-    # encode/decode
-    encoded = encode_torch_module(mod)
-    decoded = decode_torch_module("base64:" + encoded)
-    assert isinstance(decoded, torch.nn.Module)
+    loaded = json.loads(NonFiniteModel().model_dump_json())
+    assert loaded["values"][:2] == ["-Infinity", "Infinity"]
+    assert loaded["values"][2] == "NaN"
+    reloaded = NonFiniteModel.model_validate(loaded)
+    assert reloaded.values[0] == -float("inf")
+    assert reloaded.values[1] == float("inf")
+    assert reloaded.values[2] != reloaded.values[2]
 
 
-def test_xoptbasemodel_to_json_yaml(tmp_path):
-    class M(XoptBaseModel):
+def test_xoptbase_public_io_and_whole_file_compression(tmp_path):
+    class Model(XoptBaseModel):
         a: int = 1
 
-    m = M()
-    assert isinstance(m.to_json(), str)
-    assert isinstance(m.json(), str)
-    assert isinstance(m.yaml(), str)
-    # test from_dict
-    m2 = M.from_dict({"a": 2})
-    assert m2.a == 2
-    # test from_yaml
-    yaml_str = yaml.dump({"a": 3})
-    m3 = M.from_yaml(io.StringIO(yaml_str))
-    assert m3.a == 3
-    # test from_file
-    file = tmp_path / "test.yaml"
-    file.write_text(yaml_str)
-    m4 = M.from_file(str(file))
-    assert m4.a == 3
-    # test file not found
+    model = Model()
+    assert json.loads(model.to_json()) == {"a": 1}
+    assert yaml.safe_load(model.yaml()) == {"a": 1}
+    assert Model.from_dict({"a": 2}).a == 2
+    assert Model.from_yaml(io.StringIO("a: 3\n")).a == 3
+
+    plain = tmp_path / "model.yaml"
+    plain.write_text("a: 4\n")
+    assert Model.from_file(str(plain)).a == 4
+    compressed = tmp_path / "model.yaml.gz"
+    compressed.write_bytes(gzip.compress(b"a: 5\n"))
+    assert Model.from_file(str(compressed)).a == 5
     with pytest.raises(OSError):
-        M.from_file("nonexistent.yaml")
-
-    # test torch load in XoptBaseModel
-    torch.save(torch.nn.Linear(2, 2), tmp_path / "model.pt")
-    M.validate_files(yaml.safe_load(str(tmp_path / "model.pt")))
+        Model.from_file(str(tmp_path / "missing.yaml"))
 
 
-def test_remove_none_values():
-    d = {"a": 1, "b": None, "c": {"d": None, "e": 2}, "f": [None, 3]}
-    cleaned = remove_none_values(d)
-    assert "b" not in cleaned
-    assert "d" not in cleaned["c"]
-    assert cleaned["f"] == [3]
+def test_xopt_generator_name_and_serialize_as_any():
+    class CustomRandomGenerator(RandomGenerator):
+        subclass_only: int = 17
+
+    generator = CustomRandomGenerator(vocs=TEST_VOCS_BASE)
+    xopt = Xopt(generator=generator, evaluator=Evaluator(function=misc_fn))
+
+    python_dump = xopt.model_dump()
+    json_dump = json.loads(xopt.model_dump_json())
+    assert python_dump["generator"]["name"] == generator.name
+    assert python_dump["generator"]["subclass_only"] == 17
+    assert json_dump["generator"]["name"] == generator.name
+    assert json_dump["generator"]["subclass_only"] == 17
 
 
-def test_get_descriptions_defaults():
-    class M(XoptBaseModel):
-        """desc"""
+def test_callable_serialization_warns_when_not_reloadable(monkeypatch):
+    import functools
+    import warnings
 
-        a: int = 1
-        f: Callable = lambda x: x + 1
+    import xopt.types
 
-    m = M()
-    desc = get_descriptions_defaults(m)
-    assert "a" in desc
-    assert "f" in desc
+    monkeypatch.setattr(xopt.types, "_WARNED_CALLABLE_NAMES", set())
 
+    class FnModel(XoptBaseModel):
+        fn: CallableRef
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        dump = json.loads(FnModel(fn=misc_fn).model_dump_json())
+    assert dump["fn"] == f"{__name__}.misc_fn"
+
+    model = FnModel(fn=functools.partial(misc_fn, y=3))
+    with pytest.warns(UserWarning, match="will not reload"):
+        model.model_dump_json()
+    # warned once per callable per process, not once per dump
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        model.model_dump_json()
+
+    # lambdas have no importable qualified name
+    with pytest.warns(UserWarning, match="will not reload"):
+        FnModel(fn=lambda x: x).model_dump_json()
+
+
+@pytest.mark.parametrize(
+    ("bind_args", "bind_kwargs", "build_kwargs", "expected"),
+    [
+        # tuple defaults degrade to None, None/empty defaults survive
+        ((), {}, {"a": 1}, (1, 2, None, None)),
+        # bound positional and keyword values override defaults
+        ((1,), {"b": 3}, {}, (1, 3, None, None)),
+        # build-time kwargs override stored values
+        ((1,), {"b": 3}, {"b": 4, "d": "x"}, (1, 4, None, "x")),
+    ],
+)
+def test_validate_and_compose_signature_defaults(
+    bind_args, bind_kwargs, build_kwargs, expected
+):
+    def fn(a, b=2, c=(1, 2), d=None):
+        return (a, b, c, d)
+
+    signature = validate_and_compose_signature(fn, *bind_args, **bind_kwargs)
+    args, kwargs = signature.build(**build_kwargs)
+    assert fn(*args, **kwargs) == expected
+
+
+def test_validate_and_compose_signature_varargs_and_invalid():
+    def fn(*args, x=1):
+        return args, x
+
+    signature = validate_and_compose_signature(fn, 1, 2)
+    assert signature.model_dump() == {"args": [1, 2], "x": 1}
+    # partial positional replacement keeps the remaining stored args
+    args, kwargs = signature.build(4)
+    assert (args, kwargs) == ([4, 2], {"x": 1})
+
+    def plain(a, b=2):
+        return a, b
+
+    with pytest.raises(TypeError, match="too many positional"):
+        validate_and_compose_signature(plain, 1, 2, 3)
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        validate_and_compose_signature(plain, nope=1)
+
+
+def test_callable_model_reload_and_bind():
+    model = CallableModel(callable=misc_fn, kwargs={"y": 7})
+    dumped = json.loads(model.model_dump_json())
+    assert dumped["callable"] == f"{__name__}.misc_fn"
+    reloaded = CallableModel.model_validate(dumped)
+    assert reloaded(x=5) == 12
+    # positional call args map through the stored kwarg_order
+    assert reloaded(3, 4) == 7
+
+    instance = MiscClass(value=10)
+    bound = CallableModel(callable=f"{__name__}.MiscClass.misc_method", bind=instance)
+    assert bound(x=3) == 13
+    with pytest.raises(ValueError, match="Cannot bind"):
+        CallableModel(callable=f"{__name__}.MiscClass.misc_method", bind=object())
+    with pytest.raises(ValueError, match="must be object or a string"):
+        CallableModel(callable=123)
+
+
+def test_objloader_guards_and_store():
+    # loader callable must match the parameterized type
+    with pytest.raises(ValueError):
+        ObjLoader[MiscClass].model_validate(
+            {"loader": {"callable": f"{__name__}.misc_fn"}}
+        )
+
+    loader_dump = json.loads(ObjLoader[MiscClass]().model_dump_json())
+    assert isinstance(
+        ObjLoader[MiscClass].model_validate(loader_dump).load(), MiscClass
+    )
+
+    loader = ObjLoader[MiscClass](kwargs={"value": 5})
+    assert loader.object is None
+    obj = loader.load(store=True)
+    assert loader.object is obj and obj.value == 5
+
+
+def test_normal_executor_reload_reconstructs_executor():
+    executor = NormalExecutor[DummyExecutor](loader={"kwargs": {"tag": "loaded"}})
+    dumped = json.loads(executor.model_dump_json())
+    assert "executor" not in dumped
+
+    reloaded = NormalExecutor[DummyExecutor].model_validate(dumped)
+    assert isinstance(reloaded.executor, DummyExecutor)
+    assert reloaded.executor.tag == "loaded"
+    assert reloaded.submit(misc_fn, 1, 2) == 3
+    reloaded.shutdown()
+    assert reloaded.executor.was_shutdown
+
+    with pytest.raises(ValueError, match="instance of DummyExecutor"):
+        NormalExecutor[DummyExecutor](executor="not an executor")
+
+
+def test_dump_and_reload_sidecars_from_other_cwd(tmp_path, monkeypatch):
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+
+    generator = UpperConfidenceBoundGenerator(
+        vocs=TEST_VOCS_BASE,
+        gp_constructor=StandardModelConstructor(covar_modules={"y1": RBFKernel()}),
+    )
+    X = Xopt(
+        generator=generator,
+        evaluator=Evaluator(function=misc_fn),
+        serialize_torch=True,
+    )
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    dump_file = run_dir / "xopt.yaml"
+    X.dump(str(dump_file))
+    assert (run_dir / "covar_modules_y1.pt").is_file()
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    # from_file resolves sidecars relative to the dump file, not the cwd
+    reloaded = Xopt.from_file(str(dump_file))
+    assert isinstance(reloaded.generator.gp_constructor.covar_modules["y1"], RBFKernel)
+
+    # an explicit base_dir context must work too, surviving the custom
+    # __init__ methods in the generator chain
+    config = yaml.safe_load(dump_file.read_text())
+    reloaded = Xopt.model_validate(config, context={"base_dir": str(run_dir)})
+    assert isinstance(reloaded.generator.gp_constructor.covar_modules["y1"], RBFKernel)
+
+
+def test_retained_model_helpers():
     class Inner(XoptBaseModel):
-        """inner desc"""
-
-        x: int = 42
+        x: int = Field(1, description="x field")
 
     class Outer(XoptBaseModel):
-        """outer desc"""
-
         inner: Inner = Inner()
-        y: float = 3.14
+        fn: Any = Field(misc_fn, description="function")
 
-    o = Outer()
-    desc = get_descriptions_defaults(o)
-    # Should recurse into inner and get its description dict
-    assert "inner" in desc
-    assert isinstance(desc["inner"], dict)
-    assert "x" in desc["inner"]
-    assert "y" in desc
-
-    class DummyCallable:
-        pass
-
-    class M(XoptBaseModel):
-        """desc"""
-
-        a: DummyCallable = Field(DummyCallable(), description="callable field")
-
-    m = M()
-    desc = get_descriptions_defaults(m)
-    # Should handle object/callable type
-    assert desc["a"][0] == "callable field"
+    descriptions = get_descriptions_defaults(Outer())
+    assert descriptions["inner"]["x"][0] == "x field"
+    assert descriptions["fn"][0] == "function"
 
 
-def test_objloader_minimal():
-    class Dummy:
-        pass
+def test_scalar_and_nonfinite_array_round_trips():
+    class ArrayModel(XoptBaseModel):
+        array: NDArray
+        tensor: TorchTensor
 
-    loader = ObjLoaderMinimal[Dummy]()
-    assert loader.object_type == Dummy
+    m = ArrayModel(
+        array=np.array([np.nan, 1.0, np.inf]),
+        tensor=torch.tensor(2.5, dtype=torch.float64),
+    )
+    dumped = json.loads(m.model_dump_json())
+    assert dumped["array"] == ["NaN", 1.0, "Infinity"]
+    assert dumped["tensor"] == 2.5
 
-    # test serialize object type
-    res = loader.serialize_object_type(None)
-    assert res is None
-    res = loader.serialize_object_type(Dummy)
-    assert res == f"{Dummy.__module__}.{Dummy.__name__}"
+    loaded = ArrayModel.model_validate(dumped)
+    assert loaded.array.dtype == np.float64
+    assert np.isnan(loaded.array[0]) and loaded.array[1] == 1.0
+    assert np.isinf(loaded.array[2])
+    assert loaded.tensor.ndim == 0 and float(loaded.tensor) == 2.5
 
+    assert json.loads(loaded.model_dump_json())["array"] == dumped["array"]
 
-def test_signaturemodel_build():
-    class S(SignatureModel):
-        args: list = [1, 2]
-        kwarg_order: list = ["x"]
-        x: int = 3
-
-    s = S()
-    args, kwargs = s.build(4, x=5)
-    assert args == [4, 2]  # positional overwrite
-    assert kwargs["x"] == 5
-
-
-def test_baseexecutor_and_normalexecutor():
-    class DummyExec:
-        def submit(self, fn, *args, **kwargs):
-            return "submitted"
-
-        def map(self, fn, *args, **kwargs):
-            return ["mapped"]
-
-        def shutdown(self):
-            return "shutdown"
-
-    loader = ObjLoader[DummyExec]()  # <-- Use ObjLoader, not ObjLoaderMinimal
-    be = NormalExecutor[DummyExec](loader=loader, executor=DummyExec())
-    assert be.submit(lambda x: x, 1) == "submitted"
-    assert be.map(lambda x: x, [1, 2]) == ["mapped"]
-    be.shutdown()
+    # legacy lowercase non-finite scalars still load, and bare finite scalars
+    # round-trip as 0-d values in both codecs
+    legacy = ArrayModel.model_validate({"array": "nan", "tensor": "-inf"})
+    assert np.isnan(legacy.array) and float(legacy.tensor) == -np.inf
+    scalars = ArrayModel.model_validate({"array": 3.5, "tensor": 0.0})
+    assert scalars.array.ndim == 0 and float(scalars.array) == 3.5
+    assert scalars.tensor.ndim == 0 and float(scalars.tensor) == 0.0
+    assert json.loads(scalars.model_dump_json()) == {"array": 3.5, "tensor": 0.0}
 
 
-def test_validate_and_compose_signature_tuple_and_empty():
-    def fn_tuple(x=(1, 2)):
-        pass  # pragma: no cover
-
-    model = validate_and_compose_signature(fn_tuple)
-    # Should create a field with type tuple and default None
-    assert hasattr(model, "x")
-    assert model.model_fields["x"].annotation is tuple
-    assert model.model_fields["x"].default is None
-
-    def fn_empty(x=inspect.Parameter.empty):
-        pass  # pragma: no cover
-
-    model = validate_and_compose_signature(fn_empty)
-    # Should create a field with type inspect.Parameter.empty and default inspect.Parameter.empty
-    assert hasattr(model, "x")
-    assert model.model_fields["x"].annotation == inspect.Parameter.empty
-    assert model.model_fields["x"].default == inspect.Parameter.empty
-
-    def fn_none(x=None):
-        pass  # pragma: no cover
-
-    model = validate_and_compose_signature(fn_none)
-    # Should create a field with type inspect.Parameter.empty and default None
-    assert hasattr(model, "x")
-    assert model.model_fields["x"].annotation == inspect.Parameter.empty
-    assert model.model_fields["x"].default is None
-
-    def fn_int(x=5):
-        pass  # pragma: no cover
-
-    model = validate_and_compose_signature(fn_int)
-    # Should create a field with type int and default 5
-    assert hasattr(model, "x")
-    assert model.model_fields["x"].annotation is int
-    assert model.model_fields["x"].default == 5
+def test_xopt_data_b64_round_trip():
+    X = Xopt(
+        generator=RandomGenerator(vocs=TEST_VOCS_BASE),
+        evaluator=Evaluator(function=misc_fn),
+    )
+    X.add_data(pd.DataFrame({"x1": [0.1, 0.2], "x2": [0.3, 0.4], "y1": [1.0, 2.0]}))
+    reloaded = Xopt.from_yaml(X.yaml(df_mode="b64"))
+    assert list(reloaded.data.index) == [0, 1]
+    assert reloaded.data["x1"].tolist() == [0.1, 0.2]
 
 
-def test_objloader_validate_all_loader_variants():
-    class Dummy:
-        pass
-
-    # Loader not in values: should create CallableModel with Dummy as callable
-    loader = ObjLoader[Dummy]()
-    assert loader.object_type == Dummy
-    assert isinstance(loader.loader, type(loader.loader))
-    # Loader is already a CallableModel
-    loader2 = ObjLoader[Dummy](loader=loader.loader)
-    assert loader2.object_type == Dummy
-    assert isinstance(loader2.loader, type(loader.loader))
-    # Loader is a dict with 'callable' key
-    loader3 = ObjLoader[Dummy](loader={"callable": Dummy})
-    assert loader3.object_type == Dummy
-    assert isinstance(loader3.loader, type(loader.loader))
-    # Loader is a dict without 'callable' key
-    loader4 = ObjLoader[Dummy](loader={})
-    assert loader4.object_type == Dummy
-    assert isinstance(loader4.loader, type(loader.loader))
-
-    # test serialization of loader
-    for loader in [loader, loader2, loader3, loader4]:
-        loader.serialize_json()
-
-    # Loader with wrong callable type should raise ValueError
-    class Other:
-        pass
-
-    with pytest.raises(ValueError):
-        ObjLoader[Dummy](loader={"callable": Other})
+def test_module_wrap_serializers_respect_exclude(tmp_path):
+    constructor = StandardModelConstructor(covar_modules={"y1": RBFKernel()})
+    dumped = json.loads(constructor.model_dump_json(exclude={"covar_modules"}))
+    assert "covar_modules" not in dumped
+    dumped = json.loads(
+        constructor.model_dump_json(
+            exclude={"covar_modules"},
+            context={"module_mode": "file", "file_dir": tmp_path},
+        )
+    )
+    assert "covar_modules" not in dumped
+    assert not list(tmp_path.iterdir()), "excluded field must not write sidecars"
 
 
-def test_objloader_load_store_and_no_store():
-    class Dummy:
-        def __init__(self):
-            self.value = 42
+def test_custom_noise_prior_round_trips(tmp_path):
+    from gpytorch.priors import GammaPrior
 
-    loader = ObjLoader[Dummy]()
-    # Test store=False (should return a new Dummy instance, not store it)
-    result1 = loader.load(store=False)
-    assert isinstance(result1, Dummy)
-    assert loader.object is None  # Should not store
-    # Test store=True (should store the Dummy instance)
-    result2 = loader.load(store=True)
-    assert isinstance(result2, Dummy)
-    assert loader.object is result2  # Should store
+    constructor = StandardModelConstructor(custom_noise_prior=GammaPrior(1.0, 100.0))
+
+    # drop (default): key removed, like other module-valued fields
+    dumped = json.loads(constructor.model_dump_json())
+    assert "custom_noise_prior" not in dumped
+    assert StandardModelConstructor.model_validate(dumped).custom_noise_prior is None
+
+    # inline round trip
+    dumped = json.loads(constructor.to_json(module_mode="inline"))
+    assert dumped["custom_noise_prior"].startswith("b64pt:")
+    loaded = StandardModelConstructor.model_validate(dumped)
+    assert isinstance(loaded.custom_noise_prior, GammaPrior)
+
+    # file round trip
+    dumped = json.loads(constructor.to_json(module_mode="file", file_dir=str(tmp_path)))
+    assert dumped["custom_noise_prior"] == "custom_noise_prior.pt"
+    assert (tmp_path / "custom_noise_prior.pt").exists()
+
+    # an unset prior stays as an explicit null in every mode
+    empty = json.loads(StandardModelConstructor().model_dump_json())
+    assert empty["custom_noise_prior"] is None
+
+
+class _FirstOutputObjective(CustomXoptObjective):
+    # module scope so torch pickling can resolve it
+    def forward(self, samples, X=None):
+        return samples[..., 0]
+
+
+def test_custom_objective_round_trips():
+    from xopt.generators.bayesian.expected_improvement import (
+        ExpectedImprovementGenerator,
+    )
+
+    gen = ExpectedImprovementGenerator(
+        vocs=TEST_VOCS_BASE, custom_objective=_FirstOutputObjective(TEST_VOCS_BASE)
+    )
+    dumped = json.loads(gen.model_dump_json())
+    assert "custom_objective" not in dumped  # dropped by default, like model
+
+    inline = json.loads(gen.to_json(module_mode="inline"))
+    assert inline["custom_objective"].startswith("b64pt:")
+    loaded = ExpectedImprovementGenerator.model_validate(inline)
+    assert isinstance(loaded.custom_objective, CustomXoptObjective)
+
+
+def test_model_dump_json_mode_uses_fallback():
+    class KwargsModel(XoptBaseModel):
+        kwargs: dict = {}
+
+    m = KwargsModel(kwargs={"a": np.float32(1.5), "df": pd.DataFrame({"x": [1]})})
+    dumped = m.model_dump(mode="json")
+    assert dumped["kwargs"]["a"] == 1.5
+    assert dumped["kwargs"]["df"] == {"x": {"0": 1}}

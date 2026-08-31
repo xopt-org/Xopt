@@ -2,7 +2,6 @@ from copy import deepcopy
 from pydantic import BaseModel
 from typing import List, Tuple
 import datetime
-import importlib
 import inspect
 import logging
 import numpy as np
@@ -12,12 +11,14 @@ import sys
 import time
 import torch
 import traceback
+import warnings
 import yaml
 
 from gest_api.vocs import VOCS, GreaterThanConstraint
 
 from .generator import Generator
 from .pydantic import get_descriptions_defaults
+from .types import resolve_callable
 
 # Grab the logger
 logger = logging.getLogger(__name__)
@@ -66,31 +67,16 @@ def get_generator_name(generator):
 
 def get_function(name):
     """
-    Returns a function from a fully qualified name or global name.
+    Deprecated alias of :func:`xopt.types.resolve_callable`.
+
+    Returns a callable as-is, or imports it from a fully qualified name.
     """
-
-    # Check if already a function
-    if callable(name):
-        return name
-
-    if not isinstance(name, str):
-        raise ValueError(f"{name} must be callable or a string.")
-
-    if name in globals():
-        if callable(globals()[name]):
-            f = globals()[name]
-        else:
-            raise ValueError(f"global {name} is not callable")
-    else:
-        if "." in name:
-            # try to import
-            m_name, f_name = name.rsplit(".", 1)
-            module = importlib.import_module(m_name)
-            f = getattr(module, f_name)
-        else:
-            raise Exception(f"function {name} does not exist")
-
-    return f
+    warnings.warn(
+        "get_function is deprecated, use xopt.types.resolve_callable instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return resolve_callable(name)
 
 
 def get_function_defaults(f):
