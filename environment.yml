@@ -34,3 +34,4 @@ dependencies:
   - mkdocstrings-python
   - ruff
   - typing-extensions
+  - gest-api

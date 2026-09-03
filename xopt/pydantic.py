@@ -36,11 +36,24 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from pydantic.v1.json import custom_pydantic_encoder
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
+
+
+def custom_pydantic_encoder(type_encoders, obj):
+    # Check the class type and its superclasses for a matching encoder.
+    # Replicates pydantic v1's ``custom_pydantic_encoder`` without importing
+    # from ``pydantic.v1`` (which is incompatible with Python 3.14+).
+    for base in type(obj).__mro__[:-1]:
+        try:
+            encoder = type_encoders[base]
+        except KeyError:
+            continue
+        return encoder(obj)
+    raise TypeError(f"Object of type {type(obj).__name__!r} is not JSON serializable")
+
 
 JSON_ENCODERS = {
     # function/method type distinguished for class members
