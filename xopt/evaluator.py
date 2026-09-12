@@ -2,12 +2,15 @@ import logging
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
-from typing import Callable, Dict, List, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
+
+if TYPE_CHECKING:
+    import gymnasium as gym
 
 from xopt.errors import XoptError
 from xopt.pydantic import NormalExecutor, XoptBaseModel
@@ -437,3 +440,145 @@ class DummyExecutor(Executor):
         """
         with self._shutdownLock:
             self._shutdown = True
+
+
+try:
+    import gymnasium as gym  # noqa: F811
+
+    _HAS_GYMNASIUM = True
+except ModuleNotFoundError:
+    _HAS_GYMNASIUM = False
+
+if not _HAS_GYMNASIUM:
+    logger.debug("gymnasium not installed, GymEvaluator is not available")
+else:
+
+    class GymEvaluator(Evaluator):
+        """
+        Evaluator for OpenAI Gym environments.
+
+        Parameters
+        ----------
+        env : gym.Env
+            The Gym environment.
+        action_space_names : List[str]
+            Names of action space dimensions.
+        observation_space_names : List[str]
+            Names of observation space dimensions.
+        """
+
+        env: gym.Env
+        action_space_names: List[str]
+        observation_space_names: List[str]
+        action_history: List[np.ndarray] = []
+        action_mode: str
+
+        # state the environment is in right now, i.e. the state the *next* action
+        # will be applied to. Tracked internally since env.step() only returns the
+        # state *after* the action, and env.reset()'s return value would otherwise
+        # be discarded.
+        _current_observation: Optional[np.ndarray] = PrivateAttr(default=None)
+
+        def __init__(
+            self,
+            env: gym.Env,
+            action_space_names: List[str],
+            observation_space_names: List[str],
+            **kwargs,
+        ):
+            """
+            Initialize the GymEvaluator.
+
+            Parameters
+            ----------
+            env : gym.Env
+                The name of the environment.
+            action_space_names : List[str]
+                Names of action space dimensions.
+            observation_space_names : List[str]
+                Names of observation space dimensions.
+            """
+
+            if hasattr(env, "action_mode"):
+                action_mode = env.action_mode
+            else:
+                action_mode = "delta"
+
+            logger.debug(f"Using action mode: {action_mode}")
+
+            function = self._evaluate_function
+
+            super().__init__(
+                env=env,
+                action_space_names=action_space_names,
+                observation_space_names=observation_space_names,
+                function=function,
+                action_mode=action_mode,
+                **kwargs,
+            )
+            self.reset()
+
+        def reset(self):
+            """
+            Reset the environment and clear the action history.
+            """
+            observation, _ = self.env.reset()
+            self._current_observation = observation
+            self.action_history = []
+
+        @property
+        def current_observation(self) -> Dict[str, float]:
+            """Current observation dict, i.e. the state the next action will be applied to."""
+            return {
+                name: float(self._current_observation[i])
+                for i, name in enumerate(self.observation_space_names)
+            }
+
+        def _evaluate_function(self, x: dict) -> dict:
+            """
+            Evaluate the given input using the environment.
+
+            Parameters
+            ----------
+            x : dict
+                The input dictionary to evaluate.
+
+            Returns
+            -------
+            dict
+                The evaluation results.
+            """
+            xopt_action = np.array([x[name] for name in self.action_space_names])
+
+            # if self.action_mode == "delta":
+            #     action = target_state - self.current_action_state
+            # else:
+            #     action = target_state
+            action = xopt_action
+
+            # snapshot the state the action is actually applied to -- env.step()
+            # computes reward from this state, not from the state it returns, so
+            # pairing the action with the returned observation would associate it
+            # with the wrong (resulting, not originating) state.
+            state = self._current_observation
+
+            observation, reward, terminated, truncated, info = self.env.step(action)
+            self.action_history.append(action)
+            self._current_observation = observation
+
+            observations = {
+                name: float(state[i])
+                for i, name in enumerate(self.observation_space_names)
+            }
+            next_observations = {
+                f"next_{name}": float(observation[i])
+                for i, name in enumerate(self.observation_space_names)
+            }
+
+            # TODO: Multi-objective support
+            return {
+                "reward": reward,
+                "terminated": terminated,
+                "truncated": truncated,
+                "info": info,
+            } | observations | next_observations
