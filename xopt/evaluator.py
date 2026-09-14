@@ -576,9 +576,13 @@ else:
             }
 
             # TODO: Multi-objective support
-            return {
-                "reward": reward,
-                "terminated": terminated,
-                "truncated": truncated,
-                "info": info,
-            } | observations | next_observations
+            return (
+                {
+                    "reward": reward,
+                    "terminated": terminated,
+                    "truncated": truncated,
+                    "info": info,
+                }
+                | observations
+                | next_observations
+            )

@@ -62,7 +62,9 @@ class RLGenerator(Generator):
                     f"action variable `{name}` cannot be a ContextualVariable"
                 )
             if not isinstance(self.vocs.variables[name], ContinuousVariable):
-                raise VOCSError(f"action variable `{name}` must be a ContinuousVariable")
+                raise VOCSError(
+                    f"action variable `{name}` must be a ContinuousVariable"
+                )
 
         for name in self.observation_space_names:
             if name not in self.vocs.variables:
@@ -86,7 +88,10 @@ class RLGenerator(Generator):
             return self.initial_observation
 
         last_row = self.data.iloc[-1]
-        return {name: float(last_row[f"next_{name}"]) for name in self.observation_space_names}
+        return {
+            name: float(last_row[f"next_{name}"])
+            for name in self.observation_space_names
+        }
 
     def generate(self, n_candidates: int) -> List[Dict[str, float]]:
         if n_candidates != 1:
@@ -95,9 +100,13 @@ class RLGenerator(Generator):
             )
 
         observation = self._current_observation()
-        obs_array = np.array([observation[name] for name in self.observation_space_names])
+        obs_array = np.array(
+            [observation[name] for name in self.observation_space_names]
+        )
 
-        action, _state = self.policy.predict(obs_array, deterministic=self.deterministic)
+        action, _state = self.policy.predict(
+            obs_array, deterministic=self.deterministic
+        )
 
         return [
             {name: float(action[i]) for i, name in enumerate(self.action_space_names)}
