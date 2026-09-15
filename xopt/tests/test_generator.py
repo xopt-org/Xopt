@@ -16,6 +16,13 @@ from xopt.vocs import ContextualVariable
 from gest_api.vocs import VOCS
 
 
+class _StubPolicy:
+    """Fixed-action stand-in for a trained RL policy, used in generator serialization tests."""
+
+    def predict(self, observation, deterministic=True):
+        return [0.0], None
+
+
 class PatchGenerator(Generator):
     """
     Test generator class for testing purposes.
@@ -114,6 +121,18 @@ class TestGenerator:
                 observable_names_ordered=["y1"]
             ).model_dump()
             json.dumps(gen_config)
+
+            gen_class(vocs=test_vocs, **gen_config)
+        elif name in ["rl_policy"]:
+            # policy is an externally-trained runtime object, not JSON-serializable by design
+            test_vocs = VOCS(
+                variables={"x1": [0, 1], "obs": ContextualVariable()},
+                objectives={"y1": "MINIMIZE"},
+            )
+            gen_config["policy"] = _StubPolicy()
+            gen_config["action_space_names"] = ["x1"]
+            gen_config["observation_space_names"] = ["obs"]
+            gen_config["initial_observation"] = {"obs": 0.0}
 
             gen_class(vocs=test_vocs, **gen_config)
         else:

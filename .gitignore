@@ -2,6 +2,8 @@
 docs/examples/ga/nsga2/assets/yaml_runner_example/nsga2_output
 docs/examples/ga/nsga2/assets/yaml_runner_example/nsga2_from_checkpoint_output
 docs/examples/ga/nsga2/yaml_interface/assets/yaml_runner_example.zip
+docs/examples/rl/sac_pendulum.zip
+docs/examples/rl/inverted_pendulum_reward.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
