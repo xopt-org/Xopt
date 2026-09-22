@@ -151,7 +151,7 @@ Using MPI
 ===============
 Example MPI run, with `xopt.yaml` as the only user-defined file:
 ```b
-mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+mpirun -n 64 xopt-mpirun xopt.yaml
 ```
 
 

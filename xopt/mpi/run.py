@@ -23,7 +23,7 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
 
     Basic usage:
 
-    mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+    mpirun -n 4 xopt-mpirun xopt.yaml
     """
 
     level = "WARN"
