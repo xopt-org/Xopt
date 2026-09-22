@@ -1,15 +1,12 @@
+from mpi4py import MPI
+from mpi4py.futures import MPICommExecutor
 import argparse
 import logging
 import os
 import sys
-
 import yaml
-from mpi4py import MPI
-from mpi4py.futures import MPICommExecutor
 
 from xopt import AsynchronousXopt
-
-# from mpi4py.futures import MPIPoolExecutor
 from xopt.base import Xopt
 from xopt.log import set_handler_with_logger
 
@@ -27,8 +24,6 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
     Basic usage:
 
     mpirun -n 4 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
-
-
     """
 
     level = "WARN"
@@ -59,21 +54,15 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
     print(X)
     sys.stdout.flush()
     with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
-        # with MPIPoolExecutor() as executor:
-
         X.evaluator.executor = executor
         X.evaluator.max_workers = mpi_size
         X.run()
 
 
 if __name__ == "__main__":
-    # ARGS = 'xopt.in'.split()
-
     parser = argparse.ArgumentParser(description="Configure xopt")
     parser.add_argument("input_file", help="input_file")
-
     parser.add_argument("--logfile", "-l", help="Log file to write to")
-
     parser.add_argument("--verbose", "-v", action="count", help="Show more log output")
     parser.add_argument(
         "--asynchronous",
@@ -91,8 +80,9 @@ if __name__ == "__main__":
     verbosity = args.verbose
     asynchronous = args.asynchronous
 
-    assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
+    if not os.path.exists(input_file):
+        print(f"Input file does not exist: {input_file}")
+        exit()
 
     config = yaml.safe_load(open(input_file))
-
     run_mpi(config, verbosity=verbosity, logfile=logfile, asynchronous=asynchronous)
