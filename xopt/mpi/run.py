@@ -51,12 +51,16 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
     else:
         X = Xopt(**config)
 
-    print(X)
-    sys.stdout.flush()
+    if mpi_rank == 0:
+        print(X)
+        sys.stdout.flush()
+
+    # Launch MPI executor (it is None for the workers)
     with MPICommExecutor(MPI.COMM_WORLD, root=0) as executor:
-        X.evaluator.executor = executor
-        X.evaluator.max_workers = mpi_size
-        X.run()
+        if executor is not None:
+            X.evaluator.executor = executor
+            X.evaluator.max_workers = mpi_size
+            X.run()
 
 
 def main():
@@ -73,7 +77,8 @@ def main():
     )
 
     args = parser.parse_args()
-    print(args)
+    if mpi_rank == 0:
+        print(args)
 
     input_file = args.input_file
     logfile = args.logfile
