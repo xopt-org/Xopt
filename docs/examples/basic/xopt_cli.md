@@ -26,8 +26,8 @@ The available arguments are the following.
 - `--executor`: Override the executor defined in the config file. Available options are "map" (run serially, ie using the function `map`), "thread_pool" (use `ThreadPoolExecutor`), and "process_pool" (use `ProcessPoolExecutor`).
 - `--max_workers`: Override the number of workers in Xopt and launch this number of threads/processes if using a parallel executor.
 - `--python_path`: Add this directory to your python path. By default, the current working directory. May include environment variables and the character `~` to represent the user's home directory. Note: you can pass these values into the tool without shell expansion by surrounding them by single quotes. May have more than one of this flag.
-- `--override`: Override a value from the YAML config file. May have more than one of this flag. More details below.
-- `--initial_data`: CSV file with initial data to seed the generator before running.
+ - `--override`: Override a value from the YAML config file. May have more than one of this flag. See [Overriding Settings in Config File](#overriding-settings-in-config-file).
+ - `--initial_data`: CSV file with initial data to seed the generator before running. See [Seeding Optimization with Existing Data](#seeding-optimization-with-existing-data).
 - `-v`, `--verbose`: Display verbose output (`logging.DEBUG` level messages) from Xopt
 
 ### Overriding Settings in Config File
@@ -87,12 +87,18 @@ Similar to `xopt-run`, with an Xopt installation, the tool will be available in 
 
 ```
 xopt-mpirun [-h] [--logfile LOGFILE] [--verbose] [--asynchronous | --no-asynchronous | -a]
+            [--python_path PYTHON_PATH] [--override OVERRIDE] [--initial_data INITIAL_DATA]
             input_file
 ```
 
 The options are the following.
+ - `input_file`: (required) Path to the YAML config file
+ - `-h`: Display help text for the tool.
  - `--logfile`: Path to file log messages will be written to
- - `--logfile`: Increase log level
+ - `-v`, `--verbose`: Increase log level. Repeat for more output (`-vv` for `logging.INFO`, `-vvv` for `logging.DEBUG`).
  - `--asynchronous`/`--no-asynchronous`: Use asynchronous / non-asynchronous Xopt
+- `--python_path`: Add this directory to your python path. By default, the current working directory. May include environment variables and the character `~` to represent the user's home directory. Note: you can pass these values into the tool without shell expansion by surrounding them by single quotes. May have more than one of this flag.
+ - `--override`: Override a value from the YAML config file. May have more than one of this flag. See [Overriding Settings in Config File](#overriding-settings-in-config-file).
+ - `--initial_data`: CSV file with initial data to seed the generator before running. The file is read once, on the root rank. See [Seeding Optimization with Existing Data](#seeding-optimization-with-existing-data).
 
  Use is the same as in `xopt-run` accepting a YAML config file to perform the optimization.
