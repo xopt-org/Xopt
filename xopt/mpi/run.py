@@ -44,7 +44,7 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
         set_handler_with_logger(level=level)
 
     if logfile:
-        set_handler_with_logger(file=args.logfile, level=level)
+        set_handler_with_logger(file=logfile, level=level)
 
     # logger.info(xopt_logo)
     # logger.info('_________________________________')
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--asynchronous",
         "-a",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         help="Use asynchronous execution",
         default=True,
     )
