@@ -1,12 +1,16 @@
 # Running Xopt from the Command Line
 
+Xopt includes two ways of running from the command line depending on if you are planning to use MPI for parallel computing or not.
+
 The tool `xopt-run` allows users without advanced needs to run optimizations using only a YAML config file and an evaluation function available from python's path.
 You may use `xopt-run` if your optimization satisfies the following requirements.
 
 - You are using one of Xopt's built in `Generator` classes.
 - You plan to run the evaluation function in serial (vectorized or non-vectorized), or use `ProcessPoolExecutor` or `ThreadPoolExecutor` for parallelism.
 
-## Usage
+The tool `xopt-mpirun` allows users to perform similar optimizations as in `xopt-run`, but using MPI and `AsynchronousXopt`.
+
+## xopt-run Usage
 
 Once Xopt is installed from conda/pip, the tool will be available in your system path and can be called like this.
 
@@ -26,7 +30,7 @@ The available arguments are the following.
 - `--initial_data`: CSV file with initial data to seed the generator before running.
 - `-v`, `--verbose`: Display verbose output (`logging.DEBUG` level messages) from Xopt
 
-## Overriding Settings in Config File
+### Overriding Settings in Config File
 The flag `--override` may be used to override values in the configuration file.
 These overrides are defined using a simple key value format where each hierarchical object in the config file is separated by the period character (".").
 For example, to set the parameter `eta_m` of the mutation operator in `NSGA2Generator` to 20, the flag `--override generator.mutation_operator.eta_m=20` may be used.
@@ -34,7 +38,7 @@ For example, to set the parameter `eta_m` of the mutation operator in `NSGA2Gene
 Overrides are applied to the config file before it used to generate the `Xopt` object.
 Data types for the value follow YAML conventions.
 
-## Making the Evaluation Function Acessible to `xopt-run`
+### Making the Evaluation Function Acessible to `xopt-run`
 
 Xopt will call the evaluation function defined in the YAML file under `evaluator.function`.
 The value of this parameter should be written in the format `<package>.<function name>` where `<package>` is the name of a package available to `xopt-run`.
@@ -44,7 +48,7 @@ Xopt will automatically import the package and then use the specified function f
 The argument `--python_path <path>` is used to add the directory containing your python file with the evaluation function to your python path.
 By default, the current working directory is included in your python path.
 
-## Seeding Optimization with Existing Data
+### Seeding Optimization with Existing Data
 
 It is sometimes useful to load already evaluated data into the `Xopt` optimizer before running.
 For example, to pick up an optimization from the results of a previous run (for generators without a checkpointing feature) or to "seed" the optimizer with related results or lower fidelity simulation outputs.
@@ -52,8 +56,8 @@ The arugment `--initial_data` is used to specify a path to a CSV file containing
 The CSV file will be loaded and passed to `Xopt.add_data` before running the optimizer.
 As such, the CSV file is expected to have a header row and columns that have the same names as the keys in the VOCS of the problem being optimized.
 
-## Example Usage
-### Calling an Evaluation Function from a Python File
+### Example Usage
+#### Calling an Evaluation Function from a Python File
 As an example, if you would like to use a custom evaluation function called `eval_fun` and have defined it in the file `my_optimization.py`, your YAML config file would contain the following entry.
 ```yaml
 evaluator:
@@ -71,7 +75,24 @@ xopt-run --python_path <path to directory containing my_optimization.py> config.
 ```
 You do not need to include the argument `--python_path` if your python file is in the same directory in which you are running `xopt-run`.
 
-### Solving a Test Problem
+#### Solving a Test Problem
 A complete example of solving the multi-objective optimization problem "ZDT3" using the algorithm NSGA2 is linked below.
 
 [Solving ZDT3 with NSGA2Generator](../ga/nsga2/yaml_interface/index.md)
+
+
+## xopt-mpirun Usage
+
+Similar to `xopt-run`, with an Xopt installation, the tool will be available in your system path and can be called like this.
+
+```
+xopt-mpirun [-h] [--logfile LOGFILE] [--verbose] [--asynchronous | --no-asynchronous | -a]
+            input_file
+```
+
+The options are the following.
+ - `--logfile`: Path to file log messages will be written to
+ - `--logfile`: Increase log level
+ - `--asynchronous`/`--no-asynchronous`: Use asynchronous / non-asynchronous Xopt
+
+ Use is the same as in `xopt-run` accepting a YAML config file to perform the optimization.
