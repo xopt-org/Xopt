@@ -8,7 +8,7 @@ import yaml
 
 from xopt import AsynchronousXopt
 from xopt.base import Xopt
-from xopt.entrypoint import setup_import_paths
+from xopt.entrypoint import merge_dicts, override_to_dict, setup_import_paths
 from xopt.log import set_handler_with_logger
 
 comm = MPI.COMM_WORLD
@@ -99,6 +99,12 @@ def main():
         action="append",
         default=[],
     )
+    parser.add_argument(
+        "--override",
+        help="Override config values using dot notation (e.g., generator.mutation_operator.eta_m=20)",
+        action="append",
+        default=[],
+    )
 
     args = parser.parse_args()
     if mpi_rank == 0:
@@ -114,6 +120,17 @@ def main():
         exit()
 
     config = yaml.safe_load(open(input_file))
+
+    if args.override:
+        logger.info("Applying config file overrides:")
+    for override in args.override:
+        logger.info(f"  {override}")
+        if "=" not in override:
+            raise ValueError(
+                f'Invalid override format: "{override}". Expected key=value'
+            )
+        config = merge_dicts(config, override_to_dict(override))
+
     run_mpi(
         config,
         verbosity=verbosity,
