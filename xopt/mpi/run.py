@@ -3,12 +3,18 @@ from mpi4py.futures import MPICommExecutor
 import argparse
 import logging
 import os
+import pandas as pd
 import sys
 import yaml
 
 from xopt import AsynchronousXopt
 from xopt.base import Xopt
-from xopt.entrypoint import merge_dicts, override_to_dict, setup_import_paths
+from xopt.entrypoint import (
+    merge_dicts,
+    normalize_initial_data,
+    override_to_dict,
+    setup_import_paths,
+)
 from xopt.log import set_handler_with_logger
 
 comm = MPI.COMM_WORLD
@@ -18,7 +24,14 @@ mpi_size = comm.Get_size()
 logger = logging.getLogger("xopt")
 
 
-def run_mpi(config, verbosity=None, asynchronous=True, logfile=None, python_path=None):
+def run_mpi(
+    config,
+    verbosity=None,
+    asynchronous=True,
+    logfile=None,
+    python_path=None,
+    initial_data=None,
+):
     """
     Xopt MPI driver
 
@@ -40,6 +53,8 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None, python_path
         Directories added to the module search path on every rank. Worker ranks import
         the evaluation function themselves, so this must run before the Xopt object is
         built.
+    initial_data : str, optional
+        CSV file of existing data used to seed the generator, read on the root rank.
     """
 
     level = "WARN"
@@ -78,6 +93,11 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None, python_path
         if executor is not None:
             X.evaluator.executor = executor
             X.evaluator.max_workers = mpi_size
+
+            if initial_data is not None:
+                logger.info(f"Loading initial data from {initial_data}")
+                X.add_data(normalize_initial_data(pd.read_csv(initial_data), X.vocs))
+
             X.run()
 
 
@@ -104,6 +124,12 @@ def main():
         help="Override config values using dot notation (e.g., generator.mutation_operator.eta_m=20)",
         action="append",
         default=[],
+    )
+    parser.add_argument(
+        "--initial_data",
+        help="CSV file with initial data to seed the generator before running",
+        type=str,
+        default=None,
     )
 
     args = parser.parse_args()
@@ -137,6 +163,7 @@ def main():
         logfile=logfile,
         asynchronous=asynchronous,
         python_path=[os.getcwd()] + args.python_path,
+        initial_data=args.initial_data,
     )
 
 
