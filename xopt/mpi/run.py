@@ -8,6 +8,7 @@ import yaml
 
 from xopt import AsynchronousXopt
 from xopt.base import Xopt
+from xopt.entrypoint import setup_import_paths
 from xopt.log import set_handler_with_logger
 
 comm = MPI.COMM_WORLD
@@ -17,13 +18,28 @@ mpi_size = comm.Get_size()
 logger = logging.getLogger("xopt")
 
 
-def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
+def run_mpi(config, verbosity=None, asynchronous=True, logfile=None, python_path=None):
     """
     Xopt MPI driver
 
     Basic usage:
 
     mpirun -n 4 xopt-mpirun xopt.yaml
+
+    Parameters
+    ----------
+    config : dict
+        Xopt configuration.
+    verbosity : int, optional
+        Verbosity count controlling the log level.
+    asynchronous : bool, default=True
+        Run with AsynchronousXopt instead of Xopt.
+    logfile : str, optional
+        File log messages are written to.
+    python_path : list of str, optional
+        Directories added to the module search path on every rank. Worker ranks import
+        the evaluation function themselves, so this must run before the Xopt object is
+        built.
     """
 
     level = "WARN"
@@ -40,6 +56,8 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
 
     if logfile:
         set_handler_with_logger(file=logfile, level=level)
+
+    setup_import_paths(python_path or [])
 
     # logger.info(xopt_logo)
     # logger.info('_________________________________')
@@ -75,6 +93,12 @@ def main():
         help="Use asynchronous execution",
         default=True,
     )
+    parser.add_argument(
+        "--python_path",
+        help="Additional path to add to Python import path for evaluation function module search",
+        action="append",
+        default=[],
+    )
 
     args = parser.parse_args()
     if mpi_rank == 0:
@@ -90,7 +114,13 @@ def main():
         exit()
 
     config = yaml.safe_load(open(input_file))
-    run_mpi(config, verbosity=verbosity, logfile=logfile, asynchronous=asynchronous)
+    run_mpi(
+        config,
+        verbosity=verbosity,
+        logfile=logfile,
+        asynchronous=asynchronous,
+        python_path=[os.getcwd()] + args.python_path,
+    )
 
 
 if __name__ == "__main__":
