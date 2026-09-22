@@ -102,3 +102,8 @@ The options are the following.
  - `--initial_data`: CSV file with initial data to seed the generator before running. The file is read once, on the root rank. See [Seeding Optimization with Existing Data](#seeding-optimization-with-existing-data).
 
  Use is the same as in `xopt-run` accepting a YAML config file to perform the optimization.
+ Call using `mpirun`.
+
+```
+mpirun -n 32 xopt-mpirun config.yaml
+```
