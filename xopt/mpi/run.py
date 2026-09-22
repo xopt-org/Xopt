@@ -59,7 +59,7 @@ def run_mpi(config, verbosity=None, asynchronous=True, logfile=None):
         X.run()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Configure xopt")
     parser.add_argument("input_file", help="input_file")
     parser.add_argument("--logfile", "-l", help="Log file to write to")
@@ -86,3 +86,7 @@ if __name__ == "__main__":
 
     config = yaml.safe_load(open(input_file))
     run_mpi(config, verbosity=verbosity, logfile=logfile, asynchronous=asynchronous)
+
+
+if __name__ == "__main__":
+    main()
