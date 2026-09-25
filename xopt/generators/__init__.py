@@ -15,7 +15,7 @@ generators = {gen.name: gen for gen in registered_generators}
 # don't import this directly -- use
 all_generator_names = {
     "mggpo": {"mggpo"},
-    "scipy": {"neldermead", "latin_hypercube"},
+    "scipy": {"neldermead", "latin_hypercube", "scipy"},
     "bo": {
         "upper_confidence_bound",
         "mobo",
@@ -61,9 +61,11 @@ def get_generator_dynamic(name: str) -> type[Generator]:
         try:
             from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator
             from xopt.generators.sequential.neldermead import NelderMeadGenerator
+            from xopt.generators.sequential.scipy import ScipyGenerator
 
             registered_generators = [
                 NelderMeadGenerator,
+                ScipyGenerator,
                 LatinHypercubeGenerator,
             ]
 
@@ -160,6 +162,8 @@ def get_generator_defaults(
 
         if v.is_required():
             defaults[k] = None
+        elif v.default_factory is not None:
+            defaults[k] = v.default_factory()
         else:
             if v.default is None:
                 defaults[k] = None
