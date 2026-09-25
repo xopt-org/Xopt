@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Callable, Dict, Literal, Optional
+from typing import Literal
 
 import pandas as pd
 import torch
@@ -9,6 +10,7 @@ from botorch.acquisition import (
     GenericMCObjective,
     qUpperConfidenceBound,
 )
+from gest_api.vocs import VOCS, ContinuousVariable, MaximizeObjective, MinimizeObjective
 from pydantic import Field, field_validator
 
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -16,7 +18,6 @@ from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
 )
 from xopt.generators.bayesian.custom_botorch.multi_fidelity import NMOMF
 from xopt.generators.bayesian.mobo import MOBOGenerator
-from gest_api.vocs import VOCS, ContinuousVariable, MaximizeObjective, MinimizeObjective
 from xopt.vocs import convert_dataframe_to_inputs
 
 logger = logging.getLogger()
@@ -71,7 +72,7 @@ class MultiFidelityGenerator(MOBOGenerator):
         "of evaluating the objective function",
         exclude=True,
     )
-    reference_point: Optional[Dict[str, float]] = None
+    reference_point: dict[str, float] | None = None
     supports_multi_objective: bool = True
     supports_batch_generation: bool = True
     supports_constraints: bool = True
@@ -124,9 +125,7 @@ class MultiFidelityGenerator(MOBOGenerator):
 
         reference_point.update({"s": 0.0})
 
-        super(MultiFidelityGenerator, self).__init__(
-            **kwargs, reference_point=reference_point
-        )
+        super().__init__(**kwargs, reference_point=reference_point)
 
     def calculate_total_cost(self, data: pd.DataFrame = None) -> float:
         """
@@ -286,7 +285,7 @@ class MultiFidelityGenerator(MOBOGenerator):
                 weights[idx] = 1.0
 
         def obj_callable(
-            Z: torch.Tensor, X: Optional[torch.Tensor] = None
+            Z: torch.Tensor, X: torch.Tensor | None = None
         ) -> torch.Tensor:
             return torch.matmul(Z, weights.reshape(-1, 1)).squeeze(-1)
 

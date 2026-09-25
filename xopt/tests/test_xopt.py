@@ -7,13 +7,12 @@ import numpy as np
 import pandas as pd
 import pytest
 import yaml
-from pydantic import ValidationError
-
 from gest_api.vocs import ContinuousVariable
+from pydantic import ValidationError
 
 from xopt import from_file
 from xopt.base import Xopt
-from xopt.errors import XoptError, VOCSError
+from xopt.errors import VOCSError, XoptError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators import try_load_all_generators

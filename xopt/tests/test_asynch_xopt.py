@@ -1,13 +1,18 @@
-import pandas as pd
-import time
+import logging
 import threading
+import time
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
+
+import pandas as pd
+
 from xopt.asynchronous import AsynchronousXopt
-from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.evaluator import Evaluator
 from xopt.generators import RandomGenerator
+from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.vocs import random_inputs
+
+logger = logging.getLogger(__name__)
 
 
 class TestAsynchXopt:
@@ -503,7 +508,8 @@ class TestAsynchXopt:
             while X._futures:
                 X.process_futures()
         except Exception:
-            pass  # Should not raise due to non-strict mode
+            logger.exception
+            # Should not raise due to non-strict mode
 
         # test error raised in strict mode
         X.strict = True

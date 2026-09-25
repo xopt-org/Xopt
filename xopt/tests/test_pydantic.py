@@ -3,9 +3,10 @@ import io
 import json
 import os
 import tempfile
+from collections.abc import Callable
 from functools import partial
 from types import FunctionType, MethodType
-from typing import Callable, Optional, Union
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd
@@ -138,9 +139,7 @@ class TestSignatureValidateAndCompose:
             pass
 
         signature_model = validate_and_compose_signature(run, *args, **kwargs)
-        assert all(
-            [kwargs[kwarg] == getattr(signature_model, kwarg) for kwarg in kwargs]
-        )
+        assert all(kwargs[kwarg] == getattr(signature_model, kwarg) for kwarg in kwargs)
         # run
 
         args, kwargs = signature_model.build()
@@ -377,8 +376,8 @@ class Child2(Parent):
 
 
 class Container(BaseModel):
-    obj: SerializeAsAny[Optional[Parent]] = Field(None)
-    obj2: SerializeAsAny[Optional[Union[Child1, Child2, Parent]]] = Field(None)
+    obj: SerializeAsAny[Parent | None] = Field(None)
+    obj2: SerializeAsAny[Child1 | Child2 | Parent | None] = Field(None)
 
 
 class TestPydanticInitialization:
@@ -392,10 +391,10 @@ class TestPydanticInitialization:
         c2 = Container(obj=Child2())
         print("c2", c2.model_dump())
         # doesn't resolve child1
-        c3 = Container(**{"obj": {"a1": "a1", "name": "child1"}})
+        c3 = Container(obj={"a1": "a1", "name": "child1"})
         print(type(c3.obj), type(c3.obj2), c3)
         # works
-        c4 = Container(**{"obj2": {"a1": "a1", "name": "child1"}})
+        c4 = Container(obj2={"a1": "a1", "name": "child1"})
         print(type(c4.obj), type(c4.obj2), c4)
 
 
@@ -416,7 +415,7 @@ def test_recursive_serialize_and_deserialize():
         "a": 1,
         "b": {"c": 2},
         "d": np.array([1, 2]),
-        "e": set([1, 2]),
+        "e": {1, 2},
         "f": pd.DataFrame({"x": [1, 2]}),
     }
     ser = recursive_serialize(d.copy())
@@ -451,7 +450,7 @@ def test_orjson_dumps_and_loads():
 
 def test_orjson_dumps_preserves_non_finite_floats():
     class NonFiniteModel(XoptBaseModel):
-        values: list[float] = [-float("inf"), float("inf")]
+        values: ClassVar[list[float]] = [-float("inf"), float("inf")]
 
     m = NonFiniteModel()
     loaded = json.loads(orjson_dumps(m))
@@ -567,8 +566,8 @@ def test_objloader_minimal():
 
 def test_signaturemodel_build():
     class S(SignatureModel):
-        args: list = [1, 2]
-        kwarg_order: list = ["x"]
+        args: ClassVar[list] = [1, 2]
+        kwarg_order: ClassVar[list] = ["x"]
         x: int = 3
 
     s = S()
@@ -655,8 +654,8 @@ def test_objloader_validate_all_loader_variants():
     assert isinstance(loader4.loader, type(loader.loader))
 
     # test serialization of loader
-    for loader in [loader, loader2, loader3, loader4]:
-        loader.serialize_json()
+    for _loader in [loader, loader2, loader3, loader4]:
+        _loader.serialize_json()
 
     # Loader with wrong callable type should raise ValueError
     class Other:

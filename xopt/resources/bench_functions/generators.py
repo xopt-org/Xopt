@@ -1,14 +1,14 @@
 import logging
 import time
 
+import threadpoolctl
 import torch
 
 from xopt.generators.bayesian import ExpectedImprovementGenerator
-from xopt.resources.bench_framework import BenchDispatcher, generate_data, generate_vocs
 from xopt.generators.bayesian.models.standard import (
     BatchedModelConstructor,
 )
-import threadpoolctl
+from xopt.resources.bench_framework import BenchDispatcher, generate_data, generate_vocs
 
 logging.basicConfig(level=logging.DEBUG)
 

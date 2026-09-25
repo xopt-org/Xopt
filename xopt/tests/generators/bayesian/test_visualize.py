@@ -13,7 +13,7 @@ from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
-from xopt.vocs import ContextualVariable, VOCS
+from xopt.vocs import VOCS, ContextualVariable
 
 
 class DummyPosterior:

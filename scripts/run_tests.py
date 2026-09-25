@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import sys
 
 import pytest
@@ -17,6 +16,6 @@ if __name__ == "__main__":
         args.extend(["--cov=xopt", "--cov-report", "term-missing"])
         args.remove("--show-cov")
 
-    print("pytest arguments: {}".format(args))
+    print(f"pytest arguments: {args}")
     print(f"Running tests on Python {sys.version}")
     sys.exit(pytest.main(args))

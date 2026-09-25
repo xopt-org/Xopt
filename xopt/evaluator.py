@@ -1,8 +1,8 @@
 import logging
+from collections.abc import Callable
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
-from typing import Callable, Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -51,7 +51,7 @@ class Evaluator(XoptBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="before")
-    def validate_all(cls, values: Dict) -> Dict:
+    def validate_all(cls, values: dict) -> dict:
         """
         Validate all inputs before initializing the Evaluator.
 
@@ -87,7 +87,7 @@ class Evaluator(XoptBaseModel):
 
         return values
 
-    def evaluate(self, input: Dict, **kwargs) -> Dict:
+    def evaluate(self, input: dict, **kwargs) -> dict:
         """
         Evaluate a single input dict using Evaluator.function with
         Evaluator.function_kwargs.
@@ -110,12 +110,10 @@ class Evaluator(XoptBaseModel):
 
     def evaluate_data(
         self,
-        input_data: Union[
-            pd.DataFrame,
-            List[Dict[str, float]],
-            Dict[str, List[float]],
-            Dict[str, float],
-        ],
+        input_data: pd.DataFrame
+        | list[dict[str, float]]
+        | dict[str, list[float]]
+        | dict[str, float],
     ) -> pd.DataFrame:
         """
         Evaluate a dataframe of inputs.
@@ -172,7 +170,7 @@ class Evaluator(XoptBaseModel):
             result = result.loc[:, ~result.columns.duplicated(keep="first")]
         return result
 
-    def safe_function(self, *args, **kwargs) -> Dict:
+    def safe_function(self, *args, **kwargs) -> dict:
         """
         Safely call the function, handling exceptions.
 
@@ -190,7 +188,7 @@ class Evaluator(XoptBaseModel):
         """
         return safe_function(self.function, *args, **kwargs)
 
-    def submit(self, input: Dict) -> Future:
+    def submit(self, input: dict) -> Future:
         """
         Submit a single input to the executor.
 
@@ -205,7 +203,7 @@ class Evaluator(XoptBaseModel):
             The Future object representing the submitted task.
         """
         if not isinstance(input, dict):
-            raise ValueError("input must be a dictionary")
+            raise TypeError("input must be a dictionary")
         # return self.executor.submit(self.function, input, **self.function_kwargs)
         # Must call a function outside of the class
         # See: https://stackoverflow.com/questions/44144584/typeerror-cant-pickle-thread-lock-objects
@@ -213,7 +211,7 @@ class Evaluator(XoptBaseModel):
             safe_function, self.function, input, **self.function_kwargs
         )
 
-    def submit_data(self, input_data: pd.DataFrame) -> List[Future]:
+    def submit_data(self, input_data: pd.DataFrame) -> list[Future]:
         """
         Submit a dataframe of inputs to the executor.
 
@@ -242,7 +240,7 @@ class Evaluator(XoptBaseModel):
         return futures
 
 
-def safe_function_for_map(function: Callable, inputs: Dict, kwargs: Dict) -> Dict:
+def safe_function_for_map(function: Callable, inputs: dict, kwargs: dict) -> dict:
     """
     Safely call the function, handling exceptions.
 
@@ -263,7 +261,7 @@ def safe_function_for_map(function: Callable, inputs: Dict, kwargs: Dict) -> Dic
     return safe_function(function, inputs, **kwargs)
 
 
-def safe_function(function: Callable, *args, **kwargs) -> Dict:
+def safe_function(function: Callable, *args, **kwargs) -> dict:
     """
     Safely call the function, handling exceptions.
 
@@ -285,7 +283,7 @@ def safe_function(function: Callable, *args, **kwargs) -> Dict:
     return process_safe_outputs(safe_outputs)
 
 
-def process_safe_outputs(outputs: Dict) -> Dict:
+def process_safe_outputs(outputs: dict) -> dict:
     """
     Process the outputs of safe_call, flattening the output.
 
@@ -367,7 +365,9 @@ class DummyExecutor(Executor):
         self._shutdown = False
         self._shutdownLock = Lock()
 
-    def map(self, fn: Callable, *iterables, timeout: float = None, chunksize: int = 1):
+    def map(
+        self, fn: Callable, *iterables, timeout: float | None = None, chunksize: int = 1
+    ):
         """
         Map the function to the iterables.
 

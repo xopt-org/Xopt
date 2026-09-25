@@ -1,18 +1,15 @@
 import time
 from random import random
-from typing import Dict
 
 import numpy as np
 
 from xopt.vocs import VOCS
 
 tnk_vocs = VOCS(
-    **{
-        "variables": {"x1": [0, 3.14159], "x2": [0, 3.14159]},
-        "objectives": {"y1": "MINIMIZE", "y2": "MINIMIZE"},
-        "constraints": {"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
-        "constants": {"a": "dummy_constant"},
-    }
+    variables={"x1": [0, 3.14159], "x2": [0, 3.14159]},
+    objectives={"y1": "MINIMIZE", "y2": "MINIMIZE"},
+    constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
+    constants={"a": "dummy_constant"},
 )
 
 # With constraints, objectives are below ~1.05
@@ -33,7 +30,7 @@ def TNK(individual):
 
 
 # labeled version
-def evaluate_TNK(inputs: Dict, sleep=0, random_sleep=0, raise_probability=0, **params):
+def evaluate_TNK(inputs: dict, sleep=0, random_sleep=0, raise_probability=0, **params):
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = TNK(ind)
 

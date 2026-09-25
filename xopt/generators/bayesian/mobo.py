@@ -1,5 +1,3 @@
-from typing import Optional
-
 import torch
 from botorch.acquisition.multi_objective import MCMultiOutputObjective
 from botorch.acquisition.multi_objective.logei import (
@@ -119,7 +117,7 @@ class MOBOGenerator(MultiObjectiveBayesianGenerator):
         )
         return acq
 
-    def _get_initial_conditions(self, n_candidates: int = 1) -> Optional[Tensor]:
+    def _get_initial_conditions(self, n_candidates: int = 1) -> Tensor | None:
         """
         Generate initial candidates for optimizing the acquisition function based on
         the Pareto front.

@@ -1,5 +1,6 @@
 import warnings
 
+import torch
 from botorch.acquisition import (
     ScalarizedPosteriorTransform,
     UpperConfidenceBound,
@@ -7,7 +8,6 @@ from botorch.acquisition import (
 )
 from gpytorch import Module
 from pydantic import Field
-import torch
 
 from xopt.errors import GeneratorWarning
 from xopt.generators.bayesian.bayesian_generator import (

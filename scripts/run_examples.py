@@ -13,11 +13,9 @@ import tempfile
 import time
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Dict, Optional
 
 import nbformat
 from nbconvert import PythonExporter
-
 
 IGNORE = {
     "xopt_parallel.ipynb",
@@ -53,7 +51,7 @@ def parse_ipynb(file: Path) -> str:
     return script
 
 
-def run_script(script: str, env: Dict[str, str] = None) -> None:
+def run_script(script: str, env: dict[str, str] | None = None) -> None:
     # need to keep the file around & close it so subprocess does not run into I/O issues
     with tempfile.NamedTemporaryFile(delete=False) as tf:
         tf_name = tf.name
@@ -62,13 +60,13 @@ def run_script(script: str, env: Dict[str, str] = None) -> None:
     if env is not None:
         env = {**os.environ, **env}
     run_out = subprocess.run(
-        ["ipython", tf_name], capture_output=True, text=True, env=env
+        ["ipython", tf_name], capture_output=True, text=True, env=env, check=False
     )
     os.remove(tf_name)
     return run_out
 
 
-def run_tutorial(tutorial: Path, smoke_test: bool = False) -> Optional[str]:
+def run_tutorial(tutorial: Path, smoke_test: bool = False) -> str | None:
     print(f"Running tutorial {tutorial.name}.")
     script = parse_ipynb(tutorial)
     tic = time.time()

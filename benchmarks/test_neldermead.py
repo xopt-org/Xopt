@@ -6,12 +6,15 @@ import pytest
 from scipy.optimize import minimize
 
 from xopt import VOCS, Xopt
-from xopt.vocs import get_variable_data, select_best
-from xopt.resources.test_functions.ackley_20 import ackley, vocs as ackleyvocs
+from xopt.resources.test_functions.ackley_20 import ackley
+from xopt.resources.test_functions.ackley_20 import vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (
     rosenbrock,
+)
+from xopt.resources.test_functions.rosenbrock import (
     rosenbrock2_vocs as rbvocs,
 )
+from xopt.vocs import get_variable_data, select_best
 
 
 def compare(X, X2):
@@ -108,7 +111,7 @@ class TestNelderMeadGenerator:
         data = get_variable_data(X.vocs, X.data).to_numpy()
         assert np.array_equal(data, scipy_data)
 
-        idx, best, _ = select_best(X.vocs, X.data)
+        idx, _, _ = select_best(X.vocs, X.data)
         xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         assert np.array_equal(xbest, result.x), (
             "Xopt Simplex does not match the vanilla one"
@@ -186,7 +189,7 @@ class TestNelderMeadGenerator:
         assert data.shape == scipy_data.shape
         assert np.allclose(data, scipy_data, rtol=0, atol=1e-10)
 
-        idx, best, _ = select_best(X.vocs, X.data)
+        idx, _, _ = select_best(X.vocs, X.data)
         xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
         assert np.array_equal(xbest, result.x), (
             "Xopt Simplex does not match the vanilla one"

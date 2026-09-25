@@ -1,9 +1,10 @@
 import json
-from typing import Any
 import warnings
+from typing import Any
+
 from xopt.errors import XoptError
-from xopt.generators.random import RandomGenerator
 from xopt.generator import Generator
+from xopt.generators.random import RandomGenerator
 
 registered_generators: list[type[Generator]] = [
     RandomGenerator,
@@ -75,6 +76,7 @@ def get_generator_dynamic(name: str) -> type[Generator]:
                 "WARNING: `scipy` not found, NelderMeadGenerator and LatinHypercubeGenerator are not available"
             )
     elif name in all_generator_names["bo"]:
+        from xopt.generators.bayesian.bax_generator import BaxGenerator
         from xopt.generators.bayesian.bayesian_exploration import (
             BayesianExplorationGenerator,
         )
@@ -87,7 +89,6 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             TDUpperConfidenceBoundGenerator,
             UpperConfidenceBoundGenerator,
         )
-        from xopt.generators.bayesian.bax_generator import BaxGenerator
 
         registered_generators = [
             UpperConfidenceBoundGenerator,

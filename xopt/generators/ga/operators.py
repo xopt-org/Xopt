@@ -1,6 +1,7 @@
+from typing import Annotated, Literal
+
 import numpy as np
 from pydantic import Field, field_validator
-from typing import Optional, Literal, Annotated, Tuple
 
 from ...pydantic import XoptBaseModel
 
@@ -44,7 +45,7 @@ class PolynomialMutation(MutationOperator):
 
     name: Literal["polynomial_mutation"] = "polynomial_mutation"
     pm: Annotated[
-        Optional[float],
+        float | None,
         Field(
             strict=True,
             ge=0,
@@ -141,7 +142,7 @@ class CrossoverOperator(XoptBaseModel):
 
     def __call__(
         self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
 
@@ -187,7 +188,7 @@ class SimulatedBinaryCrossover(CrossoverOperator):
 
     def __call__(
         self, parent_a: np.ndarray, parent_b: np.ndarray, bounds: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Apply simulated binary crossover to generate two offspring from two parents.
 

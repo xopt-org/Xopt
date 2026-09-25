@@ -1,4 +1,4 @@
-from typing import Optional, Callable
+from collections.abc import Callable
 
 import pandas as pd
 import torch
@@ -10,6 +10,7 @@ from pydantic import Field
 
 from xopt.generators.bayesian.objectives import create_mobo_objective
 from xopt.generators.ga.cnsga import CNSGAGenerator
+
 from .bayesian_generator import MultiObjectiveBayesianGenerator
 
 
@@ -50,7 +51,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
     supports_constraints: bool = True
     supports_discrete_variables: bool = False
 
-    ga_generator: Optional[CNSGAGenerator] = Field(
+    ga_generator: CNSGAGenerator | None = Field(
         None, description="CNSGA generator used to generate candidates"
     )
 

@@ -2,13 +2,14 @@ import cProfile
 import logging
 import pstats
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from xopt import Evaluator, VOCS, Xopt
+from xopt import VOCS, Evaluator, Xopt
 from xopt.generators.bayesian import MOBOGenerator
 from xopt.resources.test_functions.multi_objective import DTLZ2, LinearMO, QuadraticMO
 from xopt.resources.test_functions.tnk import (

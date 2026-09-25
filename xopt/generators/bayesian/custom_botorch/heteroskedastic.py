@@ -1,4 +1,4 @@
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 import torch
 from botorch.models import SingleTaskGP
@@ -9,8 +9,8 @@ from botorch.models.utils import validate_input_scaling
 from gpytorch.constraints.constraints import GreaterThan
 from gpytorch.distributions.multivariate_normal import MultivariateNormal
 from gpytorch.likelihoods.gaussian_likelihood import (
-    _GaussianLikelihoodBase,
     GaussianLikelihood,
+    _GaussianLikelihoodBase,
 )
 from gpytorch.likelihoods.noise_models import HeteroskedasticNoise
 from gpytorch.means.mean import Mean
@@ -52,10 +52,10 @@ class XoptHeteroskedasticSingleTaskGP(BatchedMultiOutputGPyTorchModel, ExactGP):
         train_X: Tensor,
         train_Y: Tensor,
         train_Yvar: Tensor,
-        outcome_transform: Optional[OutcomeTransform] = None,
-        input_transform: Optional[InputTransform] = None,
-        mean_module: Optional[Mean] = None,
-        covar_module: Optional[Module] = None,
+        outcome_transform: OutcomeTransform | None = None,
+        input_transform: InputTransform | None = None,
+        mean_module: Mean | None = None,
+        covar_module: Module | None = None,
     ) -> None:
         r"""
         Args:

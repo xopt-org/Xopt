@@ -1,12 +1,14 @@
 import json
 import logging
 import os
+import warnings
 from copy import deepcopy
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import yaml
+from gest_api.vocs import VOCS
 from pandas import DataFrame
 from pydantic import (
     Field,
@@ -15,7 +17,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-import warnings
 
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator, validate_outputs
@@ -23,19 +24,17 @@ from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator
 from xopt.generators.sequential import SequentialGenerator
 from xopt.pydantic import XoptBaseModel
-from xopt.utils import explode_all_columns, get_generator_name
-from xopt.vocs import (
-    ContextualVariable,
-    validate_input_data,
-    random_inputs,
-    grid_inputs,
-)
-from gest_api.vocs import VOCS
 from xopt.stopping_conditions import (
     MaxEvaluationsCondition,
     StoppingConditionUnion,
 )
-
+from xopt.utils import explode_all_columns, get_generator_name
+from xopt.vocs import (
+    ContextualVariable,
+    grid_inputs,
+    random_inputs,
+    validate_input_data,
+)
 
 from .errors import DataError
 
@@ -116,7 +115,7 @@ class Xopt(XoptBaseModel):
         Serializes the Xopt configuration to a JSON string.
     """
 
-    generator: Union[SerializeAsAny[Generator], Any] = Field(
+    generator: SerializeAsAny[Generator] | Any = Field(
         description="generator object for Xopt"
     )
     evaluator: SerializeAsAny[Evaluator] = Field(
@@ -127,13 +126,13 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if exceptions raised during evaluation "
         "should stop Xopt",
     )
-    xopt_dump_file: Optional[str] = Field(
+    xopt_dump_file: str | None = Field(
         None, description="file to dump the serialized Xopt object to"
     )
-    data_dump_file: Optional[str] = Field(
+    data_dump_file: str | None = Field(
         None, description="file to dump the evaluation data to as CSV"
     )
-    data: Optional[DataFrame] = Field(None, description="internal DataFrame object")
+    data: DataFrame | None = Field(None, description="internal DataFrame object")
     serialize_torch: bool = Field(
         False,
         description="flag to indicate that torch models should be serialized "
@@ -144,7 +143,7 @@ class Xopt(XoptBaseModel):
         description="flag to indicate if torch models"
         " should be stored inside main config file",
     )
-    stopping_condition: Optional[StoppingConditionUnion] = Field(
+    stopping_condition: StoppingConditionUnion | None = Field(
         None,
         description="optional stopping condition to check during optimization",
     )
@@ -157,7 +156,7 @@ class Xopt(XoptBaseModel):
         """
         if isinstance(data, dict):
             # Handle Xopt 2.x style VOCS definition
-            if "vocs" in data.keys():
+            if "vocs" in data:
                 generator = data["generator"]
 
                 # Move 2.x VOCS definition into generator dict definition if able
@@ -218,9 +217,8 @@ class Xopt(XoptBaseModel):
                 v = v.sort_index()
             except IndexError:
                 v = pd.DataFrame(v, index=[0])
-        elif isinstance(v, DataFrame):
-            if not pd.api.types.is_integer_dtype(v.index):
-                raise ValueError("dataframe index must be integer")
+        elif isinstance(v, DataFrame) and not pd.api.types.is_integer_dtype(v.index):
+            raise ValueError("dataframe index must be integer")
         # also add data to generator
         # TODO: find a more robust way of doing this
         generator = info.data["generator"]
@@ -278,12 +276,12 @@ class Xopt(XoptBaseModel):
         return data
 
     @property
-    def dump_file(self) -> Optional[str]:
+    def dump_file(self) -> str | None:
         warnings.warn(DUMP_FILE_RENAME_MESSAGE, DeprecationWarning, stacklevel=2)
         return self.xopt_dump_file
 
     @dump_file.setter
-    def dump_file(self, value: Optional[str]):
+    def dump_file(self, value: str | None):
         warnings.warn(DUMP_FILE_RENAME_MESSAGE, DeprecationWarning, stacklevel=2)
         self.xopt_dump_file = value
 
@@ -390,12 +388,13 @@ class Xopt(XoptBaseModel):
 
         while True:
             # Check custom stopping condition
-            if self.stopping_condition is not None:
-                if self.data is not None and self.stopping_condition.should_stop(
-                    self.data, self.vocs
-                ):
-                    logger.info("Xopt is done. Stopping condition met.")
-                    break
+            if (
+                self.stopping_condition is not None
+                and self.data is not None
+                and self.stopping_condition.should_stop(self.data, self.vocs)
+            ):
+                logger.info("Xopt is done. Stopping condition met.")
+                break
 
             self.step()
 
@@ -429,12 +428,10 @@ class Xopt(XoptBaseModel):
 
     def evaluate_data(
         self,
-        input_data: Union[
-            pd.DataFrame,
-            list[dict[str, float]],
-            dict[str, list[float]],
-            dict[str, float],
-        ],
+        input_data: pd.DataFrame
+        | list[dict[str, float]]
+        | dict[str, list[float]]
+        | dict[str, float],
     ) -> pd.DataFrame:
         """
         Evaluate data using the evaluator and wait for results.
@@ -470,9 +467,8 @@ class Xopt(XoptBaseModel):
             input_data[name] = const.value
 
         # if we are using a sequential generator that is active, make sure that the evaluated data matches the last candidate
-        if isinstance(self.generator, SequentialGenerator):
-            if self.generator.is_active:
-                self.generator.validate_point(input_data)
+        if isinstance(self.generator, SequentialGenerator) and self.generator.is_active:
+            self.generator.validate_point(input_data)
 
         output_data = self.evaluator.evaluate_data(input_data)
 
@@ -536,9 +532,9 @@ class Xopt(XoptBaseModel):
         # Pass data to generator, continue in case of invalid data when strict=False
         try:
             self.generator.ingest(new_data.to_dict(orient="records"))
-        except DataError as exc:
+        except DataError:
             if self.strict:
-                raise exc
+                raise
 
     def reset_data(self):
         """
@@ -550,7 +546,7 @@ class Xopt(XoptBaseModel):
 
     def remove_data(
         self, indices: list[int], inplace: bool = True
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Removes data from the `X.data` data storage attribute.
 
@@ -581,7 +577,7 @@ class Xopt(XoptBaseModel):
         self,
         n_samples=None,
         seed=None,
-        custom_bounds: dict = None,
+        custom_bounds: dict | None = None,
     ):
         """
         Convenience method to generate random inputs using VOCS and evaluate them.
@@ -618,8 +614,8 @@ class Xopt(XoptBaseModel):
 
     def grid_evaluate(
         self,
-        n_samples: Union[int, dict[str, int]],
-        custom_bounds: dict = None,
+        n_samples: int | dict[str, int],
+        custom_bounds: dict | None = None,
     ):
         """
         Evaluate a meshgrid of points using the VOCS and add the results to the internal
@@ -668,7 +664,7 @@ class Xopt(XoptBaseModel):
         )
         return yaml.dump(output)
 
-    def dump(self, file: str = None, **kwargs):
+    def dump(self, file: str | None = None, **kwargs):
         """
         Dump the Xopt configuration and data to a YAML file.
 
@@ -772,11 +768,13 @@ class Xopt(XoptBaseModel):
             json.loads(self.data.to_json()) if self.data is not None else None
         )
 
-        if "stopping_condition" in dict_result:
-            if dict_result["stopping_condition"] is not None:
-                dict_result["stopping_condition"] = {
-                    "name": self.stopping_condition.__class__.__name__
-                } | dict_result["stopping_condition"]
+        if (
+            "stopping_condition" in dict_result
+            and dict_result["stopping_condition"] is not None
+        ):
+            dict_result["stopping_condition"] = {
+                "name": self.stopping_condition.__class__.__name__
+            } | dict_result["stopping_condition"]
 
         # TODO: implement version checking
         # dict_result["xopt_version"] = __version__

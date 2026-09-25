@@ -3,16 +3,16 @@ import pandas as pd
 import pytest
 import torch
 from torch import nn
+
 from xopt import VOCS
 from xopt.generators.random import RandomGenerator
-
 from xopt.resources import testing as testing_utils
 
 
 def test_ackley_evaluation():
     from xopt.resources.test_functions.ackley_20 import (
-        evaluate_ackley_np,
         evaluate_ackley,
+        evaluate_ackley_np,
     )
 
     x = {f"x{i}": 0.0 for i in range(20)}
@@ -109,9 +109,9 @@ def test_multi_objective_problems():
         )
         assert isinstance(ele.bounds, list)
         assert isinstance(ele.bounds_numpy, np.ndarray)
-        assert isinstance(ele.optimal_value, type(None))
+        assert ele.optimal_value is None
 
-    DTLZ2()._max_hv
+    _ = DTLZ2()._max_hv
 
 
 class _SlotOnly:

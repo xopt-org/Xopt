@@ -1,15 +1,16 @@
 from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from xopt import Evaluator, VOCS, Xopt
-from xopt.vocs import select_best, get_variable_data
+from xopt import VOCS, Evaluator, Xopt
 from xopt.errors import SeqGeneratorError
-from xopt.generators.sequential.rcds import RCDSGenerator
 from xopt.generators.sequential import rcds
+from xopt.generators.sequential.rcds import RCDSGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
+from xopt.vocs import get_variable_data, select_best
 
 
 def f_RCDS_minimize(input_dict):

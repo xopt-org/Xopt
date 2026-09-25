@@ -1,4 +1,6 @@
-from typing import Any, Hashable
+from collections.abc import Hashable
+from typing import Any
+
 from xopt.generator import Generator
 from xopt.vocs import random_inputs
 

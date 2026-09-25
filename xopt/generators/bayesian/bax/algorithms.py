@@ -5,6 +5,7 @@ import torch
 from botorch.models.model import Model, ModelList
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
 from torch import Tensor
+
 from xopt.pydantic import XoptBaseModel
 
 

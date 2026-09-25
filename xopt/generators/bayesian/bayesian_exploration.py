@@ -1,13 +1,11 @@
-from typing import Optional
-
 from botorch.acquisition import MCAcquisitionFunction, MCAcquisitionObjective
 from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
 from botorch.sampling import MCSampler
 from botorch.utils.transforms import concatenate_pending_points, t_batch_mode_transform
+from gest_api.vocs import ExploreObjective
 from pydantic import field_validator
 from torch import Tensor
-from gest_api.vocs import ExploreObjective
 
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bayesian_generator import (
@@ -92,10 +90,10 @@ class qPosteriorVariance(MCAcquisitionFunction):
     def __init__(
         self,
         model: Model,
-        sampler: Optional[MCSampler] = None,
-        objective: Optional[MCAcquisitionObjective] = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
-        X_pending: Optional[Tensor] = None,
+        sampler: MCSampler | None = None,
+        objective: MCAcquisitionObjective | None = None,
+        posterior_transform: PosteriorTransform | None = None,
+        X_pending: Tensor | None = None,
     ) -> None:
         super().__init__(
             model=model,

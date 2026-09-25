@@ -1,13 +1,14 @@
-import pytest
 from copy import deepcopy
-import numpy as np
+
 import matplotlib
+import numpy as np
+import pytest
 
 matplotlib.use("Agg")  # Use non-interactive backend for tests
 from xopt.base import Xopt
-from xopt.generators.bayesian.bax.visualize import visualize_virtual_objective
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
+from xopt.generators.bayesian.bax.visualize import visualize_virtual_objective
 from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 

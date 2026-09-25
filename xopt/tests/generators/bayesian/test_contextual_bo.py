@@ -1,19 +1,20 @@
+import numpy as np
 import pandas as pd
+import pytest
+import torch
+
 from xopt import Xopt
+from xopt.errors import VOCSError
+from xopt.evaluator import Evaluator
 from xopt.generators.bayesian import (
     ExpectedImprovementGenerator,
 )
-from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.turbo import OptimizeTurboController
 from xopt.generators.bayesian.upper_confidence_bound import (
     UpperConfidenceBoundGenerator,
 )
-from xopt.generators.bayesian.turbo import OptimizeTurboController
 from xopt.generators.bayesian.utils import validate_turbo_controller_center
-from xopt.errors import VOCSError
 from xopt.vocs import VOCS, ContextualVariable, convert_dataframe_to_inputs
-import pytest
-import torch
-import numpy as np
 
 
 def _contextual_eval_for_yaml_roundtrip(inputs):

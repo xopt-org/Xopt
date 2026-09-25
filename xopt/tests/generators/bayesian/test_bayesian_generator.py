@@ -1,29 +1,28 @@
-from copy import deepcopy
 import os
+from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-from pydantic import ValidationInfo
 import pytest
 import torch
-from torch.nn import Module
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
-
+from pydantic import ValidationInfo
+from torch.nn import Module
 
 from xopt import VOCS
 from xopt.base import Xopt
 from xopt.errors import VOCSError, XoptError
 from xopt.evaluator import Evaluator
-from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
 )
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
 )
@@ -441,9 +440,9 @@ class TestBayesianGenerator(TestCase):
                 "_get_initial_conditions",
                 return_value=torch.zeros(1, 1, 2),
             ),
+            pytest.raises(ValueError, match="grid optimizer does not support"),
         ):
-            with pytest.raises(ValueError, match="grid optimizer does not support"):
-                gen.propose_candidates(MagicMock(), n_candidates=1)
+            gen.propose_candidates(MagicMock(), n_candidates=1)
 
     def test_model_constructor_discrete_bounds(self):
         class _CaptureBoundsModelConstructor(ModelConstructor):
@@ -518,12 +517,10 @@ class TestBayesianGenerator(TestCase):
     @patch.multiple(MultiObjectivePatchBayesianGenerator, __abstractmethods__=set())
     def test_bad_mo_vocs(self):
         vocs = VOCS(
-            **{
-                "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
-                "objectives": {"y1": "MINIMIZE"},
-                "constraints": {"c1": ["GREATER_THAN", 0.5]},
-                "constants": {"constant1": 1.0},
-            }
+            variables={"x1": [0, 1.0], "x2": [0, 10.0]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0.5]},
+            constants={"constant1": 1.0},
         )
         vocs2 = vocs.model_copy()
         vocs2.objectives = {"y1": "MINIMIZE", "y2": "MAXIMIZE"}

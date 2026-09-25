@@ -2,12 +2,13 @@ import pickle
 
 import numpy as np
 import pytest
+
+from xopt import Evaluator, Xopt
 from xopt.generators.sequential import (
-    RCDSGenerator,
     ExtremumSeekingGenerator,
     NelderMeadGenerator,
+    RCDSGenerator,
 )
-from xopt import Evaluator, Xopt
 from xopt.vocs import VOCS
 
 

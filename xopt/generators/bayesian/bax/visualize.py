@@ -1,6 +1,6 @@
 import torch
-from matplotlib import pyplot as plt
 from botorch.models import ModelListGP, SingleTaskGP
+from matplotlib import pyplot as plt
 
 from xopt.generators.bayesian.visualize import (
     _generate_input_mesh,
@@ -10,12 +10,12 @@ from xopt.generators.bayesian.visualize import (
 
 def visualize_virtual_objective(
     generator,
-    variable_names: list[str] = None,
+    variable_names: list[str] | None = None,
     idx: int = -1,
-    reference_point: dict = None,
+    reference_point: dict | None = None,
     n_grid: int = 50,
     n_samples: int = 100,
-    kwargs: dict = None,
+    kwargs: dict | None = None,
 ) -> tuple:
     """
     Displays BAX's virtual objective predictions computed from samples drawn
@@ -25,13 +25,13 @@ def visualize_virtual_objective(
     ----------
     generator : Generator
         Bayesian generator object.
-    variable_names : List[str]
+    variable_names : list[str] | None
         The variables with respect to which the GP models are displayed (maximum
         of 2). Defaults to generator.vocs.variable_names.
     idx : int
         Index of the last sample to use. This also selects the point of reference in
         higher dimensions unless an explicit reference_point is given.
-    reference_point : dict
+    reference_point : dict | None
         Reference point determining the value of variables in
         generator.vocs.variable_names, but not in variable_names (slice plots in
         higher dimensions). Defaults to last used sample.
@@ -39,7 +39,7 @@ def visualize_virtual_objective(
         Number of grid points per dimension used to display the model predictions.
     n_samples : int, optional
         Number of virtual objective samples to evaluate for each point in the scan.
-    kwargs : dict, optional
+    kwargs : dict | None, optional
         Additional keyword arguments for evaluating the virtual objective.
 
     Returns
@@ -60,7 +60,7 @@ def visualize_virtual_objective(
         )
 
     # validate variable names
-    invalid = [name not in getattr(vocs, "variable_names") for name in variable_names]
+    invalid = [name not in vocs.variable_names for name in variable_names]
     if any(invalid):
         invalid_names = [
             variable_names[i] for i in range(len(variable_names)) if invalid[i]
@@ -70,9 +70,7 @@ def visualize_virtual_objective(
         )
 
     # validate reference point keys
-    invalid = [
-        name not in getattr(vocs, "variable_names") for name in [*reference_point]
-    ]
+    invalid = [name not in vocs.variable_names for name in [*reference_point]]
     if any(invalid):
         invalid_names = [
             [*reference_point][i] for i in range(len([*reference_point])) if invalid[i]

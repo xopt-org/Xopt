@@ -19,15 +19,11 @@ class VOCSError(Exception):
     Exception for when VOCS are invalid for the generator being initialized.
     """
 
-    pass
-
 
 class DataError(Exception):
     """
     Exception related to data being passed to Xopt or Generator objects from user.
     """
-
-    pass
 
 
 class XoptWarning(Warning):

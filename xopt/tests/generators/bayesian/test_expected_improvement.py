@@ -1,11 +1,10 @@
 from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 import pytest
 import torch
-from botorch.acquisition import ExpectedImprovement
-from botorch.acquisition import FixedFeatureAcquisitionFunction
-
+from botorch.acquisition import ExpectedImprovement, FixedFeatureAcquisitionFunction
 from gest_api.vocs import (
     VOCS,
 )
@@ -90,7 +89,7 @@ class TestExpectedImprovement:
         train_data = pd.DataFrame(
             {"x1": train_x.numpy(), "y1": train_y.numpy(), "c1": train_c.numpy()}
         )
-        vocs = VOCS(**{"variables": {"x1": [0.0, 1.0]}, "observables": ["y1", "c1"]})
+        vocs = VOCS(variables={"x1": [0.0, 1.0]}, observables=["y1", "c1"])
 
         class MyObjective(CustomXoptObjective):
             def forward(self, samples, X=None):
@@ -122,9 +121,7 @@ class TestExpectedImprovement:
         test_x = torch.linspace(0.0, 1.0, 1000)
 
         for objective in ["MINIMIZE", "MAXIMIZE"]:
-            vocs = VOCS(
-                **{"variables": {"x1": [0.0, 1.0]}, "objectives": {"y1": objective}}
-            )
+            vocs = VOCS(variables={"x1": [0.0, 1.0]}, objectives={"y1": objective})
             gen = ExpectedImprovementGenerator(vocs=vocs)
             set_options(gen)
             gen.n_monte_carlo_samples = 512
@@ -156,11 +153,9 @@ class TestExpectedImprovement:
 
         # test with constraints
         vocs = VOCS(
-            **{
-                "variables": {"x1": [0.0, 1.0]},
-                "objectives": {"y1": "MAXIMIZE"},
-                "constraints": {"c1": ["GREATER_THAN", 0.0]},
-            }
+            variables={"x1": [0.0, 1.0]},
+            objectives={"y1": "MAXIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0.0]},
         )
         gen = ExpectedImprovementGenerator(vocs=vocs)
         set_options(gen)
@@ -176,17 +171,12 @@ class TestExpectedImprovement:
         # acquisition function should be nearly identical to unconstrained
         # case if the constraint is always satisfied
         vocs_unconstrained = VOCS(
-            **{
-                "variables": {"x1": [0.0, 1.0]},
-                "objectives": {"y1": "MAXIMIZE"},
-            }
+            variables={"x1": [0.0, 1.0]}, objectives={"y1": "MAXIMIZE"}
         )
         vocs_always_satisfied = VOCS(
-            **{
-                "variables": {"x1": [0.0, 1.0]},
-                "objectives": {"y1": "MAXIMIZE"},
-                "constraints": {"c1": ["LESS_THAN", 100]},
-            }
+            variables={"x1": [0.0, 1.0]},
+            objectives={"y1": "MAXIMIZE"},
+            constraints={"c1": ["LESS_THAN", 100]},
         )
         acq_values = []
         for v in [vocs_unconstrained, vocs_always_satisfied]:
@@ -204,11 +194,9 @@ class TestExpectedImprovement:
 
         # if no values satisfy the constraint, EI should raise an error
         vocs_never_satisfied = VOCS(
-            **{
-                "variables": {"x1": [0.0, 1.0]},
-                "objectives": {"y1": "MAXIMIZE"},
-                "constraints": {"c1": ["GREATER_THAN", 2.0]},
-            }
+            variables={"x1": [0.0, 1.0]},
+            objectives={"y1": "MAXIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 2.0]},
         )
         gen = ExpectedImprovementGenerator(vocs=vocs_never_satisfied)
         set_options(gen)

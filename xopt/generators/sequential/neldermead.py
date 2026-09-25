@@ -1,7 +1,6 @@
 import logging
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -23,19 +22,19 @@ class SimplexState(XoptBaseModel):
     """Container model for all simplex parameters"""
 
     astg: int = -1
-    N: Optional[int] = None
+    N: int | None = None
     kend: int = 0
     jend: int = 0
-    ind: Optional[np.ndarray] = None
-    sim: Optional[np.ndarray] = None
-    fsim: Optional[np.ndarray] = None
-    fxr: Optional[float] = None
-    x: Optional[np.ndarray] = None
-    xr: Optional[np.ndarray] = None
-    xe: Optional[np.ndarray] = None
-    xc: Optional[np.ndarray] = None
-    xcc: Optional[np.ndarray] = None
-    xbar: Optional[np.ndarray] = None
+    ind: np.ndarray | None = None
+    sim: np.ndarray | None = None
+    fsim: np.ndarray | None = None
+    fxr: float | None = None
+    x: np.ndarray | None = None
+    xr: np.ndarray | None = None
+    xe: np.ndarray | None = None
+    xc: np.ndarray | None = None
+    xcc: np.ndarray | None = None
+    xbar: np.ndarray | None = None
     doshrink: int = 0
     ngen: int = 0
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -106,8 +105,8 @@ class NelderMeadGenerator(SequentialGenerator):
     name = "neldermead"
     supports_single_objective: bool = True
 
-    initial_point: Optional[Dict[str, float]] = None  # replaces x0 argument
-    initial_simplex: Optional[Dict[str, Union[List[float], np.ndarray]]] = (
+    initial_point: dict[str, float] | None = None  # replaces x0 argument
+    initial_simplex: dict[str, list[float] | np.ndarray] | None = (
         None  # This overrides the use of initial_point
     )
     # Same as scipy.optimize._optimize._minimize_neldermead
@@ -115,11 +114,11 @@ class NelderMeadGenerator(SequentialGenerator):
         True, description="Change hyperparameters based on dimensionality"
     )
     current_state: SimplexState = SimplexState()
-    future_state: Optional[SimplexState] = None
+    future_state: SimplexState | None = None
 
     # Internal data structures
-    x: Optional[np.ndarray] = None
-    y: Optional[float] = None
+    x: np.ndarray | None = None
+    y: float | None = None
     manual_data_cnt: int = Field(
         0, description="How many points are considered manual/not part of simplex run"
     )
@@ -130,7 +129,7 @@ class NelderMeadGenerator(SequentialGenerator):
 
     _initial_simplex = None
     _initial_point = None
-    _saved_options: Dict = None
+    _saved_options: dict = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -146,7 +145,7 @@ class NelderMeadGenerator(SequentialGenerator):
         else:
             self._initial_simplex = None
 
-    def _generate(self, first_gen: bool = False) -> Optional[List[Dict[str, float]]]:
+    def _generate(self, first_gen: bool = False) -> list[dict[str, float]] | None:
         """
         Generate candidate.
 
@@ -304,7 +303,7 @@ class NelderMeadGenerator(SequentialGenerator):
         return results
 
     @property
-    def simplex(self) -> Dict[str, np.ndarray]:
+    def simplex(self) -> dict[str, np.ndarray]:
         """
         Returns the simplex in the current state.
 
@@ -354,12 +353,12 @@ def _fake_partial_state_gen(sim: np.ndarray, fsim: np.ndarray):
 def _neldermead_generator(
     x0: np.ndarray,
     state: SimplexState,
-    lastval: Optional[float] = None,
-    initial_simplex: Optional[np.ndarray] = None,
+    lastval: float | None = None,
+    initial_simplex: np.ndarray | None = None,
     adaptive: bool = True,
-    bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    bounds: tuple[np.ndarray, np.ndarray] | None = None,
     trace: bool = False,
-) -> Optional[Tuple[np.ndarray, Tuple]]:
+) -> tuple[np.ndarray, tuple] | None:
     """
     Modification of scipy.optimize._optimize._minimize_neldermead
     https://github.com/scipy/scipy/blob/4cf21e753cf937d1c6c2d2a0e372fbc1dbbeea81/scipy/optimize/_optimize.py#L635

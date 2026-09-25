@@ -1,14 +1,12 @@
-import pytest
-import torch
-from torch import Tensor
+import functools
 from unittest.mock import MagicMock, patch
 
-from gest_api.vocs import LessThanConstraint, GreaterThanConstraint
+import pytest
+import torch
+from gest_api.vocs import GreaterThanConstraint, LessThanConstraint
+from torch import Tensor
 
-from xopt.generators.bayesian.objectives import feasibility
-from xopt.generators.bayesian.objectives import create_constraint_callables
-import functools
-
+from xopt.generators.bayesian.objectives import create_constraint_callables, feasibility
 from xopt.vocs import VOCS
 
 

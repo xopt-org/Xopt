@@ -4,7 +4,6 @@ import sys
 
 import pandas as pd
 import pytest
-
 import torch
 
 from xopt.resources.bench_framework import BenchMOBO

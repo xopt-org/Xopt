@@ -1,5 +1,3 @@
-from typing import Dict
-
 from xopt import VOCS
 
 
@@ -24,11 +22,11 @@ def rosenbrock(x):
     n = len(x)
 
     return sum(
-        (100 * (x[i + 1] - x[i] ** 2) ** 2 + (1 - x[i]) ** 2 for i in range(n - 1))
+        100 * (x[i + 1] - x[i] ** 2) ** 2 + (1 - x[i]) ** 2 for i in range(n - 1)
     )
 
 
-def evaluate_rosenbrock(inputs: Dict, label="y", dummy=1) -> Dict[str, float]:
+def evaluate_rosenbrock(inputs: dict, label="y", dummy=1) -> dict[str, float]:
     """
     Evaluate the Rosenbrock function with labeled inputs and outputs.
 

@@ -17,13 +17,11 @@ repos:
         exclude: "^(python/versioneer.py|python/xopt/_version.py)$"
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.0
+    rev: v0.16.8
     hooks:
       - id: ruff-check
         args: [--fix]
-        types_or: [python, pyi, jupyter]
       - id: ruff-format
-        types_or: [python, pyi, jupyter]
 
   - repo: local
     hooks:
@@ -35,7 +33,7 @@ repos:
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
         exclude: "^.*(TODO|TODO2).ipynb$"
   # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.19.1
+  #   rev: v2.3.1
   #   hooks:
   #     - id: mypy
   #       args: [--strict, --ignore-missing-imports]

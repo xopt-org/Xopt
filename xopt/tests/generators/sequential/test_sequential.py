@@ -1,6 +1,6 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.sequential_generator import SequentialGenerator

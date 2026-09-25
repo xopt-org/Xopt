@@ -1,20 +1,19 @@
-from copy import deepcopy
-from pydantic import BaseModel
-from typing import List, Tuple
 import datetime
 import importlib
 import inspect
 import logging
-import numpy as np
 import os
-import pandas as pd
 import sys
 import time
-import torch
 import traceback
-import yaml
+from copy import deepcopy
 
+import numpy as np
+import pandas as pd
+import torch
+import yaml
 from gest_api.vocs import VOCS, GreaterThanConstraint
+from pydantic import BaseModel
 
 from .generator import Generator
 from .pydantic import get_descriptions_defaults
@@ -50,7 +49,7 @@ def add_constraint_information(data: pd.DataFrame, vocs: VOCS) -> pd.DataFrame:
 
 def isotime(include_microseconds=False):
     """UTC to ISO 8601 with Local TimeZone information without microsecond"""
-    t = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).astimezone()
+    t = datetime.datetime.utcnow().replace(tzinfo=datetime.UTC).astimezone()
     if not include_microseconds:
         t = t.replace(microsecond=0)
 
@@ -74,7 +73,7 @@ def get_function(name):
         return name
 
     if not isinstance(name, str):
-        raise ValueError(f"{name} must be callable or a string.")
+        raise TypeError(f"{name} must be callable or a string.")
 
     if name in globals():
         if callable(globals()[name]):
@@ -101,10 +100,11 @@ def get_function_defaults(f):
     """
     defaults = {}
     for k, v in inspect.signature(f).parameters.items():
-        if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-            # print(k, v.default, v.kind)
-            if v.default != inspect.Parameter.empty:
-                defaults[k] = v.default
+        if (
+            v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
+            and v.default != inspect.Parameter.empty
+        ):
+            defaults[k] = v.default
     return defaults
 
 
@@ -113,10 +113,12 @@ def get_n_required_fuction_arguments(f):
     Counts the number of required function arguments using the `inspect` module.
     """
     n = 0
-    for k, v in inspect.signature(f).parameters.items():
-        if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-            if v.default == inspect.Parameter.empty:
-                n += 1
+    for v in inspect.signature(f).parameters.values():
+        if (
+            v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
+            and v.default == inspect.Parameter.empty
+        ):
+            n += 1
     return n
 
 
@@ -168,7 +170,7 @@ def format_option_descriptions(options_object):
     return "\n\nGenerator Options\n" + yaml.dump(options_dict)
 
 
-def copy_generator(generator: Generator) -> Tuple[Generator, List[str]]:
+def copy_generator(generator: Generator) -> tuple[Generator, list[str]]:
     """
     Create a deep copy of a given generator.
     Moves any data saved on the gpu in the deepcopy of the generator to the cpu.
@@ -191,7 +193,7 @@ def copy_generator(generator: Generator) -> Tuple[Generator, List[str]]:
 
 def recursive_move_data_gpu_to_cpu(
     pydantic_object: BaseModel,
-) -> Tuple[BaseModel, List[str]]:
+) -> tuple[BaseModel, list[str]]:
     """
     A recersive method to find all the data of a pydantic object
     which is stored on the gpu and then move that data to the cpu.
@@ -218,10 +220,11 @@ def recursive_move_data_gpu_to_cpu(
             if field_value.device.type == "cuda":
                 pydantic_object_dict[field_name] = field_value.cpu()
                 list_of_fields_on_gpu.append(field_name)
-        elif isinstance(field_value, torch.nn.Module):
-            if has_device_field(field_value, torch.device("cuda")):
-                pydantic_object_dict[field_name] = field_value.cpu()
-                list_of_fields_on_gpu.append(field_name)
+        elif isinstance(field_value, torch.nn.Module) and has_device_field(
+            field_value, torch.device("cuda")
+        ):
+            pydantic_object_dict[field_name] = field_value.cpu()
+            list_of_fields_on_gpu.append(field_name)
 
     return pydantic_object, list_of_fields_on_gpu
 
@@ -310,7 +313,7 @@ def nsga2_to_cnsga_file_format(
 
         # Build filename
         timestamp = (
-            datetime.datetime.fromtimestamp(int(generation), tz=datetime.timezone.utc)
+            datetime.datetime.fromtimestamp(int(generation), tz=datetime.UTC)
             .isoformat()
             .replace(":", "_")
         )
@@ -335,9 +338,7 @@ def nsga2_to_cnsga_file_format(
         # have the same timestamp as the completed generation, the `xopt_parent_generation` needs
         # additional factor of one.
         timestamp = (
-            datetime.datetime.fromtimestamp(
-                int(generation) + 1, tz=datetime.timezone.utc
-            )
+            datetime.datetime.fromtimestamp(int(generation) + 1, tz=datetime.UTC)
             .isoformat()
             .replace(":", "_")
         )
@@ -346,13 +347,13 @@ def nsga2_to_cnsga_file_format(
 
         # Write generation data to file
         gen_pop.to_csv(filename, index_label="xopt_index")
-        logging.debug(
+        logger.debug(
             f'Saved offspring file for generation {generation} to "{filename}"'
         )
         offsprings += 1
 
     # Some logging
-    logging.info(
+    logger.info(
         f'Converted NSGA2Generator output "{input_dir}" to CNSGA2Generator format at "{output_dir}" ({generations} population files, {offsprings} offspring files, last_n_lines={last_n_lines})'
     )
 

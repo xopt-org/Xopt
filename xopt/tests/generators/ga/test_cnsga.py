@@ -1,19 +1,19 @@
+import os
+import tempfile
 from random import random
 
 import numpy as np
-import os
-import tempfile
 import pandas as pd
 import pytest
 
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
-from xopt.generators.ga.cnsga import CNSGAGenerator, uniform, cnsga_toolbox
-from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
+from xopt.generators.ga.cnsga import CNSGAGenerator, cnsga_toolbox, uniform
 from xopt.resources.test_functions.modified_tnk import (
     evaluate_modified_TNK,
     modified_tnk_vocs,
 )
+from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.stopping_conditions import MaxEvaluationsCondition
 
 

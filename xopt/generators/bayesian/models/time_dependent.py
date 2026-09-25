@@ -1,13 +1,13 @@
 from copy import deepcopy
-from typing import Dict, List, Union
 
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
+from gest_api.vocs import ContinuousVariable
 from gpytorch.kernels import (
+    MaternKernel,
     ProductKernel,
     SpectralMixtureKernel,
-    MaternKernel,
 )
 from gpytorch.priors import GammaPrior
 from pydantic import Field
@@ -15,7 +15,6 @@ from pydantic import Field
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.bayesian.utils import get_training_data
 from xopt.vocs import VOCS
-from gest_api.vocs import ContinuousVariable
 
 
 class TimeDependentModelConstructor(StandardModelConstructor):
@@ -45,12 +44,12 @@ class TimeDependentModelConstructor(StandardModelConstructor):
 
     def build_model(
         self,
-        input_names: List[str],
-        outcome_names: List[str],
+        input_names: list[str],
+        outcome_names: list[str],
         data: pd.DataFrame,
-        input_bounds: Dict[str, List] = None,
+        input_bounds: dict[str, list] = None,
         dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
+        device: torch.device | str = "cpu",
     ) -> ModelListGP:
         """
         Build the model.
@@ -132,7 +131,7 @@ class TimeDependentModelConstructor(StandardModelConstructor):
         vocs: VOCS,
         data: pd.DataFrame,
         dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
+        device: torch.device | str = "cpu",
     ) -> ModelListGP:
         """
         Build the model from VOCS.

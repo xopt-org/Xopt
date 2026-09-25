@@ -4,13 +4,12 @@ from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.vocs import VOCS
 
-
 __all__ = [
-    "Xopt",
     "VOCS",
-    "Generator",
-    "Evaluator",
     "AsynchronousXopt",
+    "Evaluator",
+    "Generator",
+    "Xopt",
 ]
 
 try:

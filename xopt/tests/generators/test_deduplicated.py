@@ -1,4 +1,5 @@
 import pytest
+
 from xopt.generators.deduplicated import DeduplicatedGeneratorBase
 from xopt.resources.test_functions.zdt import construct_zdt
 

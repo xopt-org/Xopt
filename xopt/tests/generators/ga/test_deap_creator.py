@@ -1,9 +1,10 @@
 import array
-import warnings
 import copy
+import warnings
+
 import pytest
 
-import xopt.generators.ga.deap_creator as deap_creator
+from xopt.generators.ga import deap_creator
 
 
 def test_array_deepcopy_and_reduce():
@@ -23,7 +24,7 @@ def test_array_deepcopy_and_reduce():
 def test_meta_create_and_create():
     # Create a new class with a static and instance attribute
     deap_creator.create("Foo", list, bar=dict, spam=1)
-    Foo = getattr(deap_creator, "Foo")
+    Foo = deap_creator.Foo
     f = Foo([1, 2, 3])
     assert isinstance(f, list)
     assert hasattr(f, "bar")
@@ -45,7 +46,7 @@ def test_class_replacers():
 def test_metacreator_reduce():
     # Create a class and check __reduce__
     deap_creator.create("Bar", list, baz=int)
-    Bar = getattr(deap_creator, "Bar")
+    Bar = deap_creator.Bar
     bar_instance = Bar([1, 2, 3])
     reduced = bar_instance.__reduce__()
     assert isinstance(reduced, tuple)

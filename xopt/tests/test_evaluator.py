@@ -1,14 +1,12 @@
-import pytest
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
-
-from xopt.vocs import random_inputs
+import pytest
 
 from xopt import Evaluator, Xopt
 from xopt.generators import RandomGenerator
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 class TestEvaluator:

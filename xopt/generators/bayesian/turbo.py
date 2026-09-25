@@ -1,10 +1,11 @@
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import torch
+from gest_api.vocs import VOCS, MinimizeObjective
 from pydantic import (
     Field,
     PositiveFloat,
@@ -16,19 +17,17 @@ from pydantic import (
 )
 from torch import Tensor
 
-from gest_api.vocs import VOCS, MinimizeObjective
-
 if TYPE_CHECKING:
     from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
+from xopt.errors import FeasibilityError
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
-from xopt.errors import FeasibilityError
 from xopt.vocs import (
     ContextualVariable,
     get_feasibility_data,
+    get_objective_data,
     get_variable_bounds_array,
     get_variable_data,
-    get_objective_data,
 )
 
 logger = logging.getLogger()
@@ -125,7 +124,7 @@ class TurboController(XoptBaseModel, ABC):
         validate_default=True,
     )
 
-    center_x: Optional[dict[str, float]] = Field(
+    center_x: dict[str, float] | None = Field(
         None, description="center point of trust region"
     )
     scale_factor: float = Field(
@@ -176,7 +175,7 @@ class TurboController(XoptBaseModel, ABC):
     @field_validator("center_x", mode="after")
     @classmethod
     def validate_center_x_variables(
-        cls, value: Optional[dict[str, float]], info: ValidationInfo
+        cls, value: dict[str, float] | None, info: ValidationInfo
     ):
         if value is None:
             return value
@@ -352,7 +351,6 @@ class TurboController(XoptBaseModel, ABC):
         previous_batch_size : int, optional
             The number of candidates in the previous batch evaluation, by default 1.
         """
-        pass
 
     def reset(self):
         """
@@ -396,7 +394,7 @@ class OptimizeTurboController(TurboController):
         frozen=True,
         description="name of the Turbo controller",
     )
-    best_value: Optional[float] = Field(
+    best_value: float | None = Field(
         None, description="best objective value found so far"
     )
 
@@ -597,7 +595,7 @@ class EntropyTurboController(TurboController):
     """
 
     name: str = Field("EntropyTurboController", frozen=True)
-    _best_entropy: Optional[float] = None
+    _best_entropy: float | None = None
 
     def update_state(
         self, generator: "BayesianGenerator", previous_batch_size: int = 1

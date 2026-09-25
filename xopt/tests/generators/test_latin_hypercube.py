@@ -2,9 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-from scipy.stats import qmc
-
 from gest_api.vocs import ContinuousVariable
+from scipy.stats import qmc
 
 from xopt.errors import VOCSError
 from xopt.generators.scipy.latin_hypercube import LatinHypercubeGenerator

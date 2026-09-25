@@ -1,20 +1,19 @@
 import concurrent
 import threading
-from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from pydantic import Field
 
-from xopt.base import logger, Xopt
+from xopt.base import Xopt, logger
 from xopt.errors import DataError
 from xopt.evaluator import validate_outputs
 from xopt.vocs import validate_input_data
 
 
 class AsynchronousXopt(Xopt):
-    _futures: Dict = None  # Will be initialized in __init__
+    _futures: dict = None  # Will be initialized in __init__
     _ix_last: int = 0
     _n_unfinished_futures: int = 0
     _input_data: DataFrame = None  # Will be initialized in __init__
@@ -33,12 +32,10 @@ class AsynchronousXopt(Xopt):
 
     def submit_data(
         self,
-        input_data: Union[
-            pd.DataFrame,
-            List[Dict[str, float]],
-            Dict[str, List[float]],
-            Dict[str, float],
-        ],
+        input_data: pd.DataFrame
+        | list[dict[str, float]]
+        | dict[str, list[float]]
+        | dict[str, float],
     ):
         """
         Submit data to evaluator and return futures indexed to internal futures list.
@@ -118,7 +115,7 @@ class AsynchronousXopt(Xopt):
         return_when = concurrent.futures.FIRST_COMPLETED
 
         # wait for futures to finish (depending on return_when)
-        finished_futures, unfinished_futures = concurrent.futures.wait(
+        _, unfinished_futures = concurrent.futures.wait(
             self._futures.values(), None, return_when
         )
 
@@ -225,9 +222,9 @@ class AsynchronousXopt(Xopt):
         # Continue in case of invalid data when strict=False
         try:
             self.generator.ingest(new_data.to_dict(orient="records"))
-        except DataError as exc:
+        except DataError:
             if self.strict:
-                raise exc
+                raise
 
     @property
     def data_lock(self):

@@ -2,7 +2,6 @@ import torch
 from botorch.models.transforms.input import InputTransform
 from botorch.models.transforms.outcome import OutcomeTransform
 from gpytorch.means import Mean
-from typing import List, Dict
 
 
 class CustomMean(Mean):
@@ -55,7 +54,7 @@ class CustomMean(Mean):
         """
         return self._model
 
-    def get_transformer_states(self) -> List[Dict[str, Dict[str, bool]]]:
+    def get_transformer_states(self) -> list[dict[str, dict[str, bool]]]:
         """
         Get the states of the transformers.
 
@@ -77,7 +76,7 @@ class CustomMean(Mean):
                 }
         return states
 
-    def set_transformer_states(self, states: List[Dict[str, Dict[str, bool]]]):
+    def set_transformer_states(self, states: list[dict[str, dict[str, bool]]]):
         """
         Set the states of the transformers.
 

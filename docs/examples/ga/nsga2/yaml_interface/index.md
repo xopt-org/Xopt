@@ -55,13 +55,15 @@ def eval_fun(in_dict: dict, n: int = 30) -> dict:
         The dictionary of objectives (f1, f2)
     """
     # Unpack the decision var dict
-    x = np.array([in_dict[f"x{idx}"] for idx in range(1, n+1)])
+    x = np.array([in_dict[f"x{idx}"] for idx in range(1, n + 1)])
 
     # Calculate objectives
     g = 1 + 9 * np.sum(x[1:], axis=0) / (n - 1)
     ret = {
         "f1": x[0].tolist(),
-        "f2": (g * (1 - np.sqrt(x[0] / g) - x[0] / g * np.sin(10 * np.pi * x[0]))).tolist(),
+        "f2": (
+            g * (1 - np.sqrt(x[0] / g) - x[0] / g * np.sin(10 * np.pi * x[0]))
+        ).tolist(),
     }
     return ret
 ```

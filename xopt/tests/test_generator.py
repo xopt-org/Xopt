@@ -1,7 +1,9 @@
 import json
 from copy import deepcopy
+
 import pandas as pd
 import pytest
+from gest_api.vocs import VOCS
 
 from xopt.errors import VOCSError
 from xopt.generator import Generator
@@ -13,7 +15,6 @@ from xopt.generators import (
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.vocs import ContextualVariable
-from gest_api.vocs import VOCS
 
 
 class PatchGenerator(Generator):

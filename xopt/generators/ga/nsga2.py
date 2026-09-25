@@ -1,26 +1,27 @@
-from itertools import chain
-from pydantic import Field, Discriminator, model_validator
-from typing import Annotated
-import numpy as np
-import pandas as pd
 import time
 import warnings
+from itertools import chain
+from typing import Annotated
+
+import numpy as np
+import pandas as pd
+from pydantic import Discriminator, Field, model_validator
 
 from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
+
 from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
 from ..utils import fast_dominated_argsort
 from .base import GAGeneratorBase
 from .operators import (
-    PolynomialMutation,
-    DummyMutation,
-    SimulatedBinaryCrossover,
-    DummyCrossover,
-    MutationOperator,
     CrossoverOperator,
+    DummyCrossover,
+    DummyMutation,
+    MutationOperator,
+    PolynomialMutation,
+    SimulatedBinaryCrossover,
 )
-
 
 ########################################################################################################################
 # Helper functions

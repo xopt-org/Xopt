@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple
 
 import numpy as np
 
@@ -37,10 +36,10 @@ class Problem(ABC):
         return np.vstack(self._bounds).T
 
     @abstractmethod
-    def _evaluate(self, x: np.ndarray, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
+    def _evaluate(self, x: np.ndarray, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         pass
 
-    def evaluate(self, x: np.ndarray, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
+    def evaluate(self, x: np.ndarray, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         assert x.shape[-1] == self.n_var, f"{x.shape[-1]} != {self.n_var}"
         size = x.shape[-1]
         for i in range(size):
@@ -50,7 +49,7 @@ class Problem(ABC):
                 raise ValueError(f"Input {x} lower than {self._bounds[i][0]}")
         return self._evaluate(x, **kwargs)
 
-    def evaluate_dict(self, inputs: Dict, **kwargs):
+    def evaluate_dict(self, inputs: dict, **kwargs):
         ind = np.array([inputs[f"x{i + 1}"] for i in range(self.n_var)])
         objectives, constraints = self.evaluate(ind[None, :], **kwargs)
         outputs = {}

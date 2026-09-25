@@ -1,8 +1,9 @@
 import importlib
 import logging
 import pickle
+from collections.abc import Hashable
 from copy import deepcopy
-from typing import Any, Hashable, Optional, cast
+from typing import Any, cast
 
 from botorch.models import ModelListGP, SingleTaskGP
 from gpytorch import Module
@@ -14,6 +15,7 @@ from pydantic import (
     model_validator,
 )
 from pydantic.fields import ModelPrivateAttr, PrivateAttr
+
 from xopt.errors import VOCSError
 from xopt.generators.bayesian.bax.acquisition import ModelListExpectedInformationGain
 from xopt.generators.bayesian.bax.algorithms import Algorithm, GridOptimize
@@ -66,10 +68,10 @@ class BaxGenerator(BayesianGenerator):
         default=GridOptimize(observable_names_ordered=[]),
         description="algorithm evaluated in the BAX process",
     )
-    algorithm_results: Optional[dict] = Field(
+    algorithm_results: dict | None = Field(
         None, description="dictionary results from algorithm", exclude=True
     )
-    algorithm_results_file: Optional[str] = Field(
+    algorithm_results_file: str | None = Field(
         None, description="file name to save algorithm results at every step"
     )
     _n_calls: int = 0

@@ -3,11 +3,9 @@ import numpy as np
 from xopt.vocs import VOCS
 
 sinusoid_vocs = VOCS(
-    **{
-        "variables": {"x1": [0, 1.75 * 3.14159]},
-        "objectives": {"y1": "MINIMIZE"},
-        "constraints": {"c1": ["GREATER_THAN", 0]},
-    }
+    variables={"x1": [0, 1.75 * 3.14159]},
+    objectives={"y1": "MINIMIZE"},
+    constraints={"c1": ["GREATER_THAN", 0]},
 )
 
 

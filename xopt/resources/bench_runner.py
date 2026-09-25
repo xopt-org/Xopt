@@ -1,7 +1,7 @@
 import argparse
 
-from xopt.resources.bench_framework import BenchDispatcher, BenchSuite
 import xopt.resources.bench_functions  # noqa: F401
+from xopt.resources.bench_framework import BenchDispatcher, BenchSuite
 
 
 def run_benchmark():

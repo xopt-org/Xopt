@@ -1,8 +1,10 @@
 import io
 import logging
-import tempfile
 import os
+import tempfile
+
 import pytest
+
 from xopt import log
 
 

@@ -4,12 +4,12 @@ import gpytorch
 import numpy as np
 import torch
 
-from xopt.generators.bayesian.utils import get_training_data_batched
-from xopt.resources.bench_framework import BenchDispatcher, generate_data, generate_vocs
 from xopt.generators.bayesian.models.standard import (
     BatchedModelConstructor,
     StandardModelConstructor,
 )
+from xopt.generators.bayesian.utils import get_training_data_batched
+from xopt.resources.bench_framework import BenchDispatcher, generate_data, generate_vocs
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -25,8 +25,9 @@ def preamble_build_model(verbose=False):
     # np.show_runtime()
     torch.set_num_threads(1)
     # botorch already uses same method internally, but force globally for other libs
-    import threadpoolctl
     from pprint import pprint
+
+    import threadpoolctl
 
     threadpoolctl.threadpool_limits(limits=1, user_api="blas")
     threadpoolctl.threadpool_limits(limits=1, user_api="openmp")
@@ -91,7 +92,7 @@ def bench_build_batched_botorch_patch(vocs, data, device):
         else:
             return values.clone().numpy(force=True).astype(dtype, copy=False)
 
-    import botorch.optim.closures as closures
+    from botorch.optim import closures
 
     closures.core.as_ndarray = as_ndarray
     device = torch.device(device)

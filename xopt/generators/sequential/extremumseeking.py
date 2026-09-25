@@ -1,11 +1,9 @@
-from typing import List, Dict
-
 import numpy as np
 import pandas as pd
 from pydantic import Field, PositiveFloat
 
-from xopt.vocs import get_variable_data, get_objective_data
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
+from xopt.vocs import get_objective_data, get_variable_data
 
 
 class ExtremumSeekingGenerator(SequentialGenerator):
@@ -150,7 +148,7 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         p_un_norm = p * self._p_diff / 2.0 + self._p_ave
         return p_un_norm
 
-    def _generate(self, first_gen: bool = False) -> List[Dict[str, float]]:
+    def _generate(self, first_gen: bool = False) -> list[dict[str, float]]:
         """
         Generate next candidate.
 
@@ -182,10 +180,8 @@ class ExtremumSeekingGenerator(SequentialGenerator):
                 ) * np.sqrt(self._aES[j] * self._wES[jw])
 
             # For each new ES value, check that we stay within min/max constraints
-            if p_next_n[j] < -1.0:
-                p_next_n[j] = -1.0
-            if p_next_n[j] > 1.0:
-                p_next_n[j] = 1.0
+            p_next_n[j] = max(p_next_n[j], -1.0)
+            p_next_n[j] = min(p_next_n[j], 1.0)
 
         p_next = self.p_un_normalize(p_next_n)
 

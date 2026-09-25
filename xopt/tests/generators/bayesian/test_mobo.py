@@ -10,7 +10,7 @@ from botorch.acquisition.multi_objective.logei import (
 )
 
 from xopt.base import Xopt
-from xopt.errors import XoptError, VOCSError
+from xopt.errors import VOCSError, XoptError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mobo import MOBOGenerator
 from xopt.generators.bayesian.models.standard import BatchedModelConstructor
@@ -26,8 +26,8 @@ from xopt.resources.testing import (
     TEST_VOCS_DATA_MO,
     TEST_VOCS_REF_POINT,
     check_dict_allclose,
-    check_generator_tensor_locations,
     check_dict_equal,
+    check_generator_tensor_locations,
     create_set_options_helper,
     reload_gen_from_json,
     reload_gen_from_yaml,

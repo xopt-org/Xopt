@@ -1,5 +1,5 @@
-from copy import deepcopy
 import json
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd

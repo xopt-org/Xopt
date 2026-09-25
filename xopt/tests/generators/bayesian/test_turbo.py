@@ -1,20 +1,18 @@
+import json
 import math
 import os
 from copy import deepcopy
 from unittest import TestCase
-import json
 
 import numpy as np
 import pandas as pd
 import pytest
 import torch
 import yaml
-
 from gest_api.vocs import VOCS
 
 from xopt import Evaluator, Xopt
 from xopt.errors import FeasibilityError
-from xopt.vocs import get_feasibility_data
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
@@ -25,6 +23,7 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
+from xopt.vocs import get_feasibility_data
 
 
 def sin_function(input_dict):

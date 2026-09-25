@@ -2,12 +2,11 @@ import time
 import warnings
 from abc import ABC
 from copy import copy
-from typing import Optional, List
 
 import pandas as pd
 import torch
 from botorch.acquisition import FixedFeatureAcquisitionFunction
-from pydantic import Field, ValidationInfo, field_validator, PositiveFloat
+from pydantic import Field, PositiveFloat, ValidationInfo, field_validator
 
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
@@ -47,7 +46,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
     name = "time_dependent_bayesian_generator"
     supports_single_objective: bool = True
     supports_constraints: bool = True
-    target_prediction_time: Optional[PositiveFloat] = Field(None)
+    target_prediction_time: PositiveFloat | None = Field(None)
     added_time: PositiveFloat = Field(
         0.1,
         description="time added to current time to get target prediction time",
@@ -57,7 +56,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
         TimeDependentModelConstructor(),
         description="constructor used to generate model",
     )
-    forgetting_time: Optional[PositiveFloat] = Field(
+    forgetting_time: PositiveFloat | None = Field(
         None, description="time period to forget historical data in seconds"
     )
 
@@ -70,7 +69,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
     @field_validator("gp_constructor", mode="before")
     def validate_gp_constructor(
-        cls, value: Optional[TimeDependentModelConstructor]
+        cls, value: TimeDependentModelConstructor | None
     ) -> TimeDependentModelConstructor:
         """
         Validate the Gaussian Process (GP) constructor.
@@ -129,7 +128,7 @@ class TimeDependentBayesianGenerator(BayesianGenerator, ABC):
 
         return new_data
 
-    def generate(self, n_candidates: int) -> List[dict]:
+    def generate(self, n_candidates: int) -> list[dict]:
         """
         Generate candidates for Bayesian Optimization.
 

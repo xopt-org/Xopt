@@ -88,7 +88,7 @@ else:
 class _array(array.array):
     @staticmethod
     def __new__(cls, seq=()):
-        return super(_array, cls).__new__(cls, cls.typecode, seq)
+        return super().__new__(cls, cls.typecode, seq)
 
     def __deepcopy__(self, memo):
         """Overrides the deepcopy from array.array that does not copy
@@ -109,7 +109,7 @@ class_replacers[array.array] = _array
 
 class MetaCreator(type):
     def __new__(meta, name, base, dct):
-        return super(MetaCreator, meta).__new__(meta, name, (base,), dct)
+        return super().__new__(meta, name, (base,), dct)
 
     def __init__(cls, name, base, dct):
         # A DeprecationWarning is raised when the object inherits from the
@@ -136,7 +136,7 @@ class MetaCreator(type):
 
         cls.__init__ = initType
         cls.reduce_args = (name, base, dct)
-        super(MetaCreator, cls).__init__(name, (base,), dict_cls)
+        super().__init__(name, (base,), dict_cls)
 
     def __reduce__(cls):
         return (meta_create, cls.reduce_args)
@@ -192,9 +192,9 @@ def create(name, base, **kargs):
 
     if name in globals():
         warnings.warn(
-            "A class named '{0}' has already been created and it "
+            f"A class named '{name}' has already been created and it "
             "will be overwritten. Consider deleting previous "
-            "creation of that class or rename it.".format(name),
+            "creation of that class or rename it.",
             RuntimeWarning,
         )
 

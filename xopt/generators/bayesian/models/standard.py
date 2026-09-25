@@ -210,7 +210,7 @@ class StandardModelConstructor(ModelConstructor):
         ]
         allowed_subkeys = {}
         if not isinstance(train_kwargs, dict):
-            raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
+            raise TypeError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
         invalid_keys = set(train_kwargs.keys()) - set(allowed_keys)
         if invalid_keys:
             raise ValueError(
@@ -246,7 +246,7 @@ class StandardModelConstructor(ModelConstructor):
     @field_validator("covar_modules", "mean_modules", mode="before")
     def validate_torch_modules(cls, value: Any):
         if not isinstance(value, dict):
-            raise ValueError("must be dict")
+            raise TypeError("must be dict")
         else:
             value = cast(dict[str, Any], value)
             for key, val in value.items():
@@ -266,7 +266,7 @@ class StandardModelConstructor(ModelConstructor):
 
     def get_likelihood(
         self,
-        batch_shape: torch.Size = torch.Size(),
+        batch_shape: torch.Size | None = None,
     ) -> Likelihood:
         """
         Get the likelihood for the model, considering the low noise prior and or a
@@ -278,6 +278,10 @@ class StandardModelConstructor(ModelConstructor):
             The likelihood for the model.
 
         """
+
+        if batch_shape is None:
+            batch_shape = torch.Size()
+
         if self.custom_noise_prior is not None:
             likelihood = GaussianLikelihood(
                 noise_prior=self.custom_noise_prior, batch_shape=batch_shape

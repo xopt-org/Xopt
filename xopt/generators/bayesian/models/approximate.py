@@ -1,14 +1,13 @@
 import warnings
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import torch
 from botorch.models import ModelListGP
 from botorch.models.transforms import Standardize
 from botorch.models.utils.inducing_point_allocators import InducingPointAllocator
-from pydantic import Field
 from gpytorch.mlls import VariationalELBO
+from pydantic import Field
 
 from xopt.generators.bayesian.models.standard import (
     StandardModelConstructor,
@@ -70,17 +69,17 @@ class ApproximateModelConstructor(StandardModelConstructor):
     """
 
     name: str = Field("approximate", frozen=True)
-    inducing_points: Optional[int] = None
-    inducing_point_allocator: Optional[InducingPointAllocator] = None
+    inducing_points: int | None = None
+    inducing_point_allocator: InducingPointAllocator | None = None
 
     def build_model(
         self,
-        input_names: List[str],
-        outcome_names: List[str],
+        input_names: list[str],
+        outcome_names: list[str],
         data: pd.DataFrame,
-        input_bounds: Dict[str, List] = None,
+        input_bounds: dict[str, list] | None = None,
         dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
+        device: torch.device | str = "cpu",
     ) -> ModelListGP:
         """
         Construct independent models for each objective and constraint.
@@ -130,9 +129,7 @@ class ApproximateModelConstructor(StandardModelConstructor):
             )
 
             # get training data
-            train_X, train_Y, train_Yvar = get_training_data(
-                input_names, outcome_name, data
-            )
+            train_X, train_Y, _ = get_training_data(input_names, outcome_name, data)
             # collect arguments into a single dict
             kwargs = {
                 "input_transform": input_transform,

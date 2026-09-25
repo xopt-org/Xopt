@@ -1,8 +1,6 @@
 import logging
 import sys
-
 from logging.handlers import RotatingFileHandler
-
 
 stdout_log_format = "%(message)s"
 file_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

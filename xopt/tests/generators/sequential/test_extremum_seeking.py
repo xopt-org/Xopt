@@ -1,4 +1,5 @@
 from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,7 +10,7 @@ from xopt.errors import SeqGeneratorError
 from xopt.evaluator import Evaluator
 from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
-from xopt.vocs import VOCS, select_best, get_variable_data
+from xopt.vocs import VOCS, get_variable_data, select_best
 
 
 class TestExtremumSeekingGenerator:

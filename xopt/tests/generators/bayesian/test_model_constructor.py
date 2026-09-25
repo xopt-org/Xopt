@@ -12,16 +12,15 @@ from botorch import fit_gpytorch_mll
 from botorch.exceptions import ModelFittingError
 from botorch.models import ModelListGP, SingleTaskGP, SingleTaskVariationalGP
 from botorch.models.transforms import Normalize, Standardize
-from botorch.optim.fit import fit_gpytorch_mll_torch
 from botorch.models.utils.inducing_point_allocators import GreedyVarianceReduction
+from botorch.optim.fit import fit_gpytorch_mll_torch
+from gest_api.vocs import VOCS, ContinuousVariable
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import PeriodicKernel, PolynomialKernel, ScaleKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.means import ConstantMean
 from gpytorch.priors import GammaPrior
 from pydantic import ValidationError
-
-from gest_api.vocs import VOCS, ContinuousVariable
 
 from xopt.generators.bayesian.custom_botorch.heteroskedastic import (
     XoptHeteroskedasticSingleTaskGP,

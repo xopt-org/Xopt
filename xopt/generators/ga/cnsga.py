@@ -2,11 +2,13 @@ import array
 import logging
 import os
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
-from deap import algorithms as deap_algorithms, base as deap_base, tools as deap_tools
-from pydantic import ConfigDict, confloat, Field, PrivateAttr
+from deap import algorithms as deap_algorithms
+from deap import base as deap_base
+from deap import tools as deap_tools
+from pydantic import ConfigDict, Field, PrivateAttr, confloat
 
 import xopt.utils
 from xopt.generator import Generator
@@ -80,17 +82,17 @@ class CNSGAGenerator(Generator):
     mutation_probability: confloat(ge=0, le=1) = Field(
         1.0, description="Mutation probability"
     )
-    population_file: Optional[str] = Field(
+    population_file: str | None = Field(
         None, description="Population file to load (CSV format)"
     )
-    output_path: Optional[str] = Field(
+    output_path: str | None = Field(
         None, description="Output path for population files"
     )
-    _children: List[Dict] = PrivateAttr([])
-    _offspring: Optional[pd.DataFrame] = PrivateAttr(None)
+    _children: list[dict] = PrivateAttr([])
+    _offspring: pd.DataFrame | None = PrivateAttr(None)
     _loaded_population: pd.DataFrame | None = PrivateAttr(None)
     _toolbox: Any = PrivateAttr(None)
-    population: Optional[pd.DataFrame] = Field(None)
+    population: pd.DataFrame | None = Field(None)
 
     model_config = ConfigDict(extra="allow")
 
@@ -110,7 +112,7 @@ class CNSGAGenerator(Generator):
         if self.output_path is not None:
             assert os.path.isdir(self.output_path), "Output directory does not exist"
 
-    def create_children(self) -> List[Dict]:
+    def create_children(self) -> list[dict]:
         """
         Create children for the next generation.
 
@@ -165,7 +167,7 @@ class CNSGAGenerator(Generator):
                 self._children = []  # reset children
                 self._offspring = None  # reset offspring
 
-    def generate(self, n_candidates: int) -> List[Dict]:
+    def generate(self, n_candidates: int) -> list[dict]:
         """
         Generate a specified number of candidate samples.
 
@@ -185,7 +187,7 @@ class CNSGAGenerator(Generator):
 
         return [self._children.pop() for _ in range(n_candidates)]
 
-    def write_offspring(self, filename: Optional[str] = None):
+    def write_offspring(self, filename: str | None = None):
         """
         Write the current offspring to a CSV file.
 
@@ -205,7 +207,7 @@ class CNSGAGenerator(Generator):
 
         self._offspring.to_csv(filename, index_label="xopt_index")
 
-    def write_population(self, filename: Optional[str] = None):
+    def write_population(self, filename: str | None = None):
         """
         Write the current population to a CSV file.
 
@@ -255,7 +257,7 @@ class CNSGAGenerator(Generator):
         return self.population_size
 
 
-def uniform(low: float, up: float, size: Optional[int] = None) -> List[float]:
+def uniform(low: float, up: float, size: int | None = None) -> list[float]:
     """
     Generate a list of uniform random numbers.
 
@@ -400,7 +402,7 @@ def cnsga_toolbox(vocs: VOCS, selection: str = "auto") -> deap_base.Toolbox:
     return toolbox
 
 
-def pop_from_data(data: pd.DataFrame, vocs: VOCS) -> List:
+def pop_from_data(data: pd.DataFrame, vocs: VOCS) -> list:
     """
     Return a list of DEAP deap_creator.Individual from a dataframe.
 

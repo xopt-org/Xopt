@@ -1,16 +1,12 @@
-from typing import Dict
-
 import numpy as np
 
 from xopt.vocs import VOCS
 
 modified_tnk_vocs = VOCS(
-    **{
-        "variables": {"x1": [0, 3.14159], "x2": [0, 3.14159]},
-        "objectives": {"y1": "MINIMIZE"},
-        "constraints": {"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
-        "constants": {"a": "dummy_constant"},
-    }
+    variables={"x1": [0, 3.14159], "x2": [0, 3.14159]},
+    objectives={"y1": "MINIMIZE"},
+    constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
+    constants={"a": "dummy_constant"},
 )
 
 
@@ -27,7 +23,7 @@ def modified_TNK(individual):
 
 
 # labeled version
-def evaluate_modified_TNK(inputs: Dict, extra_option="abc", **params):
+def evaluate_modified_TNK(inputs: dict, extra_option="abc", **params):
     ind = [inputs["x1"], inputs["x2"]]
     objectives, constraints = modified_TNK(ind)
     outputs = {

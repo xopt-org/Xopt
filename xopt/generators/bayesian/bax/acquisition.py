@@ -72,10 +72,8 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
 
         # calculcate the variance of the fantasy posteriors
         fantasy_posts = self.fantasy_models.posterior(
-            (
-                X.reshape(*X.shape[:-2], 1, *X.shape[-2:]).expand(
-                    *X.shape[:-2], self.xs_exe.shape[0], *X.shape[-2:]
-                )
+            X.reshape(*X.shape[:-2], 1, *X.shape[-2:]).expand(
+                *X.shape[:-2], self.xs_exe.shape[0], *X.shape[-2:]
             )
         )
         var_fantasy_posts = fantasy_posts.variance

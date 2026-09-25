@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional, Union
+from collections.abc import Callable
 
 import torch
 from botorch.acquisition import InverseCostWeightedUtility
@@ -22,20 +22,20 @@ class NMOMF(qNoisyExpectedHypervolumeImprovement):
     def __init__(
         self,
         model: Model,
-        ref_point: Union[List[float], Tensor],
+        ref_point: list[float] | Tensor,
         X_baseline: Tensor,
-        sampler: Optional[MCSampler] = None,
-        objective: Optional[MCMultiOutputObjective] = None,
-        constraints: Optional[List[Callable[[Tensor], Tensor]]] = None,
-        X_pending: Optional[Tensor] = None,
-        eta: Optional[Union[Tensor, float]] = 1e-3,
+        sampler: MCSampler | None = None,
+        objective: MCMultiOutputObjective | None = None,
+        constraints: list[Callable[[Tensor], Tensor]] | None = None,
+        X_pending: Tensor | None = None,
+        eta: Tensor | float | None = 1e-3,
         prune_baseline: bool = False,
         alpha: float = 0.0,
         cache_pending: bool = True,
         max_iep: int = 0,
         incremental_nehvi: bool = True,
         cache_root: bool = True,
-        cost_call: Callable[[Tensor], Tensor] = None,
+        cost_call: Callable[[Tensor], Tensor] | None = None,
     ):
         super().__init__(
             model=model,

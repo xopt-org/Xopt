@@ -145,10 +145,10 @@ def has_discrete_variables(vocs: VOCS) -> bool:
 
 def random_inputs(
     vocs: VOCS,
-    n: int = None,
-    custom_bounds: dict[str, list[float]] = None,
+    n: int | None = None,
+    custom_bounds: dict[str, list[float]] | None = None,
     include_constants: bool = True,
-    seed: int = None,
+    seed: int | None = None,
 ) -> list[dict]:
     """
     Generates uniform random samples of the variables as specified by VOCS.
@@ -218,7 +218,7 @@ def random_inputs(
 def grid_inputs(
     vocs: VOCS,
     n: int | dict[str, int],
-    custom_bounds: dict = None,
+    custom_bounds: dict | None = None,
     include_constants: bool = True,
 ) -> pd.DataFrame:
     """
@@ -532,7 +532,7 @@ def get_constraint_data(
 
     cdata = pd.DataFrame(index=data.index)
 
-    for k in sorted(list(vocs.constraints)):
+    for k in sorted(vocs.constraints):
         # Protect against missing data
         if k not in data:
             cdata[prefix + k] = np.inf
@@ -548,7 +548,7 @@ def get_constraint_data(
         elif isinstance(op, BoundsConstraint):  # x in [a,b] -> x-a > 0 and b-x > 0
             raise NotImplementedError("BoundsConstraint not implemented")
         else:
-            raise ValueError(f"Unknown constraint operator: {op}")
+            raise TypeError(f"Unknown constraint operator: {op}")
 
         cdata[prefix + k] = cvalues.fillna(np.inf)  # Protect against nans
     return cdata.astype(float)
@@ -628,7 +628,7 @@ def get_feasibility_data(
     cdata = get_constraint_data(vocs, data, prefix=c_prefix)
     fdata = pd.DataFrame()
 
-    for k in sorted(list(vocs.constraints)):
+    for k in sorted(vocs.constraints):
         fdata[prefix + k] = cdata[c_prefix + k].astype(float) <= 0
     # if all row values are true, then the row is feasible
     fdata["feasible"] = fdata.all(axis=1)
@@ -1018,7 +1018,7 @@ def validate_variable_bounds(variable_dict: dict[str, list[float]]):
 
     for name, value in variable_dict.items():
         if not isinstance(value, Iterable):
-            raise ValueError(f"Bounds specified for `{name}` must be a list.")
+            raise TypeError(f"Bounds specified for `{name}` must be a list.")
         if not len(value) == 2:
             raise ValueError(
                 f"Bounds specified for `{name}` must be a list of length 2."

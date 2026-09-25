@@ -1,37 +1,41 @@
+import datetime
+import logging
+import math
+import os
+import tempfile
+import time
+from typing import ClassVar
 from unittest import TestCase
 from unittest.mock import patch
-import datetime
-import time
-import math
+
 import numpy as np
-import os
 import pandas as pd
 import pytest
 import torch
-import tempfile
+from gest_api.vocs import ContinuousVariable
 from pydantic import BaseModel, ConfigDict
 from torch import nn
 
-from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 import xopt.utils
-from xopt.vocs import get_local_region
+from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.utils import (
+    _explode_pandas_modified,
     add_constraint_information,
     copy_generator,
     explode_all_columns,
-    has_device_field,
-    read_csv,
-    nsga2_to_cnsga_file_format,
-    read_xopt_csv,
-    _explode_pandas_modified,
-    safe_call,
-    get_n_required_fuction_arguments,
-    isotime,
     get_function,
     get_function_defaults,
+    get_n_required_fuction_arguments,
+    has_device_field,
+    isotime,
+    nsga2_to_cnsga_file_format,
+    read_csv,
+    read_xopt_csv,
+    safe_call,
 )
-from gest_api.vocs import ContinuousVariable
+from xopt.vocs import get_local_region
 
+logger = logging.getLogger(__name__)
 
 # Module-level function for get_function test
 
@@ -52,7 +56,7 @@ class MockBaseModel(BaseModel):
 
 class MockModule(nn.Module):
     def __init__(self):
-        super(MockModule, self).__init__()
+        super().__init__()
         self.param1 = nn.Parameter(torch.randn(5))
         self.param2 = nn.Parameter(torch.randn(5).to("cpu"))
         self.buffer1 = nn.Parameter(torch.randn(5))
@@ -112,7 +116,7 @@ class TestUtils(TestCase):
 
     def test_get_local_region(self):
         class DummyVOCS:
-            variable_names = ["x", "y"]
+            variable_names: ClassVar[list[str]] = ["x", "y"]
             variables = {
                 "x": ContinuousVariable(domain=[0.0, 10.0]),
                 "y": ContinuousVariable(domain=[1.0, 5.0]),
@@ -122,7 +126,7 @@ class TestUtils(TestCase):
         center_point = {"x": 5.0, "y": 3.0}
         # Normal case
         bounds = get_local_region(vocs, center_point, fraction=0.2)
-        assert set(bounds.keys()) == set(["x", "y"])
+        assert set(bounds.keys()) == {"x", "y"}
         # Check bounds are within the variable limits
         assert bounds["x"][0] >= vocs.variables["x"].domain[0]
         assert bounds["x"][1] <= vocs.variables["x"].domain[1]
@@ -295,7 +299,7 @@ class TestUtils(TestCase):
         try:
             get_function("not_a_function")
         except Exception:
-            pass
+            logger.exception("Expected exception for missing function")
         else:
             assert False, "Expected Exception for missing function"
 
@@ -393,7 +397,7 @@ def test_nsga2_to_cnsga_file_format(tmp_path):
     # Check population files
     for gen in [1700000000, 1700000001]:
         timestamp = (
-            datetime.datetime.fromtimestamp(int(gen), tz=datetime.timezone.utc)
+            datetime.datetime.fromtimestamp(int(gen), tz=datetime.UTC)
             .isoformat()
             .replace(":", "_")
         )
@@ -405,7 +409,7 @@ def test_nsga2_to_cnsga_file_format(tmp_path):
     # Check offspring files
     for gen in [1700000000, 1700000001]:
         timestamp = (
-            datetime.datetime.fromtimestamp(int(gen) + 1, tz=datetime.timezone.utc)
+            datetime.datetime.fromtimestamp(int(gen) + 1, tz=datetime.UTC)
             .isoformat()
             .replace(":", "_")
         )

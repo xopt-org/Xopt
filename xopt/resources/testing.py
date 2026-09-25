@@ -102,7 +102,6 @@ def recursive_torch_device_scan(
     except AttributeError:
         if verbose:
             print(f"{'    ' * depth}no slots for {type(obj)} {id(obj)}")
-        pass
 
     for k, v in attrs_and_slots.items():
         if v is None:
@@ -286,20 +285,16 @@ def create_set_options_helper(
 
 # Single-objective VOCS with constraints
 TEST_VOCS_BASE = VOCS(
-    **{
-        "variables": {"x1": [0, 1.0], "x2": [0, 10.0]},
-        "objectives": {"y1": "MINIMIZE"},
-        "constraints": {"c1": ["GREATER_THAN", 0.5]},
-        "constants": {"constant1": 1.0},
-    }
+    variables={"x1": [0, 1.0], "x2": [0, 10.0]},
+    objectives={"y1": "MINIMIZE"},
+    constraints={"c1": ["GREATER_THAN", 0.5]},
+    constants={"constant1": 1.0},
 )
 TEST_VOCS_BASE_3D = VOCS(
-    **{
-        "variables": {"x1": [0, 1.0], "x2": [0, 10.0], "x3": [-1.0, 1.0]},
-        "objectives": {"y1": "MINIMIZE"},
-        "constraints": {"c1": ["GREATER_THAN", 0.5]},
-        "constants": {"constant1": 1.0},
-    }
+    variables={"x1": [0, 1.0], "x2": [0, 10.0], "x3": [-1.0, 1.0]},
+    objectives={"y1": "MINIMIZE"},
+    constraints={"c1": ["GREATER_THAN", 0.5]},
+    constants={"constant1": 1.0},
 )
 
 # Multi-objective VOCS with constraints

@@ -1,9 +1,11 @@
+import sys
+from unittest import mock
+
 import numpy as np
 import pandas as pd
 import pytest
-import sys
 import yaml
-from unittest import mock
+
 from xopt import entrypoint
 from xopt.entrypoint import normalize_initial_data
 from xopt.resources.test_functions.tnk import tnk_vocs
@@ -45,16 +47,16 @@ class TestEntryPointScript:
             "foo=baz",
             "--verbose",
         ]
-        with mock.patch.object(sys, "argv", sys_argv):
-            with mock.patch(
-                "builtins.open", mock.mock_open(read_data=yaml.dump(config))
-            ):
-                mock_xopt_instance = mock.Mock()
-                mock_Xopt.model_validate.return_value = mock_xopt_instance
-                mock_xopt_instance.run.return_value = None
-                entrypoint.main()
-                assert mock_Xopt.model_validate.called
-                assert mock_xopt_instance.run.called
+        with (
+            mock.patch.object(sys, "argv", sys_argv),
+            mock.patch("builtins.open", mock.mock_open(read_data=yaml.dump(config))),
+        ):
+            mock_xopt_instance = mock.Mock()
+            mock_Xopt.model_validate.return_value = mock_xopt_instance
+            mock_xopt_instance.run.return_value = None
+            entrypoint.main()
+            assert mock_Xopt.model_validate.called
+            assert mock_xopt_instance.run.called
 
     def test_override_to_dict(self):
         s = "a.b.c=42"
@@ -72,9 +74,11 @@ class TestEntryPointScript:
             assert exe.__class__.__name__ == "DummyExecutor"
 
     def test_get_executor_invalid(self):
-        with pytest.raises(ValueError, match="Unknown executor: bad"):
-            with entrypoint.get_executor("bad"):
-                pass
+        with (
+            pytest.raises(ValueError, match="Unknown executor: bad"),
+            entrypoint.get_executor("bad"),
+        ):
+            pass
 
     def test_normalize_initial_data_missing_cols(self):
         df = _tnk_df().drop(columns=["y2"])
@@ -86,7 +90,7 @@ class TestEntryPointScript:
         result = normalize_initial_data(df, tnk_vocs)
         assert list(result["xopt_candidate_idx"]) == list(range(len(df)))
         assert (result["xopt_runtime"] == 0.0).all()
-        assert (result["xopt_error"] == False).all()  # noqa: E712
+        assert (result["xopt_error"] == False).all()
 
     def test_normalize_initial_data_drops_extra_cols(self):
         df = _tnk_df()
@@ -119,11 +123,11 @@ class TestEntryPointScript:
         mock_xopt_instance.run.return_value = None
 
         sys_argv = ["entrypoint.py", config_path, "--initial_data", csv_path]
-        with mock.patch.object(sys, "argv", sys_argv):
-            with mock.patch(
-                "builtins.open", mock.mock_open(read_data=yaml.dump(config))
-            ):
-                entrypoint.main()
+        with (
+            mock.patch.object(sys, "argv", sys_argv),
+            mock.patch("builtins.open", mock.mock_open(read_data=yaml.dump(config))),
+        ):
+            entrypoint.main()
 
         mock_read_csv.assert_called_once_with(csv_path)
         mock_normalize.assert_called_once_with(sentinel_df, mock_xopt_instance.vocs)

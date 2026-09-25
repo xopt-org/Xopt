@@ -113,9 +113,11 @@ vocs = VOCS(
     objectives={"f": "MINIMIZE"},
 )
 
+
 # define the function to optimize
 def sin_function(input_dict):
     return {"f": math.sin(input_dict["x"])}
+
 
 # create Xopt evaluator, generator, and Xopt objects
 evaluator = Evaluator(function=sin_function)
@@ -139,7 +141,7 @@ Xopt can interface with arbitrary evaluate functions (defined in Python) with th
 following form:
 ```python
 def evaluate(inputs: dict) -> dict:
-    """ your code here """
+    """your code here"""
 ```
 Evaluate functions must accept a dictionary object that **at least** has the keys
 specified in `variables, constants` and returns a dictionary

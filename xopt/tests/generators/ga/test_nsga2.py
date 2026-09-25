@@ -1,7 +1,7 @@
-import os
 import json
-from tempfile import TemporaryDirectory
+import os
 from datetime import datetime
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
@@ -12,16 +12,15 @@ from xopt.errors import DataError
 from xopt.evaluator import Evaluator
 from xopt.generators.ga.nsga2 import (
     NSGA2Generator,
-    generate_child_binary_tournament,
     crowded_comparison_argsort,
+    generate_child_binary_tournament,
 )
 from xopt.generators.ga.operators import PolynomialMutation, SimulatedBinaryCrossover
-from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.resources.test_functions.modified_tnk import (
     evaluate_modified_TNK,
     modified_tnk_vocs,
 )
-
+from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
 from xopt.stopping_conditions import MaxEvaluationsCondition
 from xopt.vocs import VOCS
 

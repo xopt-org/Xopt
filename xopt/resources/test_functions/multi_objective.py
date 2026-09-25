@@ -1,12 +1,10 @@
 import math
 from abc import abstractmethod
-from typing import Dict
 
 import numpy as np
 from scipy.special import gamma
 
 from xopt.resources.test_functions.problem import Problem
-
 from xopt.vocs import VOCS
 
 
@@ -21,7 +19,7 @@ class MOProblem(Problem):
         rp = self.ref_point
         return {f"y{i + 1}": rp[i] for i in range(self.n_obj)}
 
-    def evaluate_dict(self, inputs: Dict, *args, **params):
+    def evaluate_dict(self, inputs: dict, *args, **params):
         ind = np.array([inputs[f"x{i + 1}"] for i in range(self.n_var)])
         if ind.ndim == 1:
             # MOBO yields floats

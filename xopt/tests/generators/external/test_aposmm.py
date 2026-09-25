@@ -1,10 +1,9 @@
 import numpy as np
-from xopt import Xopt
-from xopt import Evaluator
-from xopt.stopping_conditions import MaxEvaluationsCondition
-from gest_api.vocs import VOCS
 import pytest
+from gest_api.vocs import VOCS
 
+from xopt import Evaluator, Xopt
+from xopt.stopping_conditions import MaxEvaluationsCondition
 
 pytestmark = pytest.mark.xfail(
     reason="APOSMM is temporarily xfailed until libensemble is updated",

@@ -10,21 +10,20 @@ import torch
 from xopt import Evaluator, Xopt
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.objectives import create_mobo_objective
-from xopt.generators.bayesian.utils import (
-    compute_hypervolume_and_pf,
-    torch_compile_acqf,
-    torch_compile_gp_model,
-    interpolate_points,
-    validate_turbo_controller_base,
-)
-from xopt.resources.bench_framework import time_call
-from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
-from xopt.vocs import random_inputs, VOCS
 from xopt.generators.bayesian.turbo import (
     OptimizeTurboController,
     SafetyTurboController,
 )
-
+from xopt.generators.bayesian.utils import (
+    compute_hypervolume_and_pf,
+    interpolate_points,
+    torch_compile_acqf,
+    torch_compile_gp_model,
+    validate_turbo_controller_base,
+)
+from xopt.resources.bench_framework import time_call
+from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
+from xopt.vocs import VOCS, random_inputs
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}

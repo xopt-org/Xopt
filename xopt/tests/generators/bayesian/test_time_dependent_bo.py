@@ -1,19 +1,19 @@
-import pytest
 import time
 from copy import deepcopy
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
-from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
+from xopt.generators.bayesian.time_dependent import TimeDependentBayesianGenerator
 from xopt.generators.bayesian.upper_confidence_bound import (
     TDUpperConfidenceBoundGenerator,
 )
-from xopt.vocs import VOCS
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
+from xopt.vocs import VOCS
 
 
 class TestTimeDependentBO:

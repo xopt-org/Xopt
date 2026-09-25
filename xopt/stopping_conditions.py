@@ -7,23 +7,23 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Literal, Annotated, Union
+from typing import Annotated, Literal
+
 import pandas as pd
+from gest_api.vocs import VOCS, MinimizeObjective
 from pydantic import (
     ConfigDict,
+    Discriminator,
     Field,
     PositiveFloat,
     PositiveInt,
+    TypeAdapter,
     field_serializer,
     field_validator,
-    Discriminator,
-    TypeAdapter,
 )
-
 
 from xopt.pydantic import XoptBaseModel
 from xopt.vocs import get_feasibility_data
-from gest_api.vocs import MinimizeObjective, VOCS
 
 
 class StoppingCondition(XoptBaseModel, ABC):
@@ -309,7 +309,7 @@ class CompositeCondition(StoppingCondition):
     """
 
     name: Literal["CompositeCondition"] = "CompositeCondition"
-    conditions: List["StoppingConditionUnion"] = Field(
+    conditions: list["StoppingConditionUnion"] = Field(
         description="List of stopping conditions to combine", min_length=1
     )
     logic: str = Field(
@@ -350,14 +350,12 @@ class CompositeCondition(StoppingCondition):
 
 # Typedef of union field with annotated discriminator for pydantic objects using stopping conditions
 StoppingConditionUnion = Annotated[
-    Union[
-        MaxEvaluationsCondition,
-        TargetValueCondition,
-        ConvergenceCondition,
-        StagnationCondition,
-        FeasibilityCondition,
-        CompositeCondition,
-    ],
+    MaxEvaluationsCondition
+    | TargetValueCondition
+    | ConvergenceCondition
+    | StagnationCondition
+    | FeasibilityCondition
+    | CompositeCondition,
     Discriminator("name"),
 ]
 

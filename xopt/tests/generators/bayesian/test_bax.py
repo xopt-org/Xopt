@@ -7,6 +7,7 @@ import torch
 from botorch.models import SingleTaskGP
 from botorch.models.model import ModelList
 from botorch.models.transforms import Normalize, Standardize
+
 from xopt.base import Xopt
 from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator

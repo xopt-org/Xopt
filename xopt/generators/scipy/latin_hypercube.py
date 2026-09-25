@@ -1,12 +1,11 @@
-from typing import Optional, List, Dict
+from typing import Annotated
 
+from gest_api.vocs import ExploreObjective
 from pydantic import Field, field_validator
 from scipy.stats import qmc
-from typing_extensions import Annotated
 
-from xopt.generator import Generator
-from gest_api.vocs import ExploreObjective
 from xopt.errors import VOCSError
+from xopt.generator import Generator
 
 
 class LatinHypercubeGenerator(Generator):
@@ -48,7 +47,7 @@ class LatinHypercubeGenerator(Generator):
     supports_constraints: bool = True
 
     batch_size: Annotated[
-        Optional[int],
+        int | None,
         Field(
             4096,
             strict=True,
@@ -57,21 +56,21 @@ class LatinHypercubeGenerator(Generator):
         ),
     ]
     scramble: Annotated[
-        Optional[bool],
+        bool | None,
         Field(
             True,
             description="When False, center samples within cells of a multi-dimensional grid. Otherwise, samples are randomly placed within cells of the grid. See scipy documentation.",
         ),
     ]
     optimization: Annotated[
-        Optional[str],
+        str | None,
         Field(
             "random-cd",
             description="Whether to use an optimization scheme to improve the quality after sampling. See scipy documentation.",
         ),
     ]
     strength: Annotated[
-        Optional[int],
+        int | None,
         Field(
             1,
             strict=True,
@@ -81,7 +80,7 @@ class LatinHypercubeGenerator(Generator):
         ),
     ]
     seed: Annotated[
-        Optional[int], Field(None, description="Random seed. See scipy documentation.")
+        int | None, Field(None, description="Random seed. See scipy documentation.")
     ]
 
     @field_validator("vocs", mode="after")
@@ -106,7 +105,7 @@ class LatinHypercubeGenerator(Generator):
             strength=self.strength,
             seed=self.seed,
         )
-        self._samples: List[Dict[str, float]] = []
+        self._samples: list[dict[str, float]] = []
 
     def initialize_batch(self) -> None:
         """
@@ -121,7 +120,7 @@ class LatinHypercubeGenerator(Generator):
         rows = [{name: ele for name, ele in zip(names, row)} for row in rows]
         self._samples = [{**row, **self.vocs.constants} for row in rows]
 
-    def generate(self, n_candidate: int) -> List[Dict[str, float]]:
+    def generate(self, n_candidate: int) -> list[dict[str, float]]:
         """
         Generate a specified number of candidate samples.
 
@@ -135,7 +134,7 @@ class LatinHypercubeGenerator(Generator):
         List[Dict[str, float]]
             A list of dictionaries containing the generated samples.
         """
-        ret: List[Dict[str, float]] = []
+        ret: list[dict[str, float]] = []
         while len(ret) < n_candidate:
             n_needed = n_candidate - len(ret)
             if n_needed < len(self._samples):

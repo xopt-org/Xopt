@@ -1,10 +1,10 @@
-import pytest
 import time
 from copy import deepcopy
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from xopt import Evaluator, Xopt

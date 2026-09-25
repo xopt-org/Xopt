@@ -5,45 +5,45 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
-from pydantic import ValidationError
 import yaml
+from gest_api.vocs import (
+    VOCS,
+    BoundsConstraint,
+    ContinuousVariable,
+    DiscreteVariable,
+    ExploreObjective,
+    LessThanConstraint,
+    MinimizeObjective,
+)
+from pydantic import ValidationError
 
 from xopt.errors import FeasibilityError
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
 from xopt.vocs import (
-    resolve_contextual_variable_bounds,
-    get_variable_bounds_array,
-    has_discrete_variables,
     ContextualVariable,
-    convert_numpy_to_inputs,
     convert_dataframe_to_inputs,
+    convert_numpy_to_inputs,
     cumulative_optimum,
     denormalize_inputs,
-    get_variable_bounds,
+    extract_data,
     get_constraint_data,
-    get_variable_data,
-    normalize_inputs,
-    random_inputs,
-    select_best,
-    grid_inputs,
-    get_observable_data,
     get_local_region,
     get_objective_data,
+    get_observable_data,
+    get_variable_bounds,
+    get_variable_bounds_array,
+    get_variable_data,
+    grid_inputs,
+    has_discrete_variables,
+    normalize_inputs,
+    random_inputs,
+    resolve_contextual_variable_bounds,
+    select_best,
     validate_input_data,
-    extract_data,
-)
-from gest_api.vocs import (
-    VOCS,
-    ContinuousVariable,
-    DiscreteVariable,
-    MinimizeObjective,
-    ExploreObjective,
-    LessThanConstraint,
-    BoundsConstraint,
 )
 
 
-class TestVOCS(object):
+class TestVOCS:
     def test_init(self):
         # test various configurations
         vocs = VOCS(

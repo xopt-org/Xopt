@@ -46,6 +46,7 @@ can be discovered and run by the CLI runner.
 ```python
 from xopt.resources.bench_framework import BenchDispatcher
 
+
 @BenchDispatcher.register_decorator()
 def bench_my_operation(device="cpu"):
     # setup and run
@@ -57,8 +58,7 @@ Default arguments can be registered separately:
 ```python
 @BenchDispatcher.register_defaults(["vocs", "data"], lambda: make_test_data())
 @BenchDispatcher.register_decorator()
-def bench_my_operation(vocs, data, device="cpu"):
-    ...
+def bench_my_operation(vocs, data, device="cpu"): ...
 ```
 
 ### Available Benchmarks

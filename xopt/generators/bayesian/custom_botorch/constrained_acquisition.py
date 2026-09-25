@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 import torch
 from botorch.acquisition import MCAcquisitionFunction
@@ -16,11 +16,11 @@ from xopt.resources.testing import XOPT_VERIFY_CONSTRAINED_ACQF_POSITIVE
 class FeasibilityObjective(GenericMCObjective):
     def __init__(
         self,
-        constraints: List[Callable[[Tensor], Tensor]],
+        constraints: list[Callable[[Tensor], Tensor]],
         infeasible_cost: float = 0.0,
         eta: float = 1e-3,
     ) -> None:
-        def ones_callable(Z: Tensor, X: Optional[Tensor] = None):
+        def ones_callable(Z: Tensor, X: Tensor | None = None):
             return torch.ones(Z.shape[:-1])
 
         super().__init__(objective=ones_callable)
@@ -29,7 +29,7 @@ class FeasibilityObjective(GenericMCObjective):
         self.register_buffer("eta", _eta)
         self.register_buffer("infeasible_cost", torch.as_tensor(infeasible_cost))
 
-    def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
+    def forward(self, samples: Tensor, X: Tensor | None = None) -> Tensor:
         r"""Evaluate the feasibility-weighted objective on the samples.
 
         Parameters
@@ -58,10 +58,10 @@ class ConstrainedMCAcquisitionFunction(MCAcquisitionFunction):
         self,
         model: Model,
         base_acquisition: MCAcquisitionFunction,
-        constraints: List[Callable[[Tensor], Tensor]] | None = None,
-        posterior_transform: Optional[PosteriorTransform] = None,
-        X_pending: Optional[Tensor] = None,
-        sampler: Optional[MCSampler] = None,
+        constraints: list[Callable[[Tensor], Tensor]] | None = None,
+        posterior_transform: PosteriorTransform | None = None,
+        X_pending: Tensor | None = None,
+        sampler: MCSampler | None = None,
     ) -> None:
         # make it consistent with botorch constrained EHVI
         if constraints is None:

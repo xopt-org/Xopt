@@ -276,7 +276,7 @@ class BayesianGenerator(Generator, ABC):
         if value is None:
             value = StandardModelConstructor()
         elif isinstance(value, ModelConstructor):
-            value = value
+            pass
         elif isinstance(value, str):
             if value in constructor_dict:
                 value = constructor_dict[value]()
@@ -623,14 +623,16 @@ class BayesianGenerator(Generator, ABC):
             A subset of data used to train the model form of a pandas DataFrame.
 
         """
-        if self.turbo_controller is not None:
-            if self.turbo_controller.restrict_model_data:
-                data = self.turbo_controller.get_data_in_trust_region(data, self)
-                if data.empty:
-                    raise FeasibilityError(
-                        "No training data available to build model, because ",
-                        "no points in the dataset are within the TuRBO trust region. ",
-                    )
+        if (
+            self.turbo_controller is not None
+            and self.turbo_controller.restrict_model_data
+        ):
+            data = self.turbo_controller.get_data_in_trust_region(data, self)
+            if data.empty:
+                raise FeasibilityError(
+                    "No training data available to build model, because ",
+                    "no points in the dataset are within the TuRBO trust region. ",
+                )
         return data
 
     def get_input_data(self, data: pd.DataFrame) -> torch.Tensor:
@@ -906,7 +908,7 @@ class BayesianGenerator(Generator, ABC):
         """variable names corresponding to trained model"""
         variable_names = self.vocs.variable_names
         if self.fixed_features is not None:
-            for name, _ in self.fixed_features.items():
+            for name in self.fixed_features:
                 if name not in variable_names:
                     variable_names += [name]
 
@@ -946,11 +948,13 @@ class BayesianGenerator(Generator, ABC):
 
         # if turbo restrict points is true then set the bounds to the trust region
         # bounds
-        if self.turbo_controller is not None:
-            if self.turbo_controller.restrict_model_data:
-                trust_region_bounds = self.turbo_controller.get_trust_region(self)
-                for idx, name in enumerate(self._candidate_names):
-                    variable_bounds[name] = trust_region_bounds[:, idx].numpy()
+        if (
+            self.turbo_controller is not None
+            and self.turbo_controller.restrict_model_data
+        ):
+            trust_region_bounds = self.turbo_controller.get_trust_region(self)
+            for idx, name in enumerate(self._candidate_names):
+                variable_bounds[name] = trust_region_bounds[:, idx].numpy()
 
         # add fixed feature bounds if requested
         if self.fixed_features is not None:
@@ -1074,7 +1078,7 @@ class BayesianGenerator(Generator, ABC):
             if not isinstance(variable, DiscreteVariable):
                 continue
 
-            allowed_values = set(float(v) for v in variable.values)
+            allowed_values = {float(v) for v in variable.values}
             candidate_values = results[name].astype(float).tolist()
             if any(value not in allowed_values for value in candidate_values):
                 raise ValueError(
@@ -1228,7 +1232,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
             elif isinstance(self.vocs.objectives[name], MaximizeObjective):
                 pt += [ref_val]
             else:
-                raise ValueError(
+                raise TypeError(
                     f"objective type {self.vocs.objectives[name]} not\
                     supported"
                 )

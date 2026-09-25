@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from xopt.generators.utils import (
-    get_domination,
     fast_dominated_argsort_internal,
+    get_domination,
 )
 
 
