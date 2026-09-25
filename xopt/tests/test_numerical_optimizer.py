@@ -1,3 +1,4 @@
+import pytest
 import time
 from copy import deepcopy
 from unittest.mock import patch
@@ -47,6 +48,133 @@ class TestNumericalOptimizers:
             assert time.time() - start_time < 1.0
             assert candidates.shape == torch.Size([ncandidate, ndim])
 
+    def test_lbfgsoptimizer_max_time_none(self):
+        optimizer = LBFGSOptimizer(max_time=None)
+        bounds = torch.tensor([[0.0], [1.0]])
+        with patch("xopt.numerical_optimizer.optimize_acqf") as mock_opt:
+            mock_opt.return_value = (torch.zeros(1, 1), None)
+            candidates = optimizer.optimize(f, bounds, n_candidates=1)
+            assert candidates.shape == (1, 1)
+            # Ensure timeout_sec is None
+            assert mock_opt.call_args[1]["timeout_sec"] is None
+
+    def test_lbfgsoptimizer_bounds_shape_error(self):
+        optimizer = LBFGSOptimizer()
+        # bounds with wrong shape: should be [2, ndim], here [3, 1]
+        bad_bounds = torch.zeros(3, 1)
+        with pytest.raises(ValueError, match="bounds must have the shape"):
+            optimizer.optimize(f, bad_bounds, n_candidates=1)
+
+    def test_lbfgsoptimizer_mixed_route(self):
+        optimizer = LBFGSOptimizer()
+        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
+        fixed_features_list = [{1: 0.0}, {1: 1.0}]
+
+        with patch("xopt.numerical_optimizer.optimize_acqf_mixed") as mock_opt:
+            mock_opt.return_value = (torch.zeros(1, 2), None)
+            candidates = optimizer.optimize(
+                f,
+                bounds,
+                n_candidates=1,
+                fixed_features_list=fixed_features_list,
+            )
+
+        assert candidates.shape == (1, 2)
+        assert mock_opt.call_args[1]["fixed_features_list"] == fixed_features_list
+
+    def test_lbfgsoptimizer_discrete_route(self):
+        optimizer = LBFGSOptimizer(discrete_max_batch_size=16)
+        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
+        choices = torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.double)
+
+        with patch("xopt.numerical_optimizer.optimize_acqf_discrete") as mock_opt:
+            mock_opt.return_value = (torch.zeros(1, 2), None)
+            candidates = optimizer.optimize(
+                f,
+                bounds,
+                n_candidates=1,
+                discrete_choices=choices,
+            )
+
+        assert candidates.shape == (1, 2)
+        assert mock_opt.call_args[1]["max_batch_size"] == 16
+
+    def test_lbfgsoptimizer_mixed_truncation(self):
+        optimizer = LBFGSOptimizer(mixed_max_discrete_configurations=2)
+        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
+        fixed_features_list = [{1: 0.0}, {1: 0.5}, {1: 1.0}]
+
+        with (
+            patch("xopt.numerical_optimizer.optimize_acqf_mixed") as mock_opt,
+            patch("xopt.numerical_optimizer.logger.warning") as mock_warn,
+        ):
+            mock_opt.return_value = (torch.zeros(1, 2), None)
+            candidates = optimizer.optimize(
+                f,
+                bounds,
+                n_candidates=1,
+                fixed_features_list=fixed_features_list,
+            )
+
+        assert candidates.shape == (1, 2)
+        assert len(mock_opt.call_args[1]["fixed_features_list"]) == 2
+        mock_warn.assert_called_once_with(
+            "truncating mixed discrete configurations from %d to %d", 3, 2
+        )
+
+    def test_lbfgsoptimizer_mixed_empty_fixed_features_raises(self):
+        optimizer = LBFGSOptimizer()
+        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
+        with pytest.raises(ValueError, match="fixed_features_list cannot be empty"):
+            optimizer.optimize(f, bounds, n_candidates=1, fixed_features_list=[])
+
+    def test_lbfgsoptimizer_discrete_truncation_and_drops_batch_ic(self):
+        optimizer = LBFGSOptimizer(discrete_max_choices=2, discrete_max_batch_size=8)
+        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
+        discrete_choice_points = torch.tensor(
+            [[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]], dtype=torch.double
+        )
+
+        with (
+            patch("xopt.numerical_optimizer.optimize_acqf_discrete") as mock_opt,
+            patch("xopt.numerical_optimizer.logger.warning") as mock_warn,
+        ):
+            mock_opt.return_value = (torch.zeros(1, 2), None)
+            candidates = optimizer.optimize(
+                f,
+                bounds,
+                n_candidates=1,
+                discrete_choices=discrete_choice_points,
+                batch_initial_conditions=torch.zeros(1, 1, 2),
+            )
+
+        assert candidates.shape == (1, 2)
+        assert "batch_initial_conditions" not in mock_opt.call_args[1]
+        assert mock_opt.call_args[1]["choices"].shape[0] == 2
+        assert mock_opt.call_args[1]["max_batch_size"] == 8
+        assert mock_warn.call_args_list[0].args[0] == (
+            "batch_initial_conditions are not used by optimize_acqf_discrete"
+        )
+        assert mock_warn.call_args_list[1].args == (
+            "truncating discrete choices from %d to %d",
+            3,
+            2,
+        )
+
+    def test_lbfgsoptimizer_discrete_and_mixed_conflict(self):
+        optimizer = LBFGSOptimizer()
+        bounds = torch.stack((torch.zeros(2), torch.ones(2)))
+        choices = torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.double)
+
+        with pytest.raises(ValueError, match="cannot specify both"):
+            optimizer.optimize(
+                f,
+                bounds,
+                n_candidates=1,
+                discrete_choices=choices,
+                fixed_features_list=[{1: 0.0}],
+            )
+
     def test_grid_optimizer(self):
         optimizer = GridOptimizer()
         for ndim in [1, 3]:
@@ -55,24 +183,26 @@ class TestNumericalOptimizers:
                 candidates = optimizer.optimize(f, bounds, ncandidate)
                 assert candidates.shape == torch.Size([ncandidate, ndim])
 
+    def test_gridoptimizer_bounds_shape_error(self):
+        optimizer = GridOptimizer()
+        # bounds with wrong shape: should be [2, ndim], here [3, 1]
+        bad_bounds = torch.zeros(3, 1)
+        with pytest.raises(ValueError, match="bounds must have the shape"):
+            optimizer.optimize(f, bad_bounds, n_candidates=1)
+
     def test_in_xopt(self):
         vocs = deepcopy(tnk_vocs)
 
         # can only explore one objective
-        vocs.objectives = {}
-        vocs.observables = ["y1"]
-
+        vocs.objectives = {"y1": "EXPLORE"}
         generator = BayesianExplorationGenerator(
             vocs=vocs, numerical_optimizer=GridOptimizer(n_grid_points=2)
         )
-
         evaluator = Evaluator(function=evaluate_TNK)
+        X = Xopt(generator=generator, evaluator=evaluator)
 
-        X = Xopt(generator=generator, evaluator=evaluator, vocs=vocs)
-
-        X.evaluate_data(
-            pd.DataFrame({"x1": [1.0, 0.75, 3.14, 0], "x2": [0.7, 0.95, 0, 3.14]})
-        )
+        # sample at corners of the design space except for the origin
+        X.evaluate_data(pd.DataFrame({"x1": [3.14, 3.14, 0], "x2": [3.14, 0, 3.14]}))
 
         X.step()
         assert np.allclose(

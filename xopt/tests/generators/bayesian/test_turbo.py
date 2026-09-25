@@ -7,10 +7,14 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 import yaml
 
-from xopt import Evaluator, VOCS, Xopt
+from gest_api.vocs import VOCS
+
+from xopt import Evaluator, Xopt
 from xopt.errors import FeasibilityError
+from xopt.vocs import get_feasibility_data
 from xopt.generators.bayesian import UpperConfidenceBoundGenerator
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
 from xopt.generators.bayesian.bax_generator import BaxGenerator
@@ -92,8 +96,7 @@ class TestTurbo(TestCase):
 
         # test invalid turbo controller type
         test_vocs_2 = test_vocs.model_copy()
-        test_vocs_2.objectives = {}
-        test_vocs_2.observables = ["o1"]
+        test_vocs_2.objectives = {"o1": "EXPLORE"}
         with pytest.raises(ValueError):
             gen = BayesianExplorationGenerator(
                 vocs=test_vocs_2, turbo_controller="OptimizeTurboController"
@@ -142,8 +145,8 @@ class TestTurbo(TestCase):
         turbo_state = OptimizeTurboController(vocs=gen.vocs)
         turbo_state.update_state(gen)
         tr = turbo_state.get_trust_region(gen)
-        assert tr[0].numpy() >= test_vocs.bounds[0]
-        assert tr[1].numpy() <= test_vocs.bounds[1]
+        assert tr[0].numpy() >= np.array(test_vocs.bounds).T[0]
+        assert tr[1].numpy() <= np.array(test_vocs.bounds).T[1]
 
         # test in 2D
         test_vocs = deepcopy(TEST_VOCS_BASE)
@@ -155,8 +158,8 @@ class TestTurbo(TestCase):
         turbo_state.update_state(gen)
         tr = turbo_state.get_trust_region(gen)
 
-        assert np.all(tr[0].numpy() >= test_vocs.bounds[0])
-        assert np.all(tr[1].numpy() <= test_vocs.bounds[1])
+        assert np.all(tr[0].numpy() >= np.array(test_vocs.bounds).T[0])
+        assert np.all(tr[1].numpy() <= np.array(test_vocs.bounds).T[1])
 
     def test_sign_conventions(self):
         # 2D minimization
@@ -281,8 +284,8 @@ class TestTurbo(TestCase):
         assert turbo_state._failure_counter == 1
 
         tr = turbo_state.get_trust_region(gen)
-        assert tr[0].numpy() >= test_vocs.bounds[0]
-        assert tr[1].numpy() <= test_vocs.bounds[1]
+        assert tr[0].numpy() >= np.array(test_vocs.bounds).T[0]
+        assert tr[1].numpy() <= np.array(test_vocs.bounds).T[1]
 
         # test a case where the last point is invalid
         new_data = deepcopy(gen.data)
@@ -353,10 +356,10 @@ class TestTurbo(TestCase):
 
         turbo_state.update_state(gen)
         best_value = TEST_VOCS_DATA[
-            test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
+            get_feasibility_data(test_vocs, TEST_VOCS_DATA)["feasible"]
         ].min()[test_vocs.objective_names[0]]
         best_point = TEST_VOCS_DATA.iloc[
-            TEST_VOCS_DATA[test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]][
+            TEST_VOCS_DATA[get_feasibility_data(test_vocs, TEST_VOCS_DATA)["feasible"]][
                 test_vocs.objective_names[0]
             ].idxmin()
         ][test_vocs.variable_names].to_dict()
@@ -374,7 +377,7 @@ class TestTurbo(TestCase):
 
         turbo_state.update_state(gen)
         best_value = TEST_VOCS_DATA[
-            test_vocs.feasibility_data(TEST_VOCS_DATA)["feasible"]
+            get_feasibility_data(test_vocs, TEST_VOCS_DATA)["feasible"]
         ].max()[test_vocs.objective_names[0]]
         assert turbo_state.best_value == best_value
 
@@ -411,7 +414,7 @@ class TestTurbo(TestCase):
         generator = UpperConfidenceBoundGenerator(
             vocs=vocs, turbo_controller="optimize"
         )
-        X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=generator)
 
         X.evaluate_data(pd.DataFrame({"x": [3.0, 1.75, 2.0]}))
 
@@ -487,8 +490,7 @@ class TestTurbo(TestCase):
             X = Xopt(
                 evaluator=evaluator,
                 generator=generator,
-                vocs=vocs,
-                dump_file="dump.yml",
+                xopt_dump_file="dump.yml",
             )
 
             yaml_str = X.yaml()
@@ -517,7 +519,9 @@ class TestTurbo(TestCase):
             return {"y1": np.sin(input_dict["x"])}
 
         # Prepare BAX algorithm and generator options
-        algorithm = GridOptimize(n_mesh_points=10)  # NOTE: default is to minimize
+        algorithm = GridOptimize(
+            observable_names_ordered=["y1"], n_mesh_points=10
+        )  # NOTE: default is to minimize
 
         # construct BAX generator
         generator = BaxGenerator(
@@ -532,7 +536,7 @@ class TestTurbo(TestCase):
         evaluator = Evaluator(function=basic_sin_function)
 
         # construct Xopt optimizer
-        X = Xopt(evaluator=evaluator, generator=generator, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=generator)
 
         X.random_evaluate(3)
 
@@ -591,3 +595,26 @@ class TestTurbo(TestCase):
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
+
+
+@pytest.mark.parametrize(
+    "lengthscale",
+    [pytest.param(1.0e200, id="overflow"), pytest.param(1.0e-200, id="underflow")],
+)
+def test_get_trust_region_extreme_lengthscales(lengthscale):
+    test_vocs = deepcopy(TEST_VOCS_BASE)
+    gen = UpperConfidenceBoundGenerator(vocs=test_vocs)
+    gen.add_data(TEST_VOCS_DATA)
+    gen.train_model()
+
+    turbo_state = OptimizeTurboController(vocs=gen.vocs)
+    turbo_state.update_state(gen)
+
+    covar_module = gen.model.models[0].covar_module
+    covar_module.lengthscale = torch.ones_like(covar_module.lengthscale)
+    expected = turbo_state.get_trust_region(gen)
+
+    covar_module.lengthscale = torch.full_like(covar_module.lengthscale, lengthscale)
+    actual = turbo_state.get_trust_region(gen)
+
+    torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)

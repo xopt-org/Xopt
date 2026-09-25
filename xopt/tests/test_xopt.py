@@ -1,7 +1,6 @@
 import math
 import os
 from abc import ABC
-from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
 import numpy as np
@@ -9,18 +8,19 @@ import pandas as pd
 import pytest
 import yaml
 from pydantic import ValidationError
-from xopt import from_file
 
-from xopt.asynchronous import AsynchronousXopt
+from gest_api.vocs import ContinuousVariable
+
+from xopt import from_file
 from xopt.base import Xopt
-from xopt.errors import XoptError
+from xopt.errors import XoptError, VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
 from xopt.generators import try_load_all_generators
 from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.utils import explode_all_columns
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 class DummyGenerator(Generator, ABC):
@@ -31,8 +31,12 @@ class DummyGenerator(Generator, ABC):
     def add_data(self, new_data: pd.DataFrame):
         self.data = pd.concat([self.data, new_data], axis=0)
 
-    def generate(self, n_candidates) -> pd.DataFrame:
-        pass
+    def generate(self, n_candidates) -> list:
+        bounds = np.array(self.vocs.bounds)
+        midpoints = dict(
+            zip(self.vocs.variable_names, (bounds[:, 0] + bounds[:, 1]) / 2)
+        )
+        return [midpoints.copy() for _ in range(n_candidates)]
 
     def default_options(self):
         pass
@@ -46,11 +50,11 @@ class TestXopt:
 
         evaluator = Evaluator(function=dummy)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+        Xopt(generator=gen, evaluator=evaluator)
 
         # init with yaml
         YAML = """
-        dump_file: null
+        xopt_dump_file: null
         data: null
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -59,23 +63,28 @@ class TestXopt:
 
         generator:
             name: random
-
-        vocs:
-            variables:
-                x1: [0, 3.14159]
-                x2: [0, 3.14159]
-            objectives: {y1: MINIMIZE, y2: MINIMIZE}
-            constraints:
-                c1: [GREATER_THAN, 0]
-                c2: [LESS_THAN, 0.5]
-            constants: {a: 0}
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: 0}
 
         """
         X = Xopt.from_yaml(YAML)
-        assert X.vocs.variables == {"x1": (0, 3.14159), "x2": (0, 3.14159)}
+        assert X.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
 
         X = Xopt(YAML)
-        assert X.vocs.variables == {"x1": (0, 3.14159), "x2": (0, 3.14159)}
+        assert X.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
 
         with pytest.raises(ValueError):
             Xopt(YAML, 1)
@@ -87,7 +96,126 @@ class TestXopt:
         yaml.dump(yaml.safe_load(YAML), open("test.yml", "w"))
         for ele in [False, True]:
             X = from_file("test.yml", ele)
-            assert X.vocs.variables == {"x1": (0, 3.14159), "x2": (0, 3.14159)}
+            assert X.vocs.variables == {
+                "x1": ContinuousVariable(domain=[0, 3.14159]),
+                "x2": ContinuousVariable(domain=[0, 3.14159]),
+            }
+
+    def test_legacy_vocs_yaml(self):
+        """
+        Confirm that Xopt loads with V2.x location of VOCS
+        """
+        # init with yaml
+        YAML = """
+        xopt_dump_file: null
+        data: null
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: 0}
+        generator:
+            name: random
+        """
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt.from_yaml(YAML)
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt(YAML)
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 3.14159]),
+            "x2": ContinuousVariable(domain=[0, 3.14159]),
+        }
+
+    def test_legacy_vocs_duplicate_yaml(self):
+        """
+        Confirm that we error out if user supplies multiple vocs in old + new location
+        """
+        # init with yaml
+        YAML = """
+        xopt_dump_file: null
+        data: null
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                a: 999
+        vocs:
+            variables:
+                x1: [0, 3.14159]
+                x2: [0, 3.14159]
+            objectives: {y1: MINIMIZE, y2: MINIMIZE}
+            constraints:
+                c1: [GREATER_THAN, 0]
+                c2: [LESS_THAN, 0.5]
+            constants: {a: 0}
+        generator:
+            name: random
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: 0}
+        """
+        with pytest.raises(VOCSError):
+            Xopt.from_yaml(YAML)
+        with pytest.raises(VOCSError):
+            Xopt(YAML)
+
+    def test_legacy_vocs_bad_generator_type(self):
+        """
+        Confirm that we error out if vocs is supplied at the base level but generator
+        is neither a dict nor a Generator instance.
+        """
+        evaluator = Evaluator(function=xtest_callable)
+        vocs = deepcopy(TEST_VOCS_BASE)
+
+        with pytest.raises(VOCSError):
+            Xopt(
+                generator="not_a_generator",
+                evaluator=evaluator,
+                vocs=vocs,
+            )
+
+    def test_legacy_vocs_python(self):
+        """
+        Confirm we can instantiate Xopt with 2.x VOCS definition (ie in both generator and base).
+        """
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="Defining VOCS in the base Xopt object is deprecated",
+        ):
+            xx = Xopt(
+                generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            )
+        assert xx.vocs.variables == {
+            "x1": ContinuousVariable(domain=[0, 1.0]),
+            "x2": ContinuousVariable(domain=[0, 10.0]),
+        }
 
     def test_index_typing(self):
         evaluator = Evaluator(function=xtest_callable)
@@ -107,20 +235,18 @@ class TestXopt:
             check_index(X, length)
             check_index(reload(X), length)
 
-        test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
+        test_data = random_inputs(deepcopy(TEST_VOCS_BASE), 3)
 
         with pytest.raises(ValueError):
             X1 = Xopt(
                 generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
                 evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
                 data=pd.DataFrame(test_data, index=["foo", 0.25, 1]),
             )
 
         X1 = Xopt(
             generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
             data=pd.DataFrame(test_data, index=[1, 2, 3]),
         )
         check_all(X1, 3)
@@ -128,7 +254,6 @@ class TestXopt:
         X1 = Xopt(
             generator=RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE)),
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
         check_all(X1, 0)
 
@@ -174,17 +299,16 @@ class TestXopt:
 
         generator:
             name: random
-
-        vocs:
-            variables:
-                x1: [0, 3.14159]
-                x2: [0, 3.14159]
-            objectives: {y1: MINIMIZE, y2: MINIMIZE}
-            constraints:
-                c1: [GREATER_THAN, 0]
-                c2: [LESS_THAN, 0.5]
-            constants: {a: dummy_constant}
-            bad_val: 5
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: dummy_constant}
+                bad_val: 5
 
         """
         with pytest.raises(ValidationError):
@@ -195,7 +319,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
 
         out = xopt.evaluate({"x1": 0.4, "x2": 0.3})
@@ -209,7 +334,7 @@ class TestXopt:
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=test_vocs)
 
-        xopt = Xopt(generator=generator, evaluator=evaluator, vocs=test_vocs)
+        xopt = Xopt(generator=generator, evaluator=evaluator)
 
         out = xopt.evaluate({"x2": 0.2})
         assert isinstance(out, dict)
@@ -223,11 +348,12 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
 
         # test evaluating data w/o constants specified
-        test_data = deepcopy(TEST_VOCS_BASE).random_inputs(3)
+        test_data = random_inputs(deepcopy(TEST_VOCS_BASE), 3)
 
         # test list of dicts
         xopt.evaluate_data(test_data)
@@ -251,7 +377,8 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
 
         # fixed seed for deterministic results
@@ -259,10 +386,6 @@ class TestXopt:
 
         val = str(xopt)
         assert "Data size: 2" in val
-        assert (
-            "vocs:\n  constants:\n    constant1: 1.0\n  constraints:\n    c1:\n    - "
-            "GREATER_THAN\n    - 0.5\n  objectives:\n" in val
-        )
 
     def test_function_checking(self):
         def f(x, a=True):
@@ -285,7 +408,6 @@ class TestXopt:
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=vocs,
             strict=True,
         )
         with pytest.raises(XoptError):
@@ -297,7 +419,6 @@ class TestXopt:
         X2 = Xopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=vocs,
             strict=True,
         )
         with pytest.raises(XoptError):
@@ -309,7 +430,6 @@ class TestXopt:
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
         with pytest.raises(ValueError):
             X.evaluate_data(pd.DataFrame({"x1": [0.0, 5.0], "x2": [-3.0, 1.0]}))
@@ -320,7 +440,6 @@ class TestXopt:
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
         assert X.generator.data is None
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
@@ -335,7 +454,6 @@ class TestXopt:
         X = Xopt(
             generator=generator,
             evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
         )
         X.add_data(pd.DataFrame({"x1": [0.0, 1.0], "x2": [0.0, 1.0]}))
         with pytest.raises(KeyError):
@@ -346,50 +464,19 @@ class TestXopt:
         X.remove_data([0])
         assert X.data.equals(new_data)
 
-    def test_asynch(self):
-        evaluator = Evaluator(function=xtest_callable)
-        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=generator,
-            evaluator=evaluator,
-            vocs=deepcopy(TEST_VOCS_BASE),
-        )
-        n_steps = 5
-        for i in range(n_steps):
-            X.step()
-        assert len(X.data) == n_steps
-
-        # now use a threadpool evaluator with different number of max workers
-        for mw in [2]:
-            evaluator = Evaluator(
-                function=xtest_callable, executor=ProcessPoolExecutor(), max_workers=mw
-            )
-            X2 = AsynchronousXopt(
-                generator=generator,
-                evaluator=evaluator,
-                vocs=deepcopy(TEST_VOCS_BASE),
-            )
-
-            n_steps = 5
-            for i in range(n_steps):
-                X2.step()
-
-            # TODO: better async test. This is unpredictable:
-            # assert len(X2.data) == n_steps
-
     def test_strict(self):
         def bad_function(inval):
             raise ValueError
 
         evaluator = Evaluator(function=bad_function)
         gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+        X = Xopt(generator=gen, evaluator=evaluator)
 
         # should raise an error (default)
         with pytest.raises(XoptError):
             X.step()
 
-        X2 = Xopt(generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE))
+        X2 = Xopt(generator=gen, evaluator=evaluator)
         X2.strict = False
 
         X2.random_evaluate(10)
@@ -397,38 +484,15 @@ class TestXopt:
         X2.step()
         assert "xopt_error_str" in X2.data.columns
 
-    def test_process_futures(self):
-        ss = 0
-
-        def bad_function_sometimes(inval):
-            if ss:
-                raise ValueError
-            else:
-                return {"y1": 0.0, "c1": 0.0}
-
-        evaluator = Evaluator(function=bad_function_sometimes)
-        gen = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
-        X = AsynchronousXopt(
-            generator=gen, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
-        )
-        X.strict = False
-
-        # Submit to the evaluator some new inputs
-        X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
-        X.process_futures()
-
-        ss = 1
-        X.submit_data(deepcopy(TEST_VOCS_BASE).random_inputs(4))
-        X.process_futures()
-
     def test_dump_w_exploded_cols(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
-        X.dump_file = "test_checkpointing.yaml"
+        X.xopt_dump_file = "test_checkpointing.yaml"
 
         # test case with exploded data
         data = pd.DataFrame(
@@ -458,9 +522,10 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
-        X.dump_file = "test_checkpointing.yaml"
+        X.xopt_dump_file = "test_checkpointing.yaml"
 
         X.step()
 
@@ -468,19 +533,139 @@ class TestXopt:
             X.step()
 
         # try to load the state from nothing
-        X2 = Xopt.from_file(X.dump_file)
+        X2 = Xopt.from_file(X.xopt_dump_file)
 
         assert len(X2.data) == 6
         assert isinstance(X2.generator, RandomGenerator)
         assert isinstance(X2.evaluator, Evaluator)
         assert X.vocs == X2.vocs
 
+    def test_dump_file_legacy_name(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X = Xopt(
+                generator=generator,
+                evaluator=evaluator,
+                dump_file="test_checkpointing.yaml",
+            )
+        assert X.xopt_dump_file == "test_checkpointing.yaml"
+
+        YAML = """
+        dump_file: test_checkpointing.yaml
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+        generator:
+            name: random
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE}
+        """
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X = Xopt(YAML)
+        assert X.xopt_dump_file == "test_checkpointing.yaml"
+
+    def test_dump_file_legacy_property(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file="test_checkpointing.yaml",
+        )
+
+        # Reading through the old name warns and gives the current value
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            assert X.dump_file == "test_checkpointing.yaml"
+
+        # Assigning through the old name warns and writes through
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X.dump_file = "other_checkpointing.yaml"
+        assert X.xopt_dump_file == "other_checkpointing.yaml"
+
+    def test_dump_file_legacy_conflict(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        with pytest.raises(ValidationError):
+            Xopt(
+                generator=generator,
+                evaluator=evaluator,
+                dump_file="legacy.yaml",
+                xopt_dump_file="test_checkpointing.yaml",
+            )
+
+    def test_data_dump_file(self, tmp_path):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        data_dump_file = str(tmp_path / "data.csv")
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            data_dump_file=data_dump_file,
+        )
+        X.random_evaluate(3)
+
+        assert os.path.exists(data_dump_file)
+        dumped_data = pd.read_csv(data_dump_file, index_col="xopt_index")
+        pd.testing.assert_frame_equal(
+            dumped_data, X.data, check_dtype=False, check_names=False
+        )
+
+        # dumping directly writes the same data
+        os.remove(data_dump_file)
+        X.dump_data()
+        dumped_data = pd.read_csv(data_dump_file, index_col="xopt_index")
+        pd.testing.assert_frame_equal(
+            dumped_data, X.data, check_dtype=False, check_names=False
+        )
+
+    def test_dump_file_expandvars(self, tmp_path, monkeypatch):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        monkeypatch.setenv("XOPT_TEST_DUMP_DIR", str(tmp_path))
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file="$XOPT_TEST_DUMP_DIR/dump.yml",
+            data_dump_file="$XOPT_TEST_DUMP_DIR/data.csv",
+        )
+        X.random_evaluate(1)
+
+        assert os.path.exists(tmp_path / "dump.yml")
+        assert os.path.exists(tmp_path / "data.csv")
+
+    def test_dump_without_files(self, tmp_path):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(generator=generator, evaluator=evaluator)
+
+        # no dump files specified, evaluation should not write anything or raise
+        X.random_evaluate(1)
+        assert not list(tmp_path.iterdir())
+
+        # dumping explicitly requires a destination
+        with pytest.raises(ValueError):
+            X.dump()
+
+        with pytest.raises(ValueError):
+            X.dump_data()
+
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         xopt = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
 
         # fixed seed for deterministic results
@@ -494,10 +679,12 @@ class TestXopt:
         generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
 
         X = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
         X2 = Xopt(
-            generator=generator, evaluator=evaluator, vocs=deepcopy(TEST_VOCS_BASE)
+            generator=generator,
+            evaluator=evaluator,
         )
 
         assert X.generator is not X2.generator
@@ -509,3 +696,70 @@ class TestXopt:
         for f in files:
             if os.path.exists(f):
                 os.remove(f)
+
+    def test_add_data_duplicate_columns(self):
+        """
+        Reproduction of Github issue #434 (Duplicate Columns in xopt.data When User-Provided Eval Function Returns Inputs).
+        This is an issue with the Evaluator where duplicate columns are produced when user-provided eval function returns
+        either variable or constant data.
+        """
+        vocs = VOCS(
+            variables={"x1": [0, 3.14159], "x2": [0, 3.14159]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
+            constants={"a": 1.0},
+        )
+
+        def evaluate_returns_constant(inputs):
+            x1, x2 = inputs["x1"], inputs["x2"]
+            return {
+                "y1": x1,
+                "c1": x1**2 + x2**2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
+                "c2": (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2,
+                "a": inputs[
+                    "a"
+                ],  # returning the constant 'a' back creates duplicate column
+            }
+
+        n_rows = 5
+        initial_df = pd.DataFrame(
+            {
+                "x1": np.random.uniform(0, np.pi, n_rows),
+                "x2": np.random.uniform(0, np.pi, n_rows),
+                "y1": np.random.uniform(0, 1, n_rows),
+                "y2": np.random.uniform(0, 1, n_rows),
+                "c1": np.random.uniform(-1, 1, n_rows),
+                "c2": np.random.uniform(0, 0.5, n_rows),
+            }
+        )
+
+        X = Xopt(
+            generator=DummyGenerator(vocs=vocs),
+            evaluator=Evaluator(function=evaluate_returns_constant),
+        )
+        X.add_data(initial_df)
+        X.step()
+
+    def test_add_data_duplicate_columns_different_values(self):
+        vocs = VOCS(
+            variables={"x1": [0, 3.14159], "x2": [0, 3.14159]},
+            objectives={"y1": "MINIMIZE"},
+            constraints={"c1": ["GREATER_THAN", 0], "c2": ["LESS_THAN", 0.5]},
+            constants={"a": 1.0},
+        )
+
+        def evaluate_returns_different_value(inputs):
+            x1, x2 = inputs["x1"], inputs["x2"]
+            return {
+                "y1": x1,
+                "c1": x1**2 + x2**2 - 1.0 - 0.1 * np.cos(16 * np.arctan2(x1, x2)),
+                "c2": (x1 - 0.5) ** 2 + (x2 - 0.5) ** 2,
+                "a": inputs["a"] + 1.0,  # different value -- should raise
+            }
+
+        X = Xopt(
+            generator=DummyGenerator(vocs=vocs),
+            evaluator=Evaluator(function=evaluate_returns_different_value),
+        )
+        with pytest.raises(ValueError):
+            X.step()

@@ -5,20 +5,23 @@ from typing import Any, cast
 import gpytorch
 import numpy as np
 import pandas as pd
-from pydantic import ValidationInfo
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
-from botorch.utils.multi_objective import is_non_dominated, Hypervolume
+from botorch.models.utils import multioutput_to_batch_mode_transform
+from botorch.utils.multi_objective import Hypervolume, is_non_dominated
+from gest_api.vocs import ExploreObjective, MaximizeObjective, MinimizeObjective
+from pydantic import ValidationInfo
 
+from xopt.generator import Generator
 from xopt.generators.bayesian.turbo import TurboController
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, random_inputs
 
 
 def get_training_data(
     input_names: list[str], outcome_name: str, data: pd.DataFrame
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Creates training data from input data frame.
 
@@ -76,26 +79,81 @@ def get_training_data(
     return train_X, train_Y, train_Yvar
 
 
+def get_training_data_batched(
+    input_names: list[str],
+    outcome_names: list[str],
+    data: pd.DataFrame,
+    batch_mode: bool = False,
+) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    """
+    Get data for multiple outcomes. Valid points have no NaNs for all inputs and outcomes.
+
+    Parameters
+    ----------
+    batch_mode: bool
+        If false, not unrolled - will be done by SingleTaskGP. If true, unrolls the data
+        so that each outcome is treated as a separate task in a batch mode model.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        train_X `n x d` or `m x n x d`
+        train_Y `n x m` or `m x n x 1`
+        train_Yvar `n x m` or `m x n x 1`
+    """
+    input_data = data[input_names]
+    outcome_data = data[outcome_names]
+
+    non_nans_input = ~input_data.isnull().T.any()
+    non_nans_output = ~outcome_data.isnull().T.any()
+    non_nans_all = non_nans_input & non_nans_output
+    input_data = input_data[non_nans_all]
+    outcome_data = outcome_data[non_nans_all]
+
+    train_X = torch.tensor(input_data.to_numpy(dtype="double"))
+
+    train_Y = torch.tensor(outcome_data[outcome_names].to_numpy(dtype="double"))
+
+    train_Yvar = None
+    yvar_names = [f"{outcome}_var" for outcome in outcome_names]
+    have_yvar = [x in data for x in yvar_names]
+    if all(have_yvar):
+        train_Yvar = torch.tensor(
+            data.loc[non_nans_all, yvar_names].to_numpy(dtype="double")
+        )
+    elif not any(have_yvar):
+        # no var
+        pass
+    else:
+        # partial - not allowed
+        raise ValueError("either all or none of the outcomes must have variance data")
+
+    if batch_mode:
+        train_X, train_Y, train_Yvar = multioutput_to_batch_mode_transform(
+            train_X, train_Y, len(outcome_names), train_Yvar
+        )
+        train_Y = train_Y.unsqueeze(-1)
+        if train_Yvar is not None:
+            train_Yvar = train_Yvar.unsqueeze(-1)
+    return train_X, train_Y, train_Yvar
+
+
 def set_botorch_weights(vocs: VOCS):
     """set weights to multiply xopt objectives or observables for botorch objectives"""
     output_names = vocs.output_names
 
     weights = torch.zeros(len(output_names), dtype=torch.double)
 
-    if vocs.n_objectives > 0:
-        # if objectives exist this is an optimization problem
-        # set weights according to the index of the models -- corresponds to the
-        # ordering of output names
-        for objective_name in vocs.objective_names:
-            if vocs.objectives[objective_name] == "MINIMIZE":
-                weights[output_names.index(objective_name)] = -1.0
-            elif vocs.objectives[objective_name] == "MAXIMIZE":
-                weights[output_names.index(objective_name)] = 1.0
-    if vocs.n_objectives == 0:
-        # if no objectives exist this may be an exploration problem, weight each
-        # observable by 1.0
-        for observable_name in vocs.observables:
-            weights[output_names.index(observable_name)] = 1.0
+    # if objectives exist this is an optimization problem
+    # set weights according to the index of the models -- corresponds to the
+    # ordering of output names
+    for objective_name in vocs.objective_names:
+        if isinstance(vocs.objectives[objective_name], MinimizeObjective):
+            weights[output_names.index(objective_name)] = -1.0
+        elif isinstance(
+            vocs.objectives[objective_name], MaximizeObjective
+        ) or isinstance(vocs.objectives[objective_name], ExploreObjective):
+            weights[output_names.index(objective_name)] = 1.0
 
     return weights
 
@@ -245,98 +303,33 @@ def validate_turbo_controller_base(
     for controller_type in valid_controller_types:
         if isinstance(value, controller_type):
             return value
-    else:
-        raise ValueError(
-            f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
-        )
-
-
-class MeanVarModelWrapper(torch.nn.Module):
-    def __init__(self, model: gpytorch.Module):
-        super().__init__()
-        self.model = model
-
-    def forward(self, x: torch.Tensor):
-        output_dist = self.model(x)
-        return output_dist.mean, output_dist.variance
-
-
-class MeanVarModelWrapperPosterior(torch.nn.Module):
-    def __init__(self, model: Model):
-        super().__init__()
-        self.model = model
-
-    def forward(self, x: torch.Tensor):
-        output_dist = self.model.posterior(x)
-        return output_dist.mean, output_dist.variance
-
-
-def torch_trace_gp_model(
-    model: gpytorch.Module,
-    vocs: VOCS,
-    tkwargs: dict[str, Any],
-    posterior: bool = True,
-    grad: bool = False,
-    batch_size: int = 1,
-    verify: bool = False,
-) -> torch.jit.ScriptModule:
-    """
-    Trace a GPyTorch model using torch.jit.trace. Note that resulting object will return mean and variance directly,
-    NOT a multivariate normal.
-
-    Parameters
-    ----------
-    model : Model
-        The GPyTorch model to compile.
-    vocs : VOCS
-        VOCS
-    tkwargs : dict
-        The keyword arguments for the torch tensor.
-    posterior : bool, optional
-        If True, prime the model by using posterior method, otherwise call directly (this invokes gpytorch posterior).
-    grad : bool, optional
-        If True, use gradient context, otherwise use no gradient context.
-    batch_size : int, optional
-        The batch size for the input tensor for tracing, by default 1.
-    verify : bool, optional
-        If True, request that torch verify the trace by comparing to eager mode, by default False.
-    """
-    if isinstance(model, ModelListGP):
-        raise ValueError(
-            "ModelListGP is not supported for JIT tracing - use individual models"
-        )
-    rand_point = vocs.random_inputs()[0]
-    rand_vec = torch.stack(
-        [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
+    raise ValueError(
+        f"Turbo controller of type {type(value)} not allowed for this generator. Valid types are {valid_controller_types}"
     )
-    test_x = rand_vec.to(**tkwargs)
-    # test_x_1 = test_x[:1,...]
 
-    gradctx = nullcontext() if grad else torch.no_grad()
-    model.eval()
-    with gradctx, gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        if posterior:
-            pred = model.posterior(test_x)
-            traced_model = torch.jit.trace(
-                MeanVarModelWrapperPosterior(model), test_x, check_trace=False
-            )
-            traced_model = torch.jit.optimize_for_inference(traced_model)
-        else:
-            pred = model(test_x)
-            traced_model = torch.jit.trace(
-                MeanVarModelWrapper(model), test_x, check_trace=False
-            )
-            traced_model = torch.jit.optimize_for_inference(traced_model)
-        if verify:
-            traced_mean, traced_var = traced_model(test_x)
-            assert torch.allclose(pred.mean, traced_mean, rtol=0), (
-                f"JIT traced mean != original {pred.mean=} {traced_mean=}"
-            )
-            assert torch.allclose(pred.variance, traced_var, rtol=0), (
-                f"JIT traced variance != original: {pred.variance=} {traced_var=}"
-            )
 
-    return traced_model.to(**tkwargs)
+def validate_turbo_controller_center(generator: Generator) -> None:
+    if generator.turbo_controller is not None:
+        # Check that values for center_x are within trust region bounds
+        trust_region = generator.turbo_controller.get_trust_region(generator)
+        active_variable_names = list(
+            getattr(generator, "_candidate_names", generator.vocs.variable_names)
+        )
+
+        center_x = generator.turbo_controller.center_x
+        if center_x is not None:
+            for idx, key in enumerate(active_variable_names):
+                value = center_x.get(key)
+                if value is None:
+                    continue
+                lower_bound = trust_region[0, idx].item()
+                upper_bound = trust_region[1, idx].item()
+                if not (lower_bound <= value <= upper_bound):
+                    raise ValueError(
+                        f"Turbo controller center_x value for {key} : "
+                        f"{value} is outside of trust region bounds "
+                        f"[{lower_bound}, {upper_bound}]"
+                    )
 
 
 def torch_compile_gp_model(
@@ -370,71 +363,36 @@ def torch_compile_gp_model(
     """
     if isinstance(model, ModelListGP):
         raise ValueError("ModelListGP is not supported - use individual models")
-    rand_point = vocs.random_inputs()[0]
+    rand_point = random_inputs(vocs)[0]
     rand_vec = torch.stack(
         [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
     )
     test_x = rand_vec.to(**tkwargs)
 
-    gradctx = nullcontext if grad else torch.no_grad()
-    # TODO: check if gpytorch trace mode faster
+    gradctx = nullcontext() if grad else torch.no_grad()
     with gradctx, gpytorch.settings.fast_pred_var():
         model.eval()
         if posterior:
             pred = model.posterior(test_x)
-            traced_model = torch.compile(
+            compiled_model = torch.compile(
                 model, backend=backend, mode=mode, dynamic=None
             )
-            mvn = traced_model.posterior(test_x)
+            mvn = compiled_model.posterior(test_x)
         else:
             pred = model(test_x)
-            traced_model = torch.compile(
+            compiled_model = torch.compile(
                 model, backend=backend, mode=mode, dynamic=None
             )
-            mvn = traced_model(test_x)
-        traced_mean, traced_var = mvn.mean, mvn.variance
-        assert torch.allclose(pred.mean, traced_mean, rtol=0), (
-            f"Compiled mean != original {pred.mean=} {traced_mean=}"
+            mvn = compiled_model(test_x)
+        compiled_mean, compiled_var = mvn.mean, mvn.variance
+        assert torch.allclose(pred.mean, compiled_mean, rtol=0), (
+            f"Compiled mean != original {pred.mean=} {compiled_mean=}"
         )
-        assert torch.allclose(pred.variance, traced_var, rtol=0), (
-            f"Compiled variance != original: {pred.variance=} {traced_var=}"
+        assert torch.allclose(pred.variance, compiled_var, rtol=0), (
+            f"Compiled variance != original: {pred.variance=} {compiled_var=}"
         )
 
-    return traced_model
-
-
-def torch_trace_acqf(
-    acq: AcquisitionFunction, vocs: VOCS, tkwargs: dict
-) -> torch.jit.ScriptModule:
-    """
-    Trace an acquisition function using torch.jit.trace.
-
-    Parameters
-    ----------
-    acq : AcquisitionFunction
-        The acquisition function to trace.
-    vocs : VOCS
-        VOCS
-    tkwargs : dict
-        The keyword arguments for the torch tensor.
-    """
-    # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
-    rand_point = vocs.random_inputs()[0]
-    rand_vec = torch.stack(
-        [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
-    )
-    test_x = rand_vec.to(**tkwargs)
-    test_x = test_x.unsqueeze(-2)
-    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        # Need dummy evaluation to set caches
-        acq(test_x.clone().detach())
-        saqcf = torch.jit.trace(
-            acq,
-            example_inputs=test_x.clone().detach(),
-            check_trace=True,
-            check_tolerance=1e-8,
-        )
-    return saqcf
+    return compiled_model
 
 
 def torch_compile_acqf(
@@ -463,14 +421,13 @@ def torch_compile_acqf(
     verify : bool, optional
         If True, do the verification vs eager mode.
     """
-    # TODO: check if trace mode better
     # NOTE: is verify is False, you need to ensure tensors are copied before calling
     # or RuntimeError: Error: accessing tensor output of CUDAGraphs that has been overwritten by a subsequent run
-    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
+    with gpytorch.settings.fast_pred_var():
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
         if verify:
-            rand_point = vocs.random_inputs()[0]
+            rand_point = random_inputs(vocs)[0]
             rand_vec = torch.stack(
                 [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
             )

@@ -55,7 +55,7 @@ def evaluate_rosenbrock(inputs: Dict, label="y", dummy=1) -> Dict[str, float]:
 
     """
 
-    return {"y": rosenbrock([inputs[k] for k in sorted(inputs)])}
+    return {label: rosenbrock([inputs[k] for k in sorted(inputs)])}
 
 
 def make_rosenbrock_vocs(n):

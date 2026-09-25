@@ -3,8 +3,10 @@ from copy import deepcopy
 import pandas as pd
 import pytest
 import torch
+from gest_api.vocs import VOCS
 
 from xopt.base import Xopt
+from xopt.errors import VOCSError
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian.mggpo import MGGPOGenerator
 from xopt.resources.test_functions.tnk import evaluate_TNK, tnk_vocs
@@ -67,7 +69,7 @@ class TestMGGPO:
         vocs = deepcopy(tnk_vocs)
         reference_point = {"y1": 3.14, "y2": 3.14}
         gen = MGGPOGenerator(vocs=vocs, reference_point=reference_point)
-        X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=gen)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
         samples = X.generator.generate(10)
         assert pd.DataFrame(samples).to_numpy().shape == (10, 2)
@@ -83,8 +85,17 @@ class TestMGGPO:
         reference_point = {"y1": 3.14, "y2": 3.14}
         gen = MGGPOGenerator(vocs=vocs, reference_point=reference_point)
 
-        X = Xopt(evaluator=evaluator, generator=gen, vocs=vocs)
+        X = Xopt(evaluator=evaluator, generator=gen)
         X.evaluate_data(pd.DataFrame({"x1": [1.0, 0.75], "x2": [0.75, 1.0]}))
 
         for _ in [0, 1]:
             X.step()
+
+    def test_discrete_variables_not_supported(self):
+        vocs = VOCS(
+            variables={"x1": {0.0, 1.0}, "x2": [0.0, 1.0]},
+            objectives={"y1": "MINIMIZE", "y2": "MINIMIZE"},
+        )
+
+        with pytest.raises(VOCSError, match="does not support discrete variables"):
+            MGGPOGenerator(vocs=vocs, reference_point={"y1": 1.0, "y2": 1.0})

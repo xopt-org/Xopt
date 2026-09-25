@@ -7,7 +7,7 @@ import pytest
 
 import torch
 
-from xopt.resources.benchmarking import BenchMOBO
+from xopt.resources.bench_framework import BenchMOBO
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

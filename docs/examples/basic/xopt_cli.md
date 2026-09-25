@@ -12,7 +12,7 @@ Once Xopt is installed from conda/pip, the tool will be available in your system
 
 ```
 xopt-run [-h] [--executor {map,thread_pool,process_pool}] [--max_workers MAX_WORKERS]
-         [--python_path PYTHON_PATH] [--override OVERRIDE] [-v] config
+         [--python_path PYTHON_PATH] [--override OVERRIDE] [--initial_data INITIAL_DATA] [-v] config
 ```
 
 The available arguments are the following.
@@ -23,6 +23,7 @@ The available arguments are the following.
 - `--max_workers`: Override the number of workers in Xopt and launch this number of threads/processes if using a parallel executor.
 - `--python_path`: Add this directory to your python path. By default, the current working directory. May include environment variables and the character `~` to represent the user's home directory. Note: you can pass these values into the tool without shell expansion by surrounding them by single quotes. May have more than one of this flag.
 - `--override`: Override a value from the YAML config file. May have more than one of this flag. More details below.
+- `--initial_data`: CSV file with initial data to seed the generator before running.
 - `-v`, `--verbose`: Display verbose output (`logging.DEBUG` level messages) from Xopt
 
 ## Overriding Settings in Config File
@@ -42,6 +43,14 @@ Xopt will automatically import the package and then use the specified function f
 
 The argument `--python_path <path>` is used to add the directory containing your python file with the evaluation function to your python path.
 By default, the current working directory is included in your python path.
+
+## Seeding Optimization with Existing Data
+
+It is sometimes useful to load already evaluated data into the `Xopt` optimizer before running.
+For example, to pick up an optimization from the results of a previous run (for generators without a checkpointing feature) or to "seed" the optimizer with related results or lower fidelity simulation outputs.
+The arugment `--initial_data` is used to specify a path to a CSV file containing the data to seed the generator with.
+The CSV file will be loaded and passed to `Xopt.add_data` before running the optimizer.
+As such, the CSV file is expected to have a header row and columns that have the same names as the keys in the VOCS of the problem being optimized.
 
 ## Example Usage
 ### Calling an Evaluation Function from a Python File

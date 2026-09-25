@@ -1,5 +1,6 @@
 from copy import deepcopy
 import numpy as np
+import pandas as pd
 import pytest
 from pydantic import ValidationError
 
@@ -8,7 +9,7 @@ from xopt.errors import SeqGeneratorError
 from xopt.evaluator import Evaluator
 from xopt.generators.sequential.extremumseeking import ExtremumSeekingGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
-from xopt.vocs import VOCS
+from xopt.vocs import VOCS, select_best, get_variable_data
 
 
 class TestExtremumSeekingGenerator:
@@ -40,6 +41,21 @@ class TestExtremumSeekingGenerator:
         gen.decay_rate = 2
         assert gen.oscillation_size == 0.2
         assert gen.decay_rate == 2
+
+    def test_set_data(self):
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.constraints = {}
+
+        gen = ExtremumSeekingGenerator(vocs=test_vocs)
+        data = {}
+        for var in test_vocs.variable_names:
+            data[var] = [0.0]
+        data["y1"] = [0.0]
+
+        gen.set_data(pd.DataFrame(data, index=[0]))
+        assert gen._i == 0
+        assert np.allclose(gen._last_input, np.zeros(len(test_vocs.variable_names)))
+        assert gen._last_outcome == 0.0
 
     def test_es_agreement(self):
         """Compare the first 100 steps between Vanilla ES and Xopt ES"""
@@ -197,12 +213,6 @@ class TestExtremumSeekingGenerator:
                         * (aES[j] * wES[jw]) ** 0.5
                     )
 
-                # For each new ES value, check that we stay within min/max constraints
-                if p_next[j] < -1.0:
-                    p_next[j] = -1.0
-                if p_next[j] > 1.0:
-                    p_next[j] = 1.0
-
             # Return the next value
             return p_next
 
@@ -257,7 +267,7 @@ class TestExtremumSeekingGenerator:
 
         evaluator = Evaluator(function=f_ES_minimize)
         generator = ExtremumSeekingGenerator(vocs=vocs)
-        X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+        X = Xopt(evaluator=evaluator, generator=generator)
         X.evaluate_data({name: val for name, val in zip(vocs.variable_names, pES[0])})
 
         for i in range(ES_steps):
@@ -272,19 +282,22 @@ class TestExtremumSeekingGenerator:
             return {"y1": np.sum([x**2 for x in x.values()])}
 
         # reduce dimensionality to speed up test
-        variables = {f"x{i}": [-5, 5] for i in range(3)}
+        variables = {f"x{i}": [-1, 1] for i in range(3)}
         objectives = {"y1": "MINIMIZE"}
         vocs = VOCS(variables=variables, objectives=objectives)
         evaluator = Evaluator(function=eval_f)
         generator = ExtremumSeekingGenerator(vocs=vocs)
-        X = Xopt(vocs=vocs, evaluator=evaluator, generator=generator)
+        for ele in [-1.0, 1.0]:
+            X = Xopt(evaluator=evaluator, generator=generator)
 
-        X.random_evaluate(1)
-        for i in range(5000):
-            X.step()
+            X.evaluate_data(
+                {name: val for name, val in zip(vocs.variable_names, ele * np.ones(3))}
+            )
+            for i in range(50):
+                X.step()
 
-        idx, best, _ = X.vocs.select_best(X.data)
-        xbest = X.vocs.variable_data(X.data.loc[idx, :]).to_numpy().flatten()
-        assert best[0] >= 0.0
-        assert best[0] <= 1.0
-        assert np.allclose(xbest, np.zeros(3), rtol=0, atol=1.0)
+            idx, best, _ = select_best(X.vocs, X.data)
+            xbest = get_variable_data(X.vocs, X.data.loc[idx, :]).to_numpy().flatten()
+            assert best[0] >= 0.0
+            assert best[0] <= 1.0
+            assert np.allclose(xbest, np.zeros(3), rtol=0, atol=1.0)

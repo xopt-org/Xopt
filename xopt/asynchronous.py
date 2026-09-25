@@ -1,4 +1,5 @@
 import concurrent
+import threading
 from typing import Dict, List, Union
 
 import numpy as np
@@ -7,17 +8,28 @@ from pandas import DataFrame
 from pydantic import Field
 
 from xopt.base import logger, Xopt
+from xopt.errors import DataError
 from xopt.evaluator import validate_outputs
+from xopt.vocs import validate_input_data
 
 
 class AsynchronousXopt(Xopt):
-    _futures: Dict = {}
+    _futures: Dict = None  # Will be initialized in __init__
     _ix_last: int = 0
     _n_unfinished_futures: int = 0
-    _input_data: DataFrame = DataFrame([])
+    _input_data: DataFrame = None  # Will be initialized in __init__
+    _data_lock: threading.Lock = None  # Will be created lazily
+    _global_index_counter: int = 0  # Global counter for unique indices
     is_done: bool = Field(
         default=False, description="flag indicating that Xopt fininshed running"
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize instance-specific mutable objects
+        self._futures = {}
+        self._input_data = pd.DataFrame([])
+        self._global_index_counter = 0
 
     def submit_data(
         self,
@@ -71,18 +83,16 @@ class AsynchronousXopt(Xopt):
         input_data = pd.DataFrame(input_data, copy=True)  # copy for reindexing
 
         # add constants to input data
-        for name, value in self.vocs.constants.items():
-            input_data[name] = value
+        for name, ele in self.vocs.constants.items():
+            input_data[name] = ele.value
 
         # Reindex input dataframe
-        input_data.index = np.arange(
-            self._ix_last + 1, self._ix_last + 1 + len(input_data)
-        )
+        input_data.index = np.arange(self._ix_last, self._ix_last + len(input_data))
         self._ix_last += len(input_data)
         self._input_data = pd.concat([self._input_data, input_data])
 
         # validate data before submission
-        self.vocs.validate_input_data(self._input_data)
+        validate_input_data(self.vocs, self._input_data)
 
         return input_data
 
@@ -123,7 +133,11 @@ class AsynchronousXopt(Xopt):
             if self.strict:
                 if future.exception() is not None:
                     raise future.exception()
-                validate_outputs(pd.DataFrame(outputs, index=[1]))
+
+                try:
+                    validate_outputs(pd.DataFrame(outputs))
+                except ValueError:  # handle case where outputs is a dict of lists instead of list of dicts
+                    validate_outputs(pd.DataFrame(outputs, index=[1]))
             output_data.append(outputs)
 
         # Special handling of a vectorized futures.
@@ -149,3 +163,89 @@ class AsynchronousXopt(Xopt):
         self._input_data.drop(index, inplace=True)
 
         return len(unfinished_futures)
+
+    def add_data(self, new_data: pd.DataFrame):
+        """
+        Thread-safe version of add_data for concurrent access with guaranteed unique indices.
+
+        Concatenate new data to the internal DataFrame and add it to the generator's
+        data with proper synchronization to prevent race conditions and duplicate indices.
+
+        Parameters
+        ----------
+        new_data : pd.DataFrame
+            New data to be added to the internal DataFrame.
+        """
+        logger.debug(f"Adding {len(new_data)} new data to internal dataframes")
+
+        with self.data_lock:
+            # Set internal dataframe with thread safety and guaranteed unique indices
+            if self.data is not None:
+                new_data = pd.DataFrame(new_data, copy=True)  # copy for reindexing
+
+                # Use global counter to ensure unique indices
+                start_idx = self._global_index_counter
+                new_data.index = np.arange(start_idx, start_idx + len(new_data))
+                self._global_index_counter += len(new_data)
+
+                # Double-check for uniqueness before concatenation
+                if self.data.index.intersection(new_data.index).size > 0:
+                    logger.warning(
+                        "Detected potential index collision, regenerating indices"
+                    )
+                    # Fallback: use the actual max index + 1
+                    max_existing_idx = (
+                        self.data.index.max() if len(self.data) > 0 else -1
+                    )
+                    new_data.index = np.arange(
+                        max_existing_idx + 1, max_existing_idx + 1 + len(new_data)
+                    )
+                    self._global_index_counter = max_existing_idx + 1 + len(new_data)
+
+                self.data = pd.concat([self.data, new_data], axis=0)
+
+                # Final validation: ensure no duplicate indices
+                if not self.data.index.is_unique:
+                    logger.error(
+                        "Duplicate indices detected after concatenation, fixing..."
+                    )
+                    self.data = self.data.reset_index(drop=True)
+                    self._global_index_counter = len(self.data)
+
+            else:
+                new_data = pd.DataFrame(new_data, copy=True)
+                if new_data.index.dtype != np.int64:
+                    new_data.index = new_data.index.astype(np.int64)
+                # Ensure starting indices are sequential from 0
+                new_data.index = np.arange(len(new_data))
+                self._global_index_counter = len(new_data)
+                self.data = new_data
+
+        # Pass data to generator outside of lock to avoid potential deadlocks
+        # Continue in case of invalid data when strict=False
+        try:
+            self.generator.ingest(new_data.to_dict(orient="records"))
+        except DataError as exc:
+            if self.strict:
+                raise exc
+
+    @property
+    def data_lock(self):
+        """Lazy initialization of the data lock to avoid pickling issues."""
+        if self._data_lock is None:
+            self._data_lock = threading.Lock()
+        return self._data_lock
+
+    def __getstate__(self):
+        """Custom pickle method to exclude non-picklable threading objects."""
+        state = self.__dict__.copy()
+        # Remove the unpicklable lock
+        state["_data_lock"] = None
+        # Remove futures as they are also not picklable
+        state["_futures"] = {}
+        return state
+
+    def __setstate__(self, state):
+        """Custom unpickle method to restore state."""
+        self.__dict__.update(state)
+        # The lock will be recreated lazily when accessed

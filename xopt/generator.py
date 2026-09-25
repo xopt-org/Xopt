@@ -1,19 +1,22 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Hashable, Optional, cast
+from collections.abc import Hashable
+from typing import Any, ClassVar
 
 import pandas as pd
+from gest_api.generator import Generator as BaseGenerator
+from gest_api.vocs import VOCS, DiscreteVariable
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
-from xopt.vocs import VOCS
+from xopt.vocs import ContextualVariable
 
 logger = logging.getLogger(__name__)
 
 
-class Generator(XoptBaseModel, ABC):
+class Generator(XoptBaseModel, BaseGenerator, ABC):
     """
     Base class for Generators.
 
@@ -45,14 +48,20 @@ class Generator(XoptBaseModel, ABC):
         frozen=True,
         exclude=True,
     )
-    supports_multi_objective: bool = Field(
+    supports_no_objective: bool = Field(
         default=False,
-        description="flag that describes if this generator can solve multi-objective "
-        "problems",
+        description="flag that describes if this generator can solve problems with no objectives",
         frozen=True,
         exclude=True,
     )
     supports_single_objective: bool = Field(
+        default=False,
+        description="flag that describes if this generator can solve single-objective "
+        "problems",
+        frozen=True,
+        exclude=True,
+    )
+    supports_multi_objective: bool = Field(
         default=False,
         description="flag that describes if this generator can solve multi-objective "
         "problems",
@@ -66,51 +75,111 @@ class Generator(XoptBaseModel, ABC):
         frozen=True,
         exclude=True,
     )
-
-    vocs: VOCS = Field(description="generator VOCS", exclude=True)
-    data: Optional[pd.DataFrame] = Field(
-        None, description="generator data", exclude=True
+    supports_discrete_variables: bool = Field(
+        default=False,
+        description="flag that describes if this generator can optimize discrete "
+        "input variables",
+        frozen=True,
+        exclude=True,
     )
+    supports_contextual_variables: bool = Field(
+        default=False,
+        description="flag that describes if this generator can use contextual input "
+        "variables",
+        frozen=True,
+        exclude=True,
+    )
+
+    vocs: VOCS = Field(description="generator VOCS")
+    data: pd.DataFrame | None = Field(None, description="generator data", exclude=True)
 
     model_config = ConfigDict(validate_assignment=True)
 
-    # def __init__(self, **kwargs: Any):
-    #     """
-    #     Initialize the generator.
-    #     """
-    #     super().__init__(**kwargs)
-    #     logger.info(f"Initialized generator {self.name}")
+    @staticmethod
+    def _has_discrete_variables(vocs: VOCS) -> bool:
+        n_discrete_variables = getattr(vocs, "n_discrete_variables", None)
+        if n_discrete_variables is not None:
+            return n_discrete_variables > 0
+
+        return any(
+            isinstance(vocs.variables[name], DiscreteVariable)
+            for name in vocs.variable_names
+        )
+
+    @staticmethod
+    def _has_contextual_variables(vocs: VOCS) -> bool:
+        return any(
+            isinstance(vocs.variables[name], ContextualVariable)
+            for name in vocs.variable_names
+        )
 
     @field_validator("vocs", mode="after")
-    @classmethod
-    def validate_vocs(cls, value: VOCS, info: ValidationInfo) -> VOCS:
-        if value.n_constraints > 0 and not info.data["supports_constraints"]:
+    def validate_vocs(cls, v, info: ValidationInfo):
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
             raise VOCSError("this generator does not support constraints")
-        if value.n_objectives == 1:
-            if not info.data["supports_single_objective"]:
-                raise VOCSError(
-                    "this generator does not support single objective optimization"
-                )
-        elif value.n_objectives > 1 and not info.data["supports_multi_objective"]:
+
+        if (
+            cls._has_discrete_variables(v)
+            and not info.data["supports_discrete_variables"]
+        ):
+            raise VOCSError("this generator does not support discrete variables")
+
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
+
+        # check objective support
+        if v.n_objectives == 0 and not info.data["supports_no_objective"]:
+            raise VOCSError(
+                "this generator does not support problems with no objectives"
+            )
+        elif v.n_objectives == 1 and not info.data["supports_single_objective"]:
+            raise VOCSError(
+                "this generator does not support single objective optimization"
+            )
+        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
             raise VOCSError(
                 "this generator does not support multi-objective optimization"
             )
 
-        return value
+        return v
 
     @field_validator("data", mode="before")
-    @classmethod
-    def validate_data(cls, value: Any) -> Optional[pd.DataFrame]:
-        if isinstance(value, dict):
-            value_dict = cast(dict[str, Any], value)
-
+    def validate_data(cls, v):
+        if isinstance(v, dict):
             try:
-                value = pd.DataFrame(value_dict)
-            except IndexError:
-                value = pd.DataFrame(value_dict, index=[0])
-            return value
+                v = pd.DataFrame(v)
+            except Exception as e:
+                # Pydantic catches this first
+                if isinstance(
+                    e, ValueError
+                ) and "If using all scalar values, you must pass an index" in str(e):
+                    v = pd.DataFrame(v, index=[0])
+                else:
+                    raise
+        return v
 
-        return value
+    def _validate_vocs(self, vocs: VOCS):
+        pass
+
+    def __init__(self, **kwargs):
+        """
+        Initialize the generator.
+        """
+        super().__init__(**kwargs)
+        logger.info(f"Initialized generator {self.name}")
+
+    def suggest(self, num_points: int | None) -> list[dict]:
+        return self.generate(num_points)
+
+    def ingest(self, results: list[dict]) -> None:
+        self.add_data(pd.DataFrame(results))
+
+    @property
+    def is_done(self):
+        return self._is_done
 
     @abstractmethod
     def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
@@ -124,7 +193,7 @@ class Generator(XoptBaseModel, ABC):
 
         """
         if self.data is not None:
-            self.data = pd.concat([self.data, new_data], axis=0)
+            self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
         else:
             self.data = new_data
 

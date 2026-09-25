@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from pydantic import Field, PositiveFloat
 
+from xopt.vocs import get_variable_data, get_objective_data
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 
@@ -89,20 +90,20 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         for n in np.arange(self._nES):
             jw = int(np.floor(n / 2))
             self._aES[n] = self._wES[jw] * (self.oscillation_size) ** 2
-        bound_low, bound_up = self.vocs.bounds
+        bound_low, bound_up = np.array(self.vocs.bounds).T
         self._p_ave = (bound_up + bound_low) / 2
         self._p_diff = bound_up - bound_low
 
     def _reset(self):
         self._i = 0
-        self._last_input = self.vocs.variable_data(self.data).to_numpy()[-1]
-        self._last_outcome = self.vocs.objective_data(self.data).to_numpy()[-1, 0]
+        self._last_input = get_variable_data(self.vocs, self.data).to_numpy()[-1]
+        self._last_outcome = get_objective_data(self.vocs, self.data).to_numpy()[-1, 0]
 
     def _add_data(self, new_data: pd.DataFrame):
         self.data = new_data.iloc[-1:]
         self._last_input = self.data[self.vocs.variable_names].to_numpy()[0]
 
-        res = self.vocs.objective_data(new_data).to_numpy()
+        res = get_objective_data(self.vocs, new_data).to_numpy()
         self._last_outcome = res[0, 0]
 
         self._i += 1
@@ -111,8 +112,8 @@ class ExtremumSeekingGenerator(SequentialGenerator):
         self.data = data.iloc[-1:]
 
         self._i = 0
-        self._last_input = self.vocs.variable_data(self.data).to_numpy()[-1]
-        self._last_outcome = self.vocs.objective_data(self.data).to_numpy()[-1, 0]
+        self._last_input = get_variable_data(self.vocs, self.data).to_numpy()[-1]
+        self._last_outcome = get_objective_data(self.vocs, self.data).to_numpy()[-1, 0]
         # TODO: add proper reload tests
 
     def p_normalize(self, p: np.ndarray) -> np.ndarray:

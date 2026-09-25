@@ -3,32 +3,37 @@ import os
 import time
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Hashable
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from itertools import islice, product
+from math import prod
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 import torch
 from botorch.acquisition import (
-    FixedFeatureAcquisitionFunction,
-    qUpperConfidenceBound,
     AcquisitionFunction,
+    FixedFeatureAcquisitionFunction,
     MCAcquisitionObjective,
+    qUpperConfidenceBound,
 )
 from botorch.models.model import Model
-from botorch.sampling import MCSampler, get_sampler
+from botorch.sampling.base import MCSampler
+from botorch.sampling.get_sampler import get_sampler
+from gest_api.vocs import VOCS, DiscreteVariable, MaximizeObjective, MinimizeObjective
 from pydantic import (
     Field,
-    field_validator,
     PositiveInt,
     SerializeAsAny,
+    field_validator,
     model_validator,
 )
-from pydantic.fields import PrivateAttr, ModelPrivateAttr
+from pydantic.fields import ModelPrivateAttr, PrivateAttr
 from pydantic_core.core_schema import ValidationInfo
 from torch import Tensor
 
-from xopt.errors import XoptError, FeasibilityError
+from xopt.errors import FeasibilityError, VOCSError, XoptError
 from xopt.generator import Generator
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
@@ -37,26 +42,39 @@ from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
 from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
     LogAcquisitionFunction,
 )
-from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.models.approximate import ApproximateModelConstructor
+from xopt.generators.bayesian.models.standard import (
+    BatchedModelConstructor,
+    StandardModelConstructor,
+)
+from xopt.generators.bayesian.models.time_dependent import TimeDependentModelConstructor
 from xopt.generators.bayesian.objectives import (
+    CustomXoptObjective,
     create_constraint_callables,
     create_mc_objective,
-    CustomXoptObjective,
 )
 from xopt.generators.bayesian.turbo import (
     TurboController,
 )
 from xopt.generators.bayesian.utils import (
+    compute_hypervolume_and_pf,
     interpolate_points,
     rectilinear_domain_union,
     set_botorch_weights,
     validate_turbo_controller_base,
-    compute_hypervolume_and_pf,
+    validate_turbo_controller_center,
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
 from xopt.pydantic import decode_torch_module
-from xopt.vocs import VOCS
+from xopt.vocs import (
+    ContextualVariable,
+    convert_numpy_to_inputs,
+    extract_data,
+    get_variable_bounds,
+    get_variable_bounds_array,
+    has_discrete_variables,
+)
 
 logger = logging.getLogger()
 
@@ -106,7 +124,7 @@ class BayesianGenerator(Generator, ABC):
     computation_time : Optional[pd.DataFrame]
         A data frame tracking computation time in seconds.
 
-    n_interpolate_samples: Optional[PositiveInt]
+    n_interpolate_points: Optional[PositiveInt]
         Number of interpolation points to generate between last observation and next
         observation, requires n_candidates to be 1.
 
@@ -136,13 +154,18 @@ class BayesianGenerator(Generator, ABC):
     """
 
     name = "base_bayesian_generator"
-    model: Optional[Model] = Field(
+    supports_discrete_variables: bool = True
+    supports_contextual_variables: bool = True
+    supports_no_objective: bool = (
+        True  # note: only supports if custom objective is provided
+    )
+    model: Model | None = Field(
         None, description="botorch model used by the generator to perform optimization"
     )
     n_monte_carlo_samples: int = Field(
         128, description="number of monte carlo samples to use"
     )
-    turbo_controller: SerializeAsAny[Optional[TurboController]] = Field(
+    turbo_controller: SerializeAsAny[TurboController | None] = Field(
         default=None, description="turbo controller for trust-region BO"
     )
     use_cuda: bool = Field(False, description="flag to enable cuda usage if available")
@@ -153,37 +176,64 @@ class BayesianGenerator(Generator, ABC):
         LBFGSOptimizer(),
         description="optimizer used to optimize the acquisition function",
     )
-    max_travel_distances: Optional[List[float]] = Field(
+    max_travel_distances: list[float] | None = Field(
         None,
         description="limits for travel distance between points in normalized space",
     )
-    fixed_features: Optional[Dict[str, float]] = Field(
+    fixed_features: dict[str, float] | None = Field(
         None, description="fixed features used in Bayesian optimization"
     )
-    computation_time: Optional[pd.DataFrame] = Field(
+    computation_time: pd.DataFrame | None = Field(
         None,
         description="data frame tracking computation time in seconds",
     )
-    custom_objective: Optional[CustomXoptObjective] = Field(
+    custom_objective: CustomXoptObjective | None = Field(
         None,
         description="custom objective for optimization, replaces objective specified by VOCS",
     )
-    n_interpolate_points: Optional[PositiveInt] = None
+    n_interpolate_points: PositiveInt | None = None
 
     n_candidates: int = 1
 
-    _compatible_turbo_controllers: Optional[list[type[TurboController]]] = PrivateAttr(
+    _compatible_turbo_controllers: list[type[TurboController]] | None = PrivateAttr(
         default=None
     )
     _compatible_numerical_optimizers: list[type[NumericalOptimizer]] = PrivateAttr(
         default=[LBFGSOptimizer, GridOptimizer]
     )
 
+    @field_validator("vocs", mode="after")
+    @classmethod
+    def validate_vocs(cls, v: VOCS, info: ValidationInfo) -> VOCS:
+        if v.n_constraints > 0 and not info.data["supports_constraints"]:
+            raise VOCSError("this generator does not support constraints")
+
+        if has_discrete_variables(v) and not info.data["supports_discrete_variables"]:
+            raise VOCSError("this generator does not support discrete variables")
+
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
+
+        # assertion that at least one objective exists is done in model_validator below
+
+        if v.n_objectives == 1:
+            if not info.data["supports_single_objective"]:
+                raise VOCSError(
+                    "this generator does not support single objective optimization"
+                )
+        elif v.n_objectives > 1 and not info.data["supports_multi_objective"]:
+            raise VOCSError(
+                "this generator does not support multi-objective optimization"
+            )
+
+        return v
+
     @classmethod
     def get_compatible_turbo_controllers(cls) -> list[type[TurboController] | None]:
         compatible = cls._compatible_turbo_controllers
-        if compatible is None:
-            return [None]
 
         compatible_list: list[type[TurboController] | None] = []
         # If it's a ModelPrivateAttr, get the default value
@@ -204,18 +254,25 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("model", mode="before")
     @classmethod
-    def validate_torch_modules(cls, value: Any):
+    def validate_torch_modules(cls, value: Any) -> Any:
         if isinstance(value, str):
             if value.startswith("base64:"):
                 value = decode_torch_module(value)
             elif os.path.exists(value):
                 value = torch.load(value, weights_only=False)
+            else:
+                raise XoptError(f"cannot load torch module from {value}")
         return value
 
     @field_validator("gp_constructor", mode="before")
     @classmethod
-    def validate_gp_constructor(cls, value: Any):
-        constructor_dict = {"standard": StandardModelConstructor}
+    def validate_gp_constructor(cls, value: Any) -> Any:
+        constructor_dict = {
+            "standard": StandardModelConstructor,
+            "batched": BatchedModelConstructor,
+            "time_dependent": TimeDependentModelConstructor,
+            "approximate": ApproximateModelConstructor,
+        }
         if value is None:
             value = StandardModelConstructor()
         elif isinstance(value, ModelConstructor):
@@ -237,7 +294,7 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("numerical_optimizer", mode="before")
     @classmethod
-    def validate_numerical_optimizer(cls, value: Any):
+    def validate_numerical_optimizer(cls, value: Any) -> Any:
         optimizer_dict: dict[str, type[NumericalOptimizer]] = {
             "grid": GridOptimizer,
             "LBFGS": LBFGSOptimizer,
@@ -264,13 +321,10 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("turbo_controller", mode="before")
     @classmethod
-    def validate_turbo_controller(cls, value: Any, info: ValidationInfo):
+    def validate_turbo_controller(cls, value: Any, info: ValidationInfo) -> Any:
         """note default behavior is no use of turbo"""
         if value is None:
             return value
-
-        if cls._compatible_turbo_controllers is None:
-            raise ValueError("no turbo controllers are compatible with this generator")
 
         compatible_turbo_controllers = [
             turbo_controller
@@ -287,10 +341,8 @@ class BayesianGenerator(Generator, ABC):
 
     @field_validator("computation_time", mode="before")
     @classmethod
-    def validate_computation_time(cls, value: Any):
-        if value is None:
-            return value
-        elif isinstance(value, pd.DataFrame):
+    def validate_computation_time(cls, value: Any) -> Any:
+        if value is None or isinstance(value, pd.DataFrame):
             return value
         elif isinstance(value, dict):
             value = pd.DataFrame(value)
@@ -302,28 +354,25 @@ class BayesianGenerator(Generator, ABC):
         return value
 
     @model_validator(mode="after")
-    def validate_model_after(self):
-        if self.turbo_controller is not None:
-            # Check that values for center_x are within trust region bounds
-            trust_region = self.turbo_controller.get_trust_region(self)
+    def validate_model_after(self) -> "BayesianGenerator":
+        # validate turbo controller center if it exists
+        validate_turbo_controller_center(self)
 
-            center_x = self.turbo_controller.center_x
-            if center_x is not None:
-                for key, value in center_x.items():
-                    if key in self.vocs.variable_names:
-                        idx = self.vocs.variable_names.index(key)
-                        lower_bound = trust_region[0, idx].item()
-                        upper_bound = trust_region[1, idx].item()
-                        if not (lower_bound <= value <= upper_bound):
-                            raise ValueError(
-                                f"Turbo controller center_x value for {key} : "
-                                f"{value} is outside of trust region bounds "
-                                f"[{lower_bound}, {upper_bound}]"
-                            )
+        # cannot have both a discrete variable and n_interpolate_points
+        if has_discrete_variables(self.vocs) and self.n_interpolate_points is not None:
+            raise ValueError(
+                "cannot have both discrete variables and n_interpolate_points"
+            )
+
+        # check to make sure that either multiple objectives exist or custom objective is set
+        if self.vocs.n_objectives == 0 and self.custom_objective is None:
+            raise VOCSError(
+                "the generator must have at least one objective or a custom objective"
+            )
 
         return self
 
-    def add_data(self, new_data: pd.DataFrame):
+    def add_data(self, new_data: pd.DataFrame) -> None:
         """
         Add new data to the generator for Bayesian Optimization.
 
@@ -336,9 +385,9 @@ class BayesianGenerator(Generator, ABC):
         -----
         This method appends the new data to the existing data in the generator.
         """
-        self.data = pd.concat([self.data, new_data], axis=0)
+        self.data = pd.concat([self.data, new_data], axis=0, ignore_index=True)
 
-    def generate(self, n_candidates: int):
+    def generate(self, n_candidates: int) -> list[dict[Hashable, Any]]:
         """
         Generate candidates using Bayesian Optimization.
 
@@ -349,7 +398,7 @@ class BayesianGenerator(Generator, ABC):
 
         Returns
         -------
-        List[Dict]
+        list[dict[Hashable, Any]]
             A list of dictionaries containing the generated candidates.
 
         Raises
@@ -388,9 +437,12 @@ class BayesianGenerator(Generator, ABC):
             # dict to track runtimes
             timing_results = {}
 
+            training_data = self.get_training_data(self.data)
+            self._validate_contextual_variables_no_nan(training_data)
+
             # update internal model with internal data
             start_time = time.perf_counter()
-            model = self.train_model(self.get_training_data(self.data))
+            model = self.train_model(training_data)
             timing_results["training"] = time.perf_counter() - start_time
 
             # propose candidates given model
@@ -416,6 +468,11 @@ class BayesianGenerator(Generator, ABC):
                 self.computation_time = pd.DataFrame(timing_results, index=[0])
 
             if self.n_interpolate_points is not None:
+                if has_discrete_variables(self.vocs):
+                    raise RuntimeError(
+                        "cannot generate interpolated points for discrete variables"
+                    )
+
                 if self.n_candidates > 1:
                     raise RuntimeError(
                         "cannot generate interpolated points for "
@@ -469,46 +526,20 @@ class BayesianGenerator(Generator, ABC):
             if self.data is None:
                 raise ValueError("no data available to build model")
             data = self.get_training_data(self.data)
+            if data is None:
+                raise ValueError("no data available to build model")
+
         if data.empty:
             raise ValueError("no data available to build model")
 
         # get input bounds
-        variable_bounds = deepcopy(self.vocs.variables)
-
-        # if turbo restrict points is true then set the bounds to the trust region
-        # bounds
-        if self.turbo_controller is not None:
-            if self.turbo_controller.restrict_model_data:
-                variable_bounds = dict(
-                    zip(
-                        self.vocs.variable_names,
-                        self.turbo_controller.get_trust_region(self).numpy().T,  # type: ignore
-                    )
-                )
-
-        # add fixed feature bounds if requested
-        if self.fixed_features is not None:
-            # get bounds for each fixed_feature (vocs bounds take precedent)
-            for key in self.fixed_features:
-                if key not in variable_bounds:
-                    if key not in data:
-                        raise KeyError(
-                            "generator data needs to contain fixed feature "
-                            f"column name `{key}`"
-                        )
-                    f_data = data[key]
-                    bounds = [f_data.min(), f_data.max()]
-                    if bounds[1] - bounds[0] < 1e-8:
-                        bounds[1] = bounds[0] + 1e-8
-                    variable_bounds[key] = bounds  # type: ignore
-
-        input_bounds = {name: variable_bounds[name] for name in self.model_input_names}
+        variable_bounds = self.get_model_input_bounds(data)
 
         _model = self.gp_constructor.build_model(
             self.model_input_names,
-            self.vocs.output_names,
+            self.model_output_names,
             data,
-            input_bounds,
+            variable_bounds,
             **self.tkwargs,
         )
 
@@ -552,14 +583,25 @@ class BayesianGenerator(Generator, ABC):
         # get initial candidates to start acquisition function optimization
         initial_points = self._get_initial_conditions(n_candidates)
 
+        optimization_kwargs = self._get_discrete_optimization_kwargs()
+
         # get candidates -- grid optimizer does not support batch_initial_conditions
         if isinstance(self.numerical_optimizer, GridOptimizer):
+            if optimization_kwargs:
+                raise ValueError(
+                    "grid optimizer does not support discrete variable optimization; "
+                    "use LBFGS optimizer"
+                )
             candidates = self.numerical_optimizer.optimize(
                 acq_funct, bounds, n_candidates
             )
         else:
             candidates = self.numerical_optimizer.optimize(
-                acq_funct, bounds, n_candidates, batch_initial_conditions=initial_points
+                acq_funct,
+                bounds,
+                n_candidates,
+                batch_initial_conditions=initial_points,
+                **optimization_kwargs,
             )
         return candidates
 
@@ -657,7 +699,7 @@ class BayesianGenerator(Generator, ABC):
             # log transform the result to handle the constraints
             acq = LogAcquisitionFunction(acq)
 
-        acq = self._apply_fixed_features(acq)
+        acq = self._apply_fixed_features_and_contextual_variables(acq)
         acq = acq.to(**self.tkwargs)
         return acq
 
@@ -676,23 +718,25 @@ class BayesianGenerator(Generator, ABC):
                 self._get_constraint_callables(),
                 sampler=self._get_sampler(self.model),
             )
-        bounds = self._get_bounds()
+        bounds = self._get_torch_bounds()
 
-        if self.fixed_features is not None:
-            acq = self._apply_fixed_features(acq)
-
-            indices: list[int] = []
-            for idx, name in enumerate(self.vocs.variable_names):
-                if name not in self.fixed_features:
-                    indices += [idx]
-
-            bounds = bounds[:, indices]
+        if self.fixed_features is not None or self.contextual_variables:
+            acq = self._apply_fixed_features_and_contextual_variables(acq)
 
         bounds = bounds.to(**self.tkwargs)
         acq = acq.to(**self.tkwargs)
 
         # use default initial conditions for a global search
-        result = self.numerical_optimizer.optimize(acq, bounds, 1)
+        optimization_kwargs = self._get_discrete_optimization_kwargs()
+        if isinstance(self.numerical_optimizer, GridOptimizer) and optimization_kwargs:
+            raise ValueError(
+                "grid optimizer does not support discrete variable optimization; "
+                "use LBFGS optimizer"
+            )
+
+        result = self.numerical_optimizer.optimize(
+            acq, bounds, 1, **optimization_kwargs
+        )
 
         return self._process_candidates(result)
 
@@ -713,6 +757,7 @@ class BayesianGenerator(Generator, ABC):
             - variable_names : List[str]
                 The variables with respect to which the GP models are displayed (maximum of 2).
                 Defaults to vocs.variable_names.
+                Contextual variables are allowed for GP model visualization axes.
             - idx : int
                 Index of the last sample to use. This also selects the point of reference in
                 higher dimensions unless an explicit reference_point is given.
@@ -727,6 +772,8 @@ class BayesianGenerator(Generator, ABC):
                 Whether the feasibility region is shown.
             - show_acquisition : bool, optional
                 Whether the acquisition function is computed and shown (only if acquisition function is not None).
+                If contextual variables are selected as plot axes, the acquisition subplot is replaced
+                with warning text because the acquisition is conditioned on contextual values.
             - n_grid : int, optional
                 Number of grid points per dimension used to display the model predictions.
             - axes : Axes, optional
@@ -741,7 +788,7 @@ class BayesianGenerator(Generator, ABC):
         """
         return visualize_generator_model(self, **kwargs)
 
-    def _get_initial_conditions(self, n_candidates: int = 1) -> Union[Tensor, None]:
+    def _get_initial_conditions(self, n_candidates: int = 1) -> Tensor | None:
         """overwrite if algorithm should specifiy initial candidates for optimizing
         the acquisition function"""
         return None
@@ -749,6 +796,7 @@ class BayesianGenerator(Generator, ABC):
     def _process_candidates(self, candidates: Tensor) -> pd.DataFrame:
         """process pytorch candidates from optimizing the acquisition function"""
         logger.debug(f"Best candidate from optimize {candidates}")
+        candidates = self._snap_discrete_candidates(candidates)
 
         if self.fixed_features is not None:
             results = pd.DataFrame(
@@ -759,10 +807,11 @@ class BayesianGenerator(Generator, ABC):
                 results[name] = val
 
         else:
-            results = self.vocs.convert_numpy_to_inputs(
-                candidates.detach().cpu().numpy(),
-                include_constants=False,  # type: ignore
+            results = convert_numpy_to_inputs(
+                self.vocs, candidates.detach().cpu().numpy(), include_constants=False
             )
+
+        self._validate_discrete_outputs(results)
 
         return results
 
@@ -777,8 +826,8 @@ class BayesianGenerator(Generator, ABC):
         return sampler
 
     @abstractmethod
-    def _get_acquisition(self, model: Model) -> AcquisitionFunction:
-        raise NotImplementedError
+    def _get_acquisition(self, model):
+        pass  # pragma: no cover
 
     def _get_objective(self) -> MCAcquisitionObjective:
         """
@@ -803,26 +852,35 @@ class BayesianGenerator(Generator, ABC):
 
     def _get_constraint_callables(
         self,
-    ) -> Optional[list[Callable[[torch.Tensor], torch.Tensor]]]:
+    ) -> list[Callable[[torch.Tensor], torch.Tensor]] | None:
         """return constraint callable determined by vocs"""
         constraint_callables = create_constraint_callables(self.vocs)
         if len(constraint_callables) == 0:
             constraint_callables = None
         return constraint_callables
 
-    def _apply_fixed_features(self, acq: AcquisitionFunction) -> AcquisitionFunction:
-        """apply fixed features to the acquisition function if needed"""
+    def _apply_fixed_features_and_contextual_variables(self, acq):
+        """apply fixed features and contextual variables to the acquisition function if needed"""
+        # get input dim
+        dim = len(self.model_input_names)
+        columns = []
+        values = []
+
         if self.fixed_features is not None:
-            # get input dim
-            dim = len(self.model_input_names)
-            columns: list[int] = []
-            _values: list[float] = []
             for name, value in self.fixed_features.items():
                 columns.append(self.model_input_names.index(name))
-                _values.append(value)
+                values.append(value)
 
+        if self.contextual_variables is not None:
+            # get the last contextual variable values
+            for var in self.contextual_variables:
+                columns.append(self.model_input_names.index(var))
+                values.append(self.data[var].iloc[-1])
+
+        # if we have fixed features or contextual variables then we need to apply the fixed feature acquisition function
+        if len(columns) > 0:
             # necessary because fixed feature acq must get tensor - it searches for dtype/device
-            values = torch.tensor(_values).to(**self.tkwargs)
+            values = torch.tensor(values).to(**self.tkwargs)
             acq = FixedFeatureAcquisitionFunction(
                 acq_function=acq, d=dim, columns=columns, values=values
             )
@@ -851,25 +909,178 @@ class BayesianGenerator(Generator, ABC):
             for name, _ in self.fixed_features.items():
                 if name not in variable_names:
                     variable_names += [name]
+
         return variable_names
 
     @property
-    def _candidate_names(self) -> list[str]:
-        """variable names corresponding to generated candidates"""
-        variable_names = self.vocs.variable_names
+    def contextual_variables(self):
+        return [
+            name
+            for name, var in self.vocs.variables.items()
+            if isinstance(var, ContextualVariable)
+        ]
+
+    @property
+    def model_output_names(self):
+        """output names corresponding to trained model"""
+        return self.vocs.output_names
+
+    def get_model_input_bounds(self, data: pd.DataFrame) -> dict[str, list[float]]:
+        """
+        This will create a dictionary of variable bounds for the model input variables. It starts with the
+        bounds from vocs, and then updates them based on the turbo trust region, fixed features, and
+        contextual variables if they are specified.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data in the form of a pandas DataFrame.
+
+        Returns
+        -------
+        variable_bounds : Dict[str, List[float]]
+            A dictionary containing the variable bounds for the model input variables.
+
+        """
+        variable_bounds = deepcopy(get_variable_bounds(self.vocs, data=data))
+
+        # if turbo restrict points is true then set the bounds to the trust region
+        # bounds
+        if self.turbo_controller is not None:
+            if self.turbo_controller.restrict_model_data:
+                trust_region_bounds = self.turbo_controller.get_trust_region(self)
+                for idx, name in enumerate(self._candidate_names):
+                    variable_bounds[name] = trust_region_bounds[:, idx].numpy()
+
+        # add fixed feature bounds if requested
         if self.fixed_features is not None:
-            for name in self.fixed_features:
-                if name in variable_names:
-                    variable_names.remove(name)
+            # get bounds for each fixed_feature (vocs bounds take precedent)
+            for key in self.fixed_features:
+                # if the fixed feature is not in the variable bounds, then we need to add it based on the data
+                if key not in variable_bounds:
+                    if key not in data:
+                        raise KeyError(
+                            "generator data needs to contain fixed feature "
+                            f"column name `{key}`"
+                        )
+                    f_data = data[key]
+                    bounds = [f_data.min(), f_data.max()]
+                    if bounds[1] - bounds[0] < 1e-8:
+                        bounds[1] = bounds[0] + 1e-8
+                    variable_bounds[key] = bounds
+
+        return variable_bounds
+
+    def _validate_contextual_variables_no_nan(self, data: pd.DataFrame):
+        """check to make sure that the last row of data does not contain NaN in any of the contextual variable columns"""
+        last_row = data.iloc[-1]
+        contextual_with_nan = [
+            name
+            for name in self.contextual_variables
+            if name in data.columns and pd.isna(last_row[name])
+        ]
+        if contextual_with_nan:
+            raise ValueError(
+                "latest row contains NaN in contextual variable columns: "
+                + ", ".join(contextual_with_nan)
+            )
+
+    @property
+    def _candidate_names(self):
+        """variable names corresponding to generated candidates"""
+        variable_names = list(self.vocs.variable_names)
+        excluded = set(self.fixed_features or {}) | set(self.contextual_variables)
+        variable_names = [n for n in variable_names if n not in excluded]
         return variable_names
 
-    def _get_bounds(self) -> torch.Tensor:
+    def _get_torch_bounds(self) -> torch.Tensor:
         """
-        Convert bounds from vocs to torch tensors of shape 2 x d.
+        Convert bounds from vocs `get_variable_bounds` to torch tensors of shape 2 x d.
 
-        Tensor stays on CPU
         """
-        return torch.tensor(self.vocs.bounds)  # type: ignore
+        bounds = get_variable_bounds_array(
+            self.vocs,
+            variable_names=self._candidate_names,
+        )
+        return torch.tensor(bounds, dtype=torch.double)
+
+    def _get_active_discrete_variable_values(self) -> dict[int, list[float]]:
+        """Get the possible values of the discrete variables from vocs."""
+        discrete_values: dict[int, list[float]] = {}
+        for idx, name in enumerate(self._candidate_names):
+            variable = self.vocs.variables[name]
+            if isinstance(variable, DiscreteVariable):
+                discrete_values[idx] = sorted(float(v) for v in variable.values)
+        return discrete_values
+
+    def _get_discrete_optimization_kwargs(self) -> dict[str, Any]:
+        """
+        If there are discrete variables, get the optimization kwargs
+        needed to optimize over those variables. If there are no discrete variables,
+        return an empty dict.
+        """
+        discrete_values = self._get_active_discrete_variable_values()
+        if not discrete_values:
+            return {}
+
+        discrete_indices = sorted(discrete_values)
+        value_lists = [discrete_values[idx] for idx in discrete_indices]
+        total_configurations = prod(len(values) for values in value_lists)
+
+        max_configs = None
+        if isinstance(self.numerical_optimizer, LBFGSOptimizer):
+            max_configs = self.numerical_optimizer.mixed_max_discrete_configurations
+            if total_configurations > max_configs:
+                logger.warning(
+                    "truncating discrete configuration count from %d to %d",
+                    total_configurations,
+                    max_configs,
+                )
+
+        combinations = product(*value_lists)
+        if max_configs is not None:
+            combinations = islice(combinations, max_configs)
+
+        # all candidates are discrete
+        if len(discrete_indices) == len(self._candidate_names):
+            choices = torch.tensor(list(combinations), **self.tkwargs)
+            return {"discrete_choices": choices}
+
+        fixed_features_list = [
+            {dim: value for dim, value in zip(discrete_indices, discrete_configuration)}
+            for discrete_configuration in combinations
+        ]
+        return {"fixed_features_list": fixed_features_list}
+
+    def _snap_discrete_candidates(self, candidates: Tensor) -> Tensor:
+        """Snap candidate values to nearest discrete variable values if discrete variables are present."""
+        discrete_values = self._get_active_discrete_variable_values()
+        if not discrete_values:
+            return candidates
+
+        candidates = candidates.clone()
+        for idx, values in discrete_values.items():
+            allowed = torch.tensor(
+                values, device=candidates.device, dtype=candidates.dtype
+            )
+            distances = torch.abs(candidates[..., idx].unsqueeze(-1) - allowed)
+            nearest_idx = torch.argmin(distances, dim=-1)
+            candidates[..., idx] = allowed[nearest_idx]
+        return candidates
+
+    def _validate_discrete_outputs(self, results: pd.DataFrame) -> None:
+        for name in self.vocs.variable_names:
+            variable = self.vocs.variables[name]
+            if not isinstance(variable, DiscreteVariable):
+                continue
+
+            allowed_values = set(float(v) for v in variable.values)
+            candidate_values = results[name].astype(float).tolist()
+            if any(value not in allowed_values for value in candidate_values):
+                raise ValueError(
+                    f"candidate values for discrete variable '{name}' are not members "
+                    "of the configured discrete set"
+                )
 
     def _get_optimization_bounds(self) -> torch.Tensor:
         """
@@ -892,7 +1103,7 @@ class BayesianGenerator(Generator, ABC):
             the bounds associated with those features are removed.
 
         """
-        bounds = self._get_bounds()
+        bounds = self._get_torch_bounds()
 
         # if specified modify bounds to limit maximum travel distances
         if self.max_travel_distances is not None:
@@ -904,18 +1115,6 @@ class BayesianGenerator(Generator, ABC):
             # set the best value
             turbo_bounds = self.turbo_controller.get_trust_region(self)
             bounds = rectilinear_domain_union(bounds, turbo_bounds)
-
-        # if fixed features key is in vocs then we need to remove the bounds
-        # associated with that key
-        if self.fixed_features is not None:
-            # grab variable name indices that are NOT in fixed features
-            indices = []
-            for idx, name in enumerate(self.vocs.variable_names):
-                if name not in self.fixed_features:
-                    indices += [idx]
-
-            # grab indexed bounds
-            bounds = bounds[:, indices]
 
         bounds = bounds.to(**self.tkwargs)
         return bounds
@@ -964,10 +1163,13 @@ class BayesianGenerator(Generator, ABC):
                 "No data exists to specify max_travel_distances "
                 "from, add data first to use during BO"
             )
-        last_point = self.data[self.vocs.variable_names].iloc[-1].to_numpy()
+        last_point = self.data[self._candidate_names].iloc[-1].to_numpy()
 
         # bound lengths based on vocs for normalization
-        vocs_bounds = self.vocs.bounds
+        vocs_bounds = get_variable_bounds_array(
+            self.vocs,
+            variable_names=self._candidate_names,
+        )
         lengths = vocs_bounds[1, :] - vocs_bounds[0, :]
 
         # get maximum travel distances
@@ -987,7 +1189,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         description="dict specifying reference point for multi-objective optimization",
         # validate_default=True,
     )
-    pareto_front_history: Optional[pd.DataFrame] = Field(
+    pareto_front_history: pd.DataFrame | None = Field(
         None,
         description="history of pareto front statistics every time points are added to the generator",
         exclude=True,
@@ -1000,19 +1202,15 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     def validate_pareto_front_history(cls, value: Any):
         return pd.DataFrame(value) if value is not None else None
 
-    @field_validator("reference_point", mode="after")
-    @classmethod
-    def validate_reference_point(
-        cls, value: dict[str, float], info: ValidationInfo
-    ) -> dict[str, float]:
-        # set default reference point if not specified
-        _vocs: VOCS | None = info.data.get("vocs", None)
+    @model_validator(mode="after")
+    def validate_reference_point(self):
+        _vocs = self.vocs
         objective_names = _vocs.objective_names if _vocs is not None else []
 
-        if set(value.keys()) != set(objective_names):
+        if set(self.reference_point.keys()) != set(objective_names):
             raise XoptError("reference point must contain all objective names in vocs")
 
-        return value
+        return self
 
     @property
     def torch_reference_point(self) -> torch.Tensor:
@@ -1025,9 +1223,9 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
                     "need to specify reference point for the following "
                     f"objective {name}"
                 )
-            if self.vocs.objectives[name] == "MINIMIZE":
+            if isinstance(self.vocs.objectives[name], MinimizeObjective):
                 pt += [-ref_val]
-            elif self.vocs.objectives[name] == "MAXIMIZE":
+            elif isinstance(self.vocs.objectives[name], MaximizeObjective):
                 pt += [ref_val]
             else:
                 raise ValueError(
@@ -1042,22 +1240,7 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None, float]:
         """
         Get the pareto front and hypervolume of the current data.
-
-        Returns
-        -------
-        pareto_front_variables : torch.Tensor
-            The pareto front variable data.
-        pareto_front_objectives : torch.Tensor
-            The pareto front objective data.
-        pareto_mask : torch.Tensor
-            A mask indicating which points are part of the pareto front.
-        hv : float
-            The hypervolume of the pareto front.
         """
-
-        # get scaled data
-        # note that the objective data is scaled by +/- 1
-        # based on maximization / minimization
         variable_data, objective_data, weights = self._get_scaled_data(data=self.data)
 
         # if there are no valid points skip PF calculation and return None
@@ -1140,8 +1323,8 @@ class MultiObjectiveBayesianGenerator(BayesianGenerator, ABC):
         maximization for each objective"""
 
         # get raw data
-        var_df, obj_df, _, _ = self.vocs.extract_data(
-            data, return_raw=True, return_valid=True
+        var_df, obj_df, _, _ = extract_data(
+            self.vocs, data, return_raw=True, return_valid=True
         )
 
         variable_data = torch.tensor(var_df[self.vocs.variable_names].to_numpy())

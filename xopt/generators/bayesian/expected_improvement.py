@@ -1,14 +1,15 @@
 from typing import Any
-from pandas import DataFrame
+
 import torch
 from botorch.acquisition import (
-    ScalarizedPosteriorTransform,
     LogExpectedImprovement,
+    ScalarizedPosteriorTransform,
     qLogExpectedImprovement,
-    FixedFeatureAcquisitionFunction,
 )
-from botorch.models.model import Model
+from gest_api.vocs import MinimizeObjective
+from pandas import DataFrame
 
+from xopt.errors import FeasibilityError
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     formatted_base_docstring,
@@ -20,7 +21,7 @@ from xopt.generators.bayesian.turbo import (
     SafetyTurboController,
 )
 from xopt.generators.bayesian.utils import set_botorch_weights
-from xopt.errors import FeasibilityError
+from xopt.vocs import get_observable_data, select_best
 
 
 class ExpectedImprovementGenerator(BayesianGenerator):
@@ -62,23 +63,12 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         acq = self._get_acquisition(model)
 
         # apply fixed features if specified in the generator
-        if self.fixed_features is not None:
-            # get input dim
-            dim = len(self.model_input_names)
-            columns = []
-            values = []
-            for name, value in self.fixed_features.items():
-                columns += [self.model_input_names.index(name)]
-                values += [value]
-
-            acq = FixedFeatureAcquisitionFunction(
-                acq_function=acq, d=dim, columns=columns, values=values
-            )
+        acq = self._apply_fixed_features_and_contextual_variables(acq)
 
         acq = acq.to(**self.tkwargs)
         return acq
 
-    def _get_acquisition(self, model: Model):
+    def _get_acquisition(self, model):
         """
         Get the acquisition function for Bayesian Optimization.
 
@@ -139,19 +129,23 @@ class ExpectedImprovementGenerator(BayesianGenerator):
         """
         if isinstance(objective, CustomXoptObjective):
             best_f = objective(
-                torch.tensor(self.vocs.observable_data(data).to_numpy(), **self.tkwargs)
+                torch.tensor(
+                    get_observable_data(self.vocs, data).to_numpy(), **self.tkwargs
+                )
             ).max()
         else:
             # return the best feasible objective value from the data
             # note: this is critical for proper handling of constraints since the base EI
             # function will be zero if an extreme value is in the constrained region
-            if self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE":
+            if isinstance(
+                self.vocs.objectives[self.vocs.objective_names[0]], MinimizeObjective
+            ):
                 multiplier = -1
             else:
                 multiplier = 1
 
             try:
-                _, value, _ = self.vocs.select_best(data)
+                _, value, _ = select_best(self.vocs, data)
             except FeasibilityError:
                 raise RuntimeError(
                     "No feasible points found in the data; cannot compute expected improvement."

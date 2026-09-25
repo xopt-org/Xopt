@@ -1,25 +1,37 @@
 from copy import deepcopy
+import os
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationInfo
 import pytest
 import torch
+from torch.nn import Module
 from botorch.models.gpytorch import GPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import PeriodicKernel
 
+
 from xopt import VOCS
 from xopt.base import Xopt
-from xopt.errors import VOCSError
+from xopt.errors import VOCSError, XoptError
 from xopt.evaluator import Evaluator
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
+from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.bayesian_generator import (
     BayesianGenerator,
     MultiObjectiveBayesianGenerator,
 )
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+)
+from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer
+from xopt.pydantic import encode_torch_module
 from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid, sinusoid_vocs
 from xopt.resources.testing import TEST_VOCS_BASE, TEST_VOCS_DATA
+from xopt.vocs import random_inputs
 
 
 class PatchBayesianGenerator(BayesianGenerator):
@@ -28,20 +40,78 @@ class PatchBayesianGenerator(BayesianGenerator):
     """
 
     supports_batch_generation: bool = True
-    # supports_multi_objective: bool = True
     supports_single_objective: bool = True
     supports_constraints: bool = True
+
+
+class PatchNoConstraintsBayesianGenerator(BayesianGenerator):
+    supports_batch_generation: bool = True
+    supports_single_objective: bool = True
+    supports_constraints: bool = False
 
 
 class MultiObjectivePatchBayesianGenerator(MultiObjectiveBayesianGenerator):
     supports_constraints: bool = True
 
 
+class DummyModelConstructor(ModelConstructor):
+    name: str = "dummy"
+
+    def build_model(self, *a, **k):
+        pass  # pragma: no cover
+
+    def build_model_from_vocs(self, *a, **k):
+        pass  # pragma: no cover
+
+    def build_single_task_gp(self, *a, **k):
+        pass  # pragma: no cover
+
+
 class TestBayesianGenerator(TestCase):
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    @patch.multiple(PatchNoConstraintsBayesianGenerator, __abstractmethods__=set())
     def test_init(self):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         gen.model_dump()
+
+        # test with no data
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        assert gen.data is None
+        with pytest.raises(RuntimeError):
+            gen.generate(1)
+
+        with pytest.raises(ValueError):
+            gen.train_model()
+
+        with pytest.raises(ValueError):
+            gen.get_acquisition(gen.model)
+
+        # test asking for batch generation when not supported
+        gen.supports_batch_generation = False
+        with pytest.raises(NotImplementedError):
+            gen.generate(2)
+
+        # test with n_interpolate_points but mutiple candidates
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.n_interpolate_points = 5
+        gen.supports_batch_generation = True
+        with pytest.raises(RuntimeError):
+            gen.generate(2)
+
+        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
+        gen.data = pd.DataFrame()
+        with pytest.raises(ValueError):
+            gen.train_model()
+
+        # test single objective generator with multi-objective vocs
+        test_vocs = deepcopy(TEST_VOCS_BASE)
+        test_vocs.objectives.update({"y2": "MINIMIZE"})
+        with pytest.raises(VOCSError):
+            PatchBayesianGenerator(vocs=test_vocs)
+
+        # test no constraints generator with constrained vocs
+        with pytest.raises(VOCSError):
+            PatchNoConstraintsBayesianGenerator(vocs=TEST_VOCS_BASE)
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model(self):
@@ -54,7 +124,7 @@ class TestBayesianGenerator(TestCase):
         # test evaluating the model
         test_pts = torch.tensor(
             pd.DataFrame(
-                TEST_VOCS_BASE.random_inputs(5, include_constants=False)
+                random_inputs(TEST_VOCS_BASE, 5, include_constants=False)
             ).to_numpy()
         )
 
@@ -73,9 +143,63 @@ class TestBayesianGenerator(TestCase):
         gen = deepcopy(gen)
         gen.gp_constructor.covar_modules = {"y1": PeriodicKernel()}
 
-        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE, **gen.model_dump())
+        gen = PatchBayesianGenerator(**gen.model_dump())
         model = gen.train_model(test_data)
         assert isinstance(model.models[0].covar_module, PeriodicKernel)
+
+    def test_class_methods(self):
+        # test base class
+        assert BayesianGenerator.get_compatible_turbo_controllers() == [None]
+        assert BayesianGenerator.get_compatible_numerical_optimizers() == [
+            LBFGSOptimizer,
+            GridOptimizer,
+        ]
+
+        # define separate class
+        class CustomBayesianGenerator(BayesianGenerator):
+            _compatible_turbo_controllers = None
+
+        assert CustomBayesianGenerator.get_compatible_turbo_controllers() == [None]
+
+    def test_torch_module_validation(self):
+        # test validate torch modules
+        encoded_module = encode_torch_module(torch.nn.Linear(5, 2))
+        exit_val = BayesianGenerator.validate_torch_modules("base64: " + encoded_module)
+        assert isinstance(exit_val, Module)
+
+        torch.save(torch.nn.Linear(3, 1), "test_module.pt")
+        exit_val = BayesianGenerator.validate_torch_modules("test_module.pt")
+        assert isinstance(exit_val, torch.nn.Linear)
+        os.remove("test_module.pt")
+
+        with pytest.raises(XoptError):
+            BayesianGenerator.validate_torch_modules("invalid_string")
+
+    def test_numerical_optimizer_validation(self):
+        # test with None
+        exit_val = BayesianGenerator.validate_numerical_optimizer(None)
+        assert exit_val == LBFGSOptimizer()
+
+        # test with class
+        exit_val = BayesianGenerator.validate_numerical_optimizer(GridOptimizer())
+        assert exit_val == GridOptimizer()
+
+        # test with string
+        exit_val = BayesianGenerator.validate_numerical_optimizer("LBFGS")
+        assert exit_val == LBFGSOptimizer()
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer("NotAnOptimizer")
+
+        # test with dict
+        exit_val = BayesianGenerator.validate_numerical_optimizer({"name": "grid"})
+        assert exit_val == GridOptimizer()
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer({"name": "NotAnOptimizer"})
+
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_numerical_optimizer(5)
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_get_model_w_conditions(self):
@@ -138,7 +262,7 @@ class TestBayesianGenerator(TestCase):
     def test_transforms(self):
         gen = PatchBayesianGenerator(vocs=sinusoid_vocs)
         evaluator = Evaluator(function=evaluate_sinusoid)
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=sinusoid_vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
 
         # generate some data samples
         import numpy as np
@@ -150,7 +274,9 @@ class TestBayesianGenerator(TestCase):
         model = gen.train_model(X.data)
 
         # test input normalization
-        input_transform = Normalize(1, bounds=torch.tensor(sinusoid_vocs.bounds))
+        input_transform = Normalize(
+            1, bounds=torch.tensor(sinusoid_vocs.bounds, dtype=torch.double).T
+        )
         for inputs in model.train_inputs:
             assert torch.allclose(
                 inputs[0].unsqueeze(-1).T,
@@ -183,7 +309,7 @@ class TestBayesianGenerator(TestCase):
     def test_get_bounds(self):
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
         bounds = gen._get_optimization_bounds()
-        assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds))
+        assert torch.allclose(bounds, torch.tensor(TEST_VOCS_BASE.bounds).T.to(bounds))
 
         # test with max_travel_distances specified but no data
         gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
@@ -191,39 +317,156 @@ class TestBayesianGenerator(TestCase):
         with pytest.raises(ValueError):
             gen._get_optimization_bounds()
 
-        # test with max_travel_distances specified and data
-        gen = PatchBayesianGenerator(vocs=TEST_VOCS_BASE)
-        gen.max_travel_distances = [0.1, 0.2]
-        gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5], "c1": [0.5]}))
-        bounds = gen._get_optimization_bounds()
-        assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
-
-        # test with max_travel_distances specified and data
-        high_d_vocs = deepcopy(TEST_VOCS_BASE)
-        high_d_vocs.variables["x3"] = [0, 1]
-
-        gen = PatchBayesianGenerator(vocs=high_d_vocs)
-        gen.max_travel_distances = [0.1, 0.2, 0.1]
-        gen.add_data(
-            pd.DataFrame(
-                {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
-            )
-        )
-        bounds = gen._get_optimization_bounds()
-        assert torch.allclose(
-            bounds, torch.tensor([[0.4, 3.0, 0.4], [0.6, 7.0, 0.6]]).to(bounds)
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}},
+            objectives={"y1": "MINIMIZE"},
         )
 
-        # test with bad max_distances
-        gen = PatchBayesianGenerator(vocs=high_d_vocs)
-        gen.max_travel_distances = [0.1, 0.2]
-        gen.add_data(
-            pd.DataFrame(
-                {"x1": [0.5], "x2": [5.0], "x3": [0.5], "y1": [0.5], "c1": [0.5]}
-            )
+        gen = PatchBayesianGenerator(vocs=vocs)
+        kwargs = gen._get_discrete_optimization_kwargs()
+
+        assert "fixed_features_list" in kwargs
+        assert kwargs["fixed_features_list"] == [
+            {1: 0.0},
+            {1: 0.5},
+            {1: 1.0},
+        ]
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_only_optimization_kwargs(self):
+        vocs = VOCS(
+            variables={"x1": {0.0, 1.0}, "x2": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
         )
-        with pytest.raises(ValueError):
-            gen._get_optimization_bounds()
+
+        gen = PatchBayesianGenerator(vocs=vocs)
+        kwargs = gen._get_discrete_optimization_kwargs()
+        assert "discrete_choices" in kwargs
+        assert kwargs["discrete_choices"].shape == (4, 2)
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_snap_and_validate_discrete_candidates(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs)
+
+        raw_candidates = torch.tensor([[0.2, 0.6], [0.1, 0.1]], dtype=torch.double)
+        snapped = gen._snap_discrete_candidates(raw_candidates)
+        assert torch.allclose(snapped[:, 1], torch.tensor([1.0, 0.0]))
+
+        result_df = pd.DataFrame(snapped.numpy(), columns=vocs.variable_names)
+        gen._validate_discrete_outputs(result_df)
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs_truncation(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}, "x3": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            numerical_optimizer=LBFGSOptimizer(mixed_max_discrete_configurations=4),
+        )
+        with patch(
+            "xopt.generators.bayesian.bayesian_generator.logger.warning"
+        ) as mock_warn:
+            kwargs = gen._get_discrete_optimization_kwargs()
+        assert "fixed_features_list" in kwargs
+        assert len(kwargs["fixed_features_list"]) == 4
+        mock_warn.assert_called_once_with(
+            "truncating discrete configuration count from %d to %d", 6, 4
+        )
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_discrete_optimization_kwargs_truncation_is_lazy(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 0.5, 1.0}, "x3": {2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            numerical_optimizer=LBFGSOptimizer(mixed_max_discrete_configurations=3),
+        )
+
+        def iter_with_guard(*_):
+            for i in range(6):
+                if i >= 3:
+                    raise RuntimeError("product consumed past truncation limit")
+                yield (float(i), float(i + 1))
+
+        with patch(
+            "xopt.generators.bayesian.bayesian_generator.product",
+            side_effect=lambda *args: iter_with_guard(),
+        ):
+            kwargs = gen._get_discrete_optimization_kwargs()
+
+        assert kwargs["fixed_features_list"] == [
+            {1: 0.0, 2: 1.0},
+            {1: 1.0, 2: 2.0},
+            {1: 2.0, 2: 3.0},
+        ]
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_validate_discrete_outputs_raises(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs)
+        with pytest.raises(ValueError, match="configured discrete set"):
+            gen._validate_discrete_outputs(pd.DataFrame({"x1": [0.2], "x2": [0.25]}))
+
+    @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
+    def test_grid_optimizer_discrete_candidates_raise_in_propose(self):
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 1.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs, numerical_optimizer=GridOptimizer())
+        with (
+            patch.object(
+                PatchBayesianGenerator,
+                "_get_optimization_bounds",
+                return_value=torch.zeros(2, 2),
+            ),
+            patch.object(
+                PatchBayesianGenerator, "get_acquisition", return_value=MagicMock()
+            ),
+            patch.object(
+                PatchBayesianGenerator,
+                "_get_initial_conditions",
+                return_value=torch.zeros(1, 1, 2),
+            ),
+        ):
+            with pytest.raises(ValueError, match="grid optimizer does not support"):
+                gen.propose_candidates(MagicMock(), n_candidates=1)
+
+    def test_model_constructor_discrete_bounds(self):
+        class _CaptureBoundsModelConstructor(ModelConstructor):
+            name: str = "capture_bounds_model_constructor"
+
+            def build_model(self, *args, **kwargs):
+                return None
+
+        constructor = _CaptureBoundsModelConstructor()
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {1.0, 2.0, 3.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        data = pd.DataFrame({"x1": [0.0], "x2": [1.0], "y1": [0.0]})
+        with patch.object(
+            _CaptureBoundsModelConstructor, "build_model", autospec=True
+        ) as mock_build:
+            constructor.build_model_from_vocs(vocs, data)
+        _, _, _, _, input_bounds, _, _ = mock_build.call_args.args
+        assert input_bounds == {
+            "x1": [0.0, 1.0],
+            "x2": [1.0, 3.0],
+        }
 
     @patch.multiple(PatchBayesianGenerator, __abstractmethods__=set())
     def test_fixed_feature(self):
@@ -295,3 +538,96 @@ class TestBayesianGenerator(TestCase):
         assert not gen.supports_single_objective
         with pytest.raises(VOCSError):
             gen.vocs = vocs
+
+    def test_validate_gp_constructor_none(self):
+        # Should return StandardModelConstructor instance
+        result = BayesianGenerator.validate_gp_constructor(None)
+        assert isinstance(result, StandardModelConstructor)
+
+    def test_validate_gp_constructor_instance(self):
+        dummy = DummyModelConstructor()
+        result = BayesianGenerator.validate_gp_constructor(dummy)
+        assert result is dummy
+
+    def test_validate_gp_constructor_str(self):
+        result = BayesianGenerator.validate_gp_constructor("standard")
+        assert isinstance(result, StandardModelConstructor)
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_gp_constructor("not_a_constructor")
+
+    def test_validate_gp_constructor_dict(self):
+        # Valid dict
+        result = BayesianGenerator.validate_gp_constructor({"name": "standard"})
+        assert isinstance(result, StandardModelConstructor)
+        # Invalid dict
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_gp_constructor({"name": "not_a_constructor"})
+
+    def test_validate_turbo_controller(self):
+        # Should return None
+        result = BayesianGenerator.validate_turbo_controller(None, {})
+        assert result is None
+
+        # Valid class instance
+        class CustomTurboController:
+            pass
+
+        custom_controller = CustomTurboController()
+        with pytest.raises(ValueError):
+            result = BayesianGenerator.validate_turbo_controller(custom_controller, {})
+
+        class CustomBayesianGenerator(BayesianGenerator):
+            _compatible_turbo_controllers = [CustomTurboController]
+
+        mock_info = MagicMock(ValidationInfo)
+        mock_info.data = {"vocs": {}}
+        result = CustomBayesianGenerator.validate_turbo_controller(
+            custom_controller, mock_info
+        )
+        assert result is custom_controller
+
+        # Invalid type
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_turbo_controller("invalid_string", {})
+
+    def test_validate_computation_time(self):
+        with pytest.raises(ValueError):
+            BayesianGenerator.validate_computation_time(10)
+
+    @patch.multiple(
+        PatchBayesianGenerator,
+        __abstractmethods__=set(),
+        _compatible_turbo_controllers=[OptimizeTurboController],
+    )
+    def test_discrete_variables(self):
+        # test fixed feature with discrete variables
+        vocs = VOCS(
+            variables={"x1": [0.0, 1.0], "x2": {0.0, 5.0, 10.0}},
+            objectives={"y1": "MINIMIZE"},
+        )
+        gen = PatchBayesianGenerator(vocs=vocs, fixed_features={"x2": 5.0})  # pin x2
+
+        # since we have a fixed feature, candidate names should only include x1
+        assert gen._candidate_names == ["x1"]
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.0], [1.0]]).to(bounds))
+
+        # test max travel distance with discrete variable
+        gen = PatchBayesianGenerator(vocs=vocs)
+        gen.max_travel_distances = [0.1, 0.2]
+
+        gen.add_data(pd.DataFrame({"x1": [0.5], "x2": [5.0], "y1": [0.5]}))
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.4, 3.0], [0.6, 7.0]]).to(bounds))
+
+        # test turbo branch with fixed discrete feature
+        gen = PatchBayesianGenerator(
+            vocs=vocs,
+            turbo_controller={
+                "name": "OptimizeTurboController",
+                "center_x": {"x1": 0.5, "x2": 5.0},
+                "length": 0.4,
+            },
+        )
+        bounds = gen._get_optimization_bounds()
+        assert torch.allclose(bounds, torch.tensor([[0.3, 3.0], [0.7, 7.0]]).to(bounds))

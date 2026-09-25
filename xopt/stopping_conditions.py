@@ -7,8 +7,7 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
-
+from typing import List, Literal, Annotated, Union
 import pandas as pd
 from pydantic import (
     ConfigDict,
@@ -17,11 +16,14 @@ from pydantic import (
     PositiveInt,
     field_serializer,
     field_validator,
+    Discriminator,
+    TypeAdapter,
 )
 
 
 from xopt.pydantic import XoptBaseModel
-from xopt.vocs import VOCS
+from xopt.vocs import get_feasibility_data
+from gest_api.vocs import MinimizeObjective, VOCS
 
 
 class StoppingCondition(XoptBaseModel, ABC):
@@ -54,32 +56,6 @@ class StoppingCondition(XoptBaseModel, ABC):
         ...
 
 
-def get_stopping_condition(name: str) -> type[StoppingCondition]:
-    """
-    Retrieve a stopping condition class by its name.
-
-    Parameters
-    ----------
-    name : str
-        Name of the stopping condition class.
-
-    Returns
-    -------
-    type[StoppingCondition]
-        The stopping condition class.
-
-    Raises
-    ------
-    ValueError
-        If no stopping condition with the given name is found.
-    """
-    subclasses = StoppingCondition.__subclasses__()
-    for subclass in subclasses:
-        if subclass.__name__ == name:
-            return subclass
-    raise ValueError(f"No stopping condition found with name: {name}")
-
-
 class MaxEvaluationsCondition(StoppingCondition):
     """
     Stop after a maximum number of evaluations. Evaluations can be counted
@@ -97,6 +73,7 @@ class MaxEvaluationsCondition(StoppingCondition):
         Whether to use the dataframe index to count evaluations (default: False).
     """
 
+    name: Literal["MaxEvaluationsCondition"] = "MaxEvaluationsCondition"
     max_evaluations: PositiveInt = Field(
         description="Maximum number of function evaluations"
     )
@@ -139,6 +116,7 @@ class TargetValueCondition(StoppingCondition):
         Tolerance for reaching the target (default: 1e-6).
     """
 
+    name: Literal["TargetValueCondition"] = "TargetValueCondition"
     objective_name: str = Field(description="Name of the objective to monitor")
     target_value: float = Field(description="Target value for the objective")
     tolerance: PositiveFloat = Field(
@@ -159,7 +137,7 @@ class TargetValueCondition(StoppingCondition):
         if len(objective_values) == 0:
             return False
 
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             best_value = objective_values.min()
             return best_value <= self.target_value + self.tolerance
         else:  # MAXIMIZE
@@ -183,6 +161,7 @@ class ConvergenceCondition(StoppingCondition):
         Whether to use relative improvement (default: False).
     """
 
+    name: Literal["ConvergenceCondition"] = "ConvergenceCondition"
     objective_name: str = Field(description="Name of the objective to monitor")
     improvement_threshold: PositiveFloat = Field(
         description="Minimum improvement required to continue optimization"
@@ -211,7 +190,7 @@ class ConvergenceCondition(StoppingCondition):
         # Check improvement over the last 'patience' evaluations
         recent_values = objective_values.iloc[-(self.patience + 1) :]
 
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             best_recent = recent_values.min()
             baseline = recent_values.iloc[0]
             improvement = baseline - best_recent
@@ -240,6 +219,7 @@ class StagnationCondition(StoppingCondition):
         Minimum improvement considered significant (default: 1e-8).
     """
 
+    name: Literal["StagnationCondition"] = "StagnationCondition"
     objective_name: str = Field(description="Name of the objective to monitor")
     patience: PositiveInt = Field(
         description="Number of evaluations without improvement before stopping"
@@ -263,7 +243,7 @@ class StagnationCondition(StoppingCondition):
         objective_values = data[self.objective_name].dropna()
 
         # Track the best value seen so far
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             cumulative_best = objective_values.cummin()
         else:  # MAXIMIZE
             cumulative_best = objective_values.cummax()
@@ -271,7 +251,7 @@ class StagnationCondition(StoppingCondition):
         recent_best = cumulative_best.iloc[-1]
         past_best = cumulative_best.iloc[-(self.patience + 1)]
 
-        if objective_type.upper() == "MINIMIZE":
+        if isinstance(objective_type, MinimizeObjective):
             improvement = past_best - recent_best
         else:  # MAXIMIZE
             improvement = recent_best - past_best
@@ -289,6 +269,7 @@ class FeasibilityCondition(StoppingCondition):
         Whether all constraints must be satisfied (default: True).
     """
 
+    name: Literal["FeasibilityCondition"] = "FeasibilityCondition"
     require_all_constraints: bool = Field(
         default=True, description="Whether all constraints must be satisfied"
     )
@@ -299,7 +280,7 @@ class FeasibilityCondition(StoppingCondition):
             return False
 
         # Use VOCS to determine feasibility
-        feasibility_data = vocs.feasibility_data(data)
+        feasibility_data = get_feasibility_data(vocs, data)
 
         if self.require_all_constraints:
             # Stop if any point is fully feasible
@@ -327,34 +308,13 @@ class CompositeCondition(StoppingCondition):
         Logic to combine conditions: "and" or "or" (default: "or").
     """
 
-    conditions: List[StoppingCondition] = Field(
-        description="List of stopping conditions to combine"
+    name: Literal["CompositeCondition"] = "CompositeCondition"
+    conditions: List["StoppingConditionUnion"] = Field(
+        description="List of stopping conditions to combine", min_length=1
     )
     logic: str = Field(
         default="or", description="Logic to combine conditions: 'and' or 'or'"
     )
-
-    @field_validator("conditions", mode="before")
-    def validate_conditions(cls, v):
-        if len(v) == 0:
-            raise ValueError("At least one condition must be provided")
-
-        # process list to ensure all are StoppingCondition instances
-        validated_conditions = []
-        for condition in v:
-            if isinstance(condition, dict):
-                name = condition.pop("name")
-                sc_class = get_stopping_condition(name)
-                condition = sc_class(**condition)
-            elif isinstance(condition, StoppingCondition):
-                pass
-            else:
-                raise ValueError(
-                    "Each condition must be a StoppingCondition instance or a dict"
-                )
-            validated_conditions.append(condition)
-
-        return validated_conditions
 
     @field_serializer("conditions")
     @classmethod
@@ -386,3 +346,20 @@ class CompositeCondition(StoppingCondition):
         if self.logic == "and":
             return all(results)
         return False
+
+
+# Typedef of union field with annotated discriminator for pydantic objects using stopping conditions
+StoppingConditionUnion = Annotated[
+    Union[
+        MaxEvaluationsCondition,
+        TargetValueCondition,
+        ConvergenceCondition,
+        StagnationCondition,
+        FeasibilityCondition,
+        CompositeCondition,
+    ],
+    Discriminator("name"),
+]
+
+# Union adaptor for users to instantiate stopping conditions directly
+StoppingConditionAdapter = TypeAdapter(StoppingConditionUnion)

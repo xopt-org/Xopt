@@ -14,11 +14,17 @@ from xopt.generators.bayesian.utils import (
     compute_hypervolume_and_pf,
     torch_compile_acqf,
     torch_compile_gp_model,
-    torch_trace_acqf,
-    torch_trace_gp_model,
+    interpolate_points,
+    validate_turbo_controller_base,
 )
-from xopt.resources.benchmarking import time_call
+from xopt.resources.bench_framework import time_call
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
+from xopt.vocs import random_inputs, VOCS
+from xopt.generators.bayesian.turbo import (
+    OptimizeTurboController,
+    SafetyTurboController,
+)
+
 
 cuda_combinations = [False] if not torch.cuda.is_available() else [False, True]
 device_map = {False: torch.device("cpu"), True: torch.device("cuda:0")}
@@ -87,68 +93,6 @@ class TestUtils:
         assert pf_Y.shape[1] == 3
         assert hv > 0
 
-    @pytest.mark.compilation_test
-    @pytest.mark.parametrize("use_cuda", cuda_combinations)
-    def test_model_jit(self, use_cuda):
-        vocs = deepcopy(TEST_VOCS_BASE)
-        vocs.constraints = {}
-        evaluator = Evaluator(function=xtest_callable)
-        gen = UpperConfidenceBoundGenerator(
-            vocs=vocs,
-        )
-        gen.use_cuda = use_cuda
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
-        gen = X.generator
-        X.random_evaluate(200)
-        gen.train_model()
-        X.random_evaluate(5000)
-        gen.gp_constructor.use_cached_hyperparameters = True
-        gen.train_model()
-        gen.model.eval()
-
-        def get_model():
-            return deepcopy(gen.model.models[0])
-
-        t1 = time.perf_counter()
-        model_jit = torch_trace_gp_model(
-            get_model(), gen.vocs, gen.tkwargs, posterior=False, batch_size=500
-        ).to(device_map[use_cuda])
-        t2 = time.perf_counter()
-        print(f"JIT compile: {t2 - t1:.4f} seconds")
-
-        t1 = time.perf_counter()
-        model_jit_posterior = torch_trace_gp_model(
-            get_model(), gen.vocs, gen.tkwargs, batch_size=500
-        ).to(device_map[use_cuda])
-        t2 = time.perf_counter()
-        print(f"JIT posterior compile: {t2 - t1:.4f} seconds")
-
-        x_grid = torch.tensor(
-            pd.DataFrame(
-                gen.vocs.random_inputs(500, include_constants=False)
-            ).to_numpy()
-        )
-        x_grid = x_grid.to(device_map[use_cuda])
-
-        m = get_model()
-        t, values1 = time_call(lambda: m(x_grid), 3)
-        t = np.array(t)
-        print(f"Original time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
-
-        m = get_model()
-        t, values1 = time_call(lambda: m.posterior(x_grid), 3)
-        t = np.array(t)
-        print(f"Original posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
-
-        t, values1 = time_call(lambda: model_jit(x_grid), 3)
-        t = np.array(t)
-        print(f"JIT time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
-
-        t, values1 = time_call(lambda: model_jit_posterior(x_grid), 3)
-        t = np.array(t)
-        print(f"JIT posterior time: {t[1:].mean():.6f}  +- {t[1:].std():.6f}")
-
-    @pytest.mark.compilation_test
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_model_compile(self, use_cuda):
         # For inductor + windows any, MSVC 2022 build tools are required
@@ -166,7 +110,7 @@ class TestUtils:
         gen.use_cuda = use_cuda
         gen.numerical_optimizer.n_restarts = 2
         gen.n_monte_carlo_samples = 4
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=TEST_VOCS_BASE)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(100)
         for _ in range(1):
             X.step()
@@ -195,21 +139,21 @@ class TestUtils:
         t2 = time.perf_counter()
         print(f"Compile AT: {t2 - t1:.4f} seconds")
 
+        t1 = time.perf_counter()
+        model_compile_direct = torch_compile_gp_model(
+            gen.train_model().models[0], gen.vocs, gen.tkwargs, posterior=False
+        ).to(device_map[use_cuda])
+        t2 = time.perf_counter()
+        print(f"Compile direct: {t2 - t1:.4f} seconds")
+
         def fmodel(m, x):
             mvn = m.posterior(x)
             return mvn.mean, mvn.variance
 
-        t1 = time.perf_counter()
-        model_jit = torch_trace_gp_model(
-            gen.train_model().models[0],
-            gen.vocs,
-            gen.tkwargs,
-        ).to(device_map[use_cuda])
-        t2 = time.perf_counter()
-        print(f"JIT trace: {t2 - t1:.4f} seconds")
-
         x_grid = torch.tensor(
-            pd.DataFrame(gen.vocs.random_inputs(20, include_constants=False)).to_numpy()
+            pd.DataFrame(
+                random_inputs(gen.vocs, 20, include_constants=False)
+            ).to_numpy()
         )
         x_grid = x_grid.to(device_map[use_cuda])
 
@@ -217,45 +161,43 @@ class TestUtils:
             t1, values1 = time_call(lambda: fmodel(model, x_grid), 10)
             t1 = np.array(t1)
 
-            t2, values2 = time_call(lambda: model_jit(x_grid), 10)
+            t2, values2 = time_call(lambda: fmodel(model_compile, x_grid), 10)
             t2 = np.array(t2)
 
-            t3, values3 = time_call(lambda: fmodel(model_compile, x_grid), 10)
+            t3, _ = time_call(lambda: fmodel(model_compile_reduce_overhead, x_grid), 10)
             t3 = np.array(t3)
 
-            t4, values4 = time_call(
-                lambda: fmodel(model_compile_reduce_overhead, x_grid), 10
-            )
+            t4, _ = time_call(lambda: fmodel(model_compile_max_autotune, x_grid), 10)
             t4 = np.array(t4)
 
-            t5, values5 = time_call(
-                lambda: fmodel(model_compile_max_autotune, x_grid), 10
-            )
-            t5 = np.array(t5)
-
             print(f"Original time: {t1} seconds")
-            print(f"JIT time: {t2} seconds")
-            print(f"Compiled time: {t3} seconds")
-            print(f"Compiled RO time: {t4} seconds")
-            print(f"Compiled AT time: {t5} seconds")
+            print(f"Compiled time: {t2} seconds")
+            print(f"Compiled RO time: {t3} seconds")
+            print(f"Compiled AT time: {t4} seconds")
             print(f"Avg: {t1[1:].mean():.6f}  +- {t1[1:].std():.6f}")
             print(f"Avg: {t2[1:].mean():.6f}  +- {t2[1:].std():.6f}")
             print(f"Avg: {t3[1:].mean():.6f}  +- {t3[1:].std():.6f}")
             print(f"Avg: {t4[1:].mean():.6f}  +- {t4[1:].std():.6f}")
-            print(f"Avg: {t5[1:].mean():.6f}  +- {t5[1:].std():.6f}")
 
-        for v1, v2, v3 in zip(values1, values2, values3):
+        for v1, v2 in zip(values1, values2):
             m1, var1 = v1
             m2, var2 = v2
-            m3, var3 = v3
-            assert torch.allclose(m1, m2, rtol=0), "JIT model output mismatch"
-            assert torch.allclose(var1, var2, rtol=0), "JIT model variance mismatch"
-            assert torch.allclose(m1, m3, rtol=0), "Compiled model output mismatch"
-            assert torch.allclose(var1, var3, rtol=0), (
+            assert torch.allclose(m1, m2, rtol=0), "Compiled model output mismatch"
+            assert torch.allclose(var1, var2, rtol=0), (
                 "Compiled model variance mismatch"
             )
 
-    @pytest.mark.compilation_test
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            model.eval()
+            mvn_eager = model(x_grid)
+            mvn_direct = model_compile_direct(x_grid)
+            assert torch.allclose(mvn_eager.mean, mvn_direct.mean, rtol=0), (
+                "Compiled model direct call output mismatch"
+            )
+            assert torch.allclose(mvn_eager.variance, mvn_direct.variance, rtol=0), (
+                "Compiled model direct call variance mismatch"
+            )
+
     @pytest.mark.parametrize("use_cuda", cuda_combinations)
     def test_acqf_compile(self, use_cuda):
         print(f"{torch._dynamo.list_backends()=}")
@@ -275,7 +217,7 @@ class TestUtils:
         gen.use_cuda = use_cuda
         gen.numerical_optimizer.n_restarts = 3
         gen.n_monte_carlo_samples = 4
-        X = Xopt(generator=gen, evaluator=evaluator, vocs=vocs)
+        X = Xopt(generator=gen, evaluator=evaluator)
         X.random_evaluate(200)
         for _ in range(1):
             X.step()
@@ -311,20 +253,12 @@ class TestUtils:
         t2 = time.perf_counter()
         print(f"Compile AT: {t2 - t1:.4f} seconds")
 
-        acqf = make_acqf().to(device_map[use_cuda])
-        t1 = time.perf_counter()
-        model_jit = torch_trace_acqf(acqf, gen.vocs, gen.tkwargs).to(
-            device_map[use_cuda]
-        )
-        t2 = time.perf_counter()
-        print(f"JIT trace: {t2 - t1:.4f} seconds")
-
         def fmodel(m, x):
             return m(x)
 
         # batch x 1 x d
         x_grid = torch.tensor(
-            pd.DataFrame(gen.vocs.random_inputs(4, include_constants=False)).to_numpy()
+            pd.DataFrame(random_inputs(gen.vocs, 4, include_constants=False)).to_numpy()
         ).unsqueeze(-2)
         x_grid = x_grid.to(device_map[use_cuda])
 
@@ -332,36 +266,94 @@ class TestUtils:
             t1, values1 = time_call(lambda: fmodel(model, x_grid), 10)
             t1 = np.array(t1)
 
-            t2, values2 = time_call(lambda: fmodel(model_jit, x_grid), 10)
+            t2, values2 = time_call(lambda: fmodel(model_compile, x_grid), 10)
             t2 = np.array(t2)
 
-            t3, values3 = time_call(lambda: fmodel(model_compile, x_grid), 10)
+            t3, _ = time_call(lambda: fmodel(model_compile_reduce_overhead, x_grid), 10)
             t3 = np.array(t3)
 
-            t4, values4 = time_call(
-                lambda: fmodel(model_compile_reduce_overhead, x_grid), 10
-            )
+            t4, _ = time_call(lambda: fmodel(model_compile_max_autotune, x_grid), 10)
             t4 = np.array(t4)
 
-            t5, values5 = time_call(
-                lambda: fmodel(model_compile_max_autotune, x_grid), 10
-            )
-            t5 = np.array(t5)
-
             print(f"Original time: {t1} seconds")
-            print(f"JIT time: {t2} seconds")
-            print(f"Compiled time: {t3} seconds")
-            print(f"Compiled RO time: {t4} seconds")
-            print(f"Compiled AT time: {t5} seconds")
+            print(f"Compiled time: {t2} seconds")
+            print(f"Compiled RO time: {t3} seconds")
+            print(f"Compiled AT time: {t4} seconds")
             print(f"Original Avg: {t1[1:].mean():.6f}  +- {t1[1:].std():.6f}")
-            print(f"JIT Avg: {t2[1:].mean():.6f}  +- {t2[1:].std():.6f}")
-            print(f"Compiled Avg: {t3[1:].mean():.6f}  +- {t3[1:].std():.6f}")
-            print(f"Compiled RO Avg: {t4[1:].mean():.6f}  +- {t4[1:].std():.6f}")
-            print(f"Compiled AT Avg: {t5[1:].mean():.6f}  +- {t5[1:].std():.6f}")
+            print(f"Compiled Avg: {t2[1:].mean():.6f}  +- {t2[1:].std():.6f}")
+            print(f"Compiled RO Avg: {t3[1:].mean():.6f}  +- {t3[1:].std():.6f}")
+            print(f"Compiled AT Avg: {t4[1:].mean():.6f}  +- {t4[1:].std():.6f}")
 
-        for v1, v2, v3 in zip(values1, values2, values3):
+        for v1, v2 in zip(values1, values2):
             m1 = v1
             m2 = v2
-            m3 = v3
             assert torch.allclose(m1, m2, rtol=1e-5)
-            assert torch.allclose(m1, m3, rtol=1e-5)
+
+    def test_compile_gp_model_model_list_error(self):
+        from botorch.models import ModelListGP
+
+        vocs = deepcopy(TEST_VOCS_BASE)
+        model = ModelListGP()
+        with pytest.raises(ValueError):
+            torch_compile_gp_model(model, vocs, {}, posterior=True)
+
+    def test_interpolate_points_invalid_rows(self):
+        # Create a DataFrame with more than two rows
+        df_invalid = pd.DataFrame({"x": [0, 1, 2], "y": [0, 1, 2]})
+
+        # Expect a ValueError when calling interpolate_points
+        with pytest.raises(
+            ValueError, match="Input DataFrame must have exactly two rows."
+        ):
+            interpolate_points(df_invalid)
+
+    def test_validate_turbo_controller_base_all_branches(self):
+        class DummyInfo:
+            data = {
+                "vocs": VOCS(
+                    variables={"x": [0, 1]},
+                    objectives={"y": "MAXIMIZE"},
+                    constraints={},
+                    observables=["y"],
+                )
+            }
+
+        info = DummyInfo()
+        valid_types = [OptimizeTurboController, SafetyTurboController]
+
+        # String input: "optimize"
+        result = validate_turbo_controller_base("optimize", valid_types, info)
+        assert isinstance(result, OptimizeTurboController)
+
+        # String input: invalid
+        with pytest.raises(ValueError, match="not found"):
+            validate_turbo_controller_base("invalid", valid_types, info)
+
+        # Dict input: valid
+        result = validate_turbo_controller_base(
+            {"name": "OptimizeTurboController"}, valid_types, info
+        )
+        assert isinstance(result, OptimizeTurboController)
+
+        # Dict input: missing name
+        with pytest.raises(ValueError, match="needs to have a `name` attribute"):
+            validate_turbo_controller_base({}, valid_types, info)
+
+        # Dict input: invalid name
+        with pytest.raises(ValueError, match="not found"):
+            validate_turbo_controller_base(
+                {"name": "InvalidController"}, valid_types, info
+            )
+
+        # Add constraints to info
+        info.data["vocs"].constraints = {"c1": ["LESS_THAN", 0.5]}
+        # String input: "safety"
+        result = validate_turbo_controller_base("safety", valid_types, info)
+        assert isinstance(result, SafetyTurboController)
+
+        # Wrong type: not a valid controller
+        class DummyController:
+            pass
+
+        with pytest.raises(ValueError, match="not allowed for this generator"):
+            validate_turbo_controller_base(DummyController(), valid_types, info)

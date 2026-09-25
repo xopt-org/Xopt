@@ -5,17 +5,14 @@ import json
 import logging
 import os.path
 import typing
+from collections.abc import Callable, Iterable
 from concurrent.futures import Future
 from functools import partial
 from importlib import import_module
 from types import FunctionType, MethodType
 from typing import (
     Any,
-    Callable,
     Generic,
-    Iterable,
-    List,
-    Optional,
     TextIO,
     TypeVar,
     cast,
@@ -29,20 +26,33 @@ import yaml
 from pydantic import (
     BaseModel,
     ConfigDict,
-    create_model,
     Field,
+    create_model,
     field_serializer,
     field_validator,
     model_serializer,
     model_validator,
 )
-from pydantic.v1.json import custom_pydantic_encoder
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
 
-JSON_ENCODERS: dict[type, Callable[[Any], Any]] = {
+
+def custom_pydantic_encoder(type_encoders, obj):
+    # Check the class type and its superclasses for a matching encoder.
+    # Replicates pydantic v1's ``custom_pydantic_encoder`` without importing
+    # from ``pydantic.v1`` (which is incompatible with Python 3.14+).
+    for base in type(obj).__mro__[:-1]:
+        try:
+            encoder = type_encoders[base]
+        except KeyError:
+            continue
+        return encoder(obj)
+    raise TypeError(f"Object of type {type(obj).__name__!r} is not JSON serializable")
+
+
+JSON_ENCODERS = {
     # function/method type distinguished for class members
     # and not recognized as callables
     FunctionType: lambda x: f"{x.__module__}.{x.__qualname__}",
@@ -57,6 +67,46 @@ JSON_ENCODERS: dict[type, Callable[[Any], Any]] = {
     # torch.nn.Module: lambda x: process_torch_module(x),
     # torch.Tensor: lambda x: x.detach().cpu().numpy().tolist(),
 }
+
+
+def _serialize_non_finite_float(value: float | np.floating) -> str:
+    value = float(value)
+    if np.isnan(value):
+        return "nan"
+    if value > 0:
+        return "inf"
+    return "-inf"
+
+
+def _serialize_list(values, base_key="", serialize_torch=False, serialize_inline=False):
+    serialized_values = []
+    for i, item in enumerate(values):
+        list_key = f"{base_key}_{i}" if base_key else str(i)
+
+        if isinstance(item, dict):
+            item = recursive_serialize(
+                item, list_key, serialize_torch, serialize_inline
+            )
+        elif isinstance(item, list):
+            item = _serialize_list(item, list_key, serialize_torch, serialize_inline)
+        elif isinstance(item, (float, np.floating)) and not np.isfinite(float(item)):
+            item = _serialize_non_finite_float(item)
+        else:
+            for _type, func in JSON_ENCODERS.items():
+                if isinstance(item, _type):
+                    item = func(item)
+
+            if isinstance(item, (float, np.floating)) and not np.isfinite(float(item)):
+                item = _serialize_non_finite_float(item)
+
+        try:
+            json.dumps(item)
+        except (TypeError, OverflowError):
+            item = f"{item.__module__}.{item.__class__.__qualname__}"
+
+        serialized_values.append(item)
+
+    return serialized_values
 
 
 # The problem with v2 serialization is that model_serialize_json() does not accept kwargs
@@ -83,6 +133,8 @@ def recursive_serialize(
     for key in list(v):
         if isinstance(v[key], dict):
             v[key] = recursive_serialize(v[key], key, serialize_torch, serialize_inline)
+        elif isinstance(v[key], list):
+            v[key] = _serialize_list(v[key], key, serialize_torch, serialize_inline)
         elif isinstance(v[key], torch.nn.Module):
             if serialize_torch:
                 if serialize_inline:
@@ -97,10 +149,21 @@ def recursive_serialize(
             v[key] = str(v[key])
         elif isinstance(v[key], pd.DataFrame):
             v[key] = json.loads(v[key].to_json())
+        elif isinstance(v[key], set):
+            v[key] = list(v[key])
+        elif isinstance(v[key], (float, np.floating)) and not np.isfinite(
+            float(v[key])
+        ):
+            v[key] = _serialize_non_finite_float(v[key])
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(v[key], _type):
                     v[key] = func(v[key])
+
+            if isinstance(v[key], (float, np.floating)) and not np.isfinite(
+                float(v[key])
+            ):
+                v[key] = _serialize_non_finite_float(v[key])
 
         # check to make sure object has been serialized,
         # if not use a generic serializer
@@ -219,15 +282,21 @@ def decode_torch_module(modulestr: str):
 class XoptBaseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    @field_validator("*", mode="before")
-    def validate_files(cls, value: Any, info: ValidationInfo):
-        if isinstance(value, str):
-            if os.path.exists(value):
-                extension = value.split(".")[-1]
-                if extension == "pt":
-                    value = torch.load(value, weights_only=False)
-
-        return value
+    @model_validator(mode="before")
+    @classmethod
+    def validate_files(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        for key, value in data.items():
+            # Exclude field `name`` from before validator for use in discriminated fields
+            if key == "name":
+                continue
+            if isinstance(value, str):
+                if os.path.exists(value):
+                    extension = value.split(".")[-1]
+                    if extension == "pt":
+                        data[key] = torch.load(value, weights_only=False)
+        return data
 
     # Note that this function still returns a dict, NOT a string. Pydantic will handle
     # final serialization of basic types in Rust.
@@ -251,7 +320,7 @@ class XoptBaseModel(BaseModel):
         return yaml.dump(output)
 
     @classmethod
-    def from_file(cls, filename: str):
+    def from_file(cls, filename: str) -> "XoptBaseModel":
         if not os.path.exists(filename):
             raise OSError(f"file {filename} is not found")
 
@@ -259,11 +328,11 @@ class XoptBaseModel(BaseModel):
             return cls.from_yaml(file)
 
     @classmethod
-    def from_yaml(cls, yaml_obj: str | TextIO):
+    def from_yaml(cls, yaml_obj: str | TextIO) -> "XoptBaseModel":
         return cls.model_validate(remove_none_values(yaml.safe_load(yaml_obj)))
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any]):
+    def from_dict(cls, config: dict) -> "XoptBaseModel":
         return cls.model_validate(remove_none_values(config))
 
 
@@ -275,7 +344,7 @@ def remove_none_values(d: Any) -> Any:
     elif isinstance(d, list):
         d = cast(list[Any], d)
         # If it's a list, recursively process each item in the list
-        d = [remove_none_values(item) for item in d]
+        d = [remove_none_values(item) for item in d if item is not None]
     return d
 
 
@@ -283,19 +352,17 @@ def get_descriptions_defaults(model: XoptBaseModel):
     """get a dict containing the descriptions of fields inside nested pydantic models"""
 
     description_dict: dict[str, Any] = {}
-    for name, val in model.__class__.model_fields.items():
-        try:
-            if issubclass(getattr(model, name), XoptBaseModel):
-                description_dict[name] = get_descriptions_defaults(getattr(model, name))
-            else:
-                description_dict[name] = [
-                    val.description,
-                    val.default,
-                ]
-
-        except TypeError:
-            # if the val is an object or callable type
-            description_dict[name] = val.description
+    for name, val in model.model_fields.items():
+        value = getattr(model, name)
+        # Check if the value is a subclass of XoptBaseModel
+        if isinstance(value, XoptBaseModel):
+            description_dict[name] = get_descriptions_defaults(value)
+        else:
+            try:
+                description_dict[name] = [val.description, val.default]
+            except TypeError:
+                # if the val is an object or callable type
+                description_dict[name] = val.description
 
     return description_dict
 
@@ -377,9 +444,9 @@ class ObjLoader(
     Generic[ObjType],
 ):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    object: Optional[ObjType] = None
+    object: ObjType | None = None
     loader: CallableModel = None
-    object_type: Optional[type] = None
+    object_type: type | None = None
 
     @model_serializer(mode="plain", when_used="json", return_type="str")
     def serialize_json(self) -> str:
@@ -438,7 +505,7 @@ class ObjLoader(
     def load(self, store: bool = False):
         # store object reference on loader
         if store:
-            self.object = self.loader.call()
+            self.object = self.loader()
             return self.object
 
         # return loaded object w/o storing
@@ -452,8 +519,8 @@ class ObjLoaderMinimal(
     Generic[ObjType],
 ):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    object: Optional[ObjType] = None
-    object_type: Optional[type] = None
+    object: ObjType | None = None
+    object_type: type | None = None
 
     @model_validator(mode="before")
     def validate_all(cls, values):
@@ -471,7 +538,6 @@ class ObjLoaderMinimal(
 
     @field_serializer("object_type", when_used="json")
     def serialize_object_type(self, x):
-        print("object_type serializer", x)
         if x is None:
             return x
         return f"{x.__module__}.{x.__name__}"
@@ -485,19 +551,19 @@ class BaseExecutor(
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # executor_type must comply with https://peps.python.org/pep-3148/ standard
-    loader: Optional[ObjLoader[ObjType]] = None  # loader of executor type
+    loader: ObjLoader[ObjType] | None = None  # loader of executor type
 
     # This is a utility field not included in reps. The typing lib has opened
     # issues on access of generic type within class.
     # This tracks for if-necessary future use.
-    executor_type: Optional[type] = Field(None, exclude=True, validate_default=True)
+    executor_type: type | None = Field(None, exclude=True, validate_default=True)
     submit_callable: str = "submit"
     map_callable: str = "map"
     shutdown_callable: str = "shutdown"
 
     # executor will not be explicitly serialized, but loaded using loader with class
     # and kwargs
-    executor: Optional[ObjType] = None
+    executor: ObjType | None = None
 
     @model_serializer(mode="plain", when_used="json", return_type="str")
     def serialize_json(self) -> str:
@@ -564,8 +630,10 @@ class BaseExecutor(
         # Compose loader utility
         if values.get("loader") is not None:
             loader_values = values.get("loader")
-            loader = ObjLoader[executor_type](**loader_values)
-
+            if isinstance(loader_values, ObjLoader):
+                loader = loader_values
+            else:
+                loader = ObjLoader[executor_type](**loader_values)
         else:
             # maintain reference to original object
             loader_values = copy.copy(values)
@@ -573,7 +641,6 @@ class BaseExecutor(
             # if executor in values, need to remove
             if "executor" in loader_values:
                 loader_values.pop("executor")
-
             loader = ObjLoader[executor_type](**loader_values)
 
         # update encoders
@@ -739,7 +806,7 @@ class SignatureModel(BaseModel):
         n_pos_only = len(stored_args)
         positional_kwargs = []
         if len(args) < n_pos_only:
-            stored_args[:n_pos_only] = args
+            stored_args[: len(args)] = args
 
         else:
             stored_args = args[:n_pos_only]
@@ -790,8 +857,8 @@ def validate_and_compose_signature(callable: Callable, *args, **kwargs):
 
     # create pydantic model
     pydantic_fields = {
-        "args": (List[Any], Field(list(sig_args))),
-        "kwarg_order": (List[Any], Field(list(sig_kwargs.keys()), exclude=True)),
+        "args": (list[Any], Field(list(sig_args))),
+        "kwarg_order": (list[Any], Field(list(sig_kwargs.keys()), exclude=True)),
     }
     for key, value in sig_kwargs.items():
         if isinstance(value, (tuple,)):

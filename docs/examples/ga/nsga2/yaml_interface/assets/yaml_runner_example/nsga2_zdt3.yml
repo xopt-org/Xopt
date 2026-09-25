@@ -6,6 +6,56 @@ generator:
   name: nsga2  # Use `NSGA2Generator`
   population_size:  50  # Number of individuals in each population
   output_dir: nsga2_output  # Where data will be output, remove to not output anything
+  # Define the variables, objectives and constraints
+  vocs:
+    # Each decision variable with its lower and upper bound
+    variables:
+      x1: [0, 1]
+      x2: [0, 1]
+      x3: [0, 1]
+      x4: [0, 1]
+      x5: [0, 1]
+      x6: [0, 1]
+      x7: [0, 1]
+      x8: [0, 1]
+      x9: [0, 1]
+      x10: [0, 1]
+      x11: [0, 1]
+      x12: [0, 1]
+      x13: [0, 1]
+      x14: [0, 1]
+      x15: [0, 1]
+      x16: [0, 1]
+      x17: [0, 1]
+      x18: [0, 1]
+      x19: [0, 1]
+      x20: [0, 1]
+      x21: [0, 1]
+      x22: [0, 1]
+      x23: [0, 1]
+      x24: [0, 1]
+      x25: [0, 1]
+      x26: [0, 1]
+      x27: [0, 1]
+      x28: [0, 1]
+      x29: [0, 1]
+      x30: [0, 1]
+
+    # Name of the objectives and which direction they are (MINIMIZE or MAXIMIZE)
+    objectives:
+      f1: MINIMIZE
+      f2: MINIMIZE
+
+    # We don't have constraints, but an example of what their definition looks like is included below
+    # constraints:
+    #   g1: ["LESS_THAN", 0]
+    #   g2: ["GREATER_THAN", 0]
+
+    # Constants may also be passed, these are used within the evaluation function
+    # constants:
+    #   const1: 0.1
+    #   const2: "path/to/template/file.txt"
+
 
 evaluator:
   # Xopt will import the module `eval_fun` and use the function `eval_fun` in it
@@ -20,53 +70,3 @@ evaluator:
   # to the population size so that a full generation is evaluated at once.
   vectorized: true
   max_workers: 50
-
-# Define the variables, objectives and constraints
-vocs:
-  # Each decision variable with its lower and upper bound
-  variables:
-    x1: [0, 1]
-    x2: [0, 1]
-    x3: [0, 1]
-    x4: [0, 1]
-    x5: [0, 1]
-    x6: [0, 1]
-    x7: [0, 1]
-    x8: [0, 1]
-    x9: [0, 1]
-    x10: [0, 1]
-    x11: [0, 1]
-    x12: [0, 1]
-    x13: [0, 1]
-    x14: [0, 1]
-    x15: [0, 1]
-    x16: [0, 1]
-    x17: [0, 1]
-    x18: [0, 1]
-    x19: [0, 1]
-    x20: [0, 1]
-    x21: [0, 1]
-    x22: [0, 1]
-    x23: [0, 1]
-    x24: [0, 1]
-    x25: [0, 1]
-    x26: [0, 1]
-    x27: [0, 1]
-    x28: [0, 1]
-    x29: [0, 1]
-    x30: [0, 1]
-
-  # Name of the objectives and which direction they are (MINIMIZE or MAXIMIZE)
-  objectives:
-    f1: MINIMIZE
-    f2: MINIMIZE
-
-  # We don't have constraints, but an example of what their definition looks like is included below
-  # constraints:
-  #   g1: ["LESS_THAN", 0]
-  #   g2: ["GREATER_THAN", 0]
-
-  # Constants may also be passed, these are used within the evaluation function
-  # constants:
-  #   const1: 0.1
-  #   const2: "path/to/template/file.txt"

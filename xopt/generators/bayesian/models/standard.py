@@ -1,30 +1,104 @@
 import os.path
 import warnings
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union, cast
+from functools import partial
+from typing import Any, Literal, cast
 
 import botorch.settings
 import pandas as pd
 import torch
-from botorch.models import ModelListGP
+from botorch import fit_gpytorch_mll
+from botorch.exceptions import ModelFittingError
+from botorch.models import ModelListGP, SingleTaskGP
+from botorch.models.gpytorch import BatchedMultiOutputGPyTorchModel
 from botorch.models.transforms import Normalize, Standardize
-from botorch.models.transforms.input import InputTransform
-from botorch.models.transforms.outcome import OutcomeTransform
+from botorch.optim import ExpMAStoppingCriterion
+from botorch.optim.closures import get_loss_closure_with_grads
+from botorch.optim.fit import fit_gpytorch_mll_scipy, fit_gpytorch_mll_torch
+from botorch.optim.utils import get_parameters
+from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.constraints import GreaterThan
 from gpytorch.kernels import Kernel
 from gpytorch.likelihoods import GaussianLikelihood, Likelihood
+from gpytorch.likelihoods.gaussian_likelihood import FixedNoiseGaussianLikelihood
 from gpytorch.priors import GammaPrior, Prior
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 from torch.nn import Module
+from torch.optim import Adam
 
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
-from xopt.generators.bayesian.utils import get_training_data
-from xopt.pydantic import decode_torch_module
+from xopt.generators.bayesian.utils import get_training_data, get_training_data_batched
+from xopt.pydantic import XoptBaseModel, decode_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
+
+# TODO: make custom stopping criterion that checks lengthscales
+
+
+def _get_non_degenerate_normalize_bounds(
+    input_names: list[str],
+    input_bounds: dict[str, list] | None,
+    tkwargs: dict | None = None,
+) -> torch.Tensor | None:
+    """Build bounds tensor for Normalize, expanding zero-width dimensions."""
+    if input_bounds is None:
+        return None
+
+    tensor_kwargs = tkwargs or {}
+    bounds = torch.vstack(
+        [torch.tensor(input_bounds[name], **tensor_kwargs) for name in input_names]
+    ).T
+
+    widths = bounds[1] - bounds[0]
+    zero_width_mask = torch.isclose(
+        widths,
+        torch.zeros_like(widths),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    if zero_width_mask.any():
+        # Singleton dimensions (e.g., one-value discrete sets) need finite width for Normalize.
+        bounds = bounds.clone()
+        centers = 0.5 * (bounds[0, zero_width_mask] + bounds[1, zero_width_mask])
+        bounds[0, zero_width_mask] = centers - 0.5
+        bounds[1, zero_width_mask] = centers + 0.5
+
+    return bounds
+
+
+class ExpMAStoppingCriterionModel(XoptBaseModel):
+    maxiter: int = Field(500, description="maximum number of iterations")
+    n_window: int = Field(
+        5, description="size of the exponential moving average window"
+    )
+    eta: float = Field(1.0, description="exponential decay factor in the weights")
+    rel_tol: float = Field(5e-4, description="relative tolerance for termination")
+
+
+class NumericalOptimizerConfig(XoptBaseModel):
+    timeout: float | None = Field(default=None, description="timeout in seconds")
+
+
+class LBFGSNumericalOptimizerConfig(NumericalOptimizerConfig):
+    gtol: float = Field(
+        default=1e-5, description="projected gradient tolerance, scipy default is 1e-5"
+    )
+    ftol: float = Field(
+        default=2.2e-9,
+        description="function tolerance, scipy default is 1e7 * np.finfo(float).eps = "
+        "2.2204460492503131e-09",
+    )
+    maxiter: int = Field(default=500, description="maximum number of iterations")
+
+
+class AdamNumericalOptimizerConfig(NumericalOptimizerConfig):
+    stopping_criterion: ExpMAStoppingCriterionModel = Field(
+        default_factory=ExpMAStoppingCriterionModel
+    )
+    lr: float = Field(default=0.1, description="learning rate for the Adam optimizer")
 
 
 class StandardModelConstructor(ModelConstructor):
@@ -43,22 +117,32 @@ class StandardModelConstructor(ModelConstructor):
         Covariance modules for GP models.
 
     mean_modules : Dict[str, Module]
-        Prior mean modules for GP models.
+        Prior mean modules for GP models.A mean function should reduce a
+        (batch) x n x d-dimensional input into a (batch) x n dimensional output.
 
     trainable_mean_keys : List[str]
         List of prior mean modules that can be trained.
 
+    transform_inputs : Union[Dict[str, bool], bool]
+        Specify if inputs should be transformed inside the GP model. Can optionally
+        specify a dict of specifications.
 
-    Methods
-    -------
-    get_likelihood
-        Get the likelihood for the model, considering the low noise prior.
+    custom_noise_prior : Optional[Prior]
+        Specify a custom noise prior for the GP likelihood. Overwrites value specified
+        by use_low_noise_prior.
 
-    build_model(input_names, outcome_names, data, input_bounds, dtype, device)
-        Construct independent models for each objective and constraint.
+    use_cached_hyperparameters : Optional[bool]
+        Flag to specify if cached hyperparameters should be used in model creation.
+        Training will still occur unless train_model is False.
 
-    build_mean_module(name, input_transform, outcome_transform)
-        Build the mean module for the output specified by name.
+    train_method : Literal["lbfgs", "adam"]
+        Numerical optimization algorithm to use.
+
+    train_model : bool
+        Flag to specify if the model should be trained (fitted to data).
+
+    train_config : NumericalOptimizerConfig
+        Configuration of the numerical optimizer.
 
     """
 
@@ -66,36 +150,98 @@ class StandardModelConstructor(ModelConstructor):
     use_low_noise_prior: bool = Field(
         False, description="specify if model should assume a low noise environment"
     )
-    covar_modules: Dict[str, Kernel] = Field(
+    covar_modules: dict[str, Kernel] = Field(
         {}, description="covariance modules for GP models"
     )
-    mean_modules: Dict[str, Module] = Field(
+    mean_modules: dict[str, Module] = Field(
         {}, description="prior mean modules for GP models"
     )
-    trainable_mean_keys: List[str] = Field(
+    trainable_mean_keys: list[str] = Field(
         [], description="list of prior mean modules that can be trained"
     )
-    transform_inputs: Union[Dict[str, bool], bool] = Field(
+    transform_inputs: dict[str, bool] | bool = Field(
         True,
         description="specify if inputs should be transformed inside the gp "
         "model, can optionally specify a dict of specifications",
     )
-    custom_noise_prior: Optional[Prior] = Field(
+    custom_noise_prior: Prior | None = Field(
         None,
         description="specify custom noise prior for the GP likelihood, "
         "overwrites value specified by use_low_noise_prior",
     )
-    use_cached_hyperparameters: Optional[bool] = Field(
+    use_cached_hyperparameters: bool | None = Field(
         False,
         description="flag to specify if cached hyperparameters should be used in "
-        "model creation instead of training",
+        "model creation. Training will still occur unless train_model is False.",
     )
-    _hyperparameter_store: Optional[Dict] = None
+    train_method: Literal["lbfgs", "adam"] = Field(
+        "lbfgs", description="numerical optimization algorithm to use"
+    )
+    train_model: bool = Field(
+        True,
+        description="flag to specify if the model should be trained (fitted to data)",
+    )
+    train_config: NumericalOptimizerConfig | None = Field(
+        None,
+        description="configuration of the numerical optimizer - see fit_gpytorch_mll_scipy"
+        " and fit_gpytorch_mll_torch",
+    )
+    train_kwargs: dict[str, Any] | None = Field(
+        None,
+        description="additional keyword arguments passed to the training optimizer",
+    )
+    _hyperparameter_store: dict | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
+
+    @field_validator("train_kwargs")
+    def validate_train_kwargs(cls, train_kwargs, info: ValidationInfo):
+        if train_kwargs is None:
+            return train_kwargs
+        # keys are from _fit_fallback in botorch/fit.py - we don't use other dispatchers
+        allowed_keys = [
+            "pick_best_of_all_attempts",
+            "max_attempts",
+            "warning_handler",
+            "optimizer_kwargs",
+        ]
+        allowed_subkeys = {}
+        if not isinstance(train_kwargs, dict):
+            raise ValueError(f"train_kwargs must be a dict, not {type(train_kwargs)}")
+        invalid_keys = set(train_kwargs.keys()) - set(allowed_keys)
+        if invalid_keys:
+            raise ValueError(
+                f"train_kwargs can only contain the keys {allowed_keys}, have {invalid_keys}"
+            )
+        for k, v in train_kwargs.items():
+            if k in allowed_subkeys and isinstance(v, dict):
+                allowed = allowed_subkeys.get(k, [])
+                if set(v.keys()) - set(allowed):
+                    raise ValueError(
+                        f"train_kwargs['{k}'] can only contain the keys {allowed}"
+                    )
+        return train_kwargs
+
+    @field_validator("train_config")
+    def validate_train_config(cls, v, info: ValidationInfo):
+        if v is None:
+            return v
+        if info.data["train_method"] == "adam":
+            if not isinstance(v, AdamNumericalOptimizerConfig):
+                raise ValueError(
+                    "train_config must be of type AdamOptimizerConfig when method is 'adam'"
+                )
+        elif info.data["train_method"] == "lbfgs":
+            if not isinstance(v, LBFGSNumericalOptimizerConfig):
+                raise ValueError(
+                    "train_config must be of type LBFGSOptimizerConfig when method is 'lbfgs'"
+                )
+        else:
+            raise ValueError("method must be either 'adam' or 'lbfgs'")
+        return v
 
     @field_validator("covar_modules", "mean_modules", mode="before")
     def validate_torch_modules(cls, value: Any):
@@ -120,8 +266,7 @@ class StandardModelConstructor(ModelConstructor):
 
     def get_likelihood(
         self,
-        dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
+        batch_shape: torch.Size = torch.Size(),
     ) -> Likelihood:
         """
         Get the likelihood for the model, considering the low noise prior and or a
@@ -133,14 +278,13 @@ class StandardModelConstructor(ModelConstructor):
             The likelihood for the model.
 
         """
-        tkwargs: dict[str, Any] = {"dtype": dtype, "device": device}
         if self.custom_noise_prior is not None:
             likelihood = GaussianLikelihood(
-                noise_prior=self.custom_noise_prior,
+                noise_prior=self.custom_noise_prior, batch_shape=batch_shape
             )
         elif self.use_low_noise_prior:
             likelihood = GaussianLikelihood(
-                noise_prior=GammaPrior(1.0, 100.0),
+                noise_prior=GammaPrior(1.0, 100.0), batch_shape=batch_shape
             )
         else:
             noise_prior = GammaPrior(1.1, 0.05)
@@ -152,8 +296,8 @@ class StandardModelConstructor(ModelConstructor):
                     transform=None,
                     initial_value=noise_prior_mode,
                 ),
+                batch_shape=batch_shape,
             )
-        likelihood = likelihood.to(**tkwargs)
         return likelihood
 
     def build_model(
@@ -163,7 +307,7 @@ class StandardModelConstructor(ModelConstructor):
         data: pd.DataFrame,
         input_bounds: dict[str, list[float]] | None = None,
         dtype: torch.dtype = torch.double,
-        device: Union[torch.device, str] = "cpu",
+        device: torch.device | str = "cpu",
     ) -> ModelListGP:
         """
         Construct independent models for each objective and constraint.
@@ -231,8 +375,8 @@ class StandardModelConstructor(ModelConstructor):
                     self.build_single_task_gp(
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
-                        likelihood=self.get_likelihood(**tkwargs),
-                        train=not self.use_cached_hyperparameters,
+                        likelihood=self.get_likelihood(),
+                        train=False,
                         **kwargs,
                     )
                 )
@@ -244,19 +388,21 @@ class StandardModelConstructor(ModelConstructor):
                         train_X.to(**tkwargs),
                         train_Y.to(**tkwargs),
                         train_Yvar.to(**tkwargs),
-                        train=not self.use_cached_hyperparameters,
+                        train=False,
                         **kwargs,
                     )
                 )
         # check all specified modules were added to the model
+        # covar_modules / mean_modules are popped from the dict as they are used,
+        # so if any remain, they were not added to the model
         if covar_modules:
             warnings.warn(
-                f"Covariance modules for output names {[k for k, v in self.covar_modules.items()]} "
+                f"Covariance modules for output names {[k for k, v in covar_modules.items()]} "
                 f"could not be added to the model."
             )
         if mean_modules:
             warnings.warn(
-                f"Mean modules for output names {[k for k, v in self.mean_modules.items()]} "
+                f"Mean modules for output names {[k for k, v in mean_modules.items()]} "
                 f"could not be added to the model."
             )
 
@@ -270,18 +416,116 @@ class StandardModelConstructor(ModelConstructor):
             }
             full_model.load_state_dict(store)
 
+        if self.train_model:
+            trained_models = []
+            models = (
+                full_model.models
+                if isinstance(full_model, ModelListGP)
+                else [full_model]
+            )
+            for m in models:
+                mll = ExactMarginalLogLikelihood(m.likelihood, m)
+                trained_models.append(self._train_model(m, mll))
+
+            # add the trained models to a ModelListGP if training was performed
+            full_model = ModelListGP(*trained_models)
+
         # cache model hyperparameters
         self._hyperparameter_store = full_model.state_dict()
 
         return full_model.to(**tkwargs)
 
+    def _train_model(self, model, mll):
+        """
+        Train a single GP model using the specified training method and configuration.
+
+        Parameters
+        ----------
+        model : gpytorch.module.Module
+            The model to be trained.
+        mll : gpytorch.mll.MarginalLogLikelihood
+            The marginal log likelihood for the model.
+
+        Returns
+        -------
+        gpytorch.module.Module
+            The trained model.
+
+        """
+
+        tr_kwargs = self.train_kwargs if self.train_kwargs is not None else {}
+        if "optimizer_kwargs" not in tr_kwargs:
+            tr_kwargs["optimizer_kwargs"] = {}
+        if self.train_config is not None and self.train_config.timeout is not None:
+            tr_kwargs["optimizer_kwargs"]["timeout_sec"] = self.train_config.timeout
+        if self.train_method == "adam":
+            cfg_adam: AdamNumericalOptimizerConfig = (
+                self.train_config or AdamNumericalOptimizerConfig()
+            )
+            sc = ExpMAStoppingCriterion(
+                maxiter=cfg_adam.stopping_criterion.maxiter,
+                n_window=cfg_adam.stopping_criterion.n_window,
+                eta=cfg_adam.stopping_criterion.eta,
+                rel_tol=cfg_adam.stopping_criterion.rel_tol,
+            )
+            opt = partial(Adam, lr=cfg_adam.lr)
+            tr_kwargs["optimizer_kwargs"]["stopping_criterion"] = sc
+            tr_kwargs["optimizer_kwargs"]["optimizer"] = opt
+            optimizer = fit_gpytorch_mll_torch
+        else:
+            cfg_lbfgs: LBFGSNumericalOptimizerConfig = (
+                self.train_config or LBFGSNumericalOptimizerConfig()
+            )
+            if "options" not in tr_kwargs["optimizer_kwargs"]:
+                tr_kwargs["optimizer_kwargs"]["options"] = {}
+            options = tr_kwargs["optimizer_kwargs"]["options"]
+            options["maxiter"] = cfg_lbfgs.maxiter
+            options["gtol"] = cfg_lbfgs.gtol
+            options["ftol"] = cfg_lbfgs.ftol
+
+            batch_shape = getattr(model, "_aug_batch_shape", None)
+            if batch_shape is None:
+                batch_shape = getattr(model, "batch_shape", torch.Size())
+            is_batched = len(batch_shape) > 0
+            if is_batched:
+                # Batched scipy optimizer in newer botorch/scipy combinations can
+                # assert when both ftol and default factr are active.
+                options["factr"] = None
+
+            # Shared (non-batched) parameters in batched models are incompatible
+            # with botorch's independent scipy batching path. Use an explicit
+            # closure to preserve single-sum-loss behavior while keeping scipy.
+            has_unbatched_trainable_params = is_batched and any(
+                p.requires_grad
+                and (
+                    p.ndim < len(batch_shape)
+                    or tuple(p.shape[: len(batch_shape)]) != tuple(batch_shape)
+                )
+                for p in model.parameters()
+            )
+
+            if has_unbatched_trainable_params:
+                params = get_parameters(mll, requires_grad=True)
+                tr_kwargs["closure"] = get_loss_closure_with_grads(
+                    mll, parameters=params
+                )
+                tr_kwargs["optimizer_kwargs"].pop("closure", None)
+
+            optimizer = fit_gpytorch_mll_scipy
+
+        try:
+            fit_gpytorch_mll(mll, optimizer=optimizer, **tr_kwargs)
+        except ModelFittingError:
+            warnings.warn("Model fitting failed. Returning untrained model.")
+        return model
+
     def build_mean_module(
         self,
         name: str,
         mean_modules: dict[str, Module],
-        input_transform: InputTransform,
-        outcome_transform: OutcomeTransform,
-    ) -> Optional[CustomMean]:
+        input_transform,
+        outcome_transform,
+    ) -> CustomMean | None:
         """
         Build the mean module for the output specified by name.
 
@@ -289,7 +533,7 @@ class StandardModelConstructor(ModelConstructor):
         ----------
         name : str
             The name of the output.
-        mean_modules: dict
+        mean_modules: dict[str, Module]
             The dictionary of mean modules.
         input_transform : InputTransform
             Transform for input variables.
@@ -336,21 +580,26 @@ class StandardModelConstructor(ModelConstructor):
         else:
             return None
 
-    def _get_input_transform(
-        self,
-        outcome_name: str,
-        input_names: list[str],
-        input_bounds: dict[str, list[float]] | None,
-        tkwargs: dict[str, Any],
-    ):
-        """get input transform based on the supplied bounds and attributes"""
+    def _get_input_transform(self, outcome_name, input_names, input_bounds, tkwargs):
+        """
+        Get input transform based on the supplied bounds and attributes
+
+        Parameters
+        ----------
+        outcome_name : str
+            The name of the outcome variable.
+        input_names : list[str]
+            The names of the input variables.
+        input_bounds : dict[str, tuple[float, float]]
+            The bounds for the input variables.
+        tkwargs : dict
+            Additional keyword arguments for tensor creation.
+
+        """
         # get input bounds
-        if input_bounds is None:
-            bounds = None
-        else:
-            bounds = torch.vstack(
-                [torch.tensor(input_bounds[name], **tkwargs) for name in input_names]
-            ).T
+        bounds = _get_non_degenerate_normalize_bounds(
+            input_names, input_bounds, tkwargs
+        )
 
         # create transform
         input_transform = Normalize(len(input_names), bounds=bounds)
@@ -371,3 +620,154 @@ class StandardModelConstructor(ModelConstructor):
             botorch.settings.validate_input_scaling(False)
 
         return input_transform
+
+
+class BatchedModelConstructor(StandardModelConstructor):
+    """
+    BatchedModelConstructor treats outputs as an additional dimension instead of looping over them.
+    It is useful when multiple outputs are being modelled and their settings are similar.
+
+    A batch shares training points (i.e. train_X/train_Y) and kernel. It uses a single pytorch
+    graph (1 sum loss), which changes convergence criteria. Resulting GP parameters are expected
+    to differ slightly from individual fitting.
+
+    Batch modelling is faster on GPUs, especially in the intermediate (<~1000) problem sizes where GPU
+    call overhead is significant and all models converge in roughly equal number of steps.
+
+    On CPU, batched fitting performance varies from slightly useful to slightly detrimental - mostly
+    not worth it.
+
+    See benchmarking docs on how to run tests for your specific hardware.
+    """
+
+    name: str = Field("batched", frozen=True)
+
+    def _get_input_transform(
+        self,
+        outcome_names: list[str],
+        input_names: list[str],
+        input_bounds,
+        batch_shape: torch.Size = torch.Size(),
+    ) -> Normalize | None:
+        bounds = _get_non_degenerate_normalize_bounds(input_names, input_bounds)
+
+        input_transform = Normalize(
+            len(input_names),
+            bounds=bounds,
+            batch_shape=batch_shape,
+        )
+
+        # remove input transform if the bool is False or the dict entry is false
+        if isinstance(self.transform_inputs, bool):
+            if not self.transform_inputs:
+                input_transform = None
+
+        if isinstance(self.transform_inputs, dict):
+            raise AttributeError(
+                "Cannot specify dict for transform_inputs when using BatchedModelConstructor"
+            )
+
+        if input_transform is None:
+            botorch.settings.validate_input_scaling(False)
+
+        return input_transform
+
+    def build_model(
+        self,
+        input_names: list[str],
+        outcome_names: list[str],
+        data: pd.DataFrame,
+        input_bounds: dict[str, list] = None,
+        dtype: torch.dtype = torch.double,
+        device: torch.device | str = "cpu",
+    ) -> SingleTaskGP:
+        """
+        Construct a single batched model for all objectives and constraints.
+        """
+        tkwargs = {"dtype": dtype, "device": device}
+
+        if self.use_cached_hyperparameters:
+            if self._hyperparameter_store is None:
+                raise RuntimeWarning(
+                    "cannot use cached hyperparameters, hyperparameter store empty, "
+                    "training GP model hyperparameters instead"
+                )
+
+        train_X, train_Y, train_Yvar = get_training_data_batched(
+            input_names, outcome_names, data
+        )
+        if train_X.shape[0] == 0 or train_Y.shape[0] == 0:
+            raise ValueError("no data found to train model!")
+
+        # train_Y is n x m, will get transformed to (m) x n x 1 by
+        # SingleTaskGP to run as m independent batches
+        # _input_batch_shape = empty
+        # _aug_batch_shape = (m,) = (_num_outputs,)
+
+        _num_outputs = train_Y.shape[-1]
+        _input_batch_shape, _aug_batch_shape = (
+            BatchedMultiOutputGPyTorchModel.get_batch_dimensions(
+                train_X=train_X, train_Y=train_Y
+            )
+        )
+
+        covar_module = None
+        if len(self.covar_modules) > 1:
+            raise ValueError(
+                "Covariance modules cannot be specified individually when using BatchedModelConstructor"
+            )
+        elif len(self.covar_modules) == 1:
+            covar_module = list(self.covar_modules.values())[0]
+
+        mean_module = None
+        if len(self.mean_modules) > 1:
+            raise ValueError(
+                "Mean modules cannot be specified individually when using BatchedModelConstructor"
+            )
+        # assume that if have 1 module, it is to be used for all outputs
+        elif len(self.mean_modules) == 1:
+            mean_module = list(self.mean_modules.values())[0]
+
+        # input and output transforms are applied BEFORE tensors are unrolled
+        input_transform = self._get_input_transform(
+            outcome_names,
+            input_names,
+            input_bounds=input_bounds,
+            batch_shape=_input_batch_shape,
+        )
+        outcome_transform = Standardize(
+            m=train_Y.shape[-1], batch_shape=_input_batch_shape
+        )
+        kwargs = {
+            "input_transform": input_transform,
+            "outcome_transform": outcome_transform,
+            "covar_module": covar_module,
+            "mean_module": mean_module,
+        }
+
+        if train_Yvar is None:
+            likelihood = self.get_likelihood(batch_shape=_aug_batch_shape)
+        else:
+            likelihood = FixedNoiseGaussianLikelihood(
+                noise=train_Yvar, batch_shape=_aug_batch_shape
+            )
+        full_model = SingleTaskGP(
+            train_X, train_Y, train_Yvar=train_Yvar, likelihood=likelihood, **kwargs
+        )
+        full_model.to(**tkwargs)
+
+        if self.use_cached_hyperparameters and self._hyperparameter_store is not None:
+            store = {
+                name: ele.to(**tkwargs)
+                for name, ele in self._hyperparameter_store.items()
+            }
+            full_model.load_state_dict(store)
+
+        if self.train_model:
+            mll = ExactMarginalLogLikelihood(full_model.likelihood, full_model)
+            full_model = self._train_model(full_model, mll)
+
+        # cache model hyperparameters
+        self._hyperparameter_store = full_model.state_dict()
+
+        return full_model

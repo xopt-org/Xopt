@@ -31,7 +31,7 @@ class TestSequentialSerialization:
         evaluator = Evaluator(function=sin_function)
         gen = generator(vocs=test_vocs)
 
-        X = Xopt(vocs=test_vocs, evaluator=evaluator, generator=gen)
+        X = Xopt(evaluator=evaluator, generator=gen)
 
         X.random_evaluate(1)
         for i in range(10):

@@ -2,6 +2,9 @@ import pytest
 import torch
 from torch import Tensor
 from unittest.mock import MagicMock, patch
+
+from gest_api.vocs import LessThanConstraint, GreaterThanConstraint
+
 from xopt.generators.bayesian.objectives import feasibility
 from xopt.generators.bayesian.objectives import create_constraint_callables
 import functools
@@ -21,7 +24,10 @@ class DummyVOCS:
 
 @pytest.fixture
 def dummy_vocs():
-    constraints = {"c1": ("LESS_THAN", 0.0), "c2": ("GREATER_THAN", 1.0)}
+    constraints = {
+        "c1": LessThanConstraint(value=0.0),
+        "c2": GreaterThanConstraint(value=1.0),
+    }
     output_names = ["c1", "c2", "y1"]
     return DummyVOCS(constraints=constraints, output_names=output_names)
 
@@ -142,7 +148,7 @@ def test_feasibility_variants(
 
 def test_create_constraint_callables_less_than():
     class V:
-        constraints = {"c1": ("LESS_THAN", 5.0)}
+        constraints = {"c1": LessThanConstraint(value=5.0)}
         output_names = ["c1"]
         constraint_names = ["c1"]
 
@@ -158,7 +164,7 @@ def test_create_constraint_callables_less_than():
 
 def test_create_constraint_callables_greater_than():
     class V:
-        constraints = {"c2": ("GREATER_THAN", 2.0)}
+        constraints = {"c2": GreaterThanConstraint(value=2.0)}
         output_names = ["c2"]
         constraint_names = ["c2"]
 
@@ -174,7 +180,10 @@ def test_create_constraint_callables_greater_than():
 
 def test_create_constraint_callables_multiple():
     class V:
-        constraints = {"c1": ("LESS_THAN", 0.0), "c2": ("GREATER_THAN", 1.0)}
+        constraints = {
+            "c1": LessThanConstraint(value=0.0),
+            "c2": GreaterThanConstraint(value=1.0),
+        }
         output_names = ["c1", "c2"]
         constraint_names = ["c1", "c2"]
 
@@ -200,7 +209,10 @@ def test_create_constraint_callables_empty_dict():
 
 def test_create_constraint_callables_partial_and_signature():
     class V:
-        constraints = {"c1": ("LESS_THAN", 2.0), "c2": ("GREATER_THAN", -1.0)}
+        constraints = {
+            "c1": LessThanConstraint(value=2.0),
+            "c2": GreaterThanConstraint(value=-1.0),
+        }
         output_names = ["c1", "c2"]
         constraint_names = ["c1", "c2"]
 

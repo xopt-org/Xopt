@@ -16,12 +16,20 @@ from pydantic import (
 )
 from torch import Tensor
 
+from gest_api.vocs import VOCS, MinimizeObjective
+
 if TYPE_CHECKING:
     from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.pydantic import XoptBaseModel
 from xopt.resources.testing import XOPT_VERIFY_TORCH_DEVICE
-from xopt.vocs import VOCS
 from xopt.errors import FeasibilityError
+from xopt.vocs import (
+    ContextualVariable,
+    get_feasibility_data,
+    get_variable_bounds_array,
+    get_variable_data,
+    get_objective_data,
+)
 
 logger = logging.getLogger()
 
@@ -194,8 +202,6 @@ class TurboController(XoptBaseModel, ABC):
         given by the `length` parameter and are scaled according to the generator
         model lengthscales (if available).
 
-        Lives on CPU always.
-
         Parameters
         ----------
         generator : BayesianGenerator
@@ -206,9 +212,18 @@ class TurboController(XoptBaseModel, ABC):
         -------
         Tensor
             The trust region bounds.
+
+        Notes
+        -----
+            Always lives on CPU.
+
         """
         model = generator.model
-        bounds = torch.tensor(self.vocs.bounds)  # type: ignore
+        active_variable_names = self._get_trust_region_variable_names(generator)
+        bounds = torch.tensor(
+            get_variable_bounds_array(self.vocs, variable_names=active_variable_names),
+            dtype=torch.double,
+        )
 
         if self.center_x is not None:
             # get bounds width
@@ -216,7 +231,7 @@ class TurboController(XoptBaseModel, ABC):
 
             # Scale the TR to be proportional to the lengthscales of the objective model
             x_center = torch.tensor(
-                [self.center_x[ele] for ele in self.vocs.variable_names],
+                [self.center_x[ele] for ele in active_variable_names],
             ).unsqueeze(dim=0)
 
             # default weights are 1 (if there is no model or a model without
@@ -229,8 +244,24 @@ class TurboController(XoptBaseModel, ABC):
                         model.models[0].covar_module.lengthscale.detach().cpu()
                     )
 
-                    # calculate the ratios of lengthscales for each axis
-                    weights = lengthscales / torch.prod(lengthscales) ** (1 / self.dim)
+                    # Restrict lengthscales to the trust-region dimensions.
+                    if lengthscales.ndim > 1:
+                        lengthscales = lengthscales.reshape(-1)
+                    input_names = list(generator.model_input_names)
+                    active_indices = [
+                        input_names.index(name)
+                        for name in active_variable_names
+                        if name in input_names
+                    ]
+                    if active_indices:
+                        lengthscales = lengthscales[active_indices]
+
+                    # Normalize by the geometric mean without forming the raw
+                    # product, which can overflow or underflow.
+                    active_dim = len(active_variable_names)
+                    weights = lengthscales / torch.prod(
+                        lengthscales ** (1 / active_dim)
+                    )
 
             # calculate the tr bounding box
             tr_lb = torch.clamp(
@@ -242,6 +273,25 @@ class TurboController(XoptBaseModel, ABC):
             return torch.cat((tr_lb, tr_ub), dim=0)
         else:
             return bounds
+
+    def _get_trust_region_variable_names(
+        self, generator: "BayesianGenerator"
+    ) -> list[str]:
+        """Return variable names used by the trust region.
+
+        Prefer generator candidate variables so trust-region filtering and
+        optimization use the same dimensionality. Fall back to non-contextual
+        VOCS variables if candidate names are unavailable.
+        """
+        candidate_names = getattr(generator, "_candidate_names", None)
+        if candidate_names is not None:
+            return list(candidate_names)
+
+        return [
+            name
+            for name in self.vocs.variable_names
+            if not isinstance(self.vocs.variables[name], ContextualVariable)
+        ]
 
     def update_trust_region(self):
         """
@@ -272,7 +322,8 @@ class TurboController(XoptBaseModel, ABC):
         pd.DataFrame
             The subset of data within the trust region.
         """
-        variable_data = torch.tensor(self.vocs.variable_data(data).to_numpy())
+        active_variable_names = self._get_trust_region_variable_names(generator)
+        variable_data = torch.tensor(data[active_variable_names].to_numpy())
 
         bounds = self.get_trust_region(generator)
 
@@ -360,7 +411,9 @@ class OptimizeTurboController(TurboController):
 
     @property
     def minimize(self) -> bool:
-        return self.vocs.objectives[self.vocs.objective_names[0]] == "MINIMIZE"
+        return isinstance(
+            self.vocs.objectives[self.vocs.objective_names[0]], MinimizeObjective
+        )
 
     def _set_best_point_value(self, data: pd.DataFrame):
         """
@@ -371,8 +424,8 @@ class OptimizeTurboController(TurboController):
         data : pd.DataFrame
             The data used to determine the best point value.
         """
-        variable_data = self.vocs.variable_data(data, "")
-        objective_data = self.vocs.objective_data(data, "", return_raw=True)
+        variable_data = get_variable_data(self.vocs, data, "")
+        objective_data = get_objective_data(self.vocs, data, "", return_raw=True)
 
         if self.minimize:
             best_idx = objective_data.idxmin()
@@ -392,9 +445,6 @@ class OptimizeTurboController(TurboController):
         Update turbo state class using min of data points that are feasible.
         If no points in the data set are feasible raise an error.
 
-        NOTE: this is the opposite of botorch which assumes maximization, xopt assumes
-        minimization
-
         Parameters
         ----------
         generator : BayesianGenerator
@@ -407,11 +457,12 @@ class OptimizeTurboController(TurboController):
         Returns
         -------
         None
+
         """
         data = generator.data
 
         # get locations of valid data samples
-        feas_data = self.vocs.feasibility_data(data)
+        feas_data = get_feasibility_data(self.vocs, data)
 
         if len(data[feas_data["feasible"]]) == 0:
             raise FeasibilityError(
@@ -423,9 +474,9 @@ class OptimizeTurboController(TurboController):
 
         # get feasibility of last `n_candidates`
         recent_data = data.iloc[-previous_batch_size:]
-        f_data = self.vocs.feasibility_data(recent_data)
+        f_data = get_feasibility_data(self.vocs, recent_data)
         recent_f_data = recent_data[f_data["feasible"]]
-        recent_f_data_minform = self.vocs.objective_data(recent_f_data, "")
+        recent_f_data_minform = get_objective_data(self.vocs, recent_f_data, "")
 
         # if none of the candidates are valid count this as a failure
         if len(recent_f_data) == 0:
@@ -434,8 +485,7 @@ class OptimizeTurboController(TurboController):
 
         else:
             # if we had previous feasible points we need to compare with previous
-            # best values, NOTE: this is the opposite of botorch which assumes
-            # maximization, xopt assumes minimization
+            # best values,
             Y_last = recent_f_data_minform[self.vocs.objective_names[0]].min()
             best_value = self.best_value if self.minimize else -self.best_value
 
@@ -465,8 +515,6 @@ class SafetyTurboController(TurboController):
 
     Methods
     -------
-    vocs_validation(cls, info)
-        Validate the VOCS for the controller.
     update_state(self, generator, previous_batch_size: int = 1)
         Update the state of the controller.
 
@@ -502,7 +550,7 @@ class SafetyTurboController(TurboController):
         self, generator: "BayesianGenerator", previous_batch_size: int = 1
     ):
         """
-        Update the state of the controller.
+        Update the state of the controller. Overwrites method from TurboController.
 
         Parameters
         ----------
@@ -514,11 +562,11 @@ class SafetyTurboController(TurboController):
         data = generator.data
 
         # set center point to be mean of valid data points
-        feas = data[self.vocs.feasibility_data(data)["feasible"]]
+        feas = data[get_feasibility_data(self.vocs, data)["feasible"]]
         self.center_x = feas[self.vocs.variable_names].mean().to_dict()
 
         # get the feasibility fractions of the last batch
-        last_batch = self.vocs.feasibility_data(data).iloc[-previous_batch_size:]
+        last_batch = get_feasibility_data(self.vocs, data).iloc[-previous_batch_size:]
         feas_fraction = last_batch["feasible"].sum() / len(last_batch)
 
         if feas_fraction > self.min_feasible_fraction:
@@ -545,7 +593,7 @@ class EntropyTurboController(TurboController):
     Methods
     -------
     update_state(self, generator, previous_batch_size: int = 1) -> None
-        Update the state of the controller.
+        Update the state of the controller. Overwrites method from TurboController.
     """
 
     name: str = Field("EntropyTurboController", frozen=True)
@@ -555,7 +603,7 @@ class EntropyTurboController(TurboController):
         self, generator: "BayesianGenerator", previous_batch_size: int = 1
     ) -> None:
         """
-        Update the state of the controller.
+        Update the state of the controller. Overwrites method from TurboController.
 
         Parameters
         ----------

@@ -1,20 +1,17 @@
-from datetime import datetime
 from itertools import chain
 from pydantic import Field, Discriminator, model_validator
 from typing import Annotated
-import json
-import logging
 import numpy as np
-import os
 import pandas as pd
 import time
 import warnings
 
+from xopt.vocs import get_constraint_data, get_objective_data, get_variable_data
 from ...errors import DataError
 from ...generator import StateOwner
 from ...vocs import VOCS
-from ..deduplicated import DeduplicatedGeneratorBase
 from ..utils import fast_dominated_argsort
+from .base import GAGeneratorBase
 from .operators import (
     PolynomialMutation,
     DummyMutation,
@@ -254,12 +251,64 @@ def cull_population(
     return crowded_comparison_argsort(pop_f, pop_g)[-population_size:]
 
 
+def generate_candidates_from_population(
+    pop: list[dict],
+    vocs: VOCS,
+    n_candidates: int,
+    mutation_operator: MutationOperator,
+    crossover_operator: CrossoverOperator,
+) -> list[dict]:
+    """
+    Generate offspring from an existing population using binary tournament selection,
+    crossover, and mutation.
+
+    Parameters
+    ----------
+    pop : list[dict]
+        Current population individuals.
+    vocs : VOCS
+        VOCS object defining variables, objectives, and constraints.
+    n_candidates : int
+        Number of offspring to produce.
+    mutation_operator : MutationOperator
+        Mutation operator to apply.
+    crossover_operator : CrossoverOperator
+        Crossover operator to apply.
+
+    Returns
+    -------
+    list[dict]
+        Generated candidates with variable name keys.
+    """
+    var_names = list(vocs.variable_names)
+    pop_x = pd.DataFrame(pop)[var_names].to_numpy()
+    pop_f = get_objective_data(vocs, pop).to_numpy()
+    pop_g = vocs_data_to_arr(get_constraint_data(vocs, pop).to_numpy())
+    fitness = get_fitness(pop_f, pop_g)
+    bounds = np.array([vocs.variables[name].domain for name in var_names]).T
+
+    candidates = []
+    for _ in range(n_candidates):
+        child = generate_child_binary_tournament(
+            pop_x,
+            pop_f,
+            pop_g,
+            bounds,
+            mutate=mutation_operator,
+            crossover=crossover_operator,
+            fitness=fitness,
+        )
+        candidates.append(dict(zip(var_names, child)))
+
+    return candidates
+
+
 ########################################################################################################################
 # Optimizer class
 ########################################################################################################################
 
 
-class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
+class NSGA2Generator(GAGeneratorBase, StateOwner):
     """
     Non-dominated Sorting Genetic Algorithm II (NSGA-II) generator.  Implements the NSGA-II algorithm
     for multi-objective optimization as described in [1]. This generator accomdates user selected mutation
@@ -278,8 +327,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Operator used to perform crossover between parent solutions.
     mutation_operator : PolynomialMutation or DummyMutation, default=PolynomialMutation()
         Operator used to perform mutation on offspring solutions.
-    output_dir : str, optional
-        Directory to save algorithm state and population history.
+    output_dir : str or os.PathLike, optional
+        Directory to save algorithm state and population history. The path actually
+        written to, after expansion and collision avoidance, is `output_dir_resolved`.
     checkpoint_freq : int, default=1
         Frequency (in generations) at which to save checkpoints.
     checkpoint_file : str, optional
@@ -309,7 +359,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     When `output_dir` is set to a path, the populations and all evaluated individuals will be written to the
     files "populations.csv" and "data.csv" respectively. Checkpoints are also saved every `checkpoint_freq` generation
     to a subdirectory. If the `output_dir` already exists at the first time output is created in the generator's lifetime,
-    a number will be appended the output path to avoid overwriting previous data.
+    a number will be appended the output path to avoid overwriting previous data. `output_dir` itself is left as given,
+    with the path in use available from `output_dir_resolved`.
 
     The population file contains all of the populations with an index "xopt_generation" to indicate with which generation
     each row is associated.
@@ -319,11 +370,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     supports_multi_objective: bool = True
     supports_constraints: bool = True
     supports_single_objective: bool = True
-
-    # Checkpoint loading
-    checkpoint_file: str | None = Field(
-        None, description="Path to checkpoint file to load from", exclude=True
-    )
 
     population_size: int = Field(50, description="Population size")
     crossover_operator: Annotated[
@@ -338,20 +384,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         ),  # Dummy placeholder to keep discriminator code from failing
         Discriminator("name"),
     ] = PolynomialMutation()
-
-    # Output options
-    output_dir: str | None = None
-    checkpoint_freq: int = Field(
-        1,
-        description="How often (in generations) to save checkpoints (set to -1 to disable)",
-    )
-    log_level: int = Field(
-        logging.INFO, description="Log message level output to log.txt"
-    )
-    _output_dir_setup: bool = (
-        False  # Used in initializing the directory. PLEASE DO NOT CHANGE
-    )
-    _logger: logging.Logger | None = None
 
     # Metadata
     fevals: int = Field(
@@ -377,62 +409,6 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
     # The population and returned children
     pop: list[dict] = Field(default=[])
     child: list[dict] = Field(default=[])
-
-    def model_post_init(self, context):
-        # Get a unique logger per object
-        self._logger = logging.getLogger(f"{__name__}.NSGA2Generator.{id(self)}")
-        self._logger.setLevel(self.log_level)
-
-    @staticmethod
-    def _load_checkpoint_data(fname: str) -> dict:
-        """
-        Internal function to load generator data from checkpoint file as well as VOCS object.
-
-        Parameters
-        ----------
-        fname : str
-            Path to the checkpoint file
-
-        Returns
-        -------
-        dict
-            Dictionary containing VOCS and checkpoint data
-        """
-        # Load the VOCS object
-        vocs_fname = os.path.join(os.path.dirname(fname), "../vocs.txt")
-        if not os.path.exists(vocs_fname):
-            raise ValueError(
-                f'Could not load VOCS file at "{vocs_fname}". Complete NSGA2Generator '
-                "output directory is required for loading from checkpoint."
-            )
-        with open(vocs_fname) as f:
-            vocs = VOCS.from_dict(json.load(f))
-
-        # Load the checkpoint
-        with open(fname) as f:
-            checkpoint_data = json.load(f)
-
-        return {"vocs": vocs, **checkpoint_data}
-
-    @model_validator(mode="before")
-    @classmethod
-    def load_from_checkpoint(cls, values):
-        """
-        Load from checkpoint file if checkpoint_file is provided.
-        """
-        # Case when a checkpoint file has been supplied
-        if isinstance(values, dict) and "checkpoint_file" in values:
-            checkpoint_file = values.pop("checkpoint_file")
-            if checkpoint_file is not None:
-                # Load checkpoint data
-                checkpoint_data = cls._load_checkpoint_data(checkpoint_file)
-
-                # Merge with user data precedence
-                merged_data = {**checkpoint_data, **values}
-                return merged_data
-
-        # No checkpoint
-        return values
 
     @model_validator(mode="after")
     def vocs_compatible(self):
@@ -483,52 +459,30 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         Returns true if every variable in the data dictionary is within bounds.
         """
         return all(
-            bnd[0] <= data[key] <= bnd[1] for key, bnd in self.vocs.variables.items()
+            bnd.domain[0] <= data[key] <= bnd.domain[1]
+            for key, bnd in self.vocs.variables.items()
         )
 
     def _generate(self, n_candidates: int) -> list[dict]:
-        self.ensure_output_dir_setup()
+        self._prepare_output()
         start_t = time.perf_counter()
 
         # If we have a population create children, otherwise generate randomly sampled points
         if self.pop:
-            # Get the variables
-            var_names = sorted(self.vocs.variable_names)
-
-            # Generate candidates one by one
-            candidates = []
-            pop_x = self.vocs.variable_data(self.pop).to_numpy()
-            pop_f = self.vocs.objective_data(self.pop).to_numpy()
-            pop_g = vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy())
-            fitness = get_fitness(pop_f, pop_g)
-            for _ in range(n_candidates):
-                candidates.append(
-                    {
-                        k: v
-                        for k, v in zip(
-                            var_names,
-                            generate_child_binary_tournament(
-                                pop_x,
-                                pop_f,
-                                pop_g,
-                                self.vocs.bounds,
-                                mutate=self.mutation_operator,
-                                crossover=self.crossover_operator,
-                                fitness=fitness,
-                            ),
-                        )
-                    }
-                )
+            candidates = generate_candidates_from_population(
+                self.pop,
+                self.vocs,
+                n_candidates,
+                self.mutation_operator,
+                self.crossover_operator,
+            )
             self._logger.debug(
                 f"generated {n_candidates} candidates from generation {self.n_generations} "
                 f"in {1000 * (time.perf_counter() - start_t):.2f}ms"
             )
         else:
             vars = np.vstack(
-                [
-                    np.random.uniform(x[0], x[1], n_candidates)
-                    for x in self.vocs.bounds.T
-                ]
+                [np.random.uniform(x[0], x[1], n_candidates) for x in self.vocs.bounds]
             ).T
             candidates = [
                 {k: v for k, v in zip(self.vocs.variable_names, individual)}
@@ -551,7 +505,7 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
         return candidates
 
     def add_data(self, new_data: pd.DataFrame):
-        self.ensure_output_dir_setup()
+        self._prepare_output()
 
         # Validate data is at least compatible with selection / genetic operators
         vocs_names = (
@@ -582,9 +536,9 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Select using domination rank / crowding distance
             idx = cull_population(
-                self.vocs.variable_data(self.pop).to_numpy(),
-                self.vocs.objective_data(self.pop).to_numpy(),
-                vocs_data_to_arr(self.vocs.constraint_data(self.pop).to_numpy()),
+                get_variable_data(self.vocs, self.pop).to_numpy(),
+                get_objective_data(self.vocs, self.pop).to_numpy(),
+                vocs_data_to_arr(get_constraint_data(self.vocs, self.pop).to_numpy()),
                 self.population_size,
             )
             self.pop = [self.pop[i] for i in idx]
@@ -592,11 +546,11 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
             # Get runtime information for the children used in this population
             rt = [x["xopt_runtime"] for x in self.child[: self.population_size]]
-            perf_message = f"{np.mean(rt):.3f}s ({np.std(rt):.3f}s)"
+            perf_message = f"{np.mean(rt):.3f}s (+/- {np.std(rt):.3f}s)"
 
             # Generate logging message
             n_feasible = np.sum(
-                (self.vocs.constraint_data(self.pop).to_numpy() <= 0.0).all(axis=1)
+                (get_constraint_data(self.vocs, self.pop).to_numpy() <= 0.0).all(axis=1)
             )
             n_err = np.sum([x["xopt_error"] for x in self.pop])
             self._logger.info(
@@ -612,75 +566,8 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
             self.child = self.child[self.population_size :]
             self.n_generations += 1
 
-            # Save the history file
-            if self.output_dir is not None:
-                save_start_t = time.perf_counter()
-
-                # Save all Xopt data
-                self.data.to_csv(os.path.join(self.output_dir, "data.csv"), index=False)
-                with open(os.path.join(self.output_dir, "vocs.txt"), "w") as f:
-                    f.write(self.vocs.to_json())
-
-                # Construct the DataFrame for this population
-                pop_df = pd.DataFrame(self.pop)
-                pop_df["xopt_generation"] = self.n_generations
-
-                # Normalize the columns in the DataFrame
-                # Avoid schema changing part way through optimization so we can write CSV in append mode
-                columns = self.vocs.all_names + [
-                    "xopt_generation",
-                    "xopt_candidate_idx",
-                    "xopt_runtime",
-                    "xopt_error",
-                ]
-                pop_df = pop_df.reindex(columns=columns)
-
-                # Write population DataFrame to file
-                csv_path = os.path.join(self.output_dir, "populations.csv")
-                pop_df.to_csv(
-                    csv_path, index=False, mode="a", header=not os.path.isfile(csv_path)
-                )
-
-                # Log some things
-                self._logger.debug(
-                    f'saved optimization data to "{self.output_dir}" '
-                    f"in {1000 * (time.perf_counter() - save_start_t):.2f}ms"
-                )
-
-                if self.checkpoint_freq > 0 and (
-                    self.n_generations % self.checkpoint_freq == 0
-                ):
-                    self._save_checkpoint()
-
-    def _save_checkpoint(self):
-        # Confirm we are ready to save checkpoint
-        if self.output_dir is None:
-            raise ValueError("Cannot save checkpoint without an output directory")
-        self.ensure_output_dir_setup()
-
-        # Create a base filename
-        os.makedirs(os.path.join(self.output_dir, "checkpoints"), exist_ok=True)
-        base_checkpoint_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
-        checkpoint_path = os.path.join(
-            self.output_dir,
-            "checkpoints",
-            f"{base_checkpoint_filename}_1.txt",
-        )
-
-        # Check if file exists and increment counter until we find a free filename
-        counter = 2
-        while os.path.exists(checkpoint_path):
-            checkpoint_path = os.path.join(
-                self.output_dir,
-                "checkpoints",
-                f"{base_checkpoint_filename}_{counter}.txt",
-            )
-            counter += 1
-
-        # Now we have a unique filename
-        with open(checkpoint_path, "w") as f:
-            f.write(self.to_json())
-        self._logger.debug(f'saved checkpoint file "{checkpoint_path}"')
+            # Write output files and save a checkpoint if one is due
+            self.end_generation(self.n_generations, self.pop)
 
     def set_data(self, data):
         self.data = data
@@ -696,51 +583,3 @@ class NSGA2Generator(DeduplicatedGeneratorBase, StateOwner):
 
     def __str__(self) -> str:
         return self.__repr__()
-
-    def ensure_output_dir_setup(self):
-        if (self.output_dir is None) or self._output_dir_setup:
-            return
-
-        # Check if directory exists and do collision avoidance
-        counter = 2
-        output_dir_dedup = self.output_dir
-        while os.path.exists(output_dir_dedup) and os.listdir(output_dir_dedup):
-            output_dir_dedup = f"{self.output_dir}_{counter}"
-            counter += 1
-        self._logger.info(
-            f'detected existing output_dir "{self.output_dir}" and corrected '
-            f'to "{output_dir_dedup}" to avoid overwriting'
-        )
-        self.output_dir = output_dir_dedup
-
-        # We are now setup
-        self._output_dir_setup = True
-
-        # Setup the directory
-        os.makedirs(self.output_dir, exist_ok=True)
-
-        # Set up file logging
-        log_file_path = os.path.join(self.output_dir, "log.txt")
-        file_handler = logging.FileHandler(log_file_path, mode="w")
-        file_handler.setLevel(self.log_level)
-
-        # Use the same format as the default logger
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        file_handler.setFormatter(formatter)
-
-        # Add the file handler to the logger
-        self._logger.addHandler(file_handler)
-        self._logger.info(f"routing log output to file: {log_file_path}")
-
-    def close_log_file(self):
-        """
-        Closes out the log file (if used)
-        """
-        if self.output_dir is not None and self._output_dir_setup:
-            # Remove all handlers from the logger
-            for handler in list(self._logger.handlers):
-                if isinstance(handler, logging.FileHandler):
-                    handler.close()
-                self._logger.removeHandler(handler)

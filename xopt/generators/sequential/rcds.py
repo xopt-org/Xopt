@@ -7,6 +7,7 @@ import pandas as pd
 from pydantic import ConfigDict, Field
 from pydantic.types import PositiveFloat
 
+from gest_api.vocs import MinimizeObjective, MaximizeObjective
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 
 logger = logging.getLogger(__name__)
@@ -762,16 +763,16 @@ class RCDSGenerator(SequentialGenerator):
             0
         ]  # rcds only supports one objective
         direction = self.vocs.objectives[objective_name]
-        if direction == "MINIMIZE":
+        if isinstance(direction, MinimizeObjective):
             self._sign = 1
-        elif direction == "MAXIMIZE":
+        elif isinstance(direction, MaximizeObjective):
             self._sign = -1
 
         x0, _f0 = self._get_initial_point()
         f0 = _f0.item()
 
         # RCDS assume a normalized problem
-        lb, ub = self.vocs.bounds
+        lb, ub = np.array(self.vocs.bounds).T
         _x0 = (x0 - lb) / (ub - lb)
 
         self._powell = PowellMainStateMachine(
@@ -781,7 +782,7 @@ class RCDSGenerator(SequentialGenerator):
             noise=self.noise,
         )
         _ = self._powell.propose()
-        self._powell.update_obj(self._sign * float(f0))
+        self._powell.update_obj(self._sign * f0)
 
     def _add_data(self, new_data: pd.DataFrame):
         # first update the rcds object from the last measurement
@@ -809,7 +810,7 @@ class RCDSGenerator(SequentialGenerator):
 
         # RCDS generator yields normalized x so denormalize it here
         _x_next = np.array(_x_next).flatten()  # convert 2D matrix to 1D array
-        lb, ub = self.vocs.bounds
+        lb, ub = np.array(self.vocs.bounds).T
         x_next = (ub - lb) * _x_next + lb
 
         x_next = [float(ele) for ele in x_next]

@@ -15,6 +15,12 @@ class CustomMean(Mean):
     ):
         """
         Custom prior mean for a GP based on an arbitrary model.
+        Torch model should contain a `forward` method that takes
+        in a tensor of shape `b x n x d` and outputs a tensor of shape `b x n x 1`
+        where `d` correponds to the number of variables in the input space (usually
+        specified by VOCs) and `b` corresponds to the batch size. The
+        input and output transformers are used to transform the inputs and
+        outputs of the model to the space of the GP.
 
         Parameters
         ----------

@@ -1,20 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Callable, List
+from collections.abc import Callable
+from functools import partial
 
 import torch
 from botorch.acquisition import (
     LinearMCObjective,
     MCAcquisitionObjective,
 )
-from botorch.acquisition.objective import PosteriorTransform
 from botorch.acquisition.multi_objective import WeightedMCMultiOutputObjective
-from botorch.sampling import get_sampler
+from botorch.acquisition.objective import PosteriorTransform
 from botorch.models.model import Model
+from botorch.sampling.get_sampler import get_sampler
+from gest_api.vocs import LessThanConstraint
 from torch import Tensor
-from functools import partial
 
 from xopt import VOCS
-
 from xopt.generators.bayesian.custom_botorch.constrained_acquisition import (
     FeasibilityObjective,
 )
@@ -41,7 +41,7 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
         self.vocs = vocs
 
     @abstractmethod
-    def forward(self, samples: Tensor, X: Optional[Tensor] = None) -> Tensor:
+    def forward(self, samples: Tensor, X: Tensor | None = None) -> Tensor:
         r"""Evaluate the objective on the samples.
 
         Args:
@@ -61,14 +61,13 @@ class CustomXoptObjective(MCAcquisitionObjective, ABC):
             >>> samples = sampler(posterior)
             >>> outcome = mc_obj(samples)
         """
-        pass
 
 
 def feasibility(
     X: Tensor,
     model: Model,
     vocs: VOCS,
-    posterior_transform: Optional[PosteriorTransform] = None,
+    posterior_transform: PosteriorTransform | None = None,
 ) -> Tensor:
     """
     Calculate the feasibility of the given points.
@@ -103,7 +102,7 @@ def feasibility(
 
 def create_constraint_callables(
     vocs: VOCS,
-) -> List[Callable[[Tensor], Tensor]] | None:
+) -> list[Callable[[Tensor], Tensor]] | None:
     """
     Create a list of constraint callables.
 
@@ -117,14 +116,15 @@ def create_constraint_callables(
     Optional[List[Callable]]
         A list of constraint callables, or None if there are no constraints.
     """
-    constraint_names = vocs.constraint_names
-    constraint_callables: list[Callable[[Tensor], Tensor]] = []
-    output_names = vocs.output_names
-    for name in constraint_names:
-        constraint = vocs.constraints[name]
-        index = output_names.index(name)
-        value = constraint[1]
-        sign = 1 if constraint[0] == "LESS_THAN" else -1
+    if vocs.constraints is not None:
+        constraint_names = vocs.constraint_names
+        constraint_callables = []
+        output_names = vocs.output_names
+        for name in constraint_names:
+            constraint = vocs.constraints[name]
+            index = output_names.index(name)
+            value = constraint.value
+            sign = 1 if isinstance(constraint, LessThanConstraint) else -1
 
         def cbf(Z: Tensor, index: int, value: float, sign: float) -> Tensor:
             return sign * (Z[..., index] - value)
