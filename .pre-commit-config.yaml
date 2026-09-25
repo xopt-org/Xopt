@@ -32,8 +32,13 @@ repos:
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
         exclude: "^.*(TODO|TODO2).ipynb$"
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v2.3.1
-  #   hooks:
-  #     - id: mypy
-  #       args: [--strict, --ignore-missing-imports]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        args: [--strict, --ignore-missing-imports]
+        additional_dependencies:
+          - pydantic
+          - pandas-stubs
+          - types-requests
