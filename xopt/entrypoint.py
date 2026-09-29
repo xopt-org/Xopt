@@ -57,6 +57,34 @@ def normalize_initial_data(df: pd.DataFrame, vocs) -> pd.DataFrame:
     return df[[c for c in keep if c in df.columns]]
 
 
+def setup_import_paths(python_path):
+    """
+    Prepend directories to the module search path.
+
+    Parameters
+    ----------
+    python_path : list of str
+        Directories to add, in priority order. User and environment variables are
+        expanded.
+
+    Returns
+    -------
+    list of str
+        Expanded directories that were inserted into sys.path.
+    """
+    added = []
+    for path in python_path:
+        expanded = os.path.expanduser(os.path.expandvars(path))
+        if expanded not in sys.path:
+            sys.path.insert(0, expanded)
+            added.append(expanded)
+
+    if added:
+        logger.info(f"Python path additions: {added}")
+
+    return added
+
+
 @contextmanager
 def get_executor(name, max_workers=1):
     """
@@ -187,18 +215,7 @@ def main():
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
 
-    # Add specified paths and CWD to sys.path
-    import_paths = [os.getcwd()]
-    import_paths.extend(
-        [os.path.expanduser(os.path.expandvars(x)) for x in args.python_path]
-    )
-    if len(import_paths) > 1:
-        logger.info("Python path additions:")
-    for idx, import_path in enumerate(import_paths):
-        if idx:
-            logger.info(f"  {import_path}")
-        if import_path not in sys.path:
-            sys.path.insert(0, import_path)
+    setup_import_paths([os.getcwd()] + args.python_path)
 
     # Create xopt
     with open(args.config) as f:
