@@ -46,7 +46,7 @@ jobs:
           mpi: openmpi
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra rl
 
       - name: Execute notebooks in parallel
         id: execute
