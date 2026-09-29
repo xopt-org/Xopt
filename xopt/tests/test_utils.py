@@ -228,6 +228,13 @@ class TestUtils(TestCase):
         assert result["exception"] is None
         assert result["traceback"] == ""
 
+    def test_safe_call_keyboard_interrupt(self):
+        def interrupted():
+            raise KeyboardInterrupt
+
+        with pytest.raises(KeyboardInterrupt):
+            safe_call(interrupted)
+
     def test_get_n_required_fuction_arguments(self):
         # Function with 2 required, 1 optional
         def f1(a, b, c=1):
