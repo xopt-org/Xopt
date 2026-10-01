@@ -89,7 +89,7 @@ acqusition function may produce uniformly zero values due to Softplus transforma
                 "with negative objective values.",
             )
 
-    def propose_candidates(self, model: Module, n_candidates: int = 1) -> Tensor:
+    def propose_candidates(self, model: Module, n_candidates: int = 1) -> torch.Tensor:
         # TODO: convert to exception in the future
         if self.vocs.n_constraints > 0 and n_candidates > 1:
             warnings.warn(
