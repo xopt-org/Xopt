@@ -71,14 +71,18 @@ Homepage = "https://github.com/xopt-org/xopt"
 [project.scripts]
 xopt-run = "xopt.entrypoint:main"
 
-[options]
-zip_safe = false
-include_package_data = true
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["xopt"]
 namespaces = false
+
+[tool.setuptools.package-data]
+# PEP 561 marker so downstream consumers type-check against Xopt's annotations.
+xopt = ["py.typed"]
 
 [project.license]
 file = "LICENSE"

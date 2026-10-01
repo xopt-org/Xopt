@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from gest_api.vocs import ExploreObjective
 from pydantic import Field, field_validator
@@ -96,7 +96,7 @@ class LatinHypercubeGenerator(Generator):
                 )
         return v
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._sampler = qmc.LatinHypercube(
             d=len(self.vocs.variables),

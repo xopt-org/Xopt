@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from pydantic import Field, PositiveFloat
@@ -78,7 +80,7 @@ class ExtremumSeekingGenerator(SequentialGenerator):
     _last_input: np.ndarray = None
     _last_outcome: float = None
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         self._nES = len(self.vocs.variables)

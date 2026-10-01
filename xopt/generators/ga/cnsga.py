@@ -96,7 +96,7 @@ class CNSGAGenerator(Generator):
 
     model_config = ConfigDict(extra="allow")
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         self._loaded_population = (

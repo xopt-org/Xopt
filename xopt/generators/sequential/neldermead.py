@@ -1,6 +1,7 @@
 import logging
 import warnings
 from copy import deepcopy
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -131,7 +132,7 @@ class NelderMeadGenerator(SequentialGenerator):
     _initial_point = None
     _saved_options: dict = None
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         self._saved_options = self.model_dump(

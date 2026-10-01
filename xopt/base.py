@@ -115,7 +115,7 @@ class Xopt(XoptBaseModel):
         Serializes the Xopt configuration to a JSON string.
     """
 
-    generator: SerializeAsAny[Generator] | Any = Field(
+    generator: SerializeAsAny[Generator] = Field(
         description="generator object for Xopt"
     )
     evaluator: SerializeAsAny[Evaluator] = Field(

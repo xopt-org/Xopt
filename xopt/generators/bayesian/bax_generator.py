@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any, cast
 
 from botorch.models import ModelListGP, SingleTaskGP
+from gest_api.vocs import VOCS
 from gpytorch import Module
 from pydantic import (
     Field,
@@ -26,7 +27,6 @@ from xopt.generators.bayesian.turbo import (
     TurboController,
 )
 from xopt.generators.bayesian.utils import validate_turbo_controller_center
-from xopt.vocs import VOCS
 
 logger = logging.getLogger()
 

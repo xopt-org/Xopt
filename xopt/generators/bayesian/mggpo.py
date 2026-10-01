@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Any
 
 import pandas as pd
 import torch
@@ -55,7 +56,7 @@ class MGGPOGenerator(MultiObjectiveBayesianGenerator):
         None, description="CNSGA generator used to generate candidates"
     )
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         # create GA generator

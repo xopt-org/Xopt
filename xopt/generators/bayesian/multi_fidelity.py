@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Literal
+from typing import Any, Literal
 
 import pandas as pd
 import torch
@@ -106,7 +106,7 @@ class MultiFidelityGenerator(MOBOGenerator):
 
         return v
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         reference_point = kwargs.pop("reference_point", None)
         vocs = kwargs.get("vocs")
         # set reference point

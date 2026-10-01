@@ -3,9 +3,10 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+from gest_api.vocs import VOCS
 from scipy.optimize import minimize
 
-from xopt import VOCS, Xopt
+from xopt import Xopt
 from xopt.resources.test_functions.ackley_20 import ackley
 from xopt.resources.test_functions.ackley_20 import vocs as ackleyvocs
 from xopt.resources.test_functions.rosenbrock import (

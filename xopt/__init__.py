@@ -1,8 +1,9 @@
+from gest_api.vocs import VOCS
+
 from xopt.asynchronous import AsynchronousXopt
 from xopt.base import Xopt
 from xopt.evaluator import Evaluator
 from xopt.generator import Generator
-from xopt.vocs import VOCS
 
 __all__ = [
     "VOCS",

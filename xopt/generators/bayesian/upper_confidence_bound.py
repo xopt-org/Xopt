@@ -1,4 +1,5 @@
 import warnings
+from typing import Any
 
 import torch
 from botorch.acquisition import (
@@ -77,7 +78,7 @@ negative objective value to ensure non-negative acquisition values. Otherwise, t
 acqusition function may produce uniformly zero values due to Softplus transformation.
     """ + formatted_base_docstring()
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if self.vocs.n_constraints > 0:
             warnings.warn(
@@ -88,7 +89,7 @@ acqusition function may produce uniformly zero values due to Softplus transforma
                 "with negative objective values.",
             )
 
-    def propose_candidates(self, model: Module, n_candidates: int = 1):
+    def propose_candidates(self, model: Module, n_candidates: int = 1) -> Tensor:
         # TODO: convert to exception in the future
         if self.vocs.n_constraints > 0 and n_candidates > 1:
             warnings.warn(

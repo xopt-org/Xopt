@@ -44,7 +44,12 @@ class Evaluator(XoptBaseModel):
 
     function: Callable
     max_workers: int = Field(1, ge=1)
-    executor: NormalExecutor = Field(exclude=True)  # Do not serialize
+    # Always overwritten by validate_all; default_factory only keeps `executor`
+    # from being a required constructor argument for type checkers.
+    executor: NormalExecutor = Field(
+        default_factory=lambda: NormalExecutor[DummyExecutor](executor=DummyExecutor()),
+        exclude=True,
+    )  # Do not serialize
     function_kwargs: dict = Field({})
     vectorized: bool = Field(False)
 

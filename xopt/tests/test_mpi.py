@@ -5,8 +5,6 @@ import yaml
 
 havempi = False
 try:
-    from mpi4py import MPI  # noqa: F401
-
     havempi = True
 except ImportError:
     pass
