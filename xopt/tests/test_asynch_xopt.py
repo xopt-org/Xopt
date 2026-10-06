@@ -1,9 +1,13 @@
+import os
 import pandas as pd
+import pytest
 import time
 import threading
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
+from pydantic import ValidationError
 from xopt.asynchronous import AsynchronousXopt
+from xopt.base import Xopt
 from xopt.resources.testing import TEST_VOCS_BASE, xtest_callable
 from xopt.evaluator import Evaluator
 from xopt.generators import RandomGenerator
@@ -513,3 +517,44 @@ class TestAsynchXopt:
                 X.process_futures()
         except ValueError as e:
             assert str(e) == "Ingest error"
+
+    def test_data_dump_file(self, tmp_path):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        data_dump_file = str(tmp_path / "data.csv")
+        X = AsynchronousXopt(
+            generator=generator,
+            evaluator=evaluator,
+            data_dump_file=data_dump_file,
+        )
+        for _ in range(3):
+            X.step()
+
+        assert os.path.exists(data_dump_file)
+        dumped_data = pd.read_csv(data_dump_file, index_col="xopt_index")
+        pd.testing.assert_frame_equal(
+            dumped_data, X.data, check_dtype=False, check_names=False
+        )
+
+    def test_xopt_dump_file(self, tmp_path):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        xopt_dump_file = str(tmp_path / "dump.yml")
+        X = AsynchronousXopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file=xopt_dump_file,
+        )
+        for _ in range(3):
+            X.step()
+
+        assert os.path.exists(xopt_dump_file)
+        X2 = AsynchronousXopt.from_file(xopt_dump_file)
+        assert isinstance(X2, AsynchronousXopt)
+        assert len(X2.data) == len(X.data)
+
+        # `is_done` is specific to AsynchronousXopt, and Xopt forbids extra keys
+        with pytest.raises(ValidationError):
+            Xopt.from_file(xopt_dump_file)
