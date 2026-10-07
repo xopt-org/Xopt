@@ -15,11 +15,27 @@ Bayesian Generators
 All of the generators here use Bayesian optimization (BO) type methods to solve single
 objective, multi objective and characterization problems. Bayesian generators
 incorperate unknown constrianing functions into optimization based on what is
-specified in `VOCS`
+specified in `VOCS` (with the exception of `BAxUSGenerator`, see below).
 
 - [`ExpectedImprovementGenerator`](examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb): implements Expected Improvement single
   objective BO. Automatically balances trade-offs between exploration and
   exploitation and is thus useful for general purpose optimization.
+- [`BAxUSGenerator`](examples/single_objective_bayes_opt/baxus.ipynb): implements
+  Bayesian Optimization with Adaptively Expanding Subspaces (BAxUS,
+  Papenmeier et al., NeurIPS 2022) for high-dimensional single objective
+  problems. Optimization happens inside a low-dimensional random embedding of
+  the input space that expands adaptively when a trust region collapses,
+  making it effective when many input dimensions are irrelevant.
+  Because the model lives in the embedded subspace rather than in `VOCS` space,
+  this generator is more restricted than the others: it supports a single
+  objective over continuous variables only, and rejects constraints,
+  observables, discrete and contextual variables, `fixed_features`,
+  `max_travel_distances`, `custom_objective` and `n_interpolate_points`. It
+  generates one candidate at a time and does not support `visualize_model`.
+  Set `eval_budget` to the total number of planned evaluations - the reference
+  expansion schedule is derived from it, and without it a slower fallback
+  heuristic is used. Note also that the acquisition function is analytic LogEI
+  over the trust region rather than the Thompson sampling used in the paper.
 - [`UpperConfidenceBoundGenerator`](examples/single_objective_bayes_opt/upper_confidence_bound.ipynb): implements Upper Confidence Bound single
   objective BO. Requires a hyperparameter `beta` that explicitly sets the tradeoff
   between exploration and exploitation. Default value of `beta=2` is a good
