@@ -8,6 +8,15 @@ from xopt.entrypoint import multiprocessing as entrypoint
 from xopt.entrypoint.utils import merge_dicts, normalize_initial_data, override_to_dict
 from xopt.resources.test_functions.tnk import tnk_vocs
 
+try:
+    from xopt.entrypoint.mpi import run_mpi
+
+    havempi = True
+except ImportError:
+    havempi = False
+
+needsmpi = pytest.mark.skipif(not havempi, reason="MPI not available")
+
 
 def _tnk_df(n=3):
     return pd.DataFrame(
@@ -142,3 +151,79 @@ class TestEntryPointScript:
         assert list(result["xopt_candidate_idx"]) == [10, 20, 30]
         assert list(result["xopt_runtime"]) == [1.1, 2.2, 3.3]
         assert list(result["xopt_error"]) == [True, False, True]
+
+
+class TestMPI:
+    @needsmpi
+    def test_mpi(self, tmp_path):
+        config_yaml = """
+                stopping_condition:
+                    name: MaxEvaluationsCondition
+                    max_evaluations: 10
+                evaluator:
+                    function: xopt.resources.test_functions.tnk.evaluate_TNK
+                    function_kwargs:
+                        a: 999
+                    max_workers: 2
+
+                generator:
+                    name: random
+                    vocs:
+                        variables:
+                            x1: [0, 3.14159]
+                            x2: [0, 3.14159]
+                        objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                        constraints:
+                            c1: [GREATER_THAN, 0]
+                            c2: [LESS_THAN, 0.5]
+                        constants: {a: dummy_constant}
+
+                """
+
+        # run batched mode
+        run_mpi(yaml.safe_load(config_yaml), 0, False, None)
+
+        # run asynch mode
+        run_mpi(yaml.safe_load(config_yaml), 0, True, None)
+
+        # test with file
+        config_path = tmp_path / "test.yml"
+        with open(config_path, "w") as f:
+            yaml.dump(yaml.safe_load(config_yaml), f)
+
+        with open(config_path) as f:
+            run_mpi(yaml.safe_load(f), 0, False, None)
+
+    @needsmpi
+    def test_with_cnsga(self):
+        config_yaml = """
+        stopping_condition:
+            name: MaxEvaluationsCondition
+            max_evaluations: 10
+
+        generator:
+            name: cnsga
+            population_size: 64
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE, y2: MINIMIZE}
+                constraints:
+                    c1: [GREATER_THAN, 0]
+                    c2: [LESS_THAN, 0.5]
+                constants: {a: dummy_constant}
+
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+            function_kwargs:
+                sleep: 0
+                random_sleep: 0.1
+
+        """
+
+        # run batched mode
+        run_mpi(yaml.safe_load(config_yaml), 0, False, None)
+
+        # run asynch mode
+        run_mpi(yaml.safe_load(config_yaml), 0, True, None)
