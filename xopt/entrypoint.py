@@ -134,6 +134,10 @@ def override_to_dict(override: str) -> dict:
     dict
         The nested dictionary containing the value.
     """
+    # Check override format
+    if "=" not in override:
+        raise ValueError(f'Invalid override format: "{override}". Expected key=value')
+
     path, value = override.split("=", 1)
     yaml_str = (
         "\n".join([" " * idx + x + ":" for idx, x in enumerate(path.split("."))])

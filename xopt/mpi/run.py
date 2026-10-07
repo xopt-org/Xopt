@@ -151,10 +151,6 @@ def main():
         logger.info("Applying config file overrides:")
     for override in args.override:
         logger.info(f"  {override}")
-        if "=" not in override:
-            raise ValueError(
-                f'Invalid override format: "{override}". Expected key=value'
-            )
         config = merge_dicts(config, override_to_dict(override))
 
     run_mpi(
