@@ -979,7 +979,8 @@ def test_nsga2_vocs_not_present_in_add_data():
 
     # Try with strict=False
     X.strict = False
-    X.add_data(pd.DataFrame({"x1": [0], "y2": [0], "c1": [0]}))
+    with pytest.warns(UserWarning, match="Generator rejected 1 new data point"):
+        X.add_data(pd.DataFrame({"x1": [0], "y2": [0], "c1": [0]}))
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -1032,3 +1033,37 @@ def test_generate_candidates_in_bounds_unsorted_vocs(seed):
             lo = float(k + 1)
             hi = lo + 0.5
             assert lo <= cand[name] <= hi, f"{name}={cand[name]!r} out of [{lo}, {hi}]"
+
+
+def test_nsga2_evaluator_errors_not_strict():
+    """
+    Evaluations which raise exceptions have no objective columns and are rejected by the
+    generator. With strict=False this must emit a warning instead of failing silently.
+    """
+    vocs = VOCS(
+        variables={
+            "I1_CAV0:rf_field_scale": [1548099.25, 1892108.375],
+            "I1_SOL1:solenoid_field_scale": [0.02393677644431591, 0.029255952686071396],
+            "distgen:t_dist:sigma_t:value": [0.10000170022249222, 0.2999997138977051],
+        },
+        objectives={"norm_emit_x": "MINIMIZE", "sigma_t": "MINIMIZE"},
+        constants={"distgen:total_charge:value": 40.0, "mean_z": 6.99},
+    )
+    n_calls = {"value": 0}
+
+    def evaluate_fails_after_first(inputs):
+        n_calls["value"] += 1
+        if n_calls["value"] > 1:
+            raise RuntimeError("simulated evaluation failure")
+        return {"norm_emit_x": np.random.random(), "sigma_t": np.random.random()}
+
+    X = Xopt(
+        generator=NSGA2Generator(vocs=vocs, population_size=10),
+        evaluator=Evaluator(function=evaluate_fails_after_first),
+        stopping_condition=MaxEvaluationsCondition(max_evaluations=50),
+        strict=False,
+    )
+    with pytest.warns(UserWarning, match="Generator rejected 1 new data point"):
+        X.run()
+
+    assert len(X.data) == 50
