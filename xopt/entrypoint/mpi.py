@@ -9,7 +9,7 @@ import yaml
 
 from xopt import AsynchronousXopt
 from xopt.base import Xopt
-from xopt.entrypoint.multiprocessing import (
+from xopt.entrypoint.utils import (
     merge_dicts,
     normalize_initial_data,
     override_to_dict,
