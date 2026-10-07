@@ -17,7 +17,7 @@ needsmpi = pytest.mark.skipif(not havempi, reason="MPI not available")
 class TestMPI:
     @needsmpi
     def test_mpi(self):
-        from xopt.mpi.run import run_mpi
+        from xopt.entrypoint.mpi import run_mpi
 
         YAML = """
                 stopping_condition:
@@ -57,7 +57,7 @@ class TestMPI:
 
     @needsmpi
     def test_with_cnsga(self):
-        from xopt.mpi.run import run_mpi
+        from xopt.entrypoint.mpi import run_mpi
 
         YAML = """
         stopping_condition:

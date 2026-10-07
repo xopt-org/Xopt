@@ -1,6 +1,6 @@
-from .base import Xopt
-from .evaluator import DummyExecutor
-from .pydantic import remove_none_values
+from ..base import Xopt
+from ..evaluator import DummyExecutor
+from ..pydantic import remove_none_values
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import contextmanager
 import argparse

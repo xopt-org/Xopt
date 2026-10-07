@@ -4,8 +4,8 @@ import pytest
 import sys
 import yaml
 from unittest import mock
-from xopt import entrypoint
-from xopt.entrypoint import normalize_initial_data
+from xopt.entrypoint import multiprocessing as entrypoint
+from xopt.entrypoint.multiprocessing import normalize_initial_data
 from xopt.resources.test_functions.tnk import tnk_vocs
 
 
@@ -30,8 +30,10 @@ class TestEntryPointScript:
         config_path.write_text(yaml.dump(config))
         return str(config_path), config
 
-    @mock.patch("xopt.entrypoint.remove_none_values", side_effect=lambda x: x)
-    @mock.patch("xopt.entrypoint.Xopt")
+    @mock.patch(
+        "xopt.entrypoint.multiprocessing.remove_none_values", side_effect=lambda x: x
+    )
+    @mock.patch("xopt.entrypoint.multiprocessing.Xopt")
     def test_main_basic(self, mock_Xopt, mock_remove_none, tmp_path):
         config_path, config = self.make_config(tmp_path)
         sys_argv = [
@@ -100,10 +102,12 @@ class TestEntryPointScript:
         result = normalize_initial_data(df, tnk_vocs)
         assert "xopt_error_str" in result.columns
 
-    @mock.patch("xopt.entrypoint.normalize_initial_data")
-    @mock.patch("xopt.entrypoint.pd.read_csv")
-    @mock.patch("xopt.entrypoint.remove_none_values", side_effect=lambda x: x)
-    @mock.patch("xopt.entrypoint.Xopt")
+    @mock.patch("xopt.entrypoint.multiprocessing.normalize_initial_data")
+    @mock.patch("xopt.entrypoint.multiprocessing.pd.read_csv")
+    @mock.patch(
+        "xopt.entrypoint.multiprocessing.remove_none_values", side_effect=lambda x: x
+    )
+    @mock.patch("xopt.entrypoint.multiprocessing.Xopt")
     def test_main_with_initial_data(
         self, mock_Xopt, mock_remove_none, mock_read_csv, mock_normalize, tmp_path
     ):

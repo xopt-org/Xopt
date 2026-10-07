@@ -71,8 +71,8 @@ doc = [
 Homepage = "https://github.com/xopt-org/xopt"
 
 [project.scripts]
-xopt-run = "xopt.entrypoint:main"
-xopt-mpirun = "xopt.mpi.run:main"
+xopt-run = "xopt.entrypoint.multiprocessing:main"
+xopt-mpirun = "xopt.entrypoint.mpi:main"
 
 [options]
 zip_safe = false
