@@ -146,7 +146,8 @@ def main():
             print(f"Input file does not exist: {input_file}", file=sys.stderr)
         sys.exit(1)
 
-    config = yaml.safe_load(open(input_file))
+    with open(input_file) as f:
+        config = yaml.safe_load(f)
 
     if args.override:
         logger.info("Applying config file overrides:")
