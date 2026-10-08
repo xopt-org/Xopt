@@ -7,13 +7,17 @@ import numpy as np
 import pandas as pd
 import pytest
 import requests
+import torch
 import uvicorn
 
 from gest_api.vocs import VOCS
 
 from xopt.errors import XoptError
 from xopt.generator import Generator
+from xopt.generators.bayesian.bax.algorithms import GridOptimize
+from xopt.generators.bayesian.bax_generator import BaxGenerator
 from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGenerator
+from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.random import RandomGenerator
 from xopt.generators.remote.http import HTTPGenerator
 from xopt.generators.remote.server import AUTH_TOKEN_ENV_VAR, app
@@ -57,6 +61,13 @@ RANDOM_VOCS = VOCS(
 BO_VOCS = VOCS(
     variables={"x": [0.0, 1.0]},
     objectives={"y": "MINIMIZE"},
+)
+
+# mirrors docs/examples/single_objective_bayes_opt/bax_tutorial.ipynb: BAX uses
+# observables (no objectives), so it exercises `supports_no_objective`
+BAX_VOCS = VOCS(
+    variables={"x": [0, 2 * np.pi]},
+    observables=["y1"],
 )
 
 
@@ -216,5 +227,81 @@ class TestHTTPGeneratorExtraMethods:
         assert dumped["generator"]["computation_time"] is not None
 
         generator.finalize()
+
+
+class TestHTTPGeneratorBax:
+    def test_bax_workflow(self, server_url):
+        # mirrors docs/examples/single_objective_bayes_opt/bax_tutorial.ipynb
+        algorithm = GridOptimize(observable_names_ordered=["y1"], n_mesh_points=20)
+        bax_generator = BaxGenerator(vocs=BAX_VOCS, algorithm=algorithm)
+        bax_generator.gp_constructor.use_low_noise_prior = True
+
+        generator = HTTPGenerator(base_url=server_url, generator=bax_generator)
+
+        train_x = np.linspace(0.1, 2 * np.pi - 0.1, 3)
+        data = pd.DataFrame({"x": train_x, "y1": np.sin(train_x)})
+        generator.ingest(data.to_dict(orient="records"))
+
+        # triggers model training + BAX algorithm execution server-side
+        points = generator.generate(1)
+        assert len(points) == 1
+        assert 0 <= points[0]["x"] <= 2 * np.pi
+
+        # BayesianGenerator.visualize_model still works through the passthrough
+        # for a BAX-specific (no-objective, custom `algorithm` field) generator
+        fig, ax = generator.visualize_model()
+        assert fig is not None
+        assert ax is not None
+
+        generator.finalize()
+
+        generator.finalize()
+
+
+class ConstraintPrior(torch.nn.Module):
+    """Prior mean function, mirrors docs/examples/single_objective_bayes_opt/custom_model.ipynb."""
+
+    def forward(self, X):
+        return (5.0 * torch.cos(2 * 3.14 * X + 0.25)).squeeze(dim=-1)
+
+
+class TestHTTPGeneratorPriorMean:
+    def test_custom_prior_mean_function(self, server_url):
+        vocs = VOCS(
+            variables={"x": [0.0, 1.0]},
+            objectives={"y": "MAXIMIZE"},
+            constraints={"c": ["LESS_THAN", 0.0]},
+        )
+        gp_constructor = StandardModelConstructor(
+            mean_modules={"c": ConstraintPrior()}, use_low_noise_prior=True
+        )
+        bo_generator = ExpectedImprovementGenerator(
+            vocs=vocs, gp_constructor=gp_constructor
+        )
+
+        generator = HTTPGenerator(base_url=server_url, generator=bo_generator)
+
+        train_x = np.array([0.2, 0.5, 0.6])
+        data = pd.DataFrame(
+            {
+                "x": train_x,
+                "y": np.sin(2 * np.pi * train_x),
+                "c": 5.0 * np.cos(2 * np.pi * train_x + 0.25),
+            }
+        )
+        generator.ingest(data.to_dict(orient="records"))
+
+        # triggers model training (with the custom prior mean) server-side
+        points = generator.generate(1)
+        assert len(points) == 1
+
+        # extra-method passthrough pulls the fitted model back across the wire
+        # (torch.save/pickle round trip), including the custom prior mean module
+        fig, ax = generator.visualize_model()
+        assert fig is not None
+        assert ax is not None
+
+        mirror = generator.generator
+        assert isinstance(mirror.gp_constructor.mean_modules["c"], ConstraintPrior)
 
         generator.finalize()
