@@ -16,6 +16,8 @@ from xopt.entrypoint.utils import (
     setup_import_paths,
 )
 from xopt.log import set_handler_with_logger
+from xopt.pydantic import remove_none_values
+
 
 comm = MPI.COMM_WORLD
 mpi_rank = comm.Get_rank()
@@ -148,6 +150,7 @@ def main():
 
     with open(input_file) as f:
         config = yaml.safe_load(f)
+        config = remove_none_values(config)
 
     if args.override:
         logger.info("Applying config file overrides:")
