@@ -57,7 +57,7 @@ Currenty **Xopt** provides:
   - `random` Uniform random sampling
 - Convenient YAML/JSON based input format
 - Driver programs:
-  - `xopt.mpi.run` Parallel MPI execution using this input format
+  - `xopt-mpirun` Parallel MPI execution using this input format
 
 Xopt does **not** provide:
 - your custom simulation or experimental measurement via an `evaluate` function.
@@ -176,7 +176,7 @@ Using MPI
 ===============
 Example MPI run, with `xopt.yaml` as the only user-defined file:
 ```b
-mpirun -n 64 python -m mpi4py.futures -m xopt.mpi.run xopt.yaml
+mpirun -n 64 xopt-mpirun xopt.yaml
 ```
 
 
