@@ -142,8 +142,9 @@ def main():
     asynchronous = args.asynchronous
 
     if not os.path.exists(input_file):
-        print(f"Input file does not exist: {input_file}")
-        exit()
+        if mpi_rank == 0:
+            print(f"Input file does not exist: {input_file}", file=sys.stderr)
+        sys.exit(1)
 
     config = yaml.safe_load(open(input_file))
 
