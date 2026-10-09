@@ -1,14 +1,45 @@
+"""HTTPGenerator remote integration and cloudpickle regression tests.
+
+All 14 tests live in the original upstream regression-test location.
+
+UPSTREAM HTTP TRANSPORT (12 tests)
+    Uses the normal Xopt server in an independent Uvicorn subprocess.
+    Covers HTTP sessions, data mirroring, authentication, random/UCB-related
+    behavior, BAX, and an importable module-level PyTorch prior.
+
+EXPERIMENTAL CLOUDPICKLE TRANSPORT (2 tests)
+    Uses the opt-in cloudpickle server in a separate Uvicorn subprocess.
+    The negative control checks that standard transport rejects a local
+    (not importable) notebook-style PyTorch class. The positive control
+    checks cloudpickle round-trip, candidate generation, and prior values.
+
+Important scope: subprocesses run on the SAME machine and can share installed
+packages. These tests do NOT prove cross-host Docker isolation. The next
+integration milestone must run a backend without the scientist's source files.
+
+Requirements for the two experimental tests:
+    python -m pip install -e ./docs/examples/remote_cloudpickle
+
+Run from repository root:
+    python -m pytest xopt/tests/generators/remote/test_http_generator.py -v -s --no-cov
+
+SECURITY: Never expose the cloudpickle deserialization endpoint to untrusted
+clients; deserialization can execute arbitrary Python code.
+"""
+
 import json
+import os
 import socket
-import threading
+import subprocess
+import sys
 import time
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
 import pytest
 import requests
 import torch
-import uvicorn
 
 from gest_api.vocs import VOCS
 
@@ -20,37 +51,85 @@ from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGen
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.random import RandomGenerator
 from xopt.generators.remote.http import HTTPGenerator
-from xopt.generators.remote.server import AUTH_TOKEN_ENV_VAR, app
+# Use an explicit name in the negative-control test so reviewers can see
+# that it exercises upstream serialization, not the cloudpickle adapter.
+from xopt.generators.remote.http import HTTPGenerator as UpstreamHTTPGenerator
+from cloudpickle_xopt.http import HTTPGenerator as CloudpickleHTTPGenerator
+from xopt.generators.remote.server import AUTH_TOKEN_ENV_VAR
 
 
 def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    """Ask the OS for an available localhost TCP port (not a fixed 8002)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+@contextmanager
+def _uvicorn_subprocess(*, auth_token=None):
+    """Start an isolated Python interpreter and reliably stop it afterward.
+
+    This tests the same process boundary as running Uvicorn in another terminal.
+    It does not require or reuse the manually launched server on port 8002.
+    """
+    port = _free_port()
+    url = f"http://127.0.0.1:{port}"
+    env = os.environ.copy()
+    # Authentication belongs to the *server* environment, not pytest's.
+    env.pop(AUTH_TOKEN_ENV_VAR, None)
+    if auth_token is not None:
+        env[AUTH_TOKEN_ENV_VAR] = auth_token
+
+    command = [
+        sys.executable, "-m", "uvicorn",
+        "xopt.generators.remote.server:app",
+        "--host", "127.0.0.1", "--port", str(port),
+        "--log-level", "warning",
+    ]
+    process = subprocess.Popen(
+        command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        # Wait for a real HTTP response, not merely an open socket.
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                error = process.stderr.read()
+                raise RuntimeError(f"Uvicorn exited during startup:\n{error}")
+            try:
+                response = requests.get(url + "/openapi.json", timeout=0.3)
+                response.raise_for_status()
+                break
+            except (requests.RequestException, OSError):
+                time.sleep(0.1)
+        else:
+            raise RuntimeError(f"Uvicorn did not become ready at {url}")
+        yield url
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        if process.stderr is not None:
+            process.stderr.close()
 
 
 @pytest.fixture(scope="module")
 def server_url():
-    port = _free_port()
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
+    """Normal upstream HTTP server, one independent process per test module."""
+    with _uvicorn_subprocess() as url:
+        yield url
 
-    url = f"http://127.0.0.1:{port}"
-    for _ in range(50):
-        try:
-            requests.get(url + "/openapi.json", timeout=0.2)
-            break
-        except requests.ConnectionError:
-            time.sleep(0.1)
-    else:
-        raise RuntimeError("test server did not start in time")
 
-    yield url
-
-    server.should_exit = True
-    thread.join(timeout=5)
+@pytest.fixture
+def authenticated_server_url():
+    """Dedicated process with a token set *before* server startup."""
+    with _uvicorn_subprocess(auth_token="secret-token") as url:
+        yield url
 
 
 RANDOM_VOCS = VOCS(
@@ -136,8 +215,8 @@ class TestHTTPGeneratorRandom:
         with pytest.raises(XoptError):
             generator.generate(1)
 
-    def test_auth_required(self, server_url, monkeypatch):
-        monkeypatch.setenv(AUTH_TOKEN_ENV_VAR, "secret-token")
+    def test_auth_required(self, authenticated_server_url):
+        server_url = authenticated_server_url
 
         unauthenticated = HTTPGenerator(
             base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
@@ -305,3 +384,148 @@ class TestHTTPGeneratorPriorMean:
         assert isinstance(mirror.gp_constructor.mean_modules["c"], ConstraintPrior)
 
         generator.finalize()
+
+
+# ---------------------------------------------------------------------------
+# Experimental cloudpickle integration tests (opt-in transport).
+# REVIEW NOTE: Keep these beside the 12 original regressions so reviewers can
+# compare unchanged upstream behavior against the opt-in serialization path.
+# These tests use a different server app than the upstream regression tests.
+# Both the client and server are independent processes, but on the same host.
+# ---------------------------------------------------------------------------
+
+def _cloudpickle_free_port():
+    """Request an unused local TCP port from the operating system."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+@contextmanager
+def _cloudpickle_server():
+    """Launch the experimental app in a completely separate interpreter.
+
+    This app contains BOTH ordinary upstream routes and opt-in cloudpickle
+    routes, so the two serialization approaches face the same backend.
+    """
+    port = _cloudpickle_free_port()
+    url = f"http://127.0.0.1:{port}"
+    env = os.environ.copy()
+    # Do not inherit an unrelated auth token from the developer's shell.
+    env.pop("XOPT_HTTP_AUTH_TOKEN", None)
+    command = [
+        sys.executable, "-m", "uvicorn", "cloudpickle_xopt.server:app",
+        "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
+    ]
+    process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise RuntimeError(f"Server exited during startup:\n{process.stderr.read()}")
+            try:
+                response = requests.get(f"{url}/openapi.json", timeout=0.3)
+                response.raise_for_status()
+                break
+            except requests.RequestException:
+                time.sleep(0.1)
+        else:
+            raise RuntimeError(f"Server did not become ready at {url}")
+        yield url
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        if process.stderr:
+            process.stderr.close()
+
+
+@pytest.fixture(scope="module")
+def cloudpickle_server_url():
+    with _cloudpickle_server() as url:
+        yield url
+
+
+def _notebook_generator():
+    """Build a prior class *inside a function*, as with a notebook cell.
+
+    A local class cannot be imported by its module-qualified name in the
+    Uvicorn interpreter. This is different from Stage 1's module-level class.
+    """
+    amplitude = 5.0
+    phase = 0.25
+
+    class ConstraintPrior(torch.nn.Module):
+        def forward(self, X):
+            # c(x) = 5 cos(2*pi*x + 0.25); a periodic constraint prior.
+            return (amplitude * torch.cos(2 * torch.pi * X + phase)).squeeze(-1)
+
+    vocs = VOCS(
+        variables={"x": [0.0, 1.0]},
+        objectives={"y": "MAXIMIZE"},
+        constraints={"c": ["LESS_THAN", 0.0]},
+    )
+    constructor = StandardModelConstructor(
+        mean_modules={"c": ConstraintPrior()}, use_low_noise_prior=True
+    )
+    generator = ExpectedImprovementGenerator(vocs=vocs, gp_constructor=constructor)
+    return generator, ConstraintPrior
+
+
+def _training_data():
+    """Three measurements of a sine objective and cosine constraint."""
+    x = np.array([0.2, 0.5, 0.6])
+    return pd.DataFrame({
+        "x": x,
+        "y": np.sin(2 * np.pi * x),
+        "c": 5.0 * np.cos(2 * np.pi * x + 0.25),
+    }).to_dict(orient="records")
+
+
+def test_upstream_rejects_notebook_local_prior(cloudpickle_server_url):
+    """Standard serialization must not silently lose the local class.
+
+    Depending on Xopt/Pydantic internals, the failure can occur while the
+    client serializes the generator or when the server decodes the request.
+    Either is an expected limitation of the ordinary transport here.
+    """
+    local_generator, _ = _notebook_generator()
+    remote = UpstreamHTTPGenerator(base_url=cloudpickle_server_url, generator=local_generator)
+    try:
+        with pytest.raises(Exception) as error:
+            remote.ingest(_training_data())
+            remote.generate(1)
+        # A successful return would mean our negative control is no longer
+        # valid and should be investigated, not marked as an expected failure.
+        assert error.value is not None
+    finally:
+        remote.finalize()
+
+
+def test_cloudpickle_round_trips_notebook_local_prior(cloudpickle_server_url):
+    """Opt-in transport reconstructs and executes the actual custom class."""
+    local_generator, prior_type = _notebook_generator()
+    remote = CloudpickleHTTPGenerator(base_url=cloudpickle_server_url, generator=local_generator)
+    try:
+        remote.ingest(_training_data())
+        points = remote.generate(1)
+        assert len(points) == 1
+        assert 0.0 <= points[0]["x"] <= 1.0
+
+        # Fetch the server's generator, not the original local object.
+        mirror = remote.pull()
+        restored_prior = mirror.gp_constructor.mean_modules["c"]
+        assert isinstance(restored_prior, prior_type)
+
+        # Check the mathematical function, not merely the Python type name.
+        X = torch.tensor([[0.2], [0.5]], dtype=torch.double)
+        actual = restored_prior(X)
+        expected = 5.0 * torch.cos(2 * torch.pi * X + 0.25).squeeze(-1)
+        torch.testing.assert_close(actual, expected)
+    finally:
+        remote.finalize()
