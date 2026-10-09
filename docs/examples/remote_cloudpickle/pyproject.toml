@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xopt-http-cloudpickle-experimental"
+version = "0.0.1"
+description = "Experimental cloudpickle transport for upstream Xopt HTTPGenerator"
+requires-python = ">=3.10"
+dependencies = ["cloudpickle", "xopt"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cloudpickle_xopt*"]
