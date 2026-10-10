@@ -13,7 +13,7 @@ from xopt.generator import Generator
 from xopt.generators.remote.http import HTTPGenerator as UpstreamHTTPGenerator
 
 
-class HTTPGenerator(UpstreamHTTPGenerator):
+class CloudpickleHTTPGenerator(UpstreamHTTPGenerator):
     """Use cloudpickle for generator transfer, preserving upstream behavior.
 
     Scientists can define a custom class in a notebook without installing its
@@ -47,3 +47,7 @@ class HTTPGenerator(UpstreamHTTPGenerator):
         mirror.data = self.data
         self.generator = mirror
         return mirror
+
+
+# Backward-compatible alias for early experiments.
+HTTPGenerator = CloudpickleHTTPGenerator

@@ -18,7 +18,7 @@ packages. These tests do NOT prove cross-host Docker isolation. The next
 integration milestone must run a backend without the scientist's source files.
 
 Requirements for the two experimental tests:
-    python -m pip install -e ./docs/examples/remote_cloudpickle
+    python -m pip install -e ".[remote]"
 
 Run from repository root:
     python -m pytest xopt/tests/generators/remote/test_http_generator.py -v -s --no-cov
@@ -54,7 +54,7 @@ from xopt.generators.remote.http import HTTPGenerator
 # Use an explicit name in the negative-control test so reviewers can see
 # that it exercises upstream serialization, not the cloudpickle adapter.
 from xopt.generators.remote.http import HTTPGenerator as UpstreamHTTPGenerator
-from cloudpickle_xopt.http import HTTPGenerator as CloudpickleHTTPGenerator
+from xopt.generators.remote.cloudpickle import CloudpickleHTTPGenerator
 from xopt.generators.remote.server import AUTH_TOKEN_ENV_VAR
 
 
@@ -414,7 +414,7 @@ def _cloudpickle_server():
     # Do not inherit an unrelated auth token from the developer's shell.
     env.pop("XOPT_HTTP_AUTH_TOKEN", None)
     command = [
-        sys.executable, "-m", "uvicorn", "cloudpickle_xopt.server:app",
+        sys.executable, "-m", "uvicorn", "xopt.generators.remote.cloudpickle_server:app",
         "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
     ]
     process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL,
