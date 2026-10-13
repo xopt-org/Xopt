@@ -43,6 +43,7 @@ nav:
                 - Fast model evaluation: examples/single_objective_bayes_opt/fast_model_eval.ipynb
                 - Hessian kernel: examples/single_objective_bayes_opt/hessian_kernel.ipynb
                 - Contextual Bayesian optimization: examples/single_objective_bayes_opt/contextual_bo.ipynb
+                - BAxUS high-dimensional optimization: examples/single_objective_bayes_opt/baxus.ipynb
             - Trust Region Bayesian Optimization:
                 - Basic example: examples/trust_region_bo/turbo_basics.ipynb
                 - Optimization: examples/trust_region_bo/turbo_optimize.ipynb
@@ -82,6 +83,7 @@ nav:
               - Time-Dependent Bayesian Generators: api/generators/bayesian/time_dependent.md
               - Bayesian Exploration: api/generators/bayesian/bayesian_exploration.md
               - Expected Improvement: api/generators/bayesian/expected_improvement.md
+              - BAxUS (high-dimensional): api/generators/bayesian/baxus.md
               - Multi-Objective BO: api/generators/bayesian/mobo.md
               - Multi-Generation Gaussian Process Optimization: api/generators/bayesian/mggpo.md
               - Multi-Fidelity: api/generators/bayesian/multi_fidelity.md

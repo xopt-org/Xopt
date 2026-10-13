@@ -34,6 +34,7 @@ Currenty **Xopt** provides:
           optimization
         - [`multi_fidelity`](examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb) Multi-fidelity single or multi objective optimization
         - [`BAX`](examples/single_objective_bayes_opt/bax_tutorial.ipynb) Bayesian algorithm execution using virtual measurements
+        - [`baxus`](examples/single_objective_bayes_opt/baxus.ipynb) High-dimensional BO in adaptively expanding random subspaces
         - BO customization:
             - [Trust region BO](examples/trust_region_bo/turbo_basics.ipynb)
             - [Heteroskedastic noise specification](examples/single_objective_bayes_opt/heteroskedastic_noise_tutorial.ipynb)
