@@ -35,7 +35,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         # on one of the sampled execution path subsequences:
         xs_exe_list = [self.xs_exe for i in range(len(model.models))]
         ys_exe_list = [
-            torch.index_select(self.ys_exe, dim=-1, index=torch.tensor([i]))
+            self.ys_exe[..., i : i + 1]
             for i in range(len(model.models))
         ]
         fantasy_models = [
