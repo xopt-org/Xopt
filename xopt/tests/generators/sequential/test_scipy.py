@@ -1,15 +1,16 @@
 import copy
 import json
 import pickle
+import warnings
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 from pydantic import ValidationError
 import pytest
-from scipy.optimize import minimize
+from scipy.optimize import OptimizeResult, minimize
 
-from xopt import Xopt
+from xopt import Evaluator, Xopt
 from xopt.errors import SeqGeneratorError
 from xopt.generators.sequential.scipy import (
     BOUNDED_METHODS,
@@ -447,7 +448,42 @@ class TestScipyGenerator:
             with pytest.raises(ValueError, match="some other value error"):
                 gen._generate()
 
-    def test_convergence_path_returns_last_point(self):
+    def test_steps_after_scipy_termination_do_not_restart_session(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(
+            vocs=vocs,
+            initial_point={"x0": 0.5, "x1": -0.5},
+            options={"maxiter": 1},
+        )
+        xopt = Xopt(generator=gen, evaluator=Evaluator(function=sphere))
+        gen = xopt.generator
+        with (
+            patch(
+                "xopt.generators.sequential.scipy.minimize", wraps=minimize
+            ) as mocked_minimize,
+            patch.object(
+                ScipyGenerator, "_build_cache", wraps=gen._build_cache
+            ) as build_cache,
+            warnings.catch_warnings(record=True) as recorded,
+        ):
+            warnings.simplefilter("always")
+            for _ in range(200):
+                xopt.step()
+            mocked_minimize.assert_called_once()
+            build_cache.assert_called_once()
+        assert gen.is_done
+        assert not gen.result.success
+        assert gen.result.nit == 1
+        assert len(recorded) == 1
+        assert "re-evaluate" in str(recorded[0].message)
+        assert len(xopt.data) == 200
+        gen.reset()
+
+    @pytest.mark.parametrize("success", [True, False])
+    def test_convergence_path_returns_last_point(self, success):
         """When scipy converges using only cached data, the last cached point is returned."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
@@ -460,14 +496,67 @@ class TestScipyGenerator:
         data = pd.DataFrame([{"x0": 0.1, "x1": 0.2, "y": 0.05}])
         gen._set_data(data)
 
-        # Mock minimize to complete without calling the objective (simulates convergence)
-        with patch("xopt.generators.sequential.scipy.minimize", return_value=None):
-            result = gen._generate()
+        scipy_result = OptimizeResult(
+            success=success, message="Optimization terminated", nit=3
+        )
+        assert gen.result is None
+        assert not gen.is_done
+        with (
+            patch(
+                "xopt.generators.sequential.scipy.minimize",
+                return_value=scipy_result,
+            ) as mocked_minimize,
+            patch.object(
+                ScipyGenerator, "_build_cache", wraps=gen._build_cache
+            ) as build_cache,
+        ):
+            with pytest.warns(RuntimeWarning, match="Optimization terminated"):
+                result = gen.generate(1)
+            session_thread = gen._session_thread
+            session_thread.join(timeout=2.0)
+            with warnings.catch_warnings(record=True) as recorded:
+                warnings.simplefilter("always")
+                for _ in range(200):
+                    assert gen.generate(1) == result
+            assert not recorded
+            assert gen._session_thread is session_thread
+            mocked_minimize.assert_called_once()
+            build_cache.assert_called_once()
 
         assert result is not None
         assert len(result) == 1
         assert result[0]["x0"] == pytest.approx(0.1)
         assert result[0]["x1"] == pytest.approx(0.2)
+        assert gen.is_done
+        assert gen.result is scipy_result
+        assert gen.result.success == success
+        assert gen.result.nit == 3
+
+        for restored in (copy.deepcopy(gen), pickle.loads(pickle.dumps(gen))):
+            assert restored.is_done
+            assert restored.result.message == scipy_result.message
+            with patch("xopt.generators.sequential.scipy.minimize") as minimize_mock:
+                with warnings.catch_warnings(record=True) as recorded:
+                    warnings.simplefilter("always")
+                    assert restored.generate(1) == result
+                assert not recorded
+                minimize_mock.assert_not_called()
+            restored.reset()
+            assert not restored.is_done
+            assert restored.result is None
+
+        gen.reset()
+        assert gen.result is None
+        assert not gen.is_done
+        with patch(
+            "xopt.generators.sequential.scipy.minimize", return_value=scipy_result
+        ) as mocked_minimize:
+            with pytest.warns(RuntimeWarning):
+                gen.generate(1)
+            mocked_minimize.assert_called_once()
+        gen.set_data(data)
+        assert gen.result is None
+        assert not gen.is_done
 
     def test_convergence_path_with_constants(self):
         """Convergence path includes constants in returned point."""
@@ -482,8 +571,12 @@ class TestScipyGenerator:
         data = pd.DataFrame([{"x0": 0.1, "x1": 0.2, "y": 0.05, "c": 3.14}])
         gen._set_data(data)
 
-        with patch("xopt.generators.sequential.scipy.minimize", return_value=None):
-            result = gen._generate()
+        with patch(
+            "xopt.generators.sequential.scipy.minimize",
+            return_value=OptimizeResult(success=True, message="Finished"),
+        ):
+            with pytest.warns(RuntimeWarning):
+                result = gen._generate()
 
         assert result is not None
         assert "c" in result[0]
@@ -498,7 +591,10 @@ class TestScipyGenerator:
             vocs=vocs, method="Powell", initial_point={"x0": 0.5, "x1": -0.5}
         )
 
-        with patch("xopt.generators.sequential.scipy.minimize", return_value=None):
+        with patch(
+            "xopt.generators.sequential.scipy.minimize",
+            return_value=OptimizeResult(success=True, message="Finished"),
+        ):
             with pytest.raises(
                 RuntimeError, match="scipy minimize converged without available data"
             ):

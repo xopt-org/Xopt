@@ -1,4 +1,5 @@
 import copy
+import warnings
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
 from typing import Any, Dict, List, Optional
@@ -6,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from pydantic import Field, PrivateAttr, field_validator
-from scipy.optimize import minimize
+from scipy.optimize import OptimizeResult, minimize
 
 from xopt.generators.sequential.sequential_generator import SequentialGenerator
 from xopt.vocs import get_objective_data, get_variable_data
@@ -84,6 +85,8 @@ class ScipyGenerator(SequentialGenerator):
     _session_thread: Optional[Thread] = PrivateAttr(default=None)
     _session_exception: Optional[Exception] = PrivateAttr(default=None)
     _session_finished: bool = PrivateAttr(default=False)
+    _result: Optional[OptimizeResult] = PrivateAttr(default=None)
+    _completion_warned: bool = PrivateAttr(default=False)
     _stop_token: object = PrivateAttr(default_factory=object)
 
     _runtime_private_attr_names = {
@@ -124,6 +127,8 @@ class ScipyGenerator(SequentialGenerator):
         copied._data_set = self._data_set
         copied._last_outcome = self._last_outcome
         copied._cache = copied._build_cache()
+        copied._result = copy.deepcopy(self._result, memo)
+        copied._completion_warned = self._completion_warned
         return copied
 
     def __getstate__(self):
@@ -154,6 +159,16 @@ class ScipyGenerator(SequentialGenerator):
         if self.data is not None and len(self.data) > 0:
             objective_data = get_objective_data(self.vocs, self.data).to_numpy()[:, 0]
             self._last_outcome = float(objective_data[-1])
+
+    @property
+    def result(self) -> Optional[OptimizeResult]:
+        """The scipy result after termination, or None while optimization is pending."""
+        return self._result
+
+    @property
+    def is_done(self) -> bool:
+        """Whether scipy has terminated, successfully or otherwise."""
+        return self._result is not None
 
     @property
     def x0(self) -> np.ndarray:
@@ -280,7 +295,7 @@ class ScipyGenerator(SequentialGenerator):
         }
 
         try:
-            minimize(self._objective, self.x0, **minimize_kwargs)
+            self._result = minimize(self._objective, self.x0, **minimize_kwargs)
         except _StopSession:
             pass
         except Exception as ex:
@@ -290,6 +305,8 @@ class ScipyGenerator(SequentialGenerator):
 
     def _start_session_if_needed(self):
         """Start the worker minimize session if one is not currently active."""
+        if self.is_done:
+            return
         if self._session_thread is not None and self._session_thread.is_alive():
             return
 
@@ -313,6 +330,8 @@ class ScipyGenerator(SequentialGenerator):
         self._session_thread = None
         self._session_exception = None
         self._session_finished = False
+        self._result = None
+        self._completion_warned = False
         self._request_queue = Queue()
         self._response_queue = Queue()
         self._stop_event = Event()
@@ -325,7 +344,7 @@ class ScipyGenerator(SequentialGenerator):
         """
         self._start_session_if_needed()
 
-        while True:
+        while not self.is_done:
             self._raise_session_error_if_present()
 
             try:
@@ -339,9 +358,23 @@ class ScipyGenerator(SequentialGenerator):
                     self._raise_session_error_if_present()
                     break
 
-        # If scipy converges using only cached data, return the latest known point.
+        # Preserve the historical fallback without replaying a completed optimization.
         if self.data is None or len(self.data) == 0:
             raise RuntimeError("scipy minimize converged without available data")
+
+        result = self.result
+        if result is None:
+            raise RuntimeError("scipy minimize session stopped without a result")
+
+        if not self._completion_warned:
+            warnings.warn(
+                f"scipy minimize has terminated: {result.message}. "
+                "Returning the latest data point; further Xopt.step() calls will "
+                "re-evaluate it. Check is_done and result, or call reset() to restart.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            self._completion_warned = True
 
         inputs = self.data[self.vocs.variable_names].iloc[-1].to_dict()
         if self.vocs.constants is not None:

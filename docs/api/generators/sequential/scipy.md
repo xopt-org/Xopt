@@ -36,9 +36,11 @@ Invalid or empty method names fail validation.
 
 ## Session Lifecycle and Errors
 
-- `reset()` stops the active worker session and clears transient runtime state.
-- `set_data(...)` stops any active session, reloads data, and rebuilds the cache.
-- If scipy converges using only cached values, generation falls back to the latest known data row.
+- `reset()` stops the active worker session and clears the result and completion state.
+- `set_data(...)` stops any active session, clears completion state, reloads data, and rebuilds the cache.
+- `result` exposes scipy's `OptimizeResult` after termination, including `success`, `message`, and solver-specific fields such as `nit`. It is `None` before termination.
+- `is_done` is true once scipy terminates, including unsuccessful termination (for example, reaching an iteration limit). Check `result.success` to distinguish successful convergence.
+- Once terminated, later `generate()` calls do not restart scipy or rebuild the cache. For compatibility, they still return the latest known data row, with a `RuntimeWarning` emitted once per session on this fallback path. Further explicit `Xopt.step()` calls will re-evaluate and append this duplicate; stop stepping when `generator.is_done` is true.
 - Common scipy `ValueError` messages are remapped to clearer runtime errors (for example unsupported solver availability or bound handling).
 
 ## State Restoration
@@ -51,6 +53,9 @@ For model-level roundtrips, use pydantic serialization:
 Then restore the evaluation history with `set_data(...)` so the cache and last outcome are reconstructed before continuing optimization.
 
 The class also defines `__getstate__` and `__setstate__` for explicit state handling of non-picklable runtime thread objects.
+Pickling does not stop the original worker. Pickle and deep-copy roundtrips retain
+completed results and the completion latch without sharing runtime thread objects;
+model-level roundtrips restart from the restored evaluation history instead.
 
 ## Configuration
 
