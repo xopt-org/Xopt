@@ -13,6 +13,7 @@ from xopt.vocs import VOCS
 
 
 def sin_function(input_dict):
+    """Return the one-dimensional objective shared by serialization tests."""
     x = input_dict["x"]
     return {
         "f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x),
@@ -30,6 +31,7 @@ class TestSequentialSerialization:
         ],
     )
     def test_serialization_and_restart(self, generator):
+        """Resume each sequential generator from YAML and verify pickle compatibility."""
         test_vocs = VOCS(
             variables={"x": [0, 3.14159]},
             objectives={"f": "MINIMIZE"},

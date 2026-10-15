@@ -22,10 +22,12 @@ from xopt.vocs import VOCS
 
 
 def sphere(input_dict):
+    """Return the quadratic objective used by generator integration tests."""
     return {"y": float(sum(v**2 for v in input_dict.values()))}
 
 
 def _direct_scipy_sequence(vocs: VOCS, method: str, maxiter: int = 30):
+    """Collect uncached requests from scipy as the reference candidate sequence."""
     mins, maxs = np.array(vocs.bounds).T
     bounds = list(zip(mins, maxs))
     x0 = np.array([1.7, -1.3], dtype=float)
@@ -57,6 +59,7 @@ def _direct_scipy_sequence(vocs: VOCS, method: str, maxiter: int = 30):
 
 class TestScipyGenerator:
     def test_scipy_generate_single_point(self):
+        """Generate one point with either a configured start or existing history."""
         YAML = """
         generator:
             name: scipy
@@ -97,6 +100,7 @@ class TestScipyGenerator:
         X_no_init.step()
 
     def test_scipy_generate_multiple_points(self):
+        """Reject batch requests for a sequential optimizer."""
         YAML = """
         generator:
             name: scipy
@@ -115,6 +119,7 @@ class TestScipyGenerator:
             X.generator.generate(2)
 
     def test_scipy_generate_and_restart(self):
+        """Resume Xopt evaluation after a full JSON serialization roundtrip."""
         YAML = """
         generator:
             name: scipy
@@ -144,6 +149,7 @@ class TestScipyGenerator:
         assert len(X2.data) == 9
 
     def test_scipy_generator_model_dump_roundtrip_continuation(self):
+        """Match restored-generator candidates to a fresh replay of the same history."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -182,29 +188,9 @@ class TestScipyGenerator:
 
         np.testing.assert_allclose(restored_x, reference_x, rtol=0.0, atol=1e-12)
 
-    def test_scipy_generator_direct(self):
-        YAML = """
-        generator:
-            name: scipy
-            method: Powell
-            initial_point: {x0: 1.0, x1: 1.0}
-            vocs:
-                variables:
-                    x0: [-5, 5]
-                    x1: [-5, 5]
-                objectives: {y: MINIMIZE}
-        evaluator:
-            function: xopt.tests.generators.sequential.test_scipy.sphere
-        """
-        X = Xopt.from_yaml(YAML)
-        gen: ScipyGenerator = X.generator
-
-        first = gen.generate(1)
-        assert len(first) == 1
-        assert set(first[0].keys()) == {"x0", "x1"}
-
     @pytest.mark.parametrize("method", BOUNDED_METHODS)
     def test_selected_points_match_scipy_minimize(self, method):
+        """Match every uncached candidate to direct scipy for each supported method."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -230,6 +216,7 @@ class TestScipyGenerator:
             gen.add_data(pd.DataFrame([{**candidate, "y": y}]))
 
     def test_scipy_reset(self):
+        """Clear active candidate/outcome state and allow generation after reset."""
         YAML = """
         generator:
             name: scipy
@@ -262,6 +249,7 @@ class TestScipyGenerator:
         assert set(candidate[0].keys()) == {"x0", "x1"}
 
     def test_validate_method_rejects_whitespace_string(self):
+        """Reject a solver name that becomes empty after whitespace normalization."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -273,6 +261,7 @@ class TestScipyGenerator:
             ScipyGenerator(vocs=vocs, method="   ")
 
     def test_validate_initial_point_empty_dict(self):
+        """Reject an explicitly supplied initial point without coordinates."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -282,7 +271,11 @@ class TestScipyGenerator:
         ):
             ScipyGenerator(vocs=vocs, initial_point={})
 
-    def test_deepcopy_with_data_copies_outcome_and_cache(self):
+    @pytest.mark.parametrize(
+        "roundtrip", [copy.deepcopy, lambda gen: pickle.loads(pickle.dumps(gen))]
+    )
+    def test_copy_with_data_preserves_outcome_and_cache(self, roundtrip):
+        """Restore independent history, last outcome, cache, and idle runtime state."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -293,17 +286,23 @@ class TestScipyGenerator:
         )
         gen._set_data(data)
 
-        copied = copy.deepcopy(gen)
+        copied = roundtrip(gen)
 
         assert copied is not gen
         assert copied.data is not gen.data
         assert copied._last_outcome == pytest.approx(gen._last_outcome)
         assert copied._cache == copied._build_cache()
+        assert copied._session_thread is None
+        assert copied._cache_lock is not gen._cache_lock
+        assert copied._request_queue is not gen._request_queue
+        assert copied._response_queue is not gen._response_queue
+        assert copied._stop_event is not gen._stop_event
 
     @pytest.mark.parametrize(
         "roundtrip", [copy.deepcopy, lambda gen: pickle.loads(pickle.dumps(gen))]
     )
     def test_copy_active_generator_preserves_sequential_state(self, roundtrip):
+        """Copy a pending candidate without stopping or sharing the original worker."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -315,8 +314,12 @@ class TestScipyGenerator:
         )
         gen.set_data(pd.DataFrame(columns=["x0", "x1", "y"]))
         candidate = gen.generate(1)[0]
+        session_thread = gen._session_thread
+        assert session_thread is not None and session_thread.is_alive()
 
         copied = roundtrip(gen)
+        assert gen._session_thread is session_thread
+        assert session_thread.is_alive()
         assert copied.is_active
         assert copied._data_set
         assert copied._last_candidate == [candidate]
@@ -333,74 +336,33 @@ class TestScipyGenerator:
         copied.reset()
         gen.reset()
 
-    def test_pickle_does_not_stop_active_session(self):
-        vocs = VOCS(
-            variables={"x0": [-5, 5], "x1": [-5, 5]},
-            objectives={"y": "MINIMIZE"},
-        )
-        gen = ScipyGenerator(
-            vocs=vocs,
-            method="Powell",
-            initial_point={"x0": 0.5, "x1": -0.5},
-        )
-        gen.generate(1)
-        session_thread = gen._session_thread
-        assert session_thread is not None and session_thread.is_alive()
-
-        serialized = pickle.dumps(gen)
-
-        assert serialized
-        assert gen._session_thread is session_thread
-        assert session_thread.is_alive()
-        gen.reset()
-
-    def test_state_roundtrip_rebuilds_runtime_state_and_last_outcome(self):
+    @pytest.mark.parametrize(
+        ("message", "expected"),
+        [
+            (
+                "Unknown solver foo",
+                "scipy method 'Powell' is not available in this environment",
+            ),
+            ("Method Powell cannot handle bounds", "does not support bounds"),
+        ],
+    )
+    def test_raise_session_error_maps_solver_errors(self, message, expected):
+        """Translate recognized worker ValueErrors into actionable runtime errors."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
         )
         gen = ScipyGenerator(vocs=vocs, method="Powell")
-        data = pd.DataFrame(
-            [{"x0": 0.2, "x1": -0.3, "y": 0.13}, {"x0": -0.1, "x1": 0.4, "y": 0.17}]
-        )
-        gen._set_data(data)
-
-        state = gen.__getstate__()
-        restored = ScipyGenerator.model_validate(gen.model_dump())
-        restored.__setstate__(state)
-
-        assert restored._cache == restored._build_cache()
-        assert restored._last_outcome == pytest.approx(0.17)
-
-    def test_raise_session_error_maps_unknown_solver(self):
-        vocs = VOCS(
-            variables={"x0": [-5, 5], "x1": [-5, 5]},
-            objectives={"y": "MINIMIZE"},
-        )
-        gen = ScipyGenerator(vocs=vocs, method="Powell")
-        gen._session_exception = ValueError("Unknown solver foo")
+        gen._session_exception = ValueError(message)
 
         with pytest.raises(
             RuntimeError,
-            match="scipy method 'Powell' is not available in this environment",
-        ):
-            gen._raise_session_error_if_present()
-
-    def test_raise_session_error_maps_cannot_handle_bounds(self):
-        vocs = VOCS(
-            variables={"x0": [-5, 5], "x1": [-5, 5]},
-            objectives={"y": "MINIMIZE"},
-        )
-        gen = ScipyGenerator(vocs=vocs, method="Powell")
-        gen._session_exception = ValueError("Method Powell cannot handle bounds")
-
-        with pytest.raises(
-            RuntimeError,
-            match="does not support bounds",
+            match=expected,
         ):
             gen._raise_session_error_if_present()
 
     def test_objective_raises_stop_session_when_stop_event_set(self):
+        """Reject objective calls belonging to an already stopped session."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -420,16 +382,17 @@ class TestScipyGenerator:
             )
 
     def test_add_data_empty_dataframe(self):
+        """Ignore an empty internal data update without changing the last outcome."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
         )
         gen = ScipyGenerator(vocs=vocs, method="Powell")
-        # _add_data with empty dataframe should return early without error
         gen._add_data(pd.DataFrame())
         assert gen._last_outcome is None
 
     def test_duplicate_add_data_answers_each_request_once(self):
+        """Prevent duplicate submissions from shifting subsequent objective responses."""
         gen = ScipyGenerator(
             vocs=VOCS(
                 variables={"x0": [-5, 5], "x1": [-5, 5]},
@@ -459,6 +422,7 @@ class TestScipyGenerator:
 
     @pytest.mark.parametrize("late_action", ["objective", "result", "exception"])
     def test_timed_out_worker_cannot_poison_new_session(self, late_action):
+        """Isolate stale objective calls, results, and exceptions after shutdown timeout."""
         gen = ScipyGenerator(
             vocs=VOCS(
                 variables={"x0": [-5, 5], "x1": [-5, 5]},
@@ -519,6 +483,7 @@ class TestScipyGenerator:
                 new_thread.join(timeout=2.0)
 
     def test_requested_points_survive_readback_and_restart(self):
+        """Retain requested-point answers across replay/copies until history replacement."""
         gen = ScipyGenerator(
             vocs=VOCS(
                 variables={"x0": [-5, 5], "x1": [-5, 5]},
@@ -551,6 +516,7 @@ class TestScipyGenerator:
         assert gen._pending_request is None
 
     def test_unknown_solver_raises_validation_error(self):
+        """Reject unsupported solver configuration when loading Xopt from YAML."""
         YAML = """
         generator:
             name: scipy
@@ -571,7 +537,7 @@ class TestScipyGenerator:
             Xopt.from_yaml(YAML)
 
     def test_non_solver_value_error_reraises(self):
-        """A ValueError that doesn't mention 'unknown solver' should propagate."""
+        """Propagate unrecognized worker ValueErrors without remapping them."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -588,6 +554,7 @@ class TestScipyGenerator:
                 gen._generate()
 
     def test_steps_after_scipy_termination_do_not_restart_session(self):
+        """Run 200 Xopt steps with one scipy invocation, one cache build, and one warning."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -622,8 +589,8 @@ class TestScipyGenerator:
         gen.reset()
 
     @pytest.mark.parametrize("success", [True, False])
-    def test_convergence_path_returns_last_point(self, success):
-        """When scipy converges using only cached data, the last cached point is returned."""
+    def test_termination_preserves_result_and_last_point(self, success):
+        """Latch either termination result through copies and clear it on reset/reload."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -631,7 +598,6 @@ class TestScipyGenerator:
         gen = ScipyGenerator(
             vocs=vocs, method="Powell", initial_point={"x0": 0.5, "x1": -0.5}
         )
-        # Populate data so the generator has something to return
         data = pd.DataFrame([{"x0": 0.1, "x1": 0.2, "y": 0.05}])
         gen._set_data(data)
 
@@ -698,7 +664,7 @@ class TestScipyGenerator:
         assert not gen.is_done
 
     def test_convergence_path_with_constants(self):
-        """Convergence path includes constants in returned point."""
+        """Include configured constants in the last-row termination fallback."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -721,7 +687,7 @@ class TestScipyGenerator:
         assert "c" in result[0]
 
     def test_convergence_path_without_data_raises_runtime_error(self):
-        """Convergence without queued requests and without data raises an error."""
+        """Raise when scipy terminates without history for the last-row fallback."""
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -740,7 +706,7 @@ class TestScipyGenerator:
                 gen._generate()
 
     def test_generate_with_constants(self):
-        """Constants are included in generated candidates."""
+        """Include configured constants in candidates requested by the live worker."""
         YAML = """
         generator:
             name: scipy
