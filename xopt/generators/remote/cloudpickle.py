@@ -49,5 +49,3 @@ class CloudpickleHTTPGenerator(UpstreamHTTPGenerator):
         return mirror
 
 
-# Backward-compatible alias for early experiments.
-HTTPGenerator = CloudpickleHTTPGenerator

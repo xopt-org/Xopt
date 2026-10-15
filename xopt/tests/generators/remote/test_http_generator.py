@@ -412,7 +412,7 @@ def _cloudpickle_server():
     url = f"http://127.0.0.1:{port}"
     env = os.environ.copy()
     # Do not inherit an unrelated auth token from the developer's shell.
-    env.pop("XOPT_HTTP_AUTH_TOKEN", None)
+    env.pop("XOPT_HTTP_GENERATOR_TOKEN", None)
     command = [
         sys.executable, "-m", "uvicorn", "xopt.generators.remote.cloudpickle_server:app",
         "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
