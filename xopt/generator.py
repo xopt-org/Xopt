@@ -9,6 +9,7 @@ from pydantic_core.core_schema import ValidationInfo
 
 from xopt.errors import VOCSError
 from xopt.pydantic import XoptBaseModel
+from xopt.vocs import ContextualVariable
 
 from gest_api.vocs import VOCS, DiscreteVariable
 from gest_api.generator import Generator as BaseGenerator
@@ -82,6 +83,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
         frozen=True,
         exclude=True,
     )
+    supports_contextual_variables: bool = Field(
+        default=False,
+        description="flag that describes if this generator can use contextual input "
+        "variables",
+        frozen=True,
+        exclude=True,
+    )
 
     vocs: VOCS = Field(description="generator VOCS")
     data: Optional[pd.DataFrame] = Field(
@@ -101,6 +109,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
             for name in vocs.variable_names
         )
 
+    @staticmethod
+    def _has_contextual_variables(vocs: VOCS) -> bool:
+        return any(
+            isinstance(vocs.variables[name], ContextualVariable)
+            for name in vocs.variable_names
+        )
+
     @field_validator("vocs", mode="after")
     def validate_vocs(cls, v, info: ValidationInfo):
         if v.n_constraints > 0 and not info.data["supports_constraints"]:
@@ -111,6 +126,12 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
             and not info.data["supports_discrete_variables"]
         ):
             raise VOCSError("this generator does not support discrete variables")
+
+        if (
+            cls._has_contextual_variables(v)
+            and not info.data["supports_contextual_variables"]
+        ):
+            raise VOCSError("this generator does not support contextual variables")
 
         # check objective support
         if v.n_objectives == 0 and not info.data["supports_no_objective"]:

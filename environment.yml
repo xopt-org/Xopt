@@ -15,6 +15,7 @@ dependencies:
   - tqdm
   - orjson
   - matplotlib
+  - gest-api>=0.2
 # parallel
   - mpi4py
   - dask
@@ -33,3 +34,4 @@ dependencies:
   - mkdocstrings-python
   - ruff
   - typing-extensions
+  - gest-api

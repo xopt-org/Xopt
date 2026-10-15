@@ -26,12 +26,12 @@ jobs:
         group: [1, 2, 3, 4]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.0
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -39,8 +39,10 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1.4.4
+        with:
+          mpi: openmpi
 
       - name: Install dependencies
         run: uv sync --extra dev
@@ -206,14 +208,14 @@ jobs:
 
       - name: Upload results artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: notebook-results-group-${{ matrix.group }}
           path: results/group-${{ matrix.group }}-results.txt
 
       - name: Upload executed notebooks
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: executed-notebooks-group-${{ matrix.group }}
           path: executed-notebooks/**/*.ipynb
@@ -228,7 +230,7 @@ jobs:
     if: always()
     steps:
       - name: Download all results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: notebook-results-group-*
           merge-multiple: true
@@ -284,12 +286,12 @@ jobs:
     name: "Build Documentation"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0  # Required for setuptools_scm version calculation
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.0.0
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -301,7 +303,7 @@ jobs:
         run: uv sync --extra doc
 
       - name: Download executed notebooks
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: executed-notebooks-group-*
           path: downloaded-notebooks
@@ -332,7 +334,7 @@ jobs:
           mv xopt-examples.zip ./site/assets/
 
       - name: Upload docs artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: ./site
 
@@ -350,4 +352,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.0

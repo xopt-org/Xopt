@@ -31,7 +31,7 @@ dependencies = [
   "tqdm",
   "orjson",
   "matplotlib",
-  "gest-api"
+  "gest-api>=0.2"
 ]
 description = "Flexible optimization of arbitrary problems in Python."
 dynamic = [ "version" ]
@@ -71,7 +71,8 @@ doc = [
 Homepage = "https://github.com/xopt-org/xopt"
 
 [project.scripts]
-xopt-run = "xopt.entrypoint:main"
+xopt-run = "xopt.entrypoint.multiprocessing:main"
+xopt-mpirun = "xopt.entrypoint.mpi:main"
 
 [options]
 zip_safe = false

@@ -29,18 +29,31 @@ import yaml
 from pydantic import (
     BaseModel,
     ConfigDict,
-    create_model,
     Field,
+    create_model,
     field_serializer,
     field_validator,
     model_serializer,
     model_validator,
 )
-from pydantic.v1.json import custom_pydantic_encoder
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 
 ObjType = TypeVar("ObjType")
 logger = logging.getLogger(__name__)
+
+
+def custom_pydantic_encoder(type_encoders, obj):
+    # Check the class type and its superclasses for a matching encoder.
+    # Replicates pydantic v1's ``custom_pydantic_encoder`` without importing
+    # from ``pydantic.v1`` (which is incompatible with Python 3.14+).
+    for base in type(obj).__mro__[:-1]:
+        try:
+            encoder = type_encoders[base]
+        except KeyError:
+            continue
+        return encoder(obj)
+    raise TypeError(f"Object of type {type(obj).__name__!r} is not JSON serializable")
+
 
 JSON_ENCODERS = {
     # function/method type distinguished for class members
@@ -57,6 +70,46 @@ JSON_ENCODERS = {
     # torch.nn.Module: lambda x: process_torch_module(x),
     # torch.Tensor: lambda x: x.detach().cpu().numpy().tolist(),
 }
+
+
+def _serialize_non_finite_float(value: float | np.floating) -> str:
+    value = float(value)
+    if np.isnan(value):
+        return "nan"
+    if value > 0:
+        return "inf"
+    return "-inf"
+
+
+def _serialize_list(values, base_key="", serialize_torch=False, serialize_inline=False):
+    serialized_values = []
+    for i, item in enumerate(values):
+        list_key = f"{base_key}_{i}" if base_key else str(i)
+
+        if isinstance(item, dict):
+            item = recursive_serialize(
+                item, list_key, serialize_torch, serialize_inline
+            )
+        elif isinstance(item, list):
+            item = _serialize_list(item, list_key, serialize_torch, serialize_inline)
+        elif isinstance(item, (float, np.floating)) and not np.isfinite(float(item)):
+            item = _serialize_non_finite_float(item)
+        else:
+            for _type, func in JSON_ENCODERS.items():
+                if isinstance(item, _type):
+                    item = func(item)
+
+            if isinstance(item, (float, np.floating)) and not np.isfinite(float(item)):
+                item = _serialize_non_finite_float(item)
+
+        try:
+            json.dumps(item)
+        except (TypeError, OverflowError):
+            item = f"{item.__module__}.{item.__class__.__qualname__}"
+
+        serialized_values.append(item)
+
+    return serialized_values
 
 
 # The problem with v2 serialization is that model_serialize_json() does not accept kwargs
@@ -80,6 +133,8 @@ def recursive_serialize(
     for key in list(v):
         if isinstance(v[key], dict):
             v[key] = recursive_serialize(v[key], key, serialize_torch, serialize_inline)
+        elif isinstance(v[key], list):
+            v[key] = _serialize_list(v[key], key, serialize_torch, serialize_inline)
         elif isinstance(v[key], torch.nn.Module):
             if serialize_torch:
                 if serialize_inline:
@@ -96,10 +151,19 @@ def recursive_serialize(
             v[key] = json.loads(v[key].to_json())
         elif isinstance(v[key], set):
             v[key] = list(v[key])
+        elif isinstance(v[key], (float, np.floating)) and not np.isfinite(
+            float(v[key])
+        ):
+            v[key] = _serialize_non_finite_float(v[key])
         else:
             for _type, func in JSON_ENCODERS.items():
                 if isinstance(v[key], _type):
                     v[key] = func(v[key])
+
+            if isinstance(v[key], (float, np.floating)) and not np.isfinite(
+                float(v[key])
+            ):
+                v[key] = _serialize_non_finite_float(v[key])
 
         # check to make sure object has been serialized,
         # if not use a generic serializer
@@ -202,7 +266,7 @@ class XoptBaseModel(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_files(cls, data: Any):
+    def validate_files(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         for key, value in data.items():
@@ -222,13 +286,13 @@ class XoptBaseModel(BaseModel):
     def serialize_json(self, sinfo: SerializationInfo) -> dict:
         return orjson_dumps_except_root(self)
 
-    def to_json(self, **kwargs) -> str:
+    def to_json(self, **kwargs: Any) -> str:
         return orjson_dumps(self, **kwargs)
 
-    def json(self, **kwargs):
+    def json(self, **kwargs: Any) -> str:
         return self.to_json(**kwargs)
 
-    def yaml(self, **kwargs):
+    def yaml(self, **kwargs: Any) -> str:
         """serialize first then dump to yaml string"""
         output = json.loads(
             self.to_json(
@@ -238,7 +302,7 @@ class XoptBaseModel(BaseModel):
         return yaml.dump(output)
 
     @classmethod
-    def from_file(cls, filename: str):
+    def from_file(cls, filename: str) -> "XoptBaseModel":
         if not os.path.exists(filename):
             raise OSError(f"file {filename} is not found")
 
@@ -246,11 +310,11 @@ class XoptBaseModel(BaseModel):
             return cls.from_yaml(file)
 
     @classmethod
-    def from_yaml(cls, yaml_obj: [str, TextIO]):
+    def from_yaml(cls, yaml_obj: str | TextIO) -> "XoptBaseModel":
         return cls.model_validate(remove_none_values(yaml.safe_load(yaml_obj)))
 
     @classmethod
-    def from_dict(cls, config: dict):
+    def from_dict(cls, config: dict) -> "XoptBaseModel":
         return cls.model_validate(remove_none_values(config))
 
 

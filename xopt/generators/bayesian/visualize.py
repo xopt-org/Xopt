@@ -10,11 +10,13 @@ from typing import (
     Union,
 )
 import textwrap
+import warnings
 
 import gpytorch
 import numpy as np
 import torch
 from botorch.acquisition import AcquisitionFunction
+from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
 from botorch.models import ModelListGP
 from gest_api.vocs import DiscreteVariable
 from pandas import DataFrame
@@ -25,10 +27,16 @@ from matplotlib.ticker import FormatStrFormatter
 
 from xopt.errors import FeasibilityError
 from xopt.generator import Generator
-from xopt.vocs import VOCS, get_feasibility_data, select_best
+from xopt.vocs import (
+    ContextualVariable,
+    VOCS,
+    get_feasibility_data,
+    resolve_contextual_variable_bounds,
+    select_best,
+)
 
 from .objectives import feasibility
-from .utils import torch_compile_gp_model, torch_trace_gp_model
+from .utils import torch_compile_gp_model
 
 # Little helper class, which is only used as a type.
 DType = TypeVar("DType")
@@ -37,6 +45,12 @@ DType = TypeVar("DType")
 class Array(np.ndarray, Generic[DType]):
     def __getitem__(self, key) -> DType:
         return super().__getitem__(key)
+
+
+ACQUISITION_CONTEXTUAL_WARNING = (
+    "Acquisition plot unavailable: conditioned on contextual variables and defined over "
+    "controllable dimensions only."
+)
 
 
 def _is_discrete_variable(variable: Any) -> bool:
@@ -172,6 +186,8 @@ def visualize_model(
         Whether the feasibility region is shown.
     show_acquisition : bool, optional
         Whether the acquisition function is computed and shown (only if acquisition function is not None).
+        If a contextual variable is selected as a plot axis, acquisition evaluation is skipped and a
+        warning panel is rendered instead.
     n_grid : int, optional
         Number of grid points per dimension used to display the model predictions.
     axes : Axes, optional
@@ -179,7 +195,9 @@ def visualize_model(
     exponentiate : bool, optional
         Flag to exponentiate acquisition function before plotting.
     model_compile_mode : str, optional
-        Compilation mode for the model. If None (default), the model is not compiled.
+        Compilation mode for the model. Use ``"inductor"`` to compile the model
+        with PyTorch's default compiler backend. If None (default), the model is
+        not compiled.
     tkwargs: dict, optional
         kwargs for torch tensor creation
     interactive: bool, optional
@@ -252,6 +270,7 @@ def visualize_model(
                 n_grid=n_grid,
                 idx=idx,
                 interactive=interactive,
+                model_compile_mode=model_compile_mode,
             )
             ax[i, 0].set_xlabel(None)
         if show_acquisition:
@@ -290,6 +309,7 @@ def visualize_model(
             reference_point=reference_point,
             variable_names=variable_names,
             vocs=vocs,
+            data=data,
             n_grid=n_grid,
             tkwargs=tkwargs,
         )
@@ -350,6 +370,7 @@ def visualize_model(
                     show_samples=False,
                     variable_names=variable_names,
                     tkwargs=tkwargs,
+                    emit_warning=True,
                     interactive=interactive,
                 )
                 ax_acq = ax[len(output_names), 1]
@@ -368,6 +389,7 @@ def visualize_model(
                 show_samples=False,
                 variable_names=variable_names,
                 tkwargs=tkwargs,
+                emit_warning=not hasattr(acquisition_function, "base_acquisition"),
                 interactive=interactive,
             )
         if show_feasibility:
@@ -418,6 +440,7 @@ def plot_model_prediction(
     color: str = "C0",
     axis: Optional[Axes] = None,
     interactive: bool = False,
+    model_compile_mode: Optional[str] = None,
 ) -> Axes:
     """Displays the GP model prediction for the selected output.
 
@@ -454,6 +477,10 @@ def plot_model_prediction(
         The axis to use for plotting. If None is given, a new one is generated.
     interactive : bool, optional
         Whether to enable picker functionality for samples in the subplots.
+    emit_warning : bool, optional
+        Whether to emit a Python warning when acquisition evaluation is skipped for contextual axes.
+    model_compile_mode : str, optional
+        See eponymous parameter of :func:`visualize_model`.
 
     Returns
     -------
@@ -468,6 +495,7 @@ def plot_model_prediction(
     input_mesh = _generate_input_mesh(
         vocs=vocs,
         variable_names=variable_names,
+        data=data,
         n_grid=n_grid,
         reference_point=reference_point,
         tkwargs=tkwargs,
@@ -481,6 +509,7 @@ def plot_model_prediction(
         model=model,
         vocs=vocs,
         include_prior_mean=show_prior_mean or requires_prior_mean,
+        model_compile_mode=model_compile_mode,
     )
     if len(variable_names) == 1:
         var_name = variable_names[0]
@@ -646,6 +675,7 @@ def plot_acquisition_function(
     n_grid: int = 100,
     axis: Optional[Axes] = None,
     exponentiate: bool = True,
+    emit_warning: bool = True,
     interactive: bool = False,
 ) -> Axes:
     """Displays the given acquisition function.
@@ -686,13 +716,25 @@ def plot_acquisition_function(
     """
     _, variable_names = _validate_names(vocs.output_names, variable_names, vocs)
     axis = _get_axis(axis, dim=len(variable_names))
+
+    contextual_axes = _get_contextual_axes(variable_names, vocs)
+    if contextual_axes:
+        if emit_warning:
+            warnings.warn(ACQUISITION_CONTEXTUAL_WARNING, RuntimeWarning, stacklevel=2)
+        return _plot_acquisition_warning(axis, contextual_axes)
+
     reference_point = _get_reference_point(reference_point, vocs, data, idx)
     input_mesh = _generate_input_mesh(
         n_grid=n_grid,
         reference_point=reference_point,
         variable_names=variable_names,
         vocs=vocs,
+        data=data,
         tkwargs=tkwargs,
+    )
+    acquisition_input_mesh = _get_acquisition_input_mesh(
+        acquisition_function=acquisition_function,
+        input_mesh=input_mesh,
     )
 
     if exponentiate:
@@ -710,12 +752,19 @@ def plot_acquisition_function(
         base_acq = None
         if hasattr(acquisition_function, "base_acquisition"):
             base_acq = (
-                acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
+                acquisition_function.base_acquisition(
+                    acquisition_input_mesh.unsqueeze(1)
+                )
                 .detach()
                 .squeeze()
                 .numpy()
             )
-        acq = acquisition_function(input_mesh.unsqueeze(1)).detach().squeeze().numpy()
+        acq = (
+            acquisition_function(acquisition_input_mesh.unsqueeze(1))
+            .detach()
+            .squeeze()
+            .numpy()
+        )
 
         if exponentiate:
             acq = np.exp(acq)
@@ -764,7 +813,9 @@ def plot_acquisition_function(
                     "Given acquisition function doesn't have a base_acquisition attribute."
                 )
             acq = (
-                acquisition_function.base_acquisition(input_mesh.unsqueeze(1))
+                acquisition_function.base_acquisition(
+                    acquisition_input_mesh.unsqueeze(1)
+                )
                 .detach()
                 .squeeze()
                 .cpu()
@@ -772,7 +823,7 @@ def plot_acquisition_function(
             )
         else:
             acq = (
-                acquisition_function(input_mesh.unsqueeze(1))
+                acquisition_function(acquisition_input_mesh.unsqueeze(1))
                 .detach()
                 .squeeze()
                 .cpu()
@@ -861,6 +912,7 @@ def plot_feasibility(
         reference_point=reference_point,
         variable_names=variable_names,
         vocs=vocs,
+        data=data,
         tkwargs=tkwargs,
     )
     feas = (
@@ -1137,6 +1189,7 @@ def _plot2d_prediction(
 def _generate_input_mesh(
     vocs: VOCS,
     variable_names: list[str],
+    data: DataFrame,
     reference_point: dict[str, Any],
     n_grid: int,
     tkwargs: dict[str, Any],
@@ -1149,6 +1202,8 @@ def _generate_input_mesh(
         VOCS object for visualization.
     variable_names : List[str]
         Variable names with respect to which the GP model(s) shall be displayed.
+    data : DataFrame
+        Data used to infer finite contextual bounds for mesh generation.
     reference_point : dict
         Reference point determining the value of variables in vocs, but not in variable_names.
     n_grid : int
@@ -1161,17 +1216,22 @@ def _generate_input_mesh(
     torch.Tensor
         The input mesh for visualization.
     """
-    mesh_axes = []
-    for k in variable_names:
-        var = vocs.variables[k]
-        if _is_discrete_variable(var):
+    mesh_axes: list = []
+    for name in variable_names:
+        variable = vocs.variables[name]
+        if isinstance(variable, ContextualVariable):
+            series = data[name] if name in data else None
+            lower, upper = resolve_contextual_variable_bounds(variable, series, name)
+
+            mesh_axes.append(torch.linspace(lower, upper, n_grid, dtype=torch.float64))
+        elif isinstance(variable, DiscreteVariable):
             mesh_axes.append(
-                torch.tensor(_get_discrete_values(var), dtype=torch.float64)
+                torch.tensor(_get_discrete_values(variable), dtype=torch.float64)
             )
         else:
             mesh_axes.append(
                 torch.linspace(
-                    var.domain[0], var.domain[1], n_grid, dtype=torch.float64
+                    variable.domain[0], variable.domain[1], n_grid, dtype=torch.float64
                 )
             )
 
@@ -1191,6 +1251,75 @@ def _generate_input_mesh(
     )
     x = x.to(**tkwargs)
     return x
+
+
+def _get_contextual_axes(variable_names: list[str], vocs: VOCS) -> list[str]:
+    """Return contextual variable names present in selected visualization axes."""
+    return [
+        name
+        for name in variable_names
+        if isinstance(vocs.variables.get(name), ContextualVariable)
+    ]
+
+
+def _get_acquisition_input_mesh(
+    acquisition_function: AcquisitionFunction,
+    input_mesh: torch.Tensor,
+) -> torch.Tensor:
+    """Project full input mesh onto unfixed dimensions for fixed-feature acquisition."""
+    if not isinstance(acquisition_function, FixedFeatureAcquisitionFunction):
+        return input_mesh
+
+    full_dim = int(acquisition_function.d)
+
+    fixed_columns = getattr(acquisition_function, "columns", None)
+    if fixed_columns is not None:
+        fixed_column_indices = sorted(int(column) for column in fixed_columns)
+        free_columns = [
+            column for column in range(full_dim) if column not in fixed_column_indices
+        ]
+    else:
+        selector = getattr(acquisition_function, "_selector", None)
+        values = getattr(acquisition_function, "values", None)
+        if selector is None or values is None:
+            return input_mesh
+
+        n_fixed = int(values.shape[-1])
+        input_dim = full_dim - n_fixed
+        free_columns = [
+            output_column
+            for output_column, source_column in enumerate(selector)
+            if int(source_column) < input_dim
+        ]
+
+    if input_mesh.shape[-1] == len(free_columns):
+        return input_mesh
+    if input_mesh.shape[-1] != full_dim:
+        return input_mesh
+    return input_mesh[..., free_columns]
+
+
+def _plot_acquisition_warning(axis: Axes, contextual_axes: list[str]) -> Axes:
+    """Render an acquisition warning panel when contextual axes are selected."""
+    contextual_label = ", ".join(contextual_axes)
+    message = (
+        f"{ACQUISITION_CONTEXTUAL_WARNING}\n"
+        f"Selected contextual axis variable(s): {contextual_label}"
+    )
+
+    axis.clear()
+    axis.set_title("Acquisition Function")
+    axis.text(
+        0.5,
+        0.5,
+        message,
+        ha="center",
+        va="center",
+        transform=axis.transAxes,
+        wrap=True,
+        fontsize=10,
+    )
+    return axis
 
 
 def _get_reference_point(
@@ -1296,7 +1425,9 @@ def _get_model_predictions(
     include_prior_mean : bool, optional
         Whether to include the prior mean in the predictions.
     model_compile_mode: str, optional
-        Compilation mode for the model. If None (default), the model is not compiled.
+        Compilation mode for the model. Use ``"inductor"`` to compile the model
+        with PyTorch's default compiler backend. If None (default), the model is
+        not compiled.
     _
 
     Returns
@@ -1307,27 +1438,11 @@ def _get_model_predictions(
     gp = model.models[vocs.output_names.index(output_name)]
     # input_mesh = input_mesh.unsqueeze(-2)
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        if model_compile_mode == "trace":
-            if hasattr(model, "_jit"):
-                jitgp = model._jit
-            else:
-                jitgp = torch_trace_gp_model(
-                    gp,
-                    vocs,
-                    {"device": input_mesh.device},
-                    posterior=True,
-                    grad=False,
-                    batch_size=input_mesh.shape[-1],
-                )
-                model._jit = jitgp
-            mean, std = jitgp(input_mesh)
-            posterior_mean = mean.detach().squeeze().cpu().numpy()
-            posterior_std = torch.sqrt(std.detach()).squeeze().cpu().numpy()
-        elif model_compile_mode == "inductor":
-            jitgp = torch_compile_gp_model(
+        if model_compile_mode == "inductor":
+            compiled_gp = torch_compile_gp_model(
                 gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False
             )
-            posterior = jitgp(input_mesh)
+            posterior = compiled_gp(input_mesh)
             posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
             posterior_std = (
                 torch.sqrt(posterior.variance).detach().squeeze().cpu().numpy()

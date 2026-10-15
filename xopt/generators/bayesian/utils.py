@@ -5,23 +5,22 @@ from typing import Any, List, cast
 import gpytorch
 import numpy as np
 import pandas as pd
-from pydantic import ValidationInfo
 import torch
 from botorch.acquisition import AcquisitionFunction
 from botorch.models import ModelListGP
 from botorch.models.model import Model
 from botorch.models.utils import multioutput_to_batch_mode_transform
-from botorch.utils.multi_objective import is_non_dominated, Hypervolume
-
-from gest_api.vocs import MinimizeObjective, MaximizeObjective, ExploreObjective
-
+from botorch.utils.multi_objective import Hypervolume, is_non_dominated
+from gest_api.vocs import ExploreObjective, MaximizeObjective, MinimizeObjective
+from pydantic import ValidationInfo
+from xopt.generator import Generator
 from xopt.generators.bayesian.turbo import TurboController
 from xopt.vocs import VOCS, random_inputs
 
 
 def get_training_data(
     input_names: List[str], outcome_name: str, data: pd.DataFrame
-) -> (torch.Tensor, torch.Tensor):
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Creates training data from input data frame.
 
@@ -215,7 +214,7 @@ def rectilinear_domain_union(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     return out_bounds
 
 
-def interpolate_points(df, num_points=10):
+def interpolate_points(df: pd.DataFrame, num_points: int = 10) -> pd.DataFrame:
     """
     Generates interpolated points between two points specified by a pandas DataFrame.
 
@@ -309,112 +308,28 @@ def validate_turbo_controller_base(
         )
 
 
-def validate_turbo_controller_center(generator):
+def validate_turbo_controller_center(generator: Generator) -> None:
     if generator.turbo_controller is not None:
         # Check that values for center_x are within trust region bounds
         trust_region = generator.turbo_controller.get_trust_region(generator)
+        active_variable_names = list(
+            getattr(generator, "_candidate_names", generator.vocs.variable_names)
+        )
 
         center_x = generator.turbo_controller.center_x
         if center_x is not None:
-            for key, value in center_x.items():
-                if key in generator.vocs.variable_names:
-                    idx = generator.vocs.variable_names.index(key)
-                    lower_bound = trust_region[0, idx].item()
-                    upper_bound = trust_region[1, idx].item()
-                    if not (lower_bound <= value <= upper_bound):
-                        raise ValueError(
-                            f"Turbo controller center_x value for {key} : "
-                            f"{value} is outside of trust region bounds "
-                            f"[{lower_bound}, {upper_bound}]"
-                        )
-
-
-class MeanVarModelWrapper(torch.nn.Module):
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def forward(self, x):
-        output_dist = self.model(x)
-        return output_dist.mean, output_dist.variance
-
-
-class MeanVarModelWrapperPosterior(torch.nn.Module):
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def forward(self, x):
-        output_dist = self.model.posterior(x)
-        return output_dist.mean, output_dist.variance
-
-
-def torch_trace_gp_model(
-    model: Model,
-    vocs: VOCS,
-    tkwargs: dict,
-    posterior: bool = True,
-    grad: bool = False,
-    batch_size: int = 1,
-    verify: bool = False,
-) -> torch.jit.ScriptModule:
-    """
-    Trace a GPyTorch model using torch.jit.trace. Note that resulting object will return mean and variance directly,
-    NOT a multivariate normal.
-
-    Parameters
-    ----------
-    model : Model
-        The GPyTorch model to compile.
-    vocs : VOCS
-        VOCS
-    tkwargs : dict
-        The keyword arguments for the torch tensor.
-    posterior : bool, optional
-        If True, prime the model by using posterior method, otherwise call directly (this invokes gpytorch posterior).
-    grad : bool, optional
-        If True, use gradient context, otherwise use no gradient context.
-    batch_size : int, optional
-        The batch size for the input tensor for tracing, by default 1.
-    verify : bool, optional
-        If True, request that torch verify the trace by comparing to eager mode, by default False.
-    """
-    if isinstance(model, ModelListGP):
-        raise ValueError(
-            "ModelListGP is not supported for JIT tracing - use individual models"
-        )
-    rand_point = random_inputs(vocs)[0]
-    rand_vec = torch.stack(
-        [rand_point[k] * torch.ones(batch_size) for k in vocs.variable_names], dim=1
-    )
-    test_x = rand_vec.to(**tkwargs)
-    # test_x_1 = test_x[:1,...]
-
-    gradctx = nullcontext() if grad else torch.no_grad()
-    model.eval()
-    with gradctx, gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        if posterior:
-            pred = model.posterior(test_x)
-            traced_model = torch.jit.trace(
-                MeanVarModelWrapperPosterior(model), test_x, check_trace=False
-            )
-            traced_model = torch.jit.optimize_for_inference(traced_model)
-        else:
-            pred = model(test_x)
-            traced_model = torch.jit.trace(
-                MeanVarModelWrapper(model), test_x, check_trace=False
-            )
-            traced_model = torch.jit.optimize_for_inference(traced_model)
-        if verify:
-            traced_mean, traced_var = traced_model(test_x)
-            assert torch.allclose(pred.mean, traced_mean, rtol=0), (
-                f"JIT traced mean != original {pred.mean=} {traced_mean=}"
-            )
-            assert torch.allclose(pred.variance, traced_var, rtol=0), (
-                f"JIT traced variance != original: {pred.variance=} {traced_var=}"
-            )
-
-    return traced_model.to(**tkwargs)
+            for idx, key in enumerate(active_variable_names):
+                value = center_x.get(key)
+                if value is None:
+                    continue
+                lower_bound = trust_region[0, idx].item()
+                upper_bound = trust_region[1, idx].item()
+                if not (lower_bound <= value <= upper_bound):
+                    raise ValueError(
+                        f"Turbo controller center_x value for {key} : "
+                        f"{value} is outside of trust region bounds "
+                        f"[{lower_bound}, {upper_bound}]"
+                    )
 
 
 def torch_compile_gp_model(
@@ -454,64 +369,30 @@ def torch_compile_gp_model(
     )
     test_x = rand_vec.to(**tkwargs)
 
-    gradctx = nullcontext if grad else torch.no_grad()
-    # TODO: check if gpytorch trace mode faster
+    gradctx = nullcontext() if grad else torch.no_grad()
     with gradctx, gpytorch.settings.fast_pred_var():
         model.eval()
         if posterior:
             pred = model.posterior(test_x)
-            traced_model = torch.compile(
+            compiled_model = torch.compile(
                 model, backend=backend, mode=mode, dynamic=None
             )
-            mvn = traced_model.posterior(test_x)
+            mvn = compiled_model.posterior(test_x)
         else:
             pred = model(test_x)
-            traced_model = torch.compile(
+            compiled_model = torch.compile(
                 model, backend=backend, mode=mode, dynamic=None
             )
-            mvn = traced_model(test_x)
-        traced_mean, traced_var = mvn.mean, mvn.variance
-        assert torch.allclose(pred.mean, traced_mean, rtol=0), (
-            f"Compiled mean != original {pred.mean=} {traced_mean=}"
+            mvn = compiled_model(test_x)
+        compiled_mean, compiled_var = mvn.mean, mvn.variance
+        assert torch.allclose(pred.mean, compiled_mean, rtol=0), (
+            f"Compiled mean != original {pred.mean=} {compiled_mean=}"
         )
-        assert torch.allclose(pred.variance, traced_var, rtol=0), (
-            f"Compiled variance != original: {pred.variance=} {traced_var=}"
+        assert torch.allclose(pred.variance, compiled_var, rtol=0), (
+            f"Compiled variance != original: {pred.variance=} {compiled_var=}"
         )
 
-    return traced_model
-
-
-def torch_trace_acqf(
-    acq: AcquisitionFunction, vocs: VOCS, tkwargs: dict
-) -> torch.jit.ScriptModule:
-    """
-    Trace an acquisition function using torch.jit.trace.
-
-    Parameters
-    ----------
-    acq : AcquisitionFunction
-        The acquisition function to trace.
-    vocs : VOCS
-        VOCS
-    tkwargs : dict
-        The keyword arguments for the torch tensor.
-    """
-    # Note that this is very fragile for when we mix q=1 and q>1 because tensors ndims changes
-    rand_point = random_inputs(vocs)[0]
-    rand_vec = torch.stack(
-        [rand_point[k] * torch.ones(1) for k in vocs.variable_names], dim=1
-    )
-    test_x = rand_vec.to(**tkwargs)
-    test_x = test_x.unsqueeze(-2)
-    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
-        # Need dummy evaluation to set caches
-        acq(test_x.clone().detach())
-        saqcf = torch.jit.trace(
-            acq,
-            example_inputs=test_x.clone().detach(),
-            check_trace=False,
-        )
-    return saqcf
+    return compiled_model
 
 
 def torch_compile_acqf(
@@ -540,10 +421,9 @@ def torch_compile_acqf(
     verify : bool, optional
         If True, do the verification vs eager mode.
     """
-    # TODO: check if trace mode better
     # NOTE: is verify is False, you need to ensure tensors are copied before calling
     # or RuntimeError: Error: accessing tensor output of CUDAGraphs that has been overwritten by a subsequent run
-    with gpytorch.settings.fast_pred_var(), gpytorch.settings.trace_mode():
+    with gpytorch.settings.fast_pred_var():
         # assume that only a few shapes will happen - batch=1 and batch=nsamples
         saqcf = torch.compile(acq, backend=backend, mode=mode, dynamic=False)
         if verify:

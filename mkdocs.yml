@@ -42,6 +42,7 @@ nav:
                 - Noisy Bayesian optimization: examples/single_objective_bayes_opt/noisy_bo_tutorial.ipynb
                 - Fast model evaluation: examples/single_objective_bayes_opt/fast_model_eval.ipynb
                 - Hessian kernel: examples/single_objective_bayes_opt/hessian_kernel.ipynb
+                - Contextual Bayesian optimization: examples/single_objective_bayes_opt/contextual_bo.ipynb
             - Trust Region Bayesian Optimization:
                 - Basic example: examples/trust_region_bo/turbo_basics.ipynb
                 - Optimization: examples/trust_region_bo/turbo_optimize.ipynb

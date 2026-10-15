@@ -54,7 +54,7 @@ class TestXopt:
 
         # init with yaml
         YAML = """
-        dump_file: null
+        xopt_dump_file: null
         data: null
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -107,7 +107,7 @@ class TestXopt:
         """
         # init with yaml
         YAML = """
-        dump_file: null
+        xopt_dump_file: null
         data: null
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -151,7 +151,7 @@ class TestXopt:
         """
         # init with yaml
         YAML = """
-        dump_file: null
+        xopt_dump_file: null
         data: null
         evaluator:
             function: xopt.resources.test_functions.tnk.evaluate_TNK
@@ -492,7 +492,7 @@ class TestXopt:
             generator=generator,
             evaluator=evaluator,
         )
-        X.dump_file = "test_checkpointing.yaml"
+        X.xopt_dump_file = "test_checkpointing.yaml"
 
         # test case with exploded data
         data = pd.DataFrame(
@@ -525,7 +525,7 @@ class TestXopt:
             generator=generator,
             evaluator=evaluator,
         )
-        X.dump_file = "test_checkpointing.yaml"
+        X.xopt_dump_file = "test_checkpointing.yaml"
 
         X.step()
 
@@ -533,12 +533,131 @@ class TestXopt:
             X.step()
 
         # try to load the state from nothing
-        X2 = Xopt.from_file(X.dump_file)
+        X2 = Xopt.from_file(X.xopt_dump_file)
 
         assert len(X2.data) == 6
         assert isinstance(X2.generator, RandomGenerator)
         assert isinstance(X2.evaluator, Evaluator)
         assert X.vocs == X2.vocs
+
+    def test_dump_file_legacy_name(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X = Xopt(
+                generator=generator,
+                evaluator=evaluator,
+                dump_file="test_checkpointing.yaml",
+            )
+        assert X.xopt_dump_file == "test_checkpointing.yaml"
+
+        YAML = """
+        dump_file: test_checkpointing.yaml
+        evaluator:
+            function: xopt.resources.test_functions.tnk.evaluate_TNK
+
+        generator:
+            name: random
+            vocs:
+                variables:
+                    x1: [0, 3.14159]
+                    x2: [0, 3.14159]
+                objectives: {y1: MINIMIZE}
+        """
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X = Xopt(YAML)
+        assert X.xopt_dump_file == "test_checkpointing.yaml"
+
+    def test_dump_file_legacy_property(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file="test_checkpointing.yaml",
+        )
+
+        # Reading through the old name warns and gives the current value
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            assert X.dump_file == "test_checkpointing.yaml"
+
+        # Assigning through the old name warns and writes through
+        with pytest.warns(DeprecationWarning, match="renamed to `xopt_dump_file`"):
+            X.dump_file = "other_checkpointing.yaml"
+        assert X.xopt_dump_file == "other_checkpointing.yaml"
+
+    def test_dump_file_legacy_conflict(self):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        with pytest.raises(ValidationError):
+            Xopt(
+                generator=generator,
+                evaluator=evaluator,
+                dump_file="legacy.yaml",
+                xopt_dump_file="test_checkpointing.yaml",
+            )
+
+    def test_data_dump_file(self, tmp_path):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        data_dump_file = str(tmp_path / "data.csv")
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            data_dump_file=data_dump_file,
+        )
+        X.random_evaluate(3)
+
+        assert os.path.exists(data_dump_file)
+        dumped_data = pd.read_csv(data_dump_file, index_col="xopt_index")
+        pd.testing.assert_frame_equal(
+            dumped_data, X.data, check_dtype=False, check_names=False
+        )
+
+        # dumping directly writes the same data
+        os.remove(data_dump_file)
+        X.dump_data()
+        dumped_data = pd.read_csv(data_dump_file, index_col="xopt_index")
+        pd.testing.assert_frame_equal(
+            dumped_data, X.data, check_dtype=False, check_names=False
+        )
+
+    def test_dump_file_expandvars(self, tmp_path, monkeypatch):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        monkeypatch.setenv("XOPT_TEST_DUMP_DIR", str(tmp_path))
+        X = Xopt(
+            generator=generator,
+            evaluator=evaluator,
+            xopt_dump_file="$XOPT_TEST_DUMP_DIR/dump.yml",
+            data_dump_file="$XOPT_TEST_DUMP_DIR/data.csv",
+        )
+        X.random_evaluate(1)
+
+        assert os.path.exists(tmp_path / "dump.yml")
+        assert os.path.exists(tmp_path / "data.csv")
+
+    def test_dump_without_files(self, tmp_path):
+        evaluator = Evaluator(function=xtest_callable)
+        generator = RandomGenerator(vocs=deepcopy(TEST_VOCS_BASE))
+
+        X = Xopt(generator=generator, evaluator=evaluator)
+
+        # no dump files specified, evaluation should not write anything or raise
+        X.random_evaluate(1)
+        assert not list(tmp_path.iterdir())
+
+        # dumping explicitly requires a destination
+        with pytest.raises(ValueError):
+            X.dump()
+
+        with pytest.raises(ValueError):
+            X.dump_data()
 
     def test_random_evaluate(self):
         evaluator = Evaluator(function=xtest_callable)
