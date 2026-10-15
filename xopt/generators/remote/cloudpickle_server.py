@@ -10,9 +10,13 @@ ONLY suitable for trusted, isolated clients; do not expose it publicly.
 """
 
 import base64
+import io
+import pickle
 import uuid
 
 import cloudpickle
+import torch
+from types import SimpleNamespace
 from fastapi import HTTPException
 from pydantic import BaseModel
 
@@ -67,4 +71,32 @@ def get_cloudpickle_state(session_id: str):
     The client uses this response to refresh its local generator mirror.
     """
     obj = upstream._get_session(session_id)
-    return {"payload": base64.b64encode(cloudpickle.dumps(obj)).decode("ascii")}
+
+    # Serialize the live generator without modifying its CUDA tensors.
+    # A separate CPU-safe snapshot is needed for CPU-only HTTP clients.
+    #
+    # PyTorch's map_location applies to tensor storage throughout the
+    # serialized object, including fitted GP models and BAX results.
+    # Cloudpickle supplies the Pickler; standard pickle supplies the
+    # Unpickler required by torch.load().
+    cloudpickle_adapter = SimpleNamespace(
+        Pickler=cloudpickle.CloudPickler,
+        Unpickler=pickle.Unpickler,
+        HIGHEST_PROTOCOL=pickle.HIGHEST_PROTOCOL,
+        __name__="cloudpickle_adapter",
+    )
+
+    buffer = io.BytesIO()
+    torch.save(obj, buffer, pickle_module=cloudpickle_adapter)
+    buffer.seek(0)
+
+    snapshot = torch.load(
+        buffer,
+        map_location="cpu",
+        weights_only=False,
+        pickle_module=cloudpickle_adapter,
+    )
+
+    # The snapshot is independent of the live GPU generator.
+    payload = base64.b64encode(cloudpickle.dumps(snapshot)).decode("ascii")
+    return {"payload": payload}

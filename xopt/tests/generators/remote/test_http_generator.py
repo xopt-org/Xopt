@@ -529,3 +529,94 @@ def test_cloudpickle_round_trips_notebook_local_prior(cloudpickle_server_url):
         torch.testing.assert_close(actual, expected)
     finally:
         remote.finalize()
+
+
+@pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="CUDA GPU required for cross-device snapshot test",
+)
+def test_cloudpickle_cuda_snapshot_preserves_live_generator():
+    """Export CUDA tensors to CPU without modifying the live generator."""
+    import base64
+
+    import cloudpickle
+
+    from xopt.generators.remote import server as upstream
+    from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
+
+    class CUDAState:
+        def __init__(self):
+            self.model = torch.nn.Linear(2, 1).cuda()
+            self.algorithm_results = {
+                "input_execution_paths": torch.ones(3, 2, device="cuda"),
+                "output_execution_paths": torch.ones(3, 1, device="cuda"),
+            }
+
+    live = CUDAState()
+    session_id = "cuda-snapshot-regression"
+
+    with upstream._lock:
+        upstream._sessions[session_id] = live
+
+    try:
+        response = get_cloudpickle_state(session_id)
+        snapshot = cloudpickle.loads(base64.b64decode(response["payload"]))
+
+        assert next(snapshot.model.parameters()).device.type == "cpu"
+        assert snapshot.algorithm_results["input_execution_paths"].device.type == "cpu"
+        assert snapshot.algorithm_results["output_execution_paths"].device.type == "cpu"
+
+        assert next(live.model.parameters()).device.type == "cuda"
+        assert live.algorithm_results["input_execution_paths"].device.type == "cuda"
+        assert live.algorithm_results["output_execution_paths"].device.type == "cuda"
+
+        assert snapshot is not live
+    finally:
+        with upstream._lock:
+            upstream._sessions.pop(session_id, None)
+
+
+def test_cloudpickle_cpu_snapshot_preserves_live_generator():
+    """A CPU snapshot must not share mutable state with the live generator."""
+    import base64
+
+    import cloudpickle
+
+    from xopt.generators.remote import server as upstream
+    from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
+
+    class CPUState:
+        def __init__(self):
+            self.model = torch.nn.Linear(2, 1)
+            self.algorithm_results = {
+                "input_execution_paths": torch.ones(3, 2),
+            }
+
+    live = CPUState()
+    session_id = "cpu-snapshot-regression"
+
+    with upstream._lock:
+        upstream._sessions[session_id] = live
+
+    try:
+        response = get_cloudpickle_state(session_id)
+        snapshot = cloudpickle.loads(base64.b64decode(response["payload"]))
+
+        assert snapshot is not live
+        assert snapshot.model is not live.model
+        assert next(snapshot.model.parameters()).device.type == "cpu"
+
+        snapshot.algorithm_results["input_execution_paths"].zero_()
+        assert torch.all(
+            live.algorithm_results["input_execution_paths"] == 1
+        )
+
+        with torch.no_grad():
+            next(snapshot.model.parameters()).zero_()
+
+        assert not torch.all(
+            next(live.model.parameters()) == 0
+        )
+    finally:
+        with upstream._lock:
+            upstream._sessions.pop(session_id, None)
