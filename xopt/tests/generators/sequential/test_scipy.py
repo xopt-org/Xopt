@@ -1,5 +1,6 @@
 import copy
 import json
+import pickle
 from unittest.mock import patch
 
 import numpy as np
@@ -296,6 +297,51 @@ class TestScipyGenerator:
         assert copied.data is not gen.data
         assert copied._last_outcome == pytest.approx(gen._last_outcome)
         assert copied._cache == copied._build_cache()
+
+    def test_deepcopy_active_generator_preserves_sequential_state(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(
+            vocs=vocs,
+            method="Powell",
+            initial_point={"x0": 0.5, "x1": -0.5},
+        )
+        gen.set_data(pd.DataFrame(columns=["x0", "x1", "y"]))
+        candidate = gen.generate(1)[0]
+
+        copied = copy.deepcopy(gen)
+        assert copied.is_active
+        assert copied._data_set
+        assert copied._last_candidate == [candidate]
+
+        copied.add_data(pd.DataFrame([{**candidate, "y": sphere(candidate)["y"]}]))
+        assert len(copied.data) == 1
+
+        copied.reset()
+        gen.reset()
+
+    def test_pickle_does_not_stop_active_session(self):
+        vocs = VOCS(
+            variables={"x0": [-5, 5], "x1": [-5, 5]},
+            objectives={"y": "MINIMIZE"},
+        )
+        gen = ScipyGenerator(
+            vocs=vocs,
+            method="Powell",
+            initial_point={"x0": 0.5, "x1": -0.5},
+        )
+        gen.generate(1)
+        session_thread = gen._session_thread
+        assert session_thread is not None and session_thread.is_alive()
+
+        serialized = pickle.dumps(gen)
+
+        assert serialized
+        assert gen._session_thread is session_thread
+        assert session_thread.is_alive()
+        gen.reset()
 
     def test_state_roundtrip_rebuilds_runtime_state_and_last_outcome(self):
         vocs = VOCS(

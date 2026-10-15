@@ -1,3 +1,4 @@
+import copy
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
 from typing import Any, Dict, List, Optional
@@ -116,18 +117,19 @@ class ScipyGenerator(SequentialGenerator):
     def __deepcopy__(self, memo):
         """Create a safe deep copy without sharing runtime thread/session objects."""
         copied = self.__class__.model_validate(self.model_dump())
+        memo[id(self)] = copied
         if self.data is not None:
             copied.data = self.data.copy(deep=True)
-            copied._last_outcome = self._last_outcome
-            copied._cache = copied._build_cache()
+        copied._last_candidate = copy.deepcopy(self._last_candidate, memo)
+        copied._data_set = self._data_set
+        copied._last_outcome = self._last_outcome
+        copied._cache = copied._build_cache()
         return copied
 
     def __getstate__(self):
-        """Return pickle state while removing non-picklable runtime session objects."""
-        # Do not pickle active threading primitives. Runtime session will be rebuilt.
-        self._stop_session()
-        state = super().__getstate__()
-        private = state.get("__pydantic_private__", {}) or {}
+        """Snapshot pickle state without stopping the live runtime session."""
+        state = super().__getstate__().copy()
+        private = dict(state.get("__pydantic_private__", {}) or {})
 
         for key in self._runtime_private_attr_names:
             private.pop(key, None)
