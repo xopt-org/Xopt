@@ -2,6 +2,7 @@ import copy
 import json
 import pickle
 import warnings
+from threading import Event
 from unittest.mock import patch
 
 import numpy as np
@@ -299,7 +300,10 @@ class TestScipyGenerator:
         assert copied._last_outcome == pytest.approx(gen._last_outcome)
         assert copied._cache == copied._build_cache()
 
-    def test_deepcopy_active_generator_preserves_sequential_state(self):
+    @pytest.mark.parametrize(
+        "roundtrip", [copy.deepcopy, lambda gen: pickle.loads(pickle.dumps(gen))]
+    )
+    def test_copy_active_generator_preserves_sequential_state(self, roundtrip):
         vocs = VOCS(
             variables={"x0": [-5, 5], "x1": [-5, 5]},
             objectives={"y": "MINIMIZE"},
@@ -312,13 +316,19 @@ class TestScipyGenerator:
         gen.set_data(pd.DataFrame(columns=["x0", "x1", "y"]))
         candidate = gen.generate(1)[0]
 
-        copied = copy.deepcopy(gen)
+        copied = roundtrip(gen)
         assert copied.is_active
         assert copied._data_set
         assert copied._last_candidate == [candidate]
 
         copied.add_data(pd.DataFrame([{**candidate, "y": sphere(candidate)["y"]}]))
         assert len(copied.data) == 1
+        assert copied._pending_request is None
+        assert copied._response_queue.empty()
+        requested_key = copied._point_key(np.array([candidate["x0"], candidate["x1"]]))
+        assert copied._build_cache()[requested_key] == sphere(candidate)["y"]
+        assert gen._pending_request == requested_key
+        assert gen.data.empty
 
         copied.reset()
         gen.reset()
@@ -399,7 +409,15 @@ class TestScipyGenerator:
         gen._stop_event.set()
 
         with pytest.raises(_StopSession):
-            gen._objective(np.array([0.0, 0.0]))
+            gen._objective(
+                np.array([0.0, 0.0]),
+                stop_event=gen._stop_event,
+                request_queue=gen._request_queue,
+                response_queue=gen._response_queue,
+                cache=gen._cache,
+                cache_lock=gen._cache_lock,
+                stop_token=gen._stop_token,
+            )
 
     def test_add_data_empty_dataframe(self):
         vocs = VOCS(
@@ -410,6 +428,127 @@ class TestScipyGenerator:
         # _add_data with empty dataframe should return early without error
         gen._add_data(pd.DataFrame())
         assert gen._last_outcome is None
+
+    def test_duplicate_add_data_answers_each_request_once(self):
+        gen = ScipyGenerator(
+            vocs=VOCS(
+                variables={"x0": [-5, 5], "x1": [-5, 5]},
+                objectives={"y": "MINIMIZE"},
+            ),
+            initial_point={"x0": 1.0, "x1": 1.0},
+        )
+        outcomes = []
+
+        def minimize_sequence(objective, x0, **kwargs):
+            for point in ([1.0, 1.0], [2.0, 2.0]):
+                outcomes.append(objective(np.array(point)))
+            return OptimizeResult(success=True, message="Finished")
+
+        with patch("xopt.generators.sequential.scipy.minimize", minimize_sequence):
+            try:
+                candidate = gen.generate(1)[0]
+                gen.add_data(pd.DataFrame([{**candidate, "y": 10.0}]))
+                gen.add_data(pd.DataFrame([{**candidate, "y": 999.0}]))
+                candidate = gen.generate(1)[0]
+                gen.add_data(pd.DataFrame([{**candidate, "y": 20.0}]))
+                gen._session_thread.join(timeout=2.0)
+                assert outcomes == [10.0, 20.0]
+                assert gen._response_queue.empty()
+            finally:
+                gen.reset()
+
+    @pytest.mark.parametrize("late_action", ["objective", "result", "exception"])
+    def test_timed_out_worker_cannot_poison_new_session(self, late_action):
+        gen = ScipyGenerator(
+            vocs=VOCS(
+                variables={"x0": [-5, 5], "x1": [-5, 5]},
+                objectives={"y": "MINIMIZE"},
+            ),
+            initial_point={"x0": 1.0, "x1": 1.0},
+        )
+        entered = Event()
+        release = Event()
+
+        def delayed_minimize(objective, x0, **kwargs):
+            entered.set()
+            assert release.wait(timeout=10.0)
+            if late_action == "objective":
+                objective(np.array([4.0, 4.0]))
+            elif late_action == "exception":
+                raise ValueError("stale worker exception")
+            return OptimizeResult(success=True, message="Stale result")
+
+        old_thread = None
+        new_thread = None
+        queues = []
+        try:
+            with patch("xopt.generators.sequential.scipy.minimize", delayed_minimize):
+                gen._start_session_if_needed()
+                old_thread = gen._session_thread
+                queues.append(gen._response_queue)
+                assert entered.wait(timeout=2.0)
+                with (
+                    patch.object(old_thread, "join", return_value=None),
+                    pytest.warns(RuntimeWarning, match="remains isolated"),
+                ):
+                    gen.reset()
+
+            gen.generate(1)
+            new_thread = gen._session_thread
+            queues.append(gen._response_queue)
+            release.set()
+            old_thread.join(timeout=2.0)
+
+            assert not old_thread.is_alive()
+            assert new_thread.is_alive()
+            assert gen.result is None
+            assert gen._session_exception is None
+            assert not gen._session_finished
+            assert gen._request_queue.empty()
+            assert gen._response_queue.empty()
+            assert gen._point_key(np.array([4.0, 4.0])) not in gen._cache
+        finally:
+            release.set()
+            for queue in queues:
+                queue.put(gen._stop_token)
+                queue.put(gen._stop_token)
+            gen.reset()
+            if old_thread is not None:
+                old_thread.join(timeout=2.0)
+            if new_thread is not None:
+                new_thread.join(timeout=2.0)
+
+    def test_requested_points_survive_readback_and_restart(self):
+        gen = ScipyGenerator(
+            vocs=VOCS(
+                variables={"x0": [-5, 5], "x1": [-5, 5]},
+                objectives={"y": "MINIMIZE"},
+            ),
+            initial_point={"x0": 1.0, "x1": 1.0},
+        )
+        try:
+            candidate = gen.generate(1)[0]
+            readback = {name: value * (1.0 + 5e-7) for name, value in candidate.items()}
+            gen.add_data(pd.DataFrame([{**readback, "y": 2.0}]))
+            requested_key = gen._point_key(np.array(list(candidate.values())))
+            assert gen._build_cache()[requested_key] == 2.0
+            gen.reset()
+            restored_generators = [
+                gen,
+                copy.deepcopy(gen),
+                pickle.loads(pickle.dumps(gen)),
+            ]
+            for restored in restored_generators:
+                try:
+                    assert restored.generate(1)[0] != candidate
+                finally:
+                    restored.reset()
+        finally:
+            gen.reset()
+
+        gen.set_data(pd.DataFrame([{**readback, "y": 3.0}]))
+        assert requested_key not in gen._build_cache()
+        assert gen._pending_request is None
 
     def test_unknown_solver_raises_validation_error(self):
         YAML = """

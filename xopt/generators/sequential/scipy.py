@@ -1,5 +1,6 @@
 import copy
 import warnings
+from functools import partial
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
 from typing import Any, Dict, List, Optional
@@ -78,6 +79,8 @@ class ScipyGenerator(SequentialGenerator):
     # Internal state
     _last_outcome: Optional[float] = None
     _cache: Dict[tuple, float] = PrivateAttr(default_factory=dict)
+    _requested_cache: Dict[tuple, float] = PrivateAttr(default_factory=dict)
+    _pending_request: Optional[tuple] = PrivateAttr(default=None)
     _cache_lock: Lock = PrivateAttr(default_factory=Lock)
     _request_queue: Queue = PrivateAttr(default_factory=Queue)
     _response_queue: Queue = PrivateAttr(default_factory=Queue)
@@ -126,6 +129,8 @@ class ScipyGenerator(SequentialGenerator):
         copied._last_candidate = copy.deepcopy(self._last_candidate, memo)
         copied._data_set = self._data_set
         copied._last_outcome = self._last_outcome
+        copied._requested_cache = copy.deepcopy(self._requested_cache, memo)
+        copied._pending_request = self._pending_request
         copied._cache = copied._build_cache()
         copied._result = copy.deepcopy(self._result, memo)
         copied._completion_warned = self._completion_warned
@@ -195,6 +200,7 @@ class ScipyGenerator(SequentialGenerator):
         """Replace the full dataset and refresh cache/session-dependent internal state."""
         self._stop_session()
         self.data = data
+        self._requested_cache = {}
         if len(data) > 0:
             objective_data = get_objective_data(self.vocs, data).to_numpy()[:, 0]
             self._last_outcome = float(objective_data[-1])
@@ -209,17 +215,23 @@ class ScipyGenerator(SequentialGenerator):
 
         x_value = get_variable_data(self.vocs, new_data).to_numpy(dtype=float)[-1]
         with self._cache_lock:
-            self._cache[self._point_key(x_value)] = self._last_outcome
-
-        if self._session_thread is not None and self._session_thread.is_alive():
-            self._response_queue.put(self._last_outcome)
+            observed_key = self._point_key(x_value)
+            self._cache[observed_key] = self._requested_cache.get(
+                observed_key, self._last_outcome
+            )
+            if self._pending_request is not None:
+                self._requested_cache[self._pending_request] = self._last_outcome
+                self._cache[self._pending_request] = self._last_outcome
+                self._pending_request = None
+                if self._session_thread is not None and self._session_thread.is_alive():
+                    self._response_queue.put(self._last_outcome)
 
     def _point_key(self, x: np.ndarray, decimals: int = 12) -> tuple:
         """Convert a floating-point vector to a rounded hashable cache key."""
         return tuple(np.round(np.array(x, dtype=float), decimals=decimals))
 
     def _build_cache(self) -> dict[tuple, float]:
-        """Build objective cache from ``self.data`` keyed by rounded variable vectors."""
+        """Combine observed history with exact requested-coordinate objective values."""
         if self.data is None or len(self.data) == 0:
             return {}
 
@@ -227,7 +239,9 @@ class ScipyGenerator(SequentialGenerator):
         x_data = get_variable_data(self.vocs, self.data).to_numpy(dtype=float)
         y_data = get_objective_data(self.vocs, self.data).to_numpy()[:, 0]
 
-        return {self._point_key(x): float(y) for x, y in zip(x_data, y_data)}
+        cache = {self._point_key(x): float(y) for x, y in zip(x_data, y_data)}
+        cache.update(self._requested_cache)
+        return cache
 
     def _map_value_error(self, ex: ValueError) -> Optional[RuntimeError]:
         """Map scipy ``ValueError`` messages to clearer runtime configuration errors."""
@@ -255,33 +269,51 @@ class ScipyGenerator(SequentialGenerator):
                 raise mapped from ex
         raise ex
 
-    def _objective(self, x: np.ndarray) -> float:
+    def _objective(
+        self,
+        x: np.ndarray,
+        *,
+        stop_event: Event,
+        request_queue: Queue,
+        response_queue: Queue,
+        cache: Dict[tuple, float],
+        cache_lock: Lock,
+        stop_token: object,
+    ) -> float:
         """Objective callback used by scipy.
 
         This method first serves values from cache. For uncached points, it sends
         the requested point to the main thread and blocks until the corresponding
         externally evaluated objective value is provided.
         """
-        if self._stop_event.is_set():
+        if stop_event.is_set():
             raise _StopSession()
 
         key = self._point_key(x)
-        with self._cache_lock:
-            if key in self._cache:
-                return self._cache[key]
+        with cache_lock:
+            if key in cache:
+                return cache[key]
 
-        self._request_queue.put(np.array(x, dtype=float))
-        response = self._response_queue.get()
+        request_queue.put(np.array(x, dtype=float))
+        response = response_queue.get()
 
-        if response is self._stop_token or self._stop_event.is_set():
+        if response is stop_token or stop_event.is_set():
             raise _StopSession()
 
         y_value = float(response)
-        with self._cache_lock:
-            self._cache[key] = y_value
+        with cache_lock:
+            cache[key] = y_value
         return y_value
 
-    def _run_session(self):
+    def _run_session(
+        self,
+        stop_event: Event,
+        request_queue: Queue,
+        response_queue: Queue,
+        cache: Dict[tuple, float],
+        cache_lock: Lock,
+        stop_token: object,
+    ):
         """Run one persistent ``scipy.optimize.minimize`` session in a worker thread."""
         mins, maxs = np.array(self.vocs.bounds).T
         bounds = list(zip(mins, maxs))
@@ -294,14 +326,30 @@ class ScipyGenerator(SequentialGenerator):
             **self.scipy_kwargs,
         }
 
+        objective = partial(
+            self._objective,
+            stop_event=stop_event,
+            request_queue=request_queue,
+            response_queue=response_queue,
+            cache=cache,
+            cache_lock=cache_lock,
+            stop_token=stop_token,
+        )
         try:
-            self._result = minimize(self._objective, self.x0, **minimize_kwargs)
+            result = minimize(objective, self.x0, **minimize_kwargs)
+            with cache_lock:
+                if self._stop_event is stop_event and not stop_event.is_set():
+                    self._result = result
         except _StopSession:
             pass
         except Exception as ex:
-            self._session_exception = ex
+            with cache_lock:
+                if self._stop_event is stop_event and not stop_event.is_set():
+                    self._session_exception = ex
         finally:
-            self._session_finished = True
+            with cache_lock:
+                if self._stop_event is stop_event and not stop_event.is_set():
+                    self._session_finished = True
 
     def _start_session_if_needed(self):
         """Start the worker minimize session if one is not currently active."""
@@ -310,28 +358,48 @@ class ScipyGenerator(SequentialGenerator):
         if self._session_thread is not None and self._session_thread.is_alive():
             return
 
-        self._stop_event.clear()
+        self._stop_event = Event()
         self._session_exception = None
         self._session_finished = False
         self._request_queue = Queue()
         self._response_queue = Queue()
         self._cache = self._build_cache()
 
-        self._session_thread = Thread(target=self._run_session, daemon=True)
+        self._session_thread = Thread(
+            target=self._run_session,
+            args=(
+                self._stop_event,
+                self._request_queue,
+                self._response_queue,
+                self._cache,
+                self._cache_lock,
+                self._stop_token,
+            ),
+            daemon=True,
+        )
         self._session_thread.start()
 
     def _stop_session(self):
         """Request worker shutdown and reset transient synchronization primitives."""
-        self._stop_event.set()
+        with self._cache_lock:
+            self._stop_event.set()
         if self._session_thread is not None and self._session_thread.is_alive():
             self._response_queue.put(self._stop_token)
             self._session_thread.join(timeout=2.0)
+            if self._session_thread.is_alive():
+                warnings.warn(
+                    "scipy worker did not stop within 2 seconds; "
+                    "it remains isolated from subsequent sessions.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
 
         self._session_thread = None
         self._session_exception = None
         self._session_finished = False
         self._result = None
         self._completion_warned = False
+        self._pending_request = None
         self._request_queue = Queue()
         self._response_queue = Queue()
         self._stop_event = Event()
@@ -349,6 +417,7 @@ class ScipyGenerator(SequentialGenerator):
 
             try:
                 requested_x = self._request_queue.get(timeout=0.05)
+                self._pending_request = self._point_key(requested_x)
                 inputs = dict(zip(self.vocs.variable_names, requested_x.tolist()))
                 if self.vocs.constants is not None:
                     inputs.update(self.vocs.constants)
