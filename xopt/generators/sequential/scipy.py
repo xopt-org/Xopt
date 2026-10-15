@@ -35,7 +35,7 @@ class ScipyGenerator(SequentialGenerator):
 
     Integration model
     -----------------
-    Xopt uses ask/tell semantics (one new point per ``step``), while scipy
+    Xopt uses ingest/suggest semantics (one new point per ``step``), while scipy
     ``minimize`` expects direct access to objective evaluations. This class bridges
     the two by running one persistent ``minimize`` call in a worker thread:
 
@@ -44,15 +44,26 @@ class ScipyGenerator(SequentialGenerator):
          checks the cache.
     3. If scipy asks for an unseen point, send that point to Xopt and block until
          Xopt provides the external objective value.
-    4. Continue the same scipy run from in-memory state until convergence.
+    4. Continue the same scipy run from in-memory state until termination.
 
     Performance implications
     ------------------------
-    - ``_build_cache`` is O(N) in number of past evaluations and is executed when the
-        persistent session starts.
+    - ``_build_cache`` is O(N + R), where N counts history rows and R counts
+        requested-coordinate cache entries. It runs when a session starts,
+        data is replaced, or state is copied or serialized.
     - The active scipy run is maintained in memory between ``step`` calls.
     - Point keys are rounded (12 decimals) before cache lookup to avoid fragile
         floating-point equality checks.
+
+    Session lifecycle
+    -----------------
+    Each worker retains its own stop event, queues, and cache; the cache lock is
+    shared across sessions. A stopped worker may finish numeric work later, but
+    cannot publish status or exchange requests/responses with a newer session.
+    Each delivered worker request has at most one response sent back to scipy.
+    A returned OptimizeResult is latched through ``result`` and ``is_done`` until
+    reset or data replacement. Subsequent generation warns once and returns the
+    last data row, or raises if no evaluated data is available.
 
     """
 
@@ -79,7 +90,9 @@ class ScipyGenerator(SequentialGenerator):
     # Internal state
     _last_outcome: Optional[float] = None
     _cache: Dict[tuple, float] = PrivateAttr(default_factory=dict)
+    # Preserve answers at requested coordinates, even if observed readbacks differ.
     _requested_cache: Dict[tuple, float] = PrivateAttr(default_factory=dict)
+    # Rounded coordinates of the delivered candidate still awaiting its first answer.
     _pending_request: Optional[tuple] = PrivateAttr(default=None)
     _cache_lock: Lock = PrivateAttr(default_factory=Lock)
     _request_queue: Queue = PrivateAttr(default_factory=Queue)
@@ -105,7 +118,7 @@ class ScipyGenerator(SequentialGenerator):
 
     @field_validator("method")
     def validate_method(cls, v: str):
-        """Ensure scipy method names are not empty after whitespace normalization."""
+        """Strip whitespace and require a method from the bounded-method allowlist."""
         value = v.strip()
         if value not in BOUNDED_METHODS:
             raise ValueError(
@@ -121,7 +134,13 @@ class ScipyGenerator(SequentialGenerator):
         return v
 
     def __deepcopy__(self, memo):
-        """Create a safe deep copy without sharing runtime thread/session objects."""
+        """Copy logical optimization state without copying a running worker.
+
+        Private sequential state is absent from ``model_dump`` and must be
+        restored explicitly so a copy can accept an outstanding candidate's
+        evaluation. An unfinished optimization restarts lazily using its cache;
+        a completed copy keeps its result and does not start another worker.
+        """
         copied = self.__class__.model_validate(self.model_dump())
         memo[id(self)] = copied
         if self.data is not None:
@@ -137,8 +156,14 @@ class ScipyGenerator(SequentialGenerator):
         return copied
 
     def __getstate__(self):
-        """Snapshot pickle state without stopping the live runtime session."""
+        """Snapshot replayable state without stopping the original worker.
+
+        Synchronization objects and worker status are process-local. Candidate,
+        requested-coordinate cache, and completed-result state remain picklable
+        so restoration can resume the ingest/suggest contract without sharing a worker.
+        """
         state = super().__getstate__().copy()
+        # Filtering a copied mapping must not remove the live object's primitives.
         private = dict(state.get("__pydantic_private__", {}) or {})
 
         for key in self._runtime_private_attr_names:
@@ -149,7 +174,11 @@ class ScipyGenerator(SequentialGenerator):
         return state
 
     def __setstate__(self, state):
-        """Restore pickle state and rebuild transient runtime synchronization objects."""
+        """Restore logical state with fresh, idle synchronization objects.
+
+        Pending evaluations can still be ingested before generation resumes.
+        No response is queued until a new worker has delivered a request.
+        """
         super().__setstate__(state)
         self._cache_lock = Lock()
         self._request_queue = Queue()
@@ -167,12 +196,20 @@ class ScipyGenerator(SequentialGenerator):
 
     @property
     def result(self) -> Optional[OptimizeResult]:
-        """The scipy result after termination, or None while optimization is pending."""
+        """Return scipy's termination result, or None before it is available.
+
+        Inspect ``success`` and ``message`` to distinguish convergence from
+        iteration limits or other solver-reported failures.
+        """
         return self._result
 
     @property
     def is_done(self) -> bool:
-        """Whether scipy has terminated, successfully or otherwise."""
+        """Whether scipy returned an OptimizeResult, successful or otherwise.
+
+        Worker exceptions and cooperative shutdown do not produce a result and
+        therefore do not set this flag.
+        """
         return self._result is not None
 
     @property
@@ -192,12 +229,16 @@ class ScipyGenerator(SequentialGenerator):
         return self._get_initial_point()[0]
 
     def _reset(self):
-        """Reset active session state while keeping existing evaluated observations."""
+        """Clear session/completion state while retaining history and replay values."""
         self._stop_session()
         self._last_outcome = None
 
     def _set_data(self, data: pd.DataFrame):
-        """Replace the full dataset and refresh cache/session-dependent internal state."""
+        """Replace history and discard request mappings belonging to the old dataset.
+
+        Unlike reset, replacement cannot reuse requested-coordinate values:
+        they may no longer correspond to observations in the supplied history.
+        """
         self._stop_session()
         self.data = data
         self._requested_cache = {}
@@ -207,7 +248,14 @@ class ScipyGenerator(SequentialGenerator):
         self._cache = self._build_cache()
 
     def _add_data(self, new_data: pd.DataFrame):
-        """Ingest one new evaluation and optionally unblock a waiting worker objective call."""
+        """Cache an evaluation and answer a delivered request at most once.
+
+        Sequential point validation permits small readback/setpoint differences.
+        Cache the first answer under the requested coordinates as well as the
+        observed coordinates so replay reproduces the values scipy received.
+        Submissions without a pending request remain in history but do not queue
+        responses that could be consumed by a later request.
+        """
         if len(new_data) == 0:
             return
         objective_data = get_objective_data(self.vocs, new_data).to_numpy()[:, 0]
@@ -216,12 +264,14 @@ class ScipyGenerator(SequentialGenerator):
         x_value = get_variable_data(self.vocs, new_data).to_numpy(dtype=float)[-1]
         with self._cache_lock:
             observed_key = self._point_key(x_value)
+            # Protect requested-coordinate answers from later observed-history updates.
             self._cache[observed_key] = self._requested_cache.get(
                 observed_key, self._last_outcome
             )
             if self._pending_request is not None:
                 self._requested_cache[self._pending_request] = self._last_outcome
                 self._cache[self._pending_request] = self._last_outcome
+                # Consume the pending request before waking the worker.
                 self._pending_request = None
                 if self._session_thread is not None and self._session_thread.is_alive():
                     self._response_queue.put(self._last_outcome)
@@ -231,7 +281,11 @@ class ScipyGenerator(SequentialGenerator):
         return tuple(np.round(np.array(x, dtype=float), decimals=decimals))
 
     def _build_cache(self) -> dict[tuple, float]:
-        """Combine observed history with exact requested-coordinate objective values."""
+        """Build an O(N + R) replay cache from N history rows and R requested answers.
+
+        Requested-point answers take precedence over observed history because
+        duplicates and accepted readback differences must not change replay.
+        """
         if self.data is None or len(self.data) == 0:
             return {}
 
@@ -285,6 +339,10 @@ class ScipyGenerator(SequentialGenerator):
         This method first serves values from cache. For uncached points, it sends
         the requested point to the main thread and blocks until the corresponding
         externally evaluated objective value is provided.
+
+        All runtime arguments belong to this worker's session, not necessarily
+        the generator's current session. Never resolve queues, cache, or stop
+        signals through ``self`` here: shutdown may have replaced them already.
         """
         if stop_event.is_set():
             raise _StopSession()
@@ -295,8 +353,10 @@ class ScipyGenerator(SequentialGenerator):
                 return cache[key]
 
         request_queue.put(np.array(x, dtype=float))
+        # Do not hold the cache lock while waiting; add_data needs it to answer.
         response = response_queue.get()
 
+        # The sentinel wakes a blocked callback; the event rejects answers after stop.
         if response is stop_token or stop_event.is_set():
             raise _StopSession()
 
@@ -314,7 +374,12 @@ class ScipyGenerator(SequentialGenerator):
         cache_lock: Lock,
         stop_token: object,
     ):
-        """Run one persistent ``scipy.optimize.minimize`` session in a worker thread."""
+        """Run scipy using session-bound resources and publish only current status.
+
+        Stop-event identity acts as a session token. Publication is guarded by
+        the same lock used to signal shutdown, so an abandoned worker cannot
+        overwrite a newer session's result, exception, or finished flag.
+        """
         mins, maxs = np.array(self.vocs.bounds).T
         bounds = list(zip(mins, maxs))
 
@@ -341,6 +406,7 @@ class ScipyGenerator(SequentialGenerator):
                 if self._stop_event is stop_event and not stop_event.is_set():
                     self._result = result
         except _StopSession:
+            # Cooperative shutdown is not an optimization failure.
             pass
         except Exception as ex:
             with cache_lock:
@@ -352,7 +418,11 @@ class ScipyGenerator(SequentialGenerator):
                     self._session_finished = True
 
     def _start_session_if_needed(self):
-        """Start the worker minimize session if one is not currently active."""
+        """Start an unfinished optimization lazily, replaying previously cached values.
+
+        A retained result latches termination, preventing expensive trajectory
+        replay on every generate call after scipy has already finished.
+        """
         if self.is_done:
             return
         if self._session_thread is not None and self._session_thread.is_alive():
@@ -380,11 +450,20 @@ class ScipyGenerator(SequentialGenerator):
         self._session_thread.start()
 
     def _stop_session(self):
-        """Request worker shutdown and reset transient synchronization primitives."""
+        """Signal shutdown, wait briefly, and detach the session's runtime state.
+
+        Python cannot interrupt scipy numeric work in another thread. If the
+        bounded join expires, warn and leave the old worker's event set; its
+        session-bound resources and guarded status updates isolate it from the
+        replacement session. Evaluation history and requested answers survive.
+        A worker still in numeric code notices the stop on its next objective
+        callback, or has its eventual result/exception discarded.
+        """
         with self._cache_lock:
             self._stop_event.set()
         if self._session_thread is not None and self._session_thread.is_alive():
             self._response_queue.put(self._stop_token)
+            # Joining under the cache lock would block worker shutdown/publication.
             self._session_thread.join(timeout=2.0)
             if self._session_thread.is_alive():
                 warnings.warn(
@@ -408,7 +487,13 @@ class ScipyGenerator(SequentialGenerator):
         """Return the next candidate requested by the live scipy session.
 
         The ``first_gen`` argument is accepted to satisfy the sequential generator
-        interface; candidate selection always follows the active persistent session.
+        interface; new candidates come from the active persistent session.
+
+        Delivery marks a request pending so add_data can answer it once. Queue
+        polling also checks worker failure/termination rather than blocking
+        forever when scipy exits without requesting another evaluation.
+        After termination, retain the historical last-row fallback and warn once:
+        explicit Xopt.step calls will still evaluate and append that duplicate.
         """
         self._start_session_if_needed()
 

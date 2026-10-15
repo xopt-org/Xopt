@@ -1,6 +1,6 @@
 # Scipy Minimize Generator
 
-`ScipyGenerator` exposes scipy's `optimize.minimize` methods through Xopt's sequential ask/tell interface.
+`ScipyGenerator` exposes scipy's `optimize.minimize` methods through Xopt's sequential ingest/suggest interface.
 
 ## Integration Model
 
