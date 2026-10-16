@@ -13,6 +13,7 @@ import base64
 import io
 import pickle
 import uuid
+from contextlib import asynccontextmanager
 
 import cloudpickle
 import torch
@@ -26,6 +27,32 @@ from xopt.generators.remote import server as upstream
 # Extend the *same* FastAPI app so standard HTTPGenerator clients continue to
 # use the unchanged upstream API. Import this module when starting Uvicorn.
 app = upstream.app
+
+
+def _require_cloudpickle_token_on_startup() -> None:
+    """Fail closed before accepting requests capable of unpickling code."""
+    import os
+
+    token = os.environ.get(upstream.AUTH_TOKEN_ENV_VAR)
+    if not token or not token.strip():
+        raise RuntimeError(
+            f"Cloudpickle server requires a nonempty {upstream.AUTH_TOKEN_ENV_VAR}"
+        )
+
+
+# Validate when the ASGI application starts, not when this module is imported.
+# Preserve the upstream application's lifespan for future compatibility.
+_upstream_lifespan = app.router.lifespan_context
+
+
+@asynccontextmanager
+async def _cloudpickle_lifespan(application):
+    _require_cloudpickle_token_on_startup()
+    async with _upstream_lifespan(application) as state:
+        yield state
+
+
+app.router.lifespan_context = _cloudpickle_lifespan
 
 
 class PicklePayload(BaseModel):

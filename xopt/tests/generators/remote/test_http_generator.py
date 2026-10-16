@@ -412,7 +412,7 @@ def _cloudpickle_server():
     url = f"http://127.0.0.1:{port}"
     env = os.environ.copy()
     # Do not inherit an unrelated auth token from the developer's shell.
-    env.pop("XOPT_HTTP_GENERATOR_TOKEN", None)
+    env["XOPT_HTTP_GENERATOR_TOKEN"] = "cloudpickle-test-token"
     command = [
         sys.executable, "-m", "uvicorn", "xopt.generators.remote.cloudpickle_server:app",
         "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
@@ -495,7 +495,10 @@ def test_upstream_rejects_notebook_local_prior(cloudpickle_server_url):
     Either is an expected limitation of the ordinary transport here.
     """
     local_generator, _ = _notebook_generator()
-    remote = UpstreamHTTPGenerator(base_url=cloudpickle_server_url, generator=local_generator)
+    remote = UpstreamHTTPGenerator(
+        base_url=cloudpickle_server_url, generator=local_generator,
+        api_key="cloudpickle-test-token",
+    )
     try:
         with pytest.raises(Exception) as error:
             remote.ingest(_training_data())
@@ -510,7 +513,10 @@ def test_upstream_rejects_notebook_local_prior(cloudpickle_server_url):
 def test_cloudpickle_round_trips_notebook_local_prior(cloudpickle_server_url):
     """Opt-in transport reconstructs and executes the actual custom class."""
     local_generator, prior_type = _notebook_generator()
-    remote = CloudpickleHTTPGenerator(base_url=cloudpickle_server_url, generator=local_generator)
+    remote = CloudpickleHTTPGenerator(
+        base_url=cloudpickle_server_url, generator=local_generator,
+        api_key="cloudpickle-test-token",
+    )
     try:
         remote.ingest(_training_data())
         points = remote.generate(1)
