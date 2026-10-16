@@ -9,6 +9,9 @@ import logging
 import os
 import threading
 import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Iterator
 from typing import Any, Optional
 
 import pandas as pd
@@ -25,7 +28,14 @@ logger = logging.getLogger(__name__)
 # is only appropriate on a trusted/loopback network
 AUTH_TOKEN_ENV_VAR = "XOPT_HTTP_GENERATOR_TOKEN"
 
-_sessions: dict[str, Generator] = {}
+@dataclass
+class GeneratorSession:
+    generator: Generator
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    closed: bool = False
+
+
+_sessions: dict[str, GeneratorSession] = {}
 _lock = threading.Lock()
 
 
@@ -69,12 +79,22 @@ app = FastAPI(
 )
 
 
-def _get_session(session_id: str) -> Generator:
+def _get_session(session_id: str) -> GeneratorSession:
     with _lock:
-        generator = _sessions.get(session_id)
-    if generator is None:
+        session = _sessions.get(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail=f"unknown session {session_id!r}")
-    return generator
+    return session
+
+
+@contextmanager
+def _locked_session(session_id: str) -> Iterator[Generator]:
+    """Protect one generator operation, including against concurrent deletion."""
+    session = _get_session(session_id)
+    with session.lock:
+        if session.closed:
+            raise HTTPException(status_code=404, detail=f"unknown session {session_id!r}")
+        yield session.generator
 
 
 @app.post("/sessions", response_model=SessionResponse)
@@ -97,15 +117,15 @@ def create_session(request: CreateSessionRequest) -> SessionResponse:
 
     session_id = str(uuid.uuid4())
     with _lock:
-        _sessions[session_id] = generator
+        _sessions[session_id] = GeneratorSession(generator)
     return SessionResponse(session_id=session_id)
 
 
 @app.post("/sessions/{session_id}/suggest", response_model=SuggestResponse)
 def suggest(session_id: str, request: SuggestRequest) -> SuggestResponse:
-    generator = _get_session(session_id)
     try:
-        points = generator.suggest(request.num_points)
+        with _locked_session(session_id) as generator:
+            points = generator.suggest(request.num_points)
     except Exception:
         logger.exception("generator.suggest failed")
         raise HTTPException(
@@ -116,9 +136,9 @@ def suggest(session_id: str, request: SuggestRequest) -> SuggestResponse:
 
 @app.post("/sessions/{session_id}/ingest", status_code=204)
 def ingest(session_id: str, request: IngestRequest) -> None:
-    generator = _get_session(session_id)
     try:
-        generator.ingest(request.results)
+        with _locked_session(session_id) as generator:
+            generator.ingest(request.results)
     except Exception as exc:
         logger.exception("generator.ingest failed")
         raise HTTPException(status_code=400, detail=f"failed to ingest results: {exc}")
@@ -126,29 +146,31 @@ def ingest(session_id: str, request: IngestRequest) -> None:
 
 @app.put("/sessions/{session_id}/data", status_code=204)
 def replace_data(session_id: str, request: ReplaceDataRequest) -> None:
-    generator = _get_session(session_id)
-    generator.data = pd.DataFrame(request.data)
+    with _locked_session(session_id) as generator:
+        generator.data = pd.DataFrame(request.data)
 
 
 @app.get("/sessions/{session_id}/state")
 def get_state(session_id: str) -> Response:
-    generator = _get_session(session_id)
-    state_json = generator.to_json(serialize_torch=True, serialize_inline=True)
+    with _locked_session(session_id) as generator:
+        state_json = generator.to_json(serialize_torch=True, serialize_inline=True)
     return Response(content=state_json, media_type="application/json")
 
 
 @app.delete("/sessions/{session_id}", status_code=204)
 def delete_session(session_id: str) -> None:
     with _lock:
-        generator = _sessions.pop(session_id, None)
-    if generator is None:
+        session = _sessions.pop(session_id, None)
+    if session is None:
         raise HTTPException(status_code=404, detail=f"unknown session {session_id!r}")
-    finalize = getattr(generator, "finalize", None)
-    if callable(finalize):
-        try:
-            finalize()
-        except Exception:
-            logger.exception("generator.finalize failed")
+    with session.lock:
+        session.closed = True
+        finalize = getattr(session.generator, "finalize", None)
+        if callable(finalize):
+            try:
+                finalize()
+            except Exception:
+                logger.exception("generator.finalize failed")
 
 
 def main() -> None:
