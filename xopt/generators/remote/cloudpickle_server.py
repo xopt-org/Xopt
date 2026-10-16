@@ -59,7 +59,7 @@ def create_cloudpickle_session(request: PicklePayload):
     # may change in future upstream releases and should be revisited before
     # merging this functionality into Xopt proper.
     with upstream._lock:
-        upstream._sessions[session_id] = obj
+        upstream._sessions[session_id] = upstream.GeneratorSession(obj)
     return upstream.SessionResponse(session_id=session_id)
 
 
@@ -70,33 +70,33 @@ def get_cloudpickle_state(session_id: str):
     Session lookup and unknown-session handling are delegated to upstream.
     The client uses this response to refresh its local generator mirror.
     """
-    obj = upstream._get_session(session_id)
+    with upstream._locked_session(session_id) as obj:
 
-    # Serialize the live generator without modifying its CUDA tensors.
-    # A separate CPU-safe snapshot is needed for CPU-only HTTP clients.
-    #
-    # PyTorch's map_location applies to tensor storage throughout the
-    # serialized object, including fitted GP models and BAX results.
-    # Cloudpickle supplies the Pickler; standard pickle supplies the
-    # Unpickler required by torch.load().
-    cloudpickle_adapter = SimpleNamespace(
-        Pickler=cloudpickle.CloudPickler,
-        Unpickler=pickle.Unpickler,
-        HIGHEST_PROTOCOL=pickle.HIGHEST_PROTOCOL,
-        __name__="cloudpickle_adapter",
-    )
+        # Serialize the live generator without modifying its CUDA tensors.
+        # A separate CPU-safe snapshot is needed for CPU-only HTTP clients.
+        #
+        # PyTorch's map_location applies to tensor storage throughout the
+        # serialized object, including fitted GP models and BAX results.
+        # Cloudpickle supplies the Pickler; standard pickle supplies the
+        # Unpickler required by torch.load().
+        cloudpickle_adapter = SimpleNamespace(
+            Pickler=cloudpickle.CloudPickler,
+            Unpickler=pickle.Unpickler,
+            HIGHEST_PROTOCOL=pickle.HIGHEST_PROTOCOL,
+            __name__="cloudpickle_adapter",
+        )
 
-    buffer = io.BytesIO()
-    torch.save(obj, buffer, pickle_module=cloudpickle_adapter)
-    buffer.seek(0)
+        buffer = io.BytesIO()
+        torch.save(obj, buffer, pickle_module=cloudpickle_adapter)
+        buffer.seek(0)
 
-    snapshot = torch.load(
-        buffer,
-        map_location="cpu",
-        weights_only=False,
-        pickle_module=cloudpickle_adapter,
-    )
+        snapshot = torch.load(
+            buffer,
+            map_location="cpu",
+            weights_only=False,
+            pickle_module=cloudpickle_adapter,
+        )
 
-    # The snapshot is independent of the live GPU generator.
-    payload = base64.b64encode(cloudpickle.dumps(snapshot)).decode("ascii")
-    return {"payload": payload}
+        # The snapshot is independent of the live GPU generator.
+        payload = base64.b64encode(cloudpickle.dumps(snapshot)).decode("ascii")
+        return {"payload": payload}

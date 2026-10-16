@@ -556,7 +556,7 @@ def test_cloudpickle_cuda_snapshot_preserves_live_generator():
     session_id = "cuda-snapshot-regression"
 
     with upstream._lock:
-        upstream._sessions[session_id] = live
+        upstream._sessions[session_id] = upstream.GeneratorSession(generator=live)
 
     try:
         response = get_cloudpickle_state(session_id)
@@ -596,7 +596,7 @@ def test_cloudpickle_cpu_snapshot_preserves_live_generator():
     session_id = "cpu-snapshot-regression"
 
     with upstream._lock:
-        upstream._sessions[session_id] = live
+        upstream._sessions[session_id] = upstream.GeneratorSession(generator=live)
 
     try:
         response = get_cloudpickle_state(session_id)
