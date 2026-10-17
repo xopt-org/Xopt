@@ -11,6 +11,7 @@ from xopt.generators import (
     list_available_generators,
 )
 from xopt.generators.bayesian.bax.algorithms import GridOptimize
+from xopt.generators.random import RandomGenerator
 from xopt.resources.testing import TEST_VOCS_BASE
 from xopt.vocs import ContextualVariable
 from gest_api.vocs import VOCS
@@ -114,6 +115,15 @@ class TestGenerator:
                 observable_names_ordered=["y1"]
             ).model_dump()
             json.dumps(gen_config)
+
+            gen_class(vocs=test_vocs, **gen_config)
+        elif name in ["http"]:
+            # base_url/generator are required with no generic default; construction
+            # doesn't perform I/O, so no server needs to be running
+            test_vocs = deepcopy(TEST_VOCS_BASE)
+            test_vocs.constraints = {}
+            gen_config["base_url"] = "http://localhost:8000"
+            gen_config["generator"] = RandomGenerator(vocs=test_vocs)
 
             gen_class(vocs=test_vocs, **gen_config)
         else:

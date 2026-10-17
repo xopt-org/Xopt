@@ -41,6 +41,11 @@ readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
+remote = [
+  "requests",
+  "fastapi",
+  "uvicorn",
+]
 dev = [
   "pytest",
   "pytest-cov",
@@ -57,6 +62,10 @@ dev = [
   "libensemble",
   "nbconvert",
   "pre-commit",
+  "requests",
+  "fastapi",
+  "uvicorn",
+  "httpx",
 ]
 doc = [
   "mkdocs",

@@ -30,6 +30,7 @@ nav:
                 - Bayesian optimization tutorial: examples/single_objective_bayes_opt/bo_tutorial.ipynb
                 - Constrained optimization: examples/single_objective_bayes_opt/constrained_bo_tutorial.ipynb
                 - Upper confidence bound: examples/single_objective_bayes_opt/upper_confidence_bound.ipynb
+                - Remote generator execution via HTTP: examples/single_objective_bayes_opt/http_generator_ucb.ipynb
                 - Custom GP models: examples/single_objective_bayes_opt/custom_model.ipynb
                 - Interpolated optimization: examples/single_objective_bayes_opt/interpolate_tutorial.ipynb
                 - Multi-Fidelity: examples/single_objective_bayes_opt/multi_fidelity_simple.ipynb
