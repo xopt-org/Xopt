@@ -156,9 +156,8 @@ def safe_call(func, *args, **kwargs):
         result = None
         outputs["exception"] = exc_tuple
         outputs["traceback"] = error_str
-    finally:
-        outputs["result"] = result
-        outputs["runtime"] = time.perf_counter() - t
+    outputs["result"] = result
+    outputs["runtime"] = time.perf_counter() - t
     return outputs
 
 
