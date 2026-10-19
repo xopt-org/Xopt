@@ -7,6 +7,7 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
+from time import monotonic
 from typing import List, Literal, Annotated, Union
 import pandas as pd
 from pydantic import (
@@ -14,6 +15,7 @@ from pydantic import (
     Field,
     PositiveFloat,
     PositiveInt,
+    PrivateAttr,
     field_serializer,
     field_validator,
     Discriminator,
@@ -100,6 +102,37 @@ class MaxEvaluationsCondition(StoppingCondition):
             return len(valid_data) >= self.max_evaluations
 
         return len(data) >= self.max_evaluations
+
+
+class MaxTimeCondition(StoppingCondition):
+    """
+    Stop after a maximum elapsed wall-clock time, starting at the first check.
+
+    The timer uses a monotonic clock and is checked between optimization steps;
+    running evaluations are not interrupted. Deserializing the condition resets
+    the timer, which starts on its first check.
+
+    Note: Set start_time to None to reset the timer.
+
+    Parameters
+    ----------
+    max_time : float
+        Maximum elapsed time in seconds. Must be positive and finite.
+    """
+
+    name: Literal["MaxTimeCondition"] = "MaxTimeCondition"
+    max_time: PositiveFloat = Field(
+        description="Maximum elapsed wall-clock time in seconds",
+        allow_inf_nan=False,
+    )
+    start_time: float | None = PrivateAttr(default=None)
+
+    def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
+        """Stop when elapsed time reaches the limit, regardless of data."""
+        now = monotonic()
+        if self.start_time is None:
+            self.start_time = now
+        return now - self.start_time >= self.max_time
 
 
 class TargetValueCondition(StoppingCondition):
@@ -352,6 +385,7 @@ class CompositeCondition(StoppingCondition):
 StoppingConditionUnion = Annotated[
     Union[
         MaxEvaluationsCondition,
+        MaxTimeCondition,
         TargetValueCondition,
         ConvergenceCondition,
         StagnationCondition,
