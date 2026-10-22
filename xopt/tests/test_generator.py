@@ -76,7 +76,7 @@ class TestGenerator:
         gen.ingest(data)
         assert (gen.data == pd.DataFrame(data)).all().all()
 
-    @pytest.mark.parametrize("name", list_available_generators())
+    @pytest.mark.parametrize("name", sorted(list_available_generators()))
     def test_serialization_loading(self, name):
         gen_config = get_generator_defaults(name)
         gen_class = get_generator(name)
