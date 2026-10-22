@@ -59,7 +59,7 @@ jobs:
           mpi: ${{ matrix.mpi }}
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra remote
 
       - name: List Python package versions
         run: uv pip list
