@@ -125,7 +125,7 @@ class MaxTimeCondition(StoppingCondition):
         description="Maximum elapsed wall-clock time in seconds",
         allow_inf_nan=False,
     )
-    start_time: float | None = PrivateAttr(default=None)
+    start_time: float | None = None
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop when elapsed time reaches the limit, regardless of data."""
