@@ -15,7 +15,6 @@ from pydantic import (
     Field,
     PositiveFloat,
     PositiveInt,
-    PrivateAttr,
     field_serializer,
     field_validator,
     Discriminator,
@@ -108,7 +107,7 @@ class MaxTimeCondition(StoppingCondition):
     """
     Stop after a maximum elapsed wall-clock time, starting at the first check.
 
-    The timer uses a monotonic clock and is checked between optimization steps;
+    The timer uses a datetime clock and is checked between optimization steps;
     running evaluations are not interrupted. Deserializing the condition resets
     the timer, which starts on its first check.
 
