@@ -122,8 +122,11 @@ def get_n_required_fuction_arguments(f):
 
 def safe_call(func, *args, **kwargs):
     """
-    Safely call the function, catching all exceptions.
-    Returns a dict
+    Safely call the Xopt evaluation function, catching all exceptions.
+
+    Note: `KeyboardInterrupt` is not a subclass of `Exception` in python and still propogates. Changes to
+    this function should avoid assuming that both `func` completes and the code ends up in the `except Exception`
+    branch. GH PR #466.
 
     Parameters
     ----------
