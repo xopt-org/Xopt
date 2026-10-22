@@ -626,3 +626,53 @@ def test_cloudpickle_cpu_snapshot_preserves_live_generator():
     finally:
         with upstream._lock:
             upstream._sessions.pop(session_id, None)
+
+
+def test_cloudpickle_snapshot_cuda_preference_falls_back_to_cpu():
+    """A CPU snapshot retains CUDA preference but runs on CPU without CUDA."""
+    import base64
+    import warnings
+    from unittest.mock import patch
+
+    import cloudpickle
+
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.generators.remote import server as upstream
+    from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
+    from xopt.vocs import VOCS
+
+    vocs = VOCS(
+        variables={"x": [0.0, 1.0]},
+        objectives={"y": "MINIMIZE"},
+    )
+    live = UpperConfidenceBoundGenerator(vocs=vocs, use_cuda=True)
+    session_id = "cpu-cuda-fallback-regression"
+
+    with upstream._lock:
+        upstream._sessions[session_id] = upstream.GeneratorSession(generator=live)
+
+    try:
+        response = get_cloudpickle_state(session_id)
+        snapshot = cloudpickle.loads(base64.b64decode(response["payload"]))
+
+        assert snapshot is not live
+        assert snapshot.use_cuda is True
+
+        with patch.object(torch.cuda, "is_available", return_value=False):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                options = snapshot.tkwargs
+
+        assert options["device"] == "cpu"
+        assert options["dtype"] == torch.double
+        assert any(
+            "Using CPU instead" in str(w.message)
+            for w in caught
+        )
+
+        assert live.use_cuda is True
+    finally:
+        with upstream._lock:
+            upstream._sessions.pop(session_id, None)
