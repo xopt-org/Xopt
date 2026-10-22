@@ -7,7 +7,7 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
-from time import monotonic
+from datetime import datetime
 from typing import List, Literal, Annotated, Union
 import pandas as pd
 from pydantic import (
@@ -125,14 +125,14 @@ class MaxTimeCondition(StoppingCondition):
         description="Maximum elapsed wall-clock time in seconds",
         allow_inf_nan=False,
     )
-    start_time: float | None = None
+    start_time: datetime | None = Field(default=None)
 
     def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
         """Stop when elapsed time reaches the limit, regardless of data."""
-        now = monotonic()
+        now = datetime.now()
         if self.start_time is None:
             self.start_time = now
-        return now - self.start_time >= self.max_time
+        return (now - self.start_time).total_seconds() >= self.max_time
 
 
 class TargetValueCondition(StoppingCondition):
