@@ -117,7 +117,7 @@ class TestGenerator:
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
-        elif name in ["http"]:
+        elif name in ["http", "cloudpickle_http"]:
             # base_url/generator are required with no generic default; construction
             # doesn't perform I/O, so no server needs to be running
             test_vocs = deepcopy(TEST_VOCS_BASE)
