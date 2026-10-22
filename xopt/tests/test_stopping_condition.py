@@ -3,6 +3,7 @@ Test the integration of stopping conditions with Xopt.run()
 """
 
 import json
+from datetime import datetime, timedelta
 from unittest.mock import Mock
 
 import pandas as pd
@@ -57,7 +58,11 @@ class TestStoppingConditionIntegration:
     @pytest.fixture
     def clock(self, monkeypatch):
         clock = Mock(return_value=100.0)
-        monkeypatch.setattr("xopt.stopping_conditions.monotonic", clock)
+        mock_datetime = Mock(wraps=datetime)
+        mock_datetime.now.side_effect = lambda: datetime(2026, 1, 1) + timedelta(
+            seconds=clock()
+        )
+        monkeypatch.setattr("xopt.stopping_conditions.datetime", mock_datetime)
         return clock
 
     @pytest.mark.parametrize("with_data", [False, True])
@@ -82,7 +87,19 @@ class TestStoppingConditionIntegration:
         clock.return_value = 10.0
         assert condition.should_stop(pd.DataFrame(), simple_vocs)
 
-    @pytest.mark.parametrize("max_time", [0, -1, float("inf"), float("-inf"), float("nan")])
+    def test_max_time_reset(self, simple_vocs, clock):
+        condition = MaxTimeCondition(max_time=10.0)
+        assert not condition.should_stop(pd.DataFrame(), simple_vocs)
+        clock.return_value = 110.0
+        assert condition.should_stop(pd.DataFrame(), simple_vocs)
+        condition.start_time = None
+        assert not condition.should_stop(pd.DataFrame(), simple_vocs)
+        clock.return_value = 120.0
+        assert condition.should_stop(pd.DataFrame(), simple_vocs)
+
+    @pytest.mark.parametrize(
+        "max_time", [0, -1, float("inf"), float("-inf"), float("nan")]
+    )
     def test_max_time_validation(self, max_time):
         with pytest.raises(ValidationError):
             MaxTimeCondition(max_time=max_time)
@@ -104,18 +121,22 @@ class TestStoppingConditionIntegration:
 
     def test_max_time_serialization(self, simple_vocs, clock):
         condition = MaxTimeCondition(max_time=10.0)
+        restored = StoppingConditionAdapter.validate_json(condition.model_dump_json())
+        assert restored.start_time is None
+        clock.assert_not_called()
         assert not condition.should_stop(pd.DataFrame(), simple_vocs)
         assert condition.model_dump() == {
             "name": "MaxTimeCondition",
             "max_time": 10.0,
+            "start_time": (datetime(2026, 1, 1) + timedelta(seconds=100)).isoformat(),
         }
-        clock.return_value = 110.0
+        clock.return_value = 109.999
         restored = StoppingConditionAdapter.validate_json(condition.model_dump_json())
         assert isinstance(restored, MaxTimeCondition)
-        clock.return_value = 200.0
+        assert restored.start_time == condition.start_time
         assert not restored.should_stop(pd.DataFrame(), simple_vocs)
+        clock.return_value = 110.0
         assert condition.should_stop(pd.DataFrame(), simple_vocs)
-        clock.return_value = 210.0
         assert restored.should_stop(pd.DataFrame(), simple_vocs)
 
     @pytest.mark.parametrize("logic", ["and", "or"])
@@ -136,7 +157,9 @@ class TestStoppingConditionIntegration:
         assert isinstance(restored.conditions[0], MaxTimeCondition)
 
     @pytest.mark.parametrize("with_data", [False, True])
-    def test_max_time_expired_before_run(self, simple_vocs, evaluator, clock, with_data):
+    def test_max_time_expired_before_run(
+        self, simple_vocs, evaluator, clock, with_data
+    ):
         condition = MaxTimeCondition(max_time=10.0)
         X = Xopt(
             evaluator=evaluator,
@@ -177,11 +200,12 @@ class TestStoppingConditionIntegration:
         assert info["stopping_condition"] == {
             "name": "MaxTimeCondition",
             "max_time": 10.0,
+            "start_time": (datetime(2026, 1, 1) + timedelta(seconds=200)).isoformat(),
         }
         info["evaluator"] = X.evaluator
         restored = Xopt(**info)
         assert isinstance(restored.stopping_condition, MaxTimeCondition)
-        assert not restored.stopping_condition.should_stop(restored.data, restored.vocs)
+        assert restored.stopping_condition.should_stop(restored.data, restored.vocs)
 
     def test_max_evaluation(self, simple_vocs, evaluator):
         """test with explict dataset max evaluations"""
