@@ -312,10 +312,30 @@ class TestHTTPGeneratorBax:
     def test_bax_workflow(self, server_url):
         # mirrors docs/examples/single_objective_bayes_opt/bax_tutorial.ipynb
         algorithm = GridOptimize(observable_names_ordered=["y1"], n_mesh_points=20)
-        bax_generator = BaxGenerator(vocs=BAX_VOCS, algorithm=algorithm)
+        fractional_vocs = VOCS(
+            variables={"x": [0.25, 2 * np.pi - 0.25]},
+            observables=["y1"],
+        )
+        bax_generator = BaxGenerator(vocs=fractional_vocs, algorithm=algorithm)
         bax_generator.gp_constructor.use_low_noise_prior = True
 
         generator = HTTPGenerator(base_url=server_url, generator=bax_generator)
+
+        # Verify fractional BAX bounds survive the HTTP round-trip.
+        remote_generator = generator.generator
+
+        original_bounds = bax_generator.vocs.variables["x"].domain
+        remote_bounds = remote_generator.vocs.variables["x"].domain
+
+        np.testing.assert_allclose(
+            remote_bounds,
+            original_bounds,
+            rtol=0,
+            atol=1e-12,
+        )
+
+        assert remote_bounds[0] == 0.25
+        assert remote_bounds[1] == 2 * np.pi - 0.25
 
         train_x = np.linspace(0.1, 2 * np.pi - 0.1, 3)
         data = pd.DataFrame({"x": train_x, "y1": np.sin(train_x)})
