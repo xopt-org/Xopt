@@ -6,6 +6,7 @@ The remote endpoint must be trusted: unpickling is code execution.
 """
 
 import base64
+from typing import ClassVar
 
 import cloudpickle
 
@@ -20,6 +21,8 @@ class CloudpickleHTTPGenerator(UpstreamHTTPGenerator):
     source module on the backend. Required libraries must still be installed
     and compatible on both sides.
     """
+
+    name: ClassVar[str] = "cloudpickle_http"
 
     def _ensure_session(self) -> str:
         """Lazily create one remote session using the opt-in endpoint."""
