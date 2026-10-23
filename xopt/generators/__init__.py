@@ -28,6 +28,7 @@ all_generator_names = {
     "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
     "rcds": {"rcds"},
+    "remote": {"http"},
 }
 
 
@@ -125,6 +126,16 @@ def get_generator_dynamic(name: str) -> type[Generator]:
 
         generators[name] = RCDSGenerator
         return RCDSGenerator
+    elif name in all_generator_names["remote"]:
+        try:
+            from xopt.generators.remote.http import HTTPGenerator
+
+            generators[name] = HTTPGenerator
+            return HTTPGenerator
+        except ModuleNotFoundError:
+            warnings.warn(
+                "WARNING: `requests` not found, HTTPGenerator is not available"
+            )
     raise KeyError
 
 
