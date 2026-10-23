@@ -34,10 +34,7 @@ class ModelListExpectedInformationGain(MultiObjectiveAnalyticAcquisitionFunction
         # at the current iteration and conditioning it
         # on one of the sampled execution path subsequences:
         xs_exe_list = [self.xs_exe for i in range(len(model.models))]
-        ys_exe_list = [
-            torch.index_select(self.ys_exe, dim=-1, index=torch.tensor([i]))
-            for i in range(len(model.models))
-        ]
+        ys_exe_list = [self.ys_exe[..., i : i + 1] for i in range(len(model.models))]
         fantasy_models = [
             m.condition_on_observations(x, y)
             for m, x, y in zip(model.models, xs_exe_list, ys_exe_list)

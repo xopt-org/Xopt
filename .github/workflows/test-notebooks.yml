@@ -87,9 +87,18 @@ jobs:
               while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
                   LAST_LOG_FILE="/tmp/nbconvert_${FILE_HASH}_${RETRY_COUNT}.log"
 
-                  if uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
-                        --ExecutePreprocessor.timeout=600 \
-                        >"$LAST_LOG_FILE" 2>&1; then
+                  if [[ "$file" == *"/remote_generator/http_generator_ucb.ipynb" ||
+                        "$file" == *"/remote_generator/http_generator_bax.ipynb" ||
+                        "$file" == *"/remote_generator/http_generator_custom_model.ipynb" ]]; then
+                      uv run python scripts/test_http_notebook.py "$file" --runner uv \
+                          >"$LAST_LOG_FILE" 2>&1
+                  else
+                      uv run jupyter nbconvert --to notebook --execute "$file" --inplace \
+                          --ExecutePreprocessor.timeout=600 \
+                          >"$LAST_LOG_FILE" 2>&1
+                  fi
+
+                  if [ $? -eq 0 ]; then
                       SUCCESS=true
                       # On success, stream log to stdout for context if it exists
                       if [ -f "$LAST_LOG_FILE" ]; then

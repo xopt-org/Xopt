@@ -28,7 +28,7 @@ all_generator_names = {
     "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
     "rcds": {"rcds"},
-    "remote": {"http"},
+    "remote": {"http", "cloudpickle_http"},
 }
 
 
@@ -128,6 +128,12 @@ def get_generator_dynamic(name: str) -> type[Generator]:
         return RCDSGenerator
     elif name in all_generator_names["remote"]:
         try:
+            if name == "cloudpickle_http":
+                from xopt.generators.remote.cloudpickle import CloudpickleHTTPGenerator
+
+                generators[name] = CloudpickleHTTPGenerator
+                return CloudpickleHTTPGenerator
+
             from xopt.generators.remote.http import HTTPGenerator
 
             generators[name] = HTTPGenerator

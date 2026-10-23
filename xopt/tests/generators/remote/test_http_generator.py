@@ -1,14 +1,45 @@
+"""HTTPGenerator remote integration and cloudpickle regression tests.
+
+All 14 tests live in the original upstream regression-test location.
+
+UPSTREAM HTTP TRANSPORT (12 tests)
+    Uses the normal Xopt server in an independent Uvicorn subprocess.
+    Covers HTTP sessions, data mirroring, authentication, random/UCB-related
+    behavior, BAX, and an importable module-level PyTorch prior.
+
+EXPERIMENTAL CLOUDPICKLE TRANSPORT (2 tests)
+    Uses the opt-in cloudpickle server in a separate Uvicorn subprocess.
+    The negative control checks that standard transport rejects a local
+    (not importable) notebook-style PyTorch class. The positive control
+    checks cloudpickle round-trip, candidate generation, and prior values.
+
+Important scope: subprocesses run on the SAME machine and can share installed
+packages. These tests do NOT prove cross-host Docker isolation. The next
+integration milestone must run a backend without the scientist's source files.
+
+Requirements for the two experimental tests:
+    python -m pip install -e ".[remote]"
+
+Run from repository root:
+    python -m pytest xopt/tests/generators/remote/test_http_generator.py -v -s --no-cov
+
+SECURITY: Never expose the cloudpickle deserialization endpoint to untrusted
+clients; deserialization can execute arbitrary Python code.
+"""
+
 import json
+import os
 import socket
-import threading
+import subprocess
+import sys
 import time
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
 import pytest
 import requests
 import torch
-import uvicorn
 
 from gest_api.vocs import VOCS
 
@@ -20,37 +51,95 @@ from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGen
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.random import RandomGenerator
 from xopt.generators.remote.http import HTTPGenerator
-from xopt.generators.remote.server import AUTH_TOKEN_ENV_VAR, app
+
+# Use an explicit name in the negative-control test so reviewers can see
+# that it exercises upstream serialization, not the cloudpickle adapter.
+from xopt.generators.remote.http import HTTPGenerator as UpstreamHTTPGenerator
+from xopt.generators.remote.cloudpickle import CloudpickleHTTPGenerator
+from xopt.generators.remote.server import AUTH_TOKEN_ENV_VAR
 
 
 def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    """Ask the OS for an available localhost TCP port (not a fixed 8002)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+@contextmanager
+def _uvicorn_subprocess(*, auth_token=None):
+    """Start an isolated Python interpreter and reliably stop it afterward.
+
+    This tests the same process boundary as running Uvicorn in another terminal.
+    It does not require or reuse the manually launched server on port 8002.
+    """
+    port = _free_port()
+    url = f"http://127.0.0.1:{port}"
+    env = os.environ.copy()
+    # Authentication belongs to the *server* environment, not pytest's.
+    env.pop(AUTH_TOKEN_ENV_VAR, None)
+    if auth_token is not None:
+        env[AUTH_TOKEN_ENV_VAR] = auth_token
+
+    command = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "xopt.generators.remote.server:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
+    ]
+    process = subprocess.Popen(
+        command,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        # Wait for a real HTTP response, not merely an open socket.
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                error = process.stderr.read()
+                raise RuntimeError(f"Uvicorn exited during startup:\n{error}")
+            try:
+                response = requests.get(url + "/openapi.json", timeout=0.3)
+                response.raise_for_status()
+                break
+            except (requests.RequestException, OSError):
+                time.sleep(0.1)
+        else:
+            raise RuntimeError(f"Uvicorn did not become ready at {url}")
+        yield url
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        if process.stderr is not None:
+            process.stderr.close()
 
 
 @pytest.fixture(scope="module")
 def server_url():
-    port = _free_port()
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
+    """Normal upstream HTTP server, one independent process per test module."""
+    with _uvicorn_subprocess() as url:
+        yield url
 
-    url = f"http://127.0.0.1:{port}"
-    for _ in range(50):
-        try:
-            requests.get(url + "/openapi.json", timeout=0.2)
-            break
-        except requests.ConnectionError:
-            time.sleep(0.1)
-    else:
-        raise RuntimeError("test server did not start in time")
 
-    yield url
-
-    server.should_exit = True
-    thread.join(timeout=5)
+@pytest.fixture
+def authenticated_server_url():
+    """Dedicated process with a token set *before* server startup."""
+    with _uvicorn_subprocess(auth_token="secret-token") as url:
+        yield url
 
 
 RANDOM_VOCS = VOCS(
@@ -136,8 +225,8 @@ class TestHTTPGeneratorRandom:
         with pytest.raises(XoptError):
             generator.generate(1)
 
-    def test_auth_required(self, server_url, monkeypatch):
-        monkeypatch.setenv(AUTH_TOKEN_ENV_VAR, "secret-token")
+    def test_auth_required(self, authenticated_server_url):
+        server_url = authenticated_server_url
 
         unauthenticated = HTTPGenerator(
             base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
@@ -233,10 +322,30 @@ class TestHTTPGeneratorBax:
     def test_bax_workflow(self, server_url):
         # mirrors docs/examples/single_objective_bayes_opt/bax_tutorial.ipynb
         algorithm = GridOptimize(observable_names_ordered=["y1"], n_mesh_points=20)
-        bax_generator = BaxGenerator(vocs=BAX_VOCS, algorithm=algorithm)
+        fractional_vocs = VOCS(
+            variables={"x": [0.25, 2 * np.pi - 0.25]},
+            observables=["y1"],
+        )
+        bax_generator = BaxGenerator(vocs=fractional_vocs, algorithm=algorithm)
         bax_generator.gp_constructor.use_low_noise_prior = True
 
         generator = HTTPGenerator(base_url=server_url, generator=bax_generator)
+
+        # Verify fractional BAX bounds survive the HTTP round-trip.
+        remote_generator = generator.generator
+
+        original_bounds = bax_generator.vocs.variables["x"].domain
+        remote_bounds = remote_generator.vocs.variables["x"].domain
+
+        np.testing.assert_allclose(
+            remote_bounds,
+            original_bounds,
+            rtol=0,
+            atol=1e-12,
+        )
+
+        assert remote_bounds[0] == 0.25
+        assert remote_bounds[1] == 2 * np.pi - 0.25
 
         train_x = np.linspace(0.1, 2 * np.pi - 0.1, 3)
         data = pd.DataFrame({"x": train_x, "y1": np.sin(train_x)})
@@ -305,3 +414,304 @@ class TestHTTPGeneratorPriorMean:
         assert isinstance(mirror.gp_constructor.mean_modules["c"], ConstraintPrior)
 
         generator.finalize()
+
+
+# ---------------------------------------------------------------------------
+# Experimental cloudpickle integration tests (opt-in transport).
+# REVIEW NOTE: Keep these beside the 12 original regressions so reviewers can
+# compare unchanged upstream behavior against the opt-in serialization path.
+# These tests use a different server app than the upstream regression tests.
+# Both the client and server are independent processes, but on the same host.
+# ---------------------------------------------------------------------------
+
+
+def _cloudpickle_free_port():
+    """Request an unused local TCP port from the operating system."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+@contextmanager
+def _cloudpickle_server():
+    """Launch the experimental app in a completely separate interpreter.
+
+    This app contains BOTH ordinary upstream routes and opt-in cloudpickle
+    routes, so the two serialization approaches face the same backend.
+    """
+    port = _cloudpickle_free_port()
+    url = f"http://127.0.0.1:{port}"
+    env = os.environ.copy()
+    # Do not inherit an unrelated auth token from the developer's shell.
+    env["XOPT_HTTP_GENERATOR_TOKEN"] = "cloudpickle-test-token"
+    command = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "xopt.generators.remote.cloudpickle_server:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
+    ]
+    process = subprocess.Popen(
+        command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise RuntimeError(
+                    f"Server exited during startup:\n{process.stderr.read()}"
+                )
+            try:
+                response = requests.get(f"{url}/openapi.json", timeout=0.3)
+                response.raise_for_status()
+                break
+            except requests.RequestException:
+                time.sleep(0.1)
+        else:
+            raise RuntimeError(f"Server did not become ready at {url}")
+        yield url
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        if process.stderr:
+            process.stderr.close()
+
+
+@pytest.fixture(scope="module")
+def cloudpickle_server_url():
+    with _cloudpickle_server() as url:
+        yield url
+
+
+def _notebook_generator():
+    """Build a prior class *inside a function*, as with a notebook cell.
+
+    A local class cannot be imported by its module-qualified name in the
+    Uvicorn interpreter. This is different from Stage 1's module-level class.
+    """
+    amplitude = 5.0
+    phase = 0.25
+
+    class ConstraintPrior(torch.nn.Module):
+        def forward(self, X):
+            # c(x) = 5 cos(2*pi*x + 0.25); a periodic constraint prior.
+            return (amplitude * torch.cos(2 * torch.pi * X + phase)).squeeze(-1)
+
+    vocs = VOCS(
+        variables={"x": [0.0, 1.0]},
+        objectives={"y": "MAXIMIZE"},
+        constraints={"c": ["LESS_THAN", 0.0]},
+    )
+    constructor = StandardModelConstructor(
+        mean_modules={"c": ConstraintPrior()}, use_low_noise_prior=True
+    )
+    generator = ExpectedImprovementGenerator(vocs=vocs, gp_constructor=constructor)
+    return generator, ConstraintPrior
+
+
+def _training_data():
+    """Three measurements of a sine objective and cosine constraint."""
+    x = np.array([0.2, 0.5, 0.6])
+    return pd.DataFrame(
+        {
+            "x": x,
+            "y": np.sin(2 * np.pi * x),
+            "c": 5.0 * np.cos(2 * np.pi * x + 0.25),
+        }
+    ).to_dict(orient="records")
+
+
+def test_upstream_rejects_notebook_local_prior(cloudpickle_server_url):
+    """Standard serialization must not silently lose the local class.
+
+    Depending on Xopt/Pydantic internals, the failure can occur while the
+    client serializes the generator or when the server decodes the request.
+    Either is an expected limitation of the ordinary transport here.
+    """
+    local_generator, _ = _notebook_generator()
+    remote = UpstreamHTTPGenerator(
+        base_url=cloudpickle_server_url,
+        generator=local_generator,
+        api_key="cloudpickle-test-token",
+    )
+    try:
+        with pytest.raises(Exception) as error:
+            remote.ingest(_training_data())
+            remote.generate(1)
+        # A successful return would mean our negative control is no longer
+        # valid and should be investigated, not marked as an expected failure.
+        assert error.value is not None
+    finally:
+        remote.finalize()
+
+
+def test_cloudpickle_round_trips_notebook_local_prior(cloudpickle_server_url):
+    """Opt-in transport reconstructs and executes the actual custom class."""
+    local_generator, prior_type = _notebook_generator()
+    remote = CloudpickleHTTPGenerator(
+        base_url=cloudpickle_server_url,
+        generator=local_generator,
+        api_key="cloudpickle-test-token",
+    )
+    try:
+        remote.ingest(_training_data())
+        points = remote.generate(1)
+        assert len(points) == 1
+        assert 0.0 <= points[0]["x"] <= 1.0
+
+        # Fetch the server's generator, not the original local object.
+        mirror = remote.pull()
+        restored_prior = mirror.gp_constructor.mean_modules["c"]
+        assert isinstance(restored_prior, prior_type)
+
+        # Check the mathematical function, not merely the Python type name.
+        X = torch.tensor([[0.2], [0.5]], dtype=torch.double)
+        actual = restored_prior(X)
+        expected = 5.0 * torch.cos(2 * torch.pi * X + 0.25).squeeze(-1)
+        torch.testing.assert_close(actual, expected)
+    finally:
+        remote.finalize()
+
+
+@pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="CUDA GPU required for cross-device snapshot test",
+)
+def test_cloudpickle_cuda_snapshot_preserves_live_generator():
+    """Export CUDA tensors to CPU without modifying the live generator."""
+    import base64
+
+    import cloudpickle
+
+    from xopt.generators.remote import server as upstream
+    from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
+
+    class CUDAState:
+        def __init__(self):
+            self.model = torch.nn.Linear(2, 1).cuda()
+            self.algorithm_results = {
+                "input_execution_paths": torch.ones(3, 2, device="cuda"),
+                "output_execution_paths": torch.ones(3, 1, device="cuda"),
+            }
+
+    live = CUDAState()
+    session_id = "cuda-snapshot-regression"
+
+    with upstream._lock:
+        upstream._sessions[session_id] = upstream.GeneratorSession(generator=live)
+
+    try:
+        response = get_cloudpickle_state(session_id)
+        snapshot = cloudpickle.loads(base64.b64decode(response["payload"]))
+
+        assert next(snapshot.model.parameters()).device.type == "cpu"
+        assert snapshot.algorithm_results["input_execution_paths"].device.type == "cpu"
+        assert snapshot.algorithm_results["output_execution_paths"].device.type == "cpu"
+
+        assert next(live.model.parameters()).device.type == "cuda"
+        assert live.algorithm_results["input_execution_paths"].device.type == "cuda"
+        assert live.algorithm_results["output_execution_paths"].device.type == "cuda"
+
+        assert snapshot is not live
+    finally:
+        with upstream._lock:
+            upstream._sessions.pop(session_id, None)
+
+
+def test_cloudpickle_cpu_snapshot_preserves_live_generator():
+    """A CPU snapshot must not share mutable state with the live generator."""
+    import base64
+
+    import cloudpickle
+
+    from xopt.generators.remote import server as upstream
+    from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
+
+    class CPUState:
+        def __init__(self):
+            self.model = torch.nn.Linear(2, 1)
+            self.algorithm_results = {
+                "input_execution_paths": torch.ones(3, 2),
+            }
+
+    live = CPUState()
+    session_id = "cpu-snapshot-regression"
+
+    with upstream._lock:
+        upstream._sessions[session_id] = upstream.GeneratorSession(generator=live)
+
+    try:
+        response = get_cloudpickle_state(session_id)
+        snapshot = cloudpickle.loads(base64.b64decode(response["payload"]))
+
+        assert snapshot is not live
+        assert snapshot.model is not live.model
+        assert next(snapshot.model.parameters()).device.type == "cpu"
+
+        snapshot.algorithm_results["input_execution_paths"].zero_()
+        assert torch.all(live.algorithm_results["input_execution_paths"] == 1)
+
+        with torch.no_grad():
+            next(snapshot.model.parameters()).zero_()
+
+        assert not torch.all(next(live.model.parameters()) == 0)
+    finally:
+        with upstream._lock:
+            upstream._sessions.pop(session_id, None)
+
+
+def test_cloudpickle_snapshot_cuda_preference_falls_back_to_cpu():
+    """A CPU snapshot retains CUDA preference but runs on CPU without CUDA."""
+    import base64
+    import warnings
+    from unittest.mock import patch
+
+    import cloudpickle
+
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.generators.remote import server as upstream
+    from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
+    from xopt.vocs import VOCS
+
+    vocs = VOCS(
+        variables={"x": [0.0, 1.0]},
+        objectives={"y": "MINIMIZE"},
+    )
+    live = UpperConfidenceBoundGenerator(vocs=vocs, use_cuda=True)
+    session_id = "cpu-cuda-fallback-regression"
+
+    with upstream._lock:
+        upstream._sessions[session_id] = upstream.GeneratorSession(generator=live)
+
+    try:
+        response = get_cloudpickle_state(session_id)
+        snapshot = cloudpickle.loads(base64.b64decode(response["payload"]))
+
+        assert snapshot is not live
+        assert snapshot.use_cuda is True
+
+        with patch.object(torch.cuda, "is_available", return_value=False):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                options = snapshot.tkwargs
+
+        assert options["device"] == "cpu"
+        assert options["dtype"] == torch.double
+        assert any("Using CPU instead" in str(w.message) for w in caught)
+
+        assert live.use_cuda is True
+    finally:
+        with upstream._lock:
+            upstream._sessions.pop(session_id, None)

@@ -45,6 +45,7 @@ remote = [
   "requests",
   "fastapi",
   "uvicorn",
+  "cloudpickle",
 ]
 dev = [
   "pytest",
