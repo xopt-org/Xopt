@@ -192,3 +192,35 @@ class TestEvaluator:
         assert result.shape[0] == 5
         assert "f" in result.columns
         assert all(result["f"] == candidates["x1"] ** 2 + candidates["x2"] ** 2)
+
+
+class TestGymEvaluator:
+    def test_current_observation_and_step(self):
+        gym = pytest.importorskip("gymnasium")
+        from xopt.evaluator import GymEvaluator
+
+        env = gym.make("Pendulum-v1")
+        obs_names = ["cos_theta", "sin_theta", "theta_dot"]
+        evaluator = GymEvaluator(
+            env=env,
+            action_space_names=["torque"],
+            observation_space_names=obs_names,
+        )
+
+        # current_observation should match the reset observation
+        env.reset(seed=0)
+        evaluator.reset()
+        assert evaluator.current_observation == {
+            name: pytest.approx(float(evaluator._current_observation[i]))
+            for i, name in enumerate(obs_names)
+        }
+
+        result = evaluator.evaluate({"torque": 0.0})
+        assert set(obs_names).issubset(result)
+        assert {f"next_{n}" for n in obs_names}.issubset(result)
+        assert "reward" in result
+
+        # current_observation should now reflect the post-step state
+        assert evaluator.current_observation == {
+            name: pytest.approx(result[f"next_{name}"]) for name in obs_names
+        }
