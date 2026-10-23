@@ -51,6 +51,7 @@ from xopt.generators.bayesian.expected_improvement import ExpectedImprovementGen
 from xopt.generators.bayesian.models.standard import StandardModelConstructor
 from xopt.generators.random import RandomGenerator
 from xopt.generators.remote.http import HTTPGenerator
+
 # Use an explicit name in the negative-control test so reviewers can see
 # that it exercises upstream serialization, not the cloudpickle adapter.
 from xopt.generators.remote.http import HTTPGenerator as UpstreamHTTPGenerator
@@ -81,13 +82,22 @@ def _uvicorn_subprocess(*, auth_token=None):
         env[AUTH_TOKEN_ENV_VAR] = auth_token
 
     command = [
-        sys.executable, "-m", "uvicorn",
+        sys.executable,
+        "-m",
+        "uvicorn",
         "xopt.generators.remote.server:app",
-        "--host", "127.0.0.1", "--port", str(port),
-        "--log-level", "warning",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
     ]
     process = subprocess.Popen(
-        command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        command,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         text=True,
     )
     try:
@@ -414,6 +424,7 @@ class TestHTTPGeneratorPriorMean:
 # Both the client and server are independent processes, but on the same host.
 # ---------------------------------------------------------------------------
 
+
 def _cloudpickle_free_port():
     """Request an unused local TCP port from the operating system."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -434,16 +445,27 @@ def _cloudpickle_server():
     # Do not inherit an unrelated auth token from the developer's shell.
     env["XOPT_HTTP_GENERATOR_TOKEN"] = "cloudpickle-test-token"
     command = [
-        sys.executable, "-m", "uvicorn", "xopt.generators.remote.cloudpickle_server:app",
-        "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "xopt.generators.remote.cloudpickle_server:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
     ]
-    process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen(
+        command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
+    )
     try:
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             if process.poll() is not None:
-                raise RuntimeError(f"Server exited during startup:\n{process.stderr.read()}")
+                raise RuntimeError(
+                    f"Server exited during startup:\n{process.stderr.read()}"
+                )
             try:
                 response = requests.get(f"{url}/openapi.json", timeout=0.3)
                 response.raise_for_status()
@@ -500,11 +522,13 @@ def _notebook_generator():
 def _training_data():
     """Three measurements of a sine objective and cosine constraint."""
     x = np.array([0.2, 0.5, 0.6])
-    return pd.DataFrame({
-        "x": x,
-        "y": np.sin(2 * np.pi * x),
-        "c": 5.0 * np.cos(2 * np.pi * x + 0.25),
-    }).to_dict(orient="records")
+    return pd.DataFrame(
+        {
+            "x": x,
+            "y": np.sin(2 * np.pi * x),
+            "c": 5.0 * np.cos(2 * np.pi * x + 0.25),
+        }
+    ).to_dict(orient="records")
 
 
 def test_upstream_rejects_notebook_local_prior(cloudpickle_server_url):
@@ -516,7 +540,8 @@ def test_upstream_rejects_notebook_local_prior(cloudpickle_server_url):
     """
     local_generator, _ = _notebook_generator()
     remote = UpstreamHTTPGenerator(
-        base_url=cloudpickle_server_url, generator=local_generator,
+        base_url=cloudpickle_server_url,
+        generator=local_generator,
         api_key="cloudpickle-test-token",
     )
     try:
@@ -534,7 +559,8 @@ def test_cloudpickle_round_trips_notebook_local_prior(cloudpickle_server_url):
     """Opt-in transport reconstructs and executes the actual custom class."""
     local_generator, prior_type = _notebook_generator()
     remote = CloudpickleHTTPGenerator(
-        base_url=cloudpickle_server_url, generator=local_generator,
+        base_url=cloudpickle_server_url,
+        generator=local_generator,
         api_key="cloudpickle-test-token",
     )
     try:
@@ -633,16 +659,12 @@ def test_cloudpickle_cpu_snapshot_preserves_live_generator():
         assert next(snapshot.model.parameters()).device.type == "cpu"
 
         snapshot.algorithm_results["input_execution_paths"].zero_()
-        assert torch.all(
-            live.algorithm_results["input_execution_paths"] == 1
-        )
+        assert torch.all(live.algorithm_results["input_execution_paths"] == 1)
 
         with torch.no_grad():
             next(snapshot.model.parameters()).zero_()
 
-        assert not torch.all(
-            next(live.model.parameters()) == 0
-        )
+        assert not torch.all(next(live.model.parameters()) == 0)
     finally:
         with upstream._lock:
             upstream._sessions.pop(session_id, None)
@@ -687,10 +709,7 @@ def test_cloudpickle_snapshot_cuda_preference_falls_back_to_cpu():
 
         assert options["device"] == "cpu"
         assert options["dtype"] == torch.double
-        assert any(
-            "Using CPU instead" in str(w.message)
-            for w in caught
-        )
+        assert any("Using CPU instead" in str(w.message) for w in caught)
 
         assert live.use_cuda is True
     finally:

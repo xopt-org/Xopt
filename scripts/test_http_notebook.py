@@ -34,9 +34,7 @@ def wait_for_server(url, process, timeout=30):
 
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise RuntimeError(
-                f"HTTP server exited with status {process.returncode}"
-            )
+            raise RuntimeError(f"HTTP server exited with status {process.returncode}")
 
         try:
             with urllib.request.urlopen(f"{url}/openapi.json", timeout=1):
@@ -84,17 +82,26 @@ def main():
 
         if args.runner == "uv":
             server_command = [
-                "uv", "run", "--no-sync", "uvicorn",
+                "uv",
+                "run",
+                "--no-sync",
+                "uvicorn",
                 backend,
-                "--host", "127.0.0.1",
-                "--port", str(port),
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(port),
             ]
         else:
             server_command = [
-                sys.executable, "-m", "uvicorn",
+                sys.executable,
+                "-m",
+                "uvicorn",
                 backend,
-                "--host", "127.0.0.1",
-                "--port", str(port),
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(port),
             ]
 
         print(f"Starting {backend} at {url}", flush=True)

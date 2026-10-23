@@ -29,10 +29,22 @@ def _server(token):
     if token is not None:
         env[TOKEN_ENV] = token
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn",
-         "xopt.generators.remote.cloudpickle_server:app",
-         "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"],
-        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "xopt.generators.remote.cloudpickle_server:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--log-level",
+            "warning",
+        ],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     try:
         yield proc, url
@@ -82,14 +94,25 @@ def test_cloudpickle_and_inherited_routes_require_token():
         )
         for path, payload in routes:
             assert requests.post(url + path, json=payload, timeout=5).status_code == 401
-            assert requests.post(
-                url + path, json=payload,
-                headers={"Authorization": "Bearer wrong-token"}, timeout=5,
-            ).status_code == 401
+            assert (
+                requests.post(
+                    url + path,
+                    json=payload,
+                    headers={"Authorization": "Bearer wrong-token"},
+                    timeout=5,
+                ).status_code
+                == 401
+            )
             # Valid authentication must reach the route's payload validation.
             # These deliberately invalid bodies should produce 400 or 422, not 401.
             response = requests.post(
-                url + path, json=payload,
-                headers={"Authorization": f"Bearer {TEST_TOKEN}"}, timeout=5,
+                url + path,
+                json=payload,
+                headers={"Authorization": f"Bearer {TEST_TOKEN}"},
+                timeout=5,
             )
-            assert response.status_code in (400, 422), (path, response.status_code, response.text)
+            assert response.status_code in (400, 422), (
+                path,
+                response.status_code,
+                response.text,
+            )

@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # is only appropriate on a trusted/loopback network
 AUTH_TOKEN_ENV_VAR = "XOPT_HTTP_GENERATOR_TOKEN"
 
+
 @dataclass
 class GeneratorSession:
     generator: Generator
@@ -93,7 +94,9 @@ def _locked_session(session_id: str) -> Iterator[Generator]:
     session = _get_session(session_id)
     with session.lock:
         if session.closed:
-            raise HTTPException(status_code=404, detail=f"unknown session {session_id!r}")
+            raise HTTPException(
+                status_code=404, detail=f"unknown session {session_id!r}"
+            )
         yield session.generator
 
 

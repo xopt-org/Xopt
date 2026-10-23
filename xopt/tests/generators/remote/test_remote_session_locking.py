@@ -8,7 +8,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import cloudpickle
-import pytest
 
 from xopt.generators.remote import server as upstream
 from xopt.generators.remote.cloudpickle_server import get_cloudpickle_state
@@ -32,7 +31,7 @@ def _remove(session_id):
 
 def test_same_session_snapshot_waits_for_mutation():
     """Export must not see a half-updated generator."""
-    session_id = 'locking-same-session'
+    session_id = "locking-same-session"
     state = _State()
     writer_entered = threading.Event()
     allow_writer_finish = threading.Event()
@@ -51,7 +50,7 @@ def test_same_session_snapshot_waits_for_mutation():
         reader_started.set()
         response = get_cloudpickle_state(session_id)
         reader_done.set()
-        return cloudpickle.loads(base64.b64decode(response['payload']))
+        return cloudpickle.loads(base64.b64decode(response["payload"]))
 
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -73,8 +72,8 @@ def test_same_session_snapshot_waits_for_mutation():
 
 def test_different_sessions_do_not_block_each_other():
     """A long-running operation in session A must not block session B."""
-    first_id = 'locking-independent-a'
-    second_id = 'locking-independent-b'
+    first_id = "locking-independent-a"
+    second_id = "locking-independent-b"
     entered_a = threading.Event()
     release_a = threading.Event()
     finished_b = threading.Event()
@@ -96,7 +95,7 @@ def test_different_sessions_do_not_block_each_other():
             future_a = pool.submit(hold_a)
             assert entered_a.wait(timeout=10)
             future_b = pool.submit(update_b)
-            assert finished_b.wait(timeout=5), 'Session B was blocked by session A'
+            assert finished_b.wait(timeout=5), "Session B was blocked by session A"
             future_b.result(timeout=10)
             release_a.set()
             future_a.result(timeout=10)

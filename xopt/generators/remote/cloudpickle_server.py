@@ -78,7 +78,9 @@ def create_cloudpickle_session(request: PicklePayload):
     except Exception as exc:
         # Note: this check occurs AFTER deserialization; it is not a security
         # sandbox and cannot prevent execution of a malicious pickle payload.
-        raise HTTPException(status_code=400, detail=f"invalid generator payload: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"invalid generator payload: {exc}"
+        ) from exc
 
     session_id = str(uuid.uuid4())
     # Integration tradeoff: reuse upstream's private session registry and lock
@@ -98,7 +100,6 @@ def get_cloudpickle_state(session_id: str):
     The client uses this response to refresh its local generator mirror.
     """
     with upstream._locked_session(session_id) as obj:
-
         # Serialize the live generator without modifying its CUDA tensors.
         # A separate CPU-safe snapshot is needed for CPU-only HTTP clients.
         #
