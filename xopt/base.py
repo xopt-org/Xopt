@@ -539,6 +539,9 @@ class Xopt(XoptBaseModel):
         except DataError as exc:
             if self.strict:
                 raise exc
+            warnings.warn(
+                f"Generator rejected {len(new_data)} new data point(s) (strict=False): {exc}"
+            )
 
     def reset_data(self):
         """
