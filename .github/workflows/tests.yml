@@ -23,6 +23,9 @@ jobs:
           max-deletions: 3
 
   test:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -101,5 +104,6 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7.0.0
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           files: coverage.xml
+          fail_ci_if_error: true
