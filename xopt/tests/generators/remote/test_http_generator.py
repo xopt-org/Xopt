@@ -715,3 +715,28 @@ def test_cloudpickle_snapshot_cuda_preference_falls_back_to_cpu():
     finally:
         with upstream._lock:
             upstream._sessions.pop(session_id, None)
+
+
+def test_http_generator_validator_preserves_non_generator_input():
+    from xopt.generators.remote.http import HTTPGenerator
+
+    data = {"timeout": 12.0}
+    assert HTTPGenerator._resolve_generator(data) is data
+
+
+def test_http_generator_rejects_generator_without_name():
+    import pytest
+    from xopt.generators.remote.http import HTTPGenerator
+
+    with pytest.raises(ValueError, match="must include a 'name' key"):
+        HTTPGenerator._resolve_generator({"generator": {}})
+
+
+def test_http_generator_unknown_private_attribute_raises():
+    import pytest
+    from xopt.generators.remote.http import HTTPGenerator
+
+    generator = HTTPGenerator.model_construct()
+
+    with pytest.raises(AttributeError, match="_missing_attribute"):
+        getattr(generator, "_missing_attribute")

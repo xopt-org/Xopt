@@ -105,3 +105,76 @@ def test_different_sessions_do_not_block_each_other():
         release_a.set()
         _remove(first_id)
         _remove(second_id)
+
+
+def test_closed_session_rejects_operations():
+    """A session marked closed must reject further operations."""
+    import pytest
+    from fastapi import HTTPException
+
+    session_id = "locking-closed-session"
+    _register(session_id, _State())
+
+    try:
+        with upstream._lock:
+            upstream._sessions[session_id].closed = True
+
+        with pytest.raises(HTTPException) as exc:
+            with upstream._locked_session(session_id):
+                pass
+
+        assert exc.value.status_code == 404
+    finally:
+        _remove(session_id)
+
+
+def test_delete_unknown_session_returns_404():
+    """Deleting a nonexistent session must return HTTP 404."""
+    import pytest
+    from fastapi import HTTPException
+
+    session_id = "locking-nonexistent-session"
+    _remove(session_id)
+
+    with pytest.raises(HTTPException) as exc:
+        upstream.delete_session(session_id)
+
+    assert exc.value.status_code == 404
+
+
+def test_ingest_failure_returns_400():
+    """Generator ingestion failures must return HTTP 400."""
+    from fastapi import HTTPException
+    import pytest
+
+    class FailingGenerator:
+        def ingest(self, results):
+            raise RuntimeError("intentional ingest failure")
+
+    session_id = "locking-ingest-failure"
+    _register(session_id, FailingGenerator())
+
+    try:
+        request = upstream.IngestRequest(results=[])
+        with pytest.raises(HTTPException) as exc:
+            upstream.ingest(session_id, request)
+
+        assert exc.value.status_code == 400
+        assert "intentional ingest failure" in exc.value.detail
+    finally:
+        _remove(session_id)
+
+
+def test_finalize_failure_does_not_prevent_session_deletion():
+    """A failing finalize hook must not leave a session registered."""
+    class FailingGenerator:
+        def finalize(self):
+            raise RuntimeError("intentional finalize failure")
+
+    session_id = "locking-finalize-failure"
+    _register(session_id, FailingGenerator())
+
+    upstream.delete_session(session_id)
+
+    with upstream._lock:
+        assert session_id not in upstream._sessions
