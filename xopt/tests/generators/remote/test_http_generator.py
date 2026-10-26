@@ -587,7 +587,7 @@ def test_cloudpickle_round_trips_notebook_local_prior(cloudpickle_server_url):
     not torch.cuda.is_available(),
     reason="CUDA GPU required for cross-device snapshot test",
 )
-def test_cloudpickle_cuda_snapshot_preserves_live_generator():
+def test_cloudpickle_cuda_snapshot_preserves_live_generator():  # pragma: no cover
     """Export CUDA tensors to CPU without modifying the live generator."""
     import base64
 
