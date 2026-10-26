@@ -167,6 +167,7 @@ def test_ingest_failure_returns_400():
 
 def test_finalize_failure_does_not_prevent_session_deletion():
     """A failing finalize hook must not leave a session registered."""
+
     class FailingGenerator:
         def finalize(self):
             raise RuntimeError("intentional finalize failure")
