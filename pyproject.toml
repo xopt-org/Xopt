@@ -45,6 +45,7 @@ remote = [
   "requests",
   "fastapi",
   "uvicorn",
+  "cloudpickle",
 ]
 dev = [
   "pytest",
@@ -107,6 +108,9 @@ testpaths = ["xopt/tests"]
 
 [tool.coverage.run]
 data_file = "/tmp/.coverage"
+parallel = true
+patch = ["subprocess"]
+sigterm = true
 
 [tool.setuptools_scm]
 version_file = "xopt/_version.py"

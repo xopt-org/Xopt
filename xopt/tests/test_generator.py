@@ -76,7 +76,7 @@ class TestGenerator:
         gen.ingest(data)
         assert (gen.data == pd.DataFrame(data)).all().all()
 
-    @pytest.mark.parametrize("name", list_available_generators())
+    @pytest.mark.parametrize("name", sorted(list_available_generators()))
     def test_serialization_loading(self, name):
         gen_config = get_generator_defaults(name)
         gen_class = get_generator(name)
@@ -117,7 +117,7 @@ class TestGenerator:
             json.dumps(gen_config)
 
             gen_class(vocs=test_vocs, **gen_config)
-        elif name in ["http"]:
+        elif name in ["http", "cloudpickle_http"]:
             # base_url/generator are required with no generic default; construction
             # doesn't perform I/O, so no server needs to be running
             test_vocs = deepcopy(TEST_VOCS_BASE)

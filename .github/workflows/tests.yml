@@ -23,6 +23,9 @@ jobs:
           max-deletions: 3
 
   test:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -59,7 +62,7 @@ jobs:
           mpi: ${{ matrix.mpi }}
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra remote
 
       - name: List Python package versions
         run: uv pip list
@@ -68,7 +71,7 @@ jobs:
         if: runner.os != 'Windows'
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: uv run pytest -n auto --cov --cov-branch --cov-report=xml
+        run: uv run pytest -n auto --cov --cov-branch --cov-report=
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
@@ -89,9 +92,18 @@ jobs:
           & $devShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
           Get-Command cl -ErrorAction Stop
 
-          uv run pytest -n auto --cov --cov-branch --cov-report=xml
+          uv run pytest -n auto --cov --cov-branch --cov-report=
+
+      - name: Combine coverage and generate XML
+        if: success() || failure()
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
+        run: |
+          uv run coverage xml -o coverage.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7.0.0
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
+          files: coverage.xml
+          fail_ci_if_error: true
