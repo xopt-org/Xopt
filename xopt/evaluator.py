@@ -556,17 +556,7 @@ else:
                 The evaluation results.
             """
             xopt_action = np.array([x[name] for name in self.action_space_names])
-
-            # if self.action_mode == "delta":
-            #     action = target_state - self.current_action_state
-            # else:
-            #     action = target_state
             action = xopt_action
-
-            # snapshot the state the action is actually applied to -- env.step()
-            # computes reward from this state, not from the state it returns, so
-            # pairing the action with the returned observation would associate it
-            # with the wrong (resulting, not originating) state.
             state = self._current_observation
 
             observation, reward, terminated, truncated, info = self.env.step(action)
