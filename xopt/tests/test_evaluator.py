@@ -3,6 +3,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
 
 from xopt.vocs import random_inputs
 
@@ -195,6 +196,40 @@ class TestEvaluator:
 
 
 class TestGymEvaluator:
+    @pytest.mark.parametrize("max_workers", [-1, 0, 2])
+    def test_max_workers_validation(self, max_workers):
+        gym = pytest.importorskip("gymnasium")
+        from xopt.evaluator import GymEvaluator
+
+        env = gym.make("Pendulum-v1")
+        try:
+            kwargs = {
+                "env": env,
+                "action_space_names": ["torque"],
+                "observation_space_names": ["cos_theta", "sin_theta", "theta_dot"],
+            }
+            with pytest.raises(
+                ValidationError, match=r"max_workers\s+Input should be 1"
+            ):
+                GymEvaluator(**kwargs, max_workers=max_workers)
+
+            evaluator = GymEvaluator(**kwargs, max_workers=1)
+            assert evaluator.max_workers == 1
+            executor = evaluator.executor
+            with pytest.raises(
+                ValidationError, match=r"max_workers\s+Input should be 1"
+            ):
+                evaluator.max_workers = max_workers
+            assert evaluator.max_workers == 1
+            assert evaluator.executor is executor
+
+            evaluator.max_workers = 1
+            evaluator.reset()
+            assert evaluator.executor is executor
+            assert "reward" in evaluator.evaluate({"torque": 0.0})
+        finally:
+            env.close()
+
     def test_current_observation_and_step(self):
         gym = pytest.importorskip("gymnasium")
         from xopt.evaluator import GymEvaluator

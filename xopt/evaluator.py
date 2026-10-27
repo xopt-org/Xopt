@@ -2,7 +2,7 @@ import logging
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from enum import Enum
 from threading import Lock
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -85,7 +85,9 @@ class Evaluator(XoptBaseModel):
             )
 
         # Cast as a NormalExecutor
-        values["executor"] = NormalExecutor[type(executor)](executor=executor)
+        if not isinstance(executor, NormalExecutor):
+            executor = NormalExecutor[type(executor)](executor=executor)
+        values["executor"] = executor
         values["max_workers"] = max_workers
 
         return values
@@ -465,6 +467,8 @@ else:
             Names of action space dimensions.
         observation_space_names : List[str]
             Names of observation space dimensions.
+        max_workers : int, default=1
+            Must be 1, including on reassignment.
         """
 
         env: gym.Env
@@ -472,6 +476,9 @@ else:
         observation_space_names: List[str]
         action_history: List[np.ndarray] = []
         action_mode: str
+        max_workers: Literal[1] = 1
+
+        model_config = ConfigDict(validate_assignment=True)
 
         # state the environment is in right now, i.e. the state the *next* action
         # will be applied to. Tracked internally since env.step() only returns the
