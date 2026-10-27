@@ -6,12 +6,14 @@ from xopt.generators.sequential import (
     RCDSGenerator,
     ExtremumSeekingGenerator,
     NelderMeadGenerator,
+    ScipyGenerator,
 )
 from xopt import Evaluator, Xopt
 from xopt.vocs import VOCS
 
 
 def sin_function(input_dict):
+    """Return the one-dimensional objective shared by serialization tests."""
     x = input_dict["x"]
     return {
         "f": -10 * np.exp(-((x - np.pi) ** 2) / 0.01) + 0.5 * np.sin(5 * x),
@@ -20,9 +22,16 @@ def sin_function(input_dict):
 
 class TestSequentialSerialization:
     @pytest.mark.parametrize(
-        "generator", [RCDSGenerator, ExtremumSeekingGenerator, NelderMeadGenerator]
+        "generator",
+        [
+            RCDSGenerator,
+            ExtremumSeekingGenerator,
+            NelderMeadGenerator,
+            ScipyGenerator,
+        ],
     )
     def test_serialization_and_restart(self, generator):
+        """Resume each sequential generator from YAML and verify pickle compatibility."""
         test_vocs = VOCS(
             variables={"x": [0, 3.14159]},
             objectives={"f": "MINIMIZE"},
@@ -43,5 +52,5 @@ class TestSequentialSerialization:
         for i in range(10):
             X2.step()
 
-        # test pickling
         pickle.dumps(X2.generator)
+        X2.generator.reset()
