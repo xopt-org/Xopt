@@ -7,6 +7,7 @@ determine whether optimization should stop.
 """
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import List, Literal, Annotated, Union
 import pandas as pd
 from pydantic import (
@@ -100,6 +101,41 @@ class MaxEvaluationsCondition(StoppingCondition):
             return len(valid_data) >= self.max_evaluations
 
         return len(data) >= self.max_evaluations
+
+
+class MaxTimeCondition(StoppingCondition):
+    """
+    Stop after a maximum elapsed wall-clock time, starting at the first check.
+
+    The timer uses a datetime clock and is checked between optimization steps;
+    running evaluations are not interrupted. Serializing and deserializing the
+    condition preserves the timer's start time.
+
+    Note: Set start_time to None to reset the timer.
+
+    Parameters
+    ----------
+    max_time : float
+        Maximum elapsed time in seconds. Must be positive and finite.
+    """
+
+    name: Literal["MaxTimeCondition"] = "MaxTimeCondition"
+    max_time: PositiveFloat = Field(
+        description="Maximum elapsed wall-clock time in seconds",
+        allow_inf_nan=False,
+    )
+    start_time: datetime | None = Field(default=None)
+
+    @field_serializer("start_time")
+    def serialize_start_time(self, start_time: datetime | None) -> str | None:
+        return start_time.isoformat() if start_time is not None else None
+
+    def should_stop(self, data: pd.DataFrame, vocs: VOCS) -> bool:
+        """Stop when elapsed time reaches the limit, regardless of data."""
+        now = datetime.now()
+        if self.start_time is None:
+            self.start_time = now
+        return (now - self.start_time).total_seconds() >= self.max_time
 
 
 class TargetValueCondition(StoppingCondition):
@@ -352,6 +388,7 @@ class CompositeCondition(StoppingCondition):
 StoppingConditionUnion = Annotated[
     Union[
         MaxEvaluationsCondition,
+        MaxTimeCondition,
         TargetValueCondition,
         ConvergenceCondition,
         StagnationCondition,
