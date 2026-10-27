@@ -6,7 +6,7 @@ The remote endpoint must be trusted: unpickling is code execution.
 """
 
 import base64
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 import cloudpickle
 
@@ -38,13 +38,13 @@ class CloudpickleHTTPGenerator(UpstreamHTTPGenerator):
             self._session_id = response.json()["session_id"]
         return self._session_id
 
-    def pull(self) -> Generator:
+    def pull(self, timeout: Optional[float] = None) -> Generator:
         """Refresh the local mirror from the server's latest generator state."""
         session_id = self._ensure_session()
         response = self._request(
             "GET",
             f"/sessions/{session_id}/state/cloudpickle",
-            timeout=self.state_timeout,
+            timeout=timeout or self.state_timeout,
         )
         # This endpoint is trusted for the same reason as session creation:
         # cloudpickle.loads() can execute Python code in the client process.

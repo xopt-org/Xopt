@@ -74,6 +74,16 @@ class HTTPGenerator(Generator):
         description="timeout in seconds for full-state pulls (may include a "
         "serialized fitted model)",
     )
+    pull_on_dump: bool = Field(
+        default=True,
+        description="pull the latest remote state before Xopt.dump() writes a "
+        "dump file, so the dump matches the server",
+    )
+    dump_pull_timeout: float = Field(
+        default=10.0,
+        description="timeout in seconds for the pull before a dump; if it fails, "
+        "the dump is written from the last pulled copy with a warning",
+    )
 
     _session_id: Optional[str] = PrivateAttr(default=None)
     _http: requests.Session = PrivateAttr(default_factory=requests.Session)
@@ -205,12 +215,27 @@ class HTTPGenerator(Generator):
         finally:
             self._session_id = None
 
-    def pull(self) -> Generator:
+    def sync_for_dump(self) -> None:
+        # with no session there is no remote state newer than the local copy
+        if not self.pull_on_dump or self._session_id is None:
+            return
+        try:
+            self.pull(timeout=self.dump_pull_timeout)
+        except XoptError as exc:
+            warnings.warn(
+                "could not reach the remote generator server before dumping; "
+                "the dump uses the last pulled copy of the generator, which may "
+                f"be out of date: {exc}"
+            )
+
+    def pull(self, timeout: Optional[float] = None) -> Generator:
         """Fetch the remote generator's full state, rebuild it locally, and store
-        it in `self.generator`."""
+        it in `self.generator`. `timeout` defaults to `state_timeout`."""
         session_id = self._ensure_session()
         response = self._request(
-            "GET", f"/sessions/{session_id}/state", timeout=self.state_timeout
+            "GET",
+            f"/sessions/{session_id}/state",
+            timeout=timeout or self.state_timeout,
         )
         generator_class = get_generator_dynamic(self.generator.name)
         mirror = generator_class.model_validate_json(response.text)

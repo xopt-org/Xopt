@@ -204,19 +204,21 @@ fig.savefig("model.png")
 
 `X.data` is always local. `api_key` is never written to dump files.
 
-**Pull before you dump.** A dump saves the client's copy of the generator,
-which is only as recent as the last `pull()`. Anything that changed on the
-server since then is missing. Automatic dumps (`xopt_dump_file`, written after
-every step) never pull, so they always contain this stale copy. For generators
-that refit on the data at each step, such as plain UCB or EI, that is harmless.
-For generators that carry state between steps, such as TuRBO trust regions,
-a reload from an automatic dump continues with that state reset. To save a
-dump that matches the server, pull first:
+**Dumps and the server's state.** The client holds a copy of the generator
+that is only as recent as the last `pull()`. To keep dumps in step with the
+server, `X.dump()`, including the automatic dump after every step when
+`xopt_dump_file` is set, pulls the latest state first. This matters for
+generators that carry state between steps, such as TuRBO trust regions.
 
-```python
-X.generator.pull()
-X.dump("dump.yaml")
-```
+- If the server can't be reached within `dump_pull_timeout` (default 10 s),
+  the dump is still written from the last pulled copy, with a warning.
+- Set `pull_on_dump=False` on the wrapper to skip the pull, e.g. if pulling a
+  large fitted model after every step is too slow. Dumps then contain the last
+  pulled copy.
+- **`X.yaml()`, `X.json()` and displaying `X` in a notebook do not pull.** They
+  show the last pulled copy, which can be out of date. Call
+  `X.generator.pull()` first if you need the current state, or save with
+  `X.dump()`.
 
 **Reloading a dump.** A dump can be loaded again to continue the run in a
 new session on the server. The token isn't saved, so add it before loading.

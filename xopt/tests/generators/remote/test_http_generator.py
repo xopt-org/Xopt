@@ -800,6 +800,71 @@ def test_remote_generator_xopt_dump_round_trip(wrapper):
     assert reloaded.generator.api_key is None
 
 
+def _turbo_xopt(base_url, tmp_path, **wrapper_kwargs):
+    from xopt import Xopt
+    from xopt.evaluator import Evaluator
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid
+
+    vocs = VOCS(variables={"x1": [0, 6.28]}, objectives={"y1": "MINIMIZE"})
+    return Xopt(
+        generator=HTTPGenerator(
+            base_url=base_url,
+            generator=UpperConfidenceBoundGenerator(
+                vocs=vocs, turbo_controller="optimize"
+            ),
+            **wrapper_kwargs,
+        ),
+        evaluator=Evaluator(function=evaluate_sinusoid),
+        xopt_dump_file=str(tmp_path / "dump.yaml"),
+    )
+
+
+def _dumped_turbo_center(tmp_path):
+    import yaml
+
+    config = yaml.safe_load((tmp_path / "dump.yaml").read_text())
+    return config["generator"]["generator"]["turbo_controller"]["center_x"]
+
+
+class TestHTTPGeneratorPullOnDump:
+    def test_automatic_dump_matches_server_state(self, server_url, tmp_path):
+        X = _turbo_xopt(server_url, tmp_path)
+        X.random_evaluate(3)
+        X.step()
+
+        # TuRBO state only changes server-side; the dump must still include it
+        center = _dumped_turbo_center(tmp_path)
+        assert center is not None
+        assert center == X.generator.generator.turbo_controller.center_x
+
+        X.generator.finalize()
+
+    def test_pull_on_dump_disabled_keeps_last_copy(self, server_url, tmp_path):
+        X = _turbo_xopt(server_url, tmp_path, pull_on_dump=False)
+        X.random_evaluate(3)
+        X.step()
+
+        assert _dumped_turbo_center(tmp_path) is None
+
+        X.generator.finalize()
+
+    def test_unreachable_server_warns_and_still_dumps(self, server_url, tmp_path):
+        X = _turbo_xopt(server_url, tmp_path)
+        X.random_evaluate(3)
+        X.step()
+
+        X.generator.base_url = "http://127.0.0.1:1"
+        (tmp_path / "dump.yaml").unlink()
+        with pytest.warns(UserWarning, match="could not reach"):
+            X.dump()
+        assert (tmp_path / "dump.yaml").exists()
+
+        X.generator._session_id = None
+
+
 def test_http_generator_unknown_private_attribute_raises():
     import pytest
     from xopt.generators.remote.http import HTTPGenerator
