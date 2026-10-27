@@ -9,7 +9,7 @@ import logging
 import os
 import threading
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from typing import Iterator
 from typing import Any, Optional
@@ -24,8 +24,9 @@ from xopt.generators import get_generator_dynamic
 
 logger = logging.getLogger(__name__)
 
-# bearer token required of callers when set; the server is open if unset, which
-# is only appropriate on a trusted/loopback network
+# bearer token required of all callers. The server refuses to start without
+# it: session creation unpickles torch modules from the client's config, so an
+# open server would let anyone who can reach the port run code on this host.
 AUTH_TOKEN_ENV_VAR = "XOPT_HTTP_GENERATOR_TOKEN"
 
 
@@ -66,17 +67,38 @@ class ReplaceDataRequest(BaseModel):
     data: list[dict[str, Any]]
 
 
-def _require_auth(authorization: Optional[str] = Header(default=None)) -> None:
+def _configured_token() -> Optional[str]:
     token = os.environ.get(AUTH_TOKEN_ENV_VAR)
+    if token is None or not token.strip():
+        return None
+    return token
+
+
+def _require_auth(authorization: Optional[str] = Header(default=None)) -> None:
+    token = _configured_token()
+    # fail closed if the app is served without the startup check (e.g. mounted
+    # inside another app, whose lifespan does not run this one's)
     if token is None:
-        return
+        raise HTTPException(
+            status_code=503, detail=f"server has no {AUTH_TOKEN_ENV_VAR} configured"
+        )
     if authorization != f"Bearer {token}":
         raise HTTPException(status_code=401, detail="invalid or missing bearer token")
+
+
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    if _configured_token() is None:
+        raise RuntimeError(
+            f"HTTPGenerator server requires a nonempty {AUTH_TOKEN_ENV_VAR}"
+        )
+    yield
 
 
 app = FastAPI(
     title="Xopt HTTPGenerator reference server",
     dependencies=[Depends(_require_auth)],
+    lifespan=_lifespan,
 )
 
 

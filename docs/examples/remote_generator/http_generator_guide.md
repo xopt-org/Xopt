@@ -98,26 +98,29 @@ group's model package or a BAX algorithm library.
 
 ## 2. Start the server
 
+Both servers require a token and will not start without one. Clients send it
+as `api_key`.
+
 For `HTTPGenerator` only:
 
 ```bash
-export XOPT_HTTP_GENERATOR_TOKEN="<a long random string>"   # recommended
+export XOPT_HTTP_GENERATOR_TOKEN="<a long random string>"
 python -m uvicorn xopt.generators.remote.server:app \
   --host 127.0.0.1 --port 8002
 ```
 
 For `CloudpickleHTTPGenerator`, start the cloudpickle server instead. It also
-serves `HTTPGenerator` clients, and it will not start without a token:
+serves `HTTPGenerator` clients:
 
 ```bash
-export XOPT_HTTP_GENERATOR_TOKEN="<a long random string>"   # required
+export XOPT_HTTP_GENERATOR_TOKEN="<a long random string>"
 python -m uvicorn xopt.generators.remote.cloudpickle_server:app \
   --host 127.0.0.1 --port 8002
 ```
 
-If `XOPT_HTTP_GENERATOR_TOKEN` is unset, the plain server accepts requests from
-anyone who can reach the port. Sessions are held in memory and are lost when the
-server restarts.
+One way to generate a token is
+`python -c "import secrets; print(secrets.token_urlsafe(32))"`. Sessions are
+held in memory and are lost when the server restarts.
 
 ## 3. Connect from the client
 
@@ -310,14 +313,15 @@ cell for the variable name. The same code works as a script.
 
 ## Security
 
-- **Both servers will run code sent by any client that can authenticate.**
+- **Both servers will run code sent by any client that has the token.**
   Cloudpickle does this by design. `HTTPGenerator` also does it: PyTorch modules
   in the configuration (custom kernels and mean functions) are sent as
-  `torch.save` data and loaded on the server with full pickle. Treat any client
-  that can reach the server as able to run code there.
-- Always set `XOPT_HTTP_GENERATOR_TOKEN`, bind to `127.0.0.1` and reach the
-  server through an SSH tunnel or a restricted network, and use TLS when
-  crossing networks. Do not expose either server publicly.
+  `torch.save` data and loaded on the server with full pickle. This is why both
+  servers refuse to start without `XOPT_HTTP_GENERATOR_TOKEN`. Share the token
+  only with people you would give a shell on the server.
+- Bind to `127.0.0.1` and reach the server through an SSH tunnel or a
+  restricted network, and use TLS when crossing networks. The token is sent in
+  plain text over unencrypted HTTP. Do not expose either server publicly.
 - The client also unpickles whatever the server returns from `pull()`, so only
   connect to servers you trust.
 - For reproducible results, record the Xopt version and the versions of your

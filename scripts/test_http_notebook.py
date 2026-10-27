@@ -66,18 +66,17 @@ def main():
 
     env = os.environ.copy()
     env["SMOKE_TEST"] = "True"
-    env.pop("XOPT_HTTP_GENERATOR_TOKEN", None)
     env["XOPT_HTTP_URL"] = url
     env["XOPT_REMOTE_URL"] = url
+    # both servers refuse to start without a token
+    token = secrets.token_urlsafe(32)
+    env["XOPT_HTTP_GENERATOR_TOKEN"] = token
 
     with tempfile.TemporaryDirectory(prefix="xopt-notebook-") as tmp:
         if notebook.name == "http_generator_custom_model.ipynb":
-            token = secrets.token_urlsafe(32)
             token_file = Path(tmp) / "token"
             token_file.write_text(token)
             token_file.chmod(0o600)
-
-            env["XOPT_HTTP_GENERATOR_TOKEN"] = token
             env["XOPT_TOKEN_FILE"] = str(token_file)
 
         if args.runner == "uv":

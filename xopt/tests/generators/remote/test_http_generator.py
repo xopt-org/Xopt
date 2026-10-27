@@ -128,10 +128,13 @@ def _uvicorn_subprocess(*, auth_token=None):
             process.stderr.close()
 
 
+SERVER_TOKEN = "module-test-token"
+
+
 @pytest.fixture(scope="module")
 def server_url():
     """Normal upstream HTTP server, one independent process per test module."""
-    with _uvicorn_subprocess() as url:
+    with _uvicorn_subprocess(auth_token=SERVER_TOKEN) as url:
         yield url
 
 
@@ -170,10 +173,40 @@ class _UnregisteredGenerator(Generator):
         return []
 
 
+@pytest.mark.parametrize("token", [None, "", "   "])
+def test_server_refuses_startup_without_token(token):
+    with pytest.raises(RuntimeError, match=AUTH_TOKEN_ENV_VAR):
+        with _uvicorn_subprocess(auth_token=token):
+            pass
+
+
+def test_server_rejects_missing_or_wrong_token(server_url):
+    body = {"generator_name": "random", "state": {}}
+    assert requests.post(server_url + "/sessions", json=body).status_code == 401
+    wrong = {"Authorization": "Bearer wrong-token"}
+    assert (
+        requests.post(server_url + "/sessions", json=body, headers=wrong).status_code
+        == 401
+    )
+
+
+def test_server_rejects_requests_if_token_missing_at_request_time(monkeypatch):
+    from fastapi import HTTPException
+
+    from xopt.generators.remote.server import _require_auth
+
+    monkeypatch.delenv(AUTH_TOKEN_ENV_VAR, raising=False)
+    with pytest.raises(HTTPException) as exc:
+        _require_auth(authorization=None)
+    assert exc.value.status_code == 503
+
+
 class TestHTTPGeneratorRandom:
     def test_suggest_within_bounds(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         points = generator.generate(5)
         assert len(points) == 5
@@ -184,7 +217,9 @@ class TestHTTPGeneratorRandom:
 
     def test_ingest_updates_local_cache(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         results = pd.DataFrame({"x1": [0.1, 0.2], "x2": [0.3, 0.4], "y1": [1.0, 2.0]})
         generator.ingest(results.to_dict(orient="records"))
@@ -194,7 +229,9 @@ class TestHTTPGeneratorRandom:
 
     def test_full_replace_updates_remote_mirror(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         # create a session first
         generator.generate(1)
@@ -210,6 +247,7 @@ class TestHTTPGeneratorRandom:
     def test_unknown_generator_name_raises(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=_UnregisteredGenerator(vocs=RANDOM_VOCS),
         )
         with pytest.raises(XoptError):
@@ -217,7 +255,9 @@ class TestHTTPGeneratorRandom:
 
     def test_unknown_session_raises(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         generator.generate(1)
         # force a bogus session id to simulate an expired/unknown session
@@ -257,6 +297,7 @@ class TestHTTPGeneratorExtraMethods:
     def test_visualize_model_passthrough(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=ExpectedImprovementGenerator(vocs=BO_VOCS),
         )
 
@@ -277,6 +318,7 @@ class TestHTTPGeneratorExtraMethods:
     def test_passthrough_reflects_latest_remote_state(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=ExpectedImprovementGenerator(vocs=BO_VOCS),
         )
 
@@ -297,6 +339,7 @@ class TestHTTPGeneratorExtraMethods:
     def test_mirror_serializes_with_http_generator(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=ExpectedImprovementGenerator(vocs=BO_VOCS),
         )
 
@@ -329,7 +372,9 @@ class TestHTTPGeneratorBax:
         bax_generator = BaxGenerator(vocs=fractional_vocs, algorithm=algorithm)
         bax_generator.gp_constructor.use_low_noise_prior = True
 
-        generator = HTTPGenerator(base_url=server_url, generator=bax_generator)
+        generator = HTTPGenerator(
+            base_url=server_url, api_key=SERVER_TOKEN, generator=bax_generator
+        )
 
         # Verify fractional BAX bounds survive the HTTP round-trip.
         remote_generator = generator.generator
@@ -388,7 +433,9 @@ class TestHTTPGeneratorPriorMean:
             vocs=vocs, gp_constructor=gp_constructor
         )
 
-        generator = HTTPGenerator(base_url=server_url, generator=bo_generator)
+        generator = HTTPGenerator(
+            base_url=server_url, api_key=SERVER_TOKEN, generator=bo_generator
+        )
 
         train_x = np.array([0.2, 0.5, 0.6])
         data = pd.DataFrame(
@@ -831,7 +878,7 @@ def _dumped_turbo_center(tmp_path):
 
 class TestHTTPGeneratorPullOnDump:
     def test_automatic_dump_matches_server_state(self, server_url, tmp_path):
-        X = _turbo_xopt(server_url, tmp_path)
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN)
         X.random_evaluate(3)
         X.step()
 
@@ -843,7 +890,7 @@ class TestHTTPGeneratorPullOnDump:
         X.generator.finalize()
 
     def test_pull_on_dump_disabled_keeps_last_copy(self, server_url, tmp_path):
-        X = _turbo_xopt(server_url, tmp_path, pull_on_dump=False)
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN, pull_on_dump=False)
         X.random_evaluate(3)
         X.step()
 
@@ -852,7 +899,7 @@ class TestHTTPGeneratorPullOnDump:
         X.generator.finalize()
 
     def test_unreachable_server_warns_and_still_dumps(self, server_url, tmp_path):
-        X = _turbo_xopt(server_url, tmp_path)
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN)
         X.random_evaluate(3)
         X.step()
 
