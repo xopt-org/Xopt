@@ -36,7 +36,7 @@ from xopt.vocs import (
 )
 
 from .objectives import feasibility
-from .utils import torch_compile_gp_model, torch_trace_gp_model
+from .utils import torch_compile_gp_model
 
 # Little helper class, which is only used as a type.
 DType = TypeVar("DType")
@@ -195,7 +195,9 @@ def visualize_model(
     exponentiate : bool, optional
         Flag to exponentiate acquisition function before plotting.
     model_compile_mode : str, optional
-        Compilation mode for the model. If None (default), the model is not compiled.
+        Compilation mode for the model. Use ``"inductor"`` to compile the model
+        with PyTorch's default compiler backend. If None (default), the model is
+        not compiled.
     tkwargs: dict, optional
         kwargs for torch tensor creation
     interactive: bool, optional
@@ -268,6 +270,7 @@ def visualize_model(
                 n_grid=n_grid,
                 idx=idx,
                 interactive=interactive,
+                model_compile_mode=model_compile_mode,
             )
             ax[i, 0].set_xlabel(None)
         if show_acquisition:
@@ -437,6 +440,7 @@ def plot_model_prediction(
     color: str = "C0",
     axis: Optional[Axes] = None,
     interactive: bool = False,
+    model_compile_mode: Optional[str] = None,
 ) -> Axes:
     """Displays the GP model prediction for the selected output.
 
@@ -475,6 +479,8 @@ def plot_model_prediction(
         Whether to enable picker functionality for samples in the subplots.
     emit_warning : bool, optional
         Whether to emit a Python warning when acquisition evaluation is skipped for contextual axes.
+    model_compile_mode : str, optional
+        See eponymous parameter of :func:`visualize_model`.
 
     Returns
     -------
@@ -503,6 +509,7 @@ def plot_model_prediction(
         model=model,
         vocs=vocs,
         include_prior_mean=show_prior_mean or requires_prior_mean,
+        model_compile_mode=model_compile_mode,
     )
     if len(variable_names) == 1:
         var_name = variable_names[0]
@@ -1418,7 +1425,9 @@ def _get_model_predictions(
     include_prior_mean : bool, optional
         Whether to include the prior mean in the predictions.
     model_compile_mode: str, optional
-        Compilation mode for the model. If None (default), the model is not compiled.
+        Compilation mode for the model. Use ``"inductor"`` to compile the model
+        with PyTorch's default compiler backend. If None (default), the model is
+        not compiled.
     _
 
     Returns
@@ -1429,27 +1438,11 @@ def _get_model_predictions(
     gp = model.models[vocs.output_names.index(output_name)]
     # input_mesh = input_mesh.unsqueeze(-2)
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        if model_compile_mode == "trace":
-            if hasattr(model, "_jit"):
-                jitgp = model._jit
-            else:
-                jitgp = torch_trace_gp_model(
-                    gp,
-                    vocs,
-                    {"device": input_mesh.device},
-                    posterior=True,
-                    grad=False,
-                    batch_size=input_mesh.shape[-1],
-                )
-                model._jit = jitgp
-            mean, std = jitgp(input_mesh)
-            posterior_mean = mean.detach().squeeze().cpu().numpy()
-            posterior_std = torch.sqrt(std.detach()).squeeze().cpu().numpy()
-        elif model_compile_mode == "inductor":
-            jitgp = torch_compile_gp_model(
+        if model_compile_mode == "inductor":
+            compiled_gp = torch_compile_gp_model(
                 gp, vocs, {"device": input_mesh.device}, posterior=True, grad=False
             )
-            posterior = jitgp(input_mesh)
+            posterior = compiled_gp(input_mesh)
             posterior_mean = posterior.mean.detach().squeeze().cpu().numpy()
             posterior_std = (
                 torch.sqrt(posterior.variance).detach().squeeze().cpu().numpy()
