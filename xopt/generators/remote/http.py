@@ -7,7 +7,14 @@ from typing import Any, ClassVar, Optional
 
 import pandas as pd
 import requests
-from pydantic import Field, PrivateAttr, SerializeAsAny, model_validator
+from pydantic import (
+    Field,
+    FieldSerializationInfo,
+    PrivateAttr,
+    SerializeAsAny,
+    field_serializer,
+    model_validator,
+)
 
 from xopt.errors import XoptError
 from xopt.generator import Generator
@@ -54,7 +61,10 @@ class HTTPGenerator(Generator):
         "pulled remote state after suggest/ingest/pull calls"
     )
     api_key: Optional[str] = Field(
-        default=None, description="bearer token sent as the Authorization header"
+        default=None,
+        description="bearer token sent as the Authorization header; "
+        "excluded from serialized output so it never lands in dump files",
+        exclude=True,
     )
     timeout: float = Field(
         default=30.0, description="timeout in seconds for suggest/ingest requests"
@@ -84,6 +94,10 @@ class HTTPGenerator(Generator):
                 raise ValueError(
                     "generator dict config must include a 'name' key"
                 ) from None
+            # Xopt only moves a top-level `vocs` into this outer generator;
+            # pass it down so YAML configs don't need to repeat it
+            if "vocs" not in wrapped and "vocs" in data:
+                wrapped["vocs"] = data["vocs"]
             wrapped = get_generator_dynamic(name).model_validate(wrapped)
             data["generator"] = wrapped
 
@@ -95,6 +109,15 @@ class HTTPGenerator(Generator):
                 data.setdefault(flag, getattr(wrapped, flag))
 
         return data
+
+    @field_serializer("generator")
+    def _serialize_generator(
+        self, value: Generator, info: FieldSerializationInfo
+    ) -> dict[str, Any]:
+        # `name` is a ClassVar and not dumped; _resolve_generator needs it
+        # to rebuild the wrapped generator when a saved config is reloaded.
+        # Dump `value` itself so subclass fields (e.g. UCB `beta`) are kept.
+        return {"name": value.name} | value.model_dump(mode=info.mode)
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)

@@ -732,6 +732,74 @@ def test_http_generator_rejects_generator_without_name():
         HTTPGenerator._resolve_generator({"generator": {}})
 
 
+def test_http_generator_yaml_inherits_top_level_vocs():
+    from xopt import Xopt
+
+    X = Xopt.from_yaml(
+        """
+        generator:
+          name: http
+          base_url: http://127.0.0.1:8002
+          generator:
+            name: upper_confidence_bound
+            beta: 0.1
+        evaluator:
+          function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
+        vocs:
+          variables: {x1: [0, 6.28]}
+          objectives: {y1: MINIMIZE}
+        """
+    )
+
+    assert isinstance(X.generator, HTTPGenerator)
+    assert X.generator.generator.vocs.variable_names == ["x1"]
+
+
+def test_http_generator_api_key_not_serialized():
+    from xopt import Xopt
+    from xopt.evaluator import Evaluator
+    from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid
+
+    vocs = VOCS(variables={"x1": [0, 6.28]}, objectives={"y1": "MINIMIZE"})
+    generator = HTTPGenerator(
+        base_url="http://127.0.0.1:8002",
+        generator=RandomGenerator(vocs=vocs),
+        api_key="secret-token",
+    )
+    X = Xopt(generator=generator, evaluator=Evaluator(function=evaluate_sinusoid))
+
+    assert "secret-token" not in X.yaml()
+    assert "secret-token" not in generator.to_json()
+    assert generator._http.headers["Authorization"] == "Bearer secret-token"
+
+
+@pytest.mark.parametrize("wrapper", [HTTPGenerator, CloudpickleHTTPGenerator])
+def test_remote_generator_xopt_dump_round_trip(wrapper):
+    from xopt import Xopt
+    from xopt.evaluator import Evaluator
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid
+
+    vocs = VOCS(variables={"x1": [0, 6.28]}, objectives={"y1": "MINIMIZE"})
+    X = Xopt(
+        generator=wrapper(
+            base_url="http://127.0.0.1:8002",
+            generator=UpperConfidenceBoundGenerator(vocs=vocs, beta=0.3),
+            api_key="secret-token",
+        ),
+        evaluator=Evaluator(function=evaluate_sinusoid),
+    )
+
+    reloaded = Xopt.from_yaml(X.yaml())
+
+    assert type(reloaded.generator) is wrapper
+    assert isinstance(reloaded.generator.generator, UpperConfidenceBoundGenerator)
+    assert reloaded.generator.generator.beta == 0.3
+    assert reloaded.generator.api_key is None
+
+
 def test_http_generator_unknown_private_attribute_raises():
     import pytest
     from xopt.generators.remote.http import HTTPGenerator

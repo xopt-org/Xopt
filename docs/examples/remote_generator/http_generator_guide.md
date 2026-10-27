@@ -1,7 +1,7 @@
 # Remote Generators — User Guide
 
-Remote generators let you keep your usual Xopt workflow in a notebook (VOCS,
-evaluator, `X.step()`, `X.data`) while the generator itself (GP training,
+Remote generators let you keep your usual Xopt workflow (VOCS, evaluator,
+`X.step()`, `X.data`) in a notebook or Python script while the generator itself (GP training,
 acquisition optimization, BAX execution paths) runs in a separate server
 process. That process can be on the same machine or on a different host, such
 as a GPU node.
@@ -15,7 +15,10 @@ X = Xopt(generator=generator, evaluator=evaluator)
 ```
 
 Your evaluator, and therefore all machine or simulation access, stays on the
-client. Only the generator's work moves to the server.
+client (your notebook or script). Only the generator's work moves to the
+server. Everything below applies to notebooks and scripts alike; the few
+practical differences are listed in
+[Notebooks, scripts, and YAML](#notebooks-scripts-and-yaml).
 
 ## Which generator should I use?
 
@@ -26,7 +29,7 @@ server. The only difference is how your configured generator gets there.
   state you get from `generator.to_json()`, and the server rebuilds it from that.
 - **`CloudpickleHTTPGenerator`** sends the Python object itself with
   [cloudpickle](https://github.com/cloudpipe/cloudpickle), including the code of
-  any classes you defined in the notebook.
+  any classes you defined in your notebook or script.
 
 The question to ask is: **can the server import every class used in my
 generator?**
@@ -44,12 +47,13 @@ covers most problems:
   the server can rebuild these as long as **the same package and version are installed there**.
 
 **Use `CloudpickleHTTPGenerator`** when part of the generator is defined in
-your notebook and isn't installed on the server. The typical case is the
+your notebook, or in the script you are running, and isn't installed on the
+server. Both count as `__main__`, so they behave the same way. The typical case is the
 [custom GP model example](../single_objective_bayes_opt/custom_model.ipynb):
 you write a `torch.nn.Module` prior mean in a cell, for example a thin-lens
 beam-size model or a fit to last week's data, and pass it as
 `mean_modules={"beam_size": MyPrior()}`. Another case is a BAX `Algorithm`
-subclass you are still developing in the notebook. With `HTTPGenerator` these
+subclass you are still developing. With `HTTPGenerator` these
 fail when the session is created, with an error such as
 `Can't get attribute 'MyPrior' on <module '__main__'>`. Cloudpickle sends the
 class definition along with the object.
@@ -115,7 +119,7 @@ If `XOPT_HTTP_GENERATOR_TOKEN` is unset, the plain server accepts requests from
 anyone who can reach the port. Sessions are held in memory and are lost when the
 server restarts.
 
-## 3. Connect from the notebook
+## 3. Connect from the client
 
 ```python
 from xopt.generators.remote.http import HTTPGenerator
@@ -147,6 +151,149 @@ client.
 - **Ending a session.** Call `X.generator.finalize()` to free the session on
   the server. The server keeps running for other sessions.
 
+## Notebooks, scripts, and YAML
+
+The remote generator works the same in all three. These are the practical
+differences.
+
+**Server address and token.** Read them from the environment rather than
+writing them into the code:
+
+```python
+import os
+
+generator = HTTPGenerator(
+    base_url=os.environ.get("XOPT_HTTP_URL", "http://127.0.0.1:8002"),
+    generator=my_generator,
+    api_key=os.environ["XOPT_HTTP_GENERATOR_TOKEN"],
+)
+```
+
+A script sees the variables of the shell it is started from. A Jupyter kernel
+only sees variables that were set before Jupyter was launched; setting them in
+a terminal afterwards has no effect until you restart Jupyter. In a notebook
+you can also set them in a cell with `os.environ[...] = ...` before creating
+the generator.
+
+**Ending the session.** Each `HTTPGenerator` opens one session on the server
+the first time it is used, and only `finalize()` closes it. `X.run()` calls
+`finalize()` when it finishes. Nothing else does: not a `X.step()` loop, a
+script that crashes or is interrupted with Ctrl-C, a kernel restart, or
+re-running the notebook cell that creates the generator. Each of those leaves
+the old session on the server until the server restarts. In a script with its
+own loop, use `try`/`finally`:
+
+```python
+try:
+    for _ in range(n_steps):
+        X.step()
+finally:
+    X.generator.finalize()
+```
+
+In a notebook, call `X.generator.finalize()` before re-creating the generator.
+
+**Inspecting the model.** In a notebook you call `X.generator.pull()` or
+`X.generator.visualize_model()` whenever you want to look at the model. In a
+script, pull once at the end, before `finalize()`, and save what you need:
+
+```python
+fig, ax = X.generator.visualize_model()
+fig.savefig("model.png")
+```
+
+`X.data` is always local. `api_key` is never written to dump files.
+
+**Pull before you dump.** A dump saves the client's copy of the generator,
+which is only as recent as the last `pull()`. Anything that changed on the
+server since then is missing. Automatic dumps (`xopt_dump_file`, written after
+every step) never pull, so they always contain this stale copy. For generators
+that refit on the data at each step, such as plain UCB or EI, that is harmless.
+For generators that carry state between steps, such as TuRBO trust regions,
+a reload from an automatic dump continues with that state reset. To save a
+dump that matches the server, pull first:
+
+```python
+X.generator.pull()
+X.dump("dump.yaml")
+```
+
+**Reloading a dump.** A dump can be loaded again to continue the run in a
+new session on the server. The token isn't saved, so add it before loading.
+If the dump contains data, loading it sends that data to the server right
+away, so the server must be running:
+
+```python
+import os
+import yaml
+from xopt import Xopt
+
+config = yaml.safe_load(open("dump.yaml"))
+config["generator"]["api_key"] = os.environ["XOPT_HTTP_GENERATOR_TOKEN"]
+X = Xopt.from_dict(config)
+```
+
+To just look at the data without contacting the server, read the file
+directly: `yaml.safe_load(open("dump.yaml"))["data"]`.
+
+By default, dumps leave out PyTorch modules such as custom kernels and prior
+means, so a reloaded generator quietly falls back to the default model. To
+keep them, set these on the Xopt object before it writes the dump:
+
+```python
+X.serialize_torch = True
+X.serialize_inline = True  # embed in the YAML; otherwise saved as .pt files in the working directory
+```
+
+Set them as attributes as shown. Passing them to `X.dump()` raises a
+`TypeError`. Without `serialize_inline`, the dump refers to the `.pt` files
+by a path relative to the working directory, so load it from that same
+directory and keep the files with the dump.
+
+The modules are stored by import path, the same as in
+[Which generator should I use?](#which-generator-should-i-use), so a reload
+only works where their classes can be imported. Classes defined in a notebook
+or script cannot be reloaded from a dump. This is normal Xopt behaviour, not
+specific to remote generators.
+
+**YAML.** Use `name: http` (or `name: cloudpickle_http`) and put your usual
+generator config under a nested `generator:` key. `vocs` can go at the top
+level, under the outer generator, or under the nested one:
+
+```yaml
+generator:
+  name: http
+  base_url: http://127.0.0.1:8002
+  generator:
+    name: upper_confidence_bound
+    beta: 0.1
+  vocs:
+    variables: {x1: [0, 6.28]}
+    objectives: {y1: MINIMIZE}
+evaluator:
+  function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
+stopping_condition:
+  name: MaxEvaluationsCondition
+  max_evaluations: 20
+```
+
+Keep the token out of the file and add it when loading:
+
+```python
+import os
+import yaml
+from xopt import Xopt
+
+config = yaml.safe_load(open("remote_ucb.yaml"))
+config["generator"]["api_key"] = os.environ["XOPT_HTTP_GENERATOR_TOKEN"]
+X = Xopt.from_dict(config)
+X.run()
+```
+
+A YAML file can only reference classes by import path, so custom classes must
+come from a module the server can import. Notebook-defined classes are not an
+option here.
+
 ## 5. Examples
 
 | Notebook | Wrapper | Shows |
@@ -155,8 +302,9 @@ client.
 | [`http_generator_bax.ipynb`](http_generator_bax.ipynb) | `HTTPGenerator` | Remote BAX with a built-in algorithm (`GridOptimize`) |
 | [`http_generator_custom_model.ipynb`](http_generator_custom_model.ipynb) | `CloudpickleHTTPGenerator` | Custom kernel and a notebook-defined prior mean |
 
-Each notebook reads the server address from an environment variable, which you
-can set before launching Jupyter. Check the first cell for the variable name.
+Each notebook reads the server address from an environment variable (see
+[Notebooks, scripts, and YAML](#notebooks-scripts-and-yaml)). Check the first
+cell for the variable name. The same code works as a script.
 
 ## Security
 
