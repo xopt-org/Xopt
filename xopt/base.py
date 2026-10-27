@@ -391,8 +391,8 @@ class Xopt(XoptBaseModel):
         while True:
             # Check custom stopping condition
             if self.stopping_condition is not None:
-                if self.data is not None and self.stopping_condition.should_stop(
-                    self.data, self.vocs
+                if self.stopping_condition.should_stop(
+                    self.data if self.data is not None else pd.DataFrame(), self.vocs
                 ):
                     logger.info("Xopt is done. Stopping condition met.")
                     break
