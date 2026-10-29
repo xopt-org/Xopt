@@ -79,7 +79,8 @@ Some points apply to both wrappers:
 
 - **Neither one decides whether the GPU is used.** Both run the generator on the
   server. GPU use is set on the generator as usual (`use_cuda=True`) and depends
-  on the server's hardware.
+  on the server's hardware. A model fitted on a GPU server is moved to the CPU
+  when it is pulled by, or a dump of it is reloaded on, a client without CUDA.
 - **Package versions must match.** Xopt, PyTorch, BoTorch, and GPyTorch need
   compatible versions on client and server. This matters even more for
   cloudpickle.
@@ -153,6 +154,9 @@ client.
   run on the client.
 - **Ending a session.** Call `X.generator.finalize()` to free the session on
   the server. The server keeps running for other sessions.
+- **Errors.** A failed request raises `XoptError` with the HTTP status and the
+  server's message, e.g. `unknown session '...'` after a server restart, or
+  `invalid or missing bearer token`.
 
 ## Notebooks, scripts, and YAML
 
@@ -224,9 +228,11 @@ generators that carry state between steps, such as TuRBO trust regions.
   `X.dump()`.
 
 **Reloading a dump.** A dump can be loaded again to continue the run in a
-new session on the server. The token isn't saved, so add it before loading.
-If the dump contains data, loading it sends that data to the server right
-away, so the server must be running:
+new session on the server. Loading contacts the server: if the dump contains
+data, it is sent to the server while the Xopt object is being validated, so
+the server must be running and the token must already be in the config. The
+token isn't saved, so add it to the loaded dict before calling `from_dict`.
+`Xopt.from_yaml(open("dump.yaml"))` on its own fails with a `401`:
 
 ```python
 import os
@@ -237,6 +243,12 @@ config = yaml.safe_load(open("dump.yaml"))
 config["generator"]["api_key"] = os.environ["XOPT_HTTP_GENERATOR_TOKEN"]
 X = Xopt.from_dict(config)
 ```
+
+The evaluator function is saved by import path. A function defined in the
+notebook or script itself is saved as `__main__.<name>`, so after a kernel
+restart or in a new process, define it again (run that cell) before loading,
+or the load fails with `module '__main__' has no attribute '<name>'`. The
+same holds for any other callable in the config, such as a custom objective.
 
 To just look at the data without contacting the server, read the file
 directly: `yaml.safe_load(open("dump.yaml"))["data"]`.

@@ -250,7 +250,8 @@ class TestHTTPGeneratorRandom:
             api_key=SERVER_TOKEN,
             generator=_UnregisteredGenerator(vocs=RANDOM_VOCS),
         )
-        with pytest.raises(XoptError):
+        # the server's reason must reach the user, not just "400 Client Error"
+        with pytest.raises(XoptError, match="unknown generator 'not_a_real_generator'"):
             generator.generate(1)
 
     def test_unknown_session_raises(self, server_url):
@@ -262,7 +263,7 @@ class TestHTTPGeneratorRandom:
         generator.generate(1)
         # force a bogus session id to simulate an expired/unknown session
         generator._session_id = "does-not-exist"
-        with pytest.raises(XoptError):
+        with pytest.raises(XoptError, match="unknown session 'does-not-exist'"):
             generator.generate(1)
 
     def test_auth_required(self, authenticated_server_url):
@@ -271,7 +272,7 @@ class TestHTTPGeneratorRandom:
         unauthenticated = HTTPGenerator(
             base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
         )
-        with pytest.raises(XoptError):
+        with pytest.raises(XoptError, match="401.*invalid or missing bearer token"):
             unauthenticated.generate(1)
 
         authenticated = HTTPGenerator(
@@ -905,11 +906,122 @@ class TestHTTPGeneratorPullOnDump:
 
         X.generator.base_url = "http://127.0.0.1:1"
         (tmp_path / "dump.yaml").unlink()
-        with pytest.warns(UserWarning, match="could not reach"):
+        with pytest.warns(UserWarning, match="could not pull"):
             X.dump()
         assert (tmp_path / "dump.yaml").exists()
 
         X.generator._session_id = None
+
+    def test_checkpoint_restores_into_new_session_and_continues(
+        self, server_url, tmp_path
+    ):
+        """Full recovery: dump, lose the server session, reload the dump into a
+        new session and keep optimizing with the TuRBO state intact."""
+        import yaml
+
+        from xopt import Xopt
+
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN)
+        X.random_evaluate(3)
+        X.step()
+        X.step()
+        n_before = len(X.data)
+        old_session = X.generator._session_id
+
+        config = yaml.safe_load((tmp_path / "dump.yaml").read_text())
+        dumped_turbo = config["generator"]["generator"]["turbo_controller"]
+        assert dumped_turbo["center_x"] is not None
+
+        # the original session is gone for good
+        X.generator.finalize()
+        X.generator._session_id = old_session
+        with pytest.raises(XoptError, match="unknown session"):
+            X.generator.generate(1)
+        X.generator._session_id = None
+
+        # loading contacts the server, so the token has to be in place first
+        with pytest.raises(XoptError, match="401"):
+            Xopt.from_dict(yaml.safe_load((tmp_path / "dump.yaml").read_text()))
+        config["generator"]["api_key"] = SERVER_TOKEN
+        X2 = Xopt.from_dict(config)
+
+        assert len(X2.data) == n_before
+        assert X2.generator._session_id not in (None, old_session)
+        turbo_keys = ("center_x", "length", "best_value")
+        local_turbo = X2.generator.generator.turbo_controller
+        remote_turbo = X2.generator.pull().turbo_controller
+        for key in turbo_keys:
+            assert getattr(local_turbo, key) == dumped_turbo[key]
+            assert getattr(remote_turbo, key) == dumped_turbo[key]
+
+        X2.step()
+        assert len(X2.data) == n_before + 1
+        assert _dumped_turbo_center(tmp_path) is not None
+
+        X2.generator.finalize()
+
+
+class _FakeResponse:
+    def __init__(self, text):
+        self.text = text
+
+
+@pytest.mark.skipif(torch.cuda.is_available(), reason="checks the CPU-only client path")
+def test_pull_maps_cuda_model_to_cpu(monkeypatch):
+    """A model fitted on a GPU server must load on a CPU-only client."""
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.generators.remote import server
+
+    remote = UpperConfidenceBoundGenerator(vocs=BO_VOCS)
+    remote.add_data(pd.DataFrame({"x": [0.1, 0.5, 0.9], "y": [1.0, 0.2, 0.7]}))
+    remote.train_model()
+
+    # the server serializes the state with the storages tagged as CUDA
+    session_id = "cuda-state"
+    with server._lock:
+        server._sessions[session_id] = server.GeneratorSession(remote)
+    monkeypatch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")
+    try:
+        state_json = server.get_state(session_id).body.decode()
+    finally:
+        monkeypatch.undo()
+        with server._lock:
+            server._sessions.pop(session_id, None)
+    assert "base64:" in state_json
+
+    client = HTTPGenerator(
+        base_url="http://127.0.0.1:1",
+        generator=UpperConfidenceBoundGenerator(vocs=BO_VOCS),
+    )
+    client._session_id = "cuda-state"
+    monkeypatch.setattr(
+        client, "_request", lambda *args, **kwargs: _FakeResponse(state_json)
+    )
+
+    mirror = client.pull()
+    assert mirror.model is not None
+    assert all(p.device.type == "cpu" for p in mirror.model.parameters())
+    assert all(b.device.type == "cpu" for b in mirror.model.buffers())
+
+
+def test_pull_reconstruction_failure_is_xopt_error(monkeypatch):
+    """Any failure while rebuilding the pulled state is an XoptError, so
+    `sync_for_dump()` falls back to the last copy instead of breaking the dump."""
+    client = HTTPGenerator(
+        base_url="http://127.0.0.1:1",
+        generator=RandomGenerator(vocs=RANDOM_VOCS),
+    )
+    client._session_id = "whatever"
+    monkeypatch.setattr(
+        client, "_request", lambda *args, **kwargs: _FakeResponse('{"vocs": 1}')
+    )
+
+    with pytest.raises(XoptError, match="failed to rebuild"):
+        client.pull()
+    with pytest.warns(UserWarning, match="could not pull"):
+        client.sync_for_dump()
 
 
 def test_http_generator_unknown_private_attribute_raises():

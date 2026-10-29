@@ -22,6 +22,18 @@ from xopt.generators import get_generator_dynamic
 
 logger = logging.getLogger(__name__)
 
+
+def _error_detail(response: requests.Response) -> str:
+    """The server's error message: FastAPI's `detail`, else the response body."""
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = None
+    if detail is None:
+        detail = response.text.strip() or response.reason
+    return str(detail)[:500]
+
+
 _SUPPORTS_FLAGS = (
     "supports_batch_generation",
     "supports_no_objective",
@@ -156,6 +168,13 @@ class HTTPGenerator(Generator):
                 method, self._url(path), timeout=timeout or self.timeout, **kwargs
             )
             response.raise_for_status()
+        except requests.HTTPError as exc:
+            # include the server's reason (e.g. "unknown generator 'foo'"); the
+            # HTTPError message itself is only the status line and URL
+            raise XoptError(
+                f"HTTPGenerator request to {path!r} failed "
+                f"({exc.response.status_code}): {_error_detail(exc.response)}"
+            ) from exc
         except requests.RequestException as exc:
             raise XoptError(f"HTTPGenerator request to {path!r} failed: {exc}") from exc
         return response
@@ -223,7 +242,7 @@ class HTTPGenerator(Generator):
             self.pull(timeout=self.dump_pull_timeout)
         except XoptError as exc:
             warnings.warn(
-                "could not reach the remote generator server before dumping; "
+                "could not pull the remote generator state before dumping; "
                 "the dump uses the last pulled copy of the generator, which may "
                 f"be out of date: {exc}"
             )
@@ -238,7 +257,14 @@ class HTTPGenerator(Generator):
             timeout=timeout or self.state_timeout,
         )
         generator_class = get_generator_dynamic(self.generator.name)
-        mirror = generator_class.model_validate_json(response.text)
+        try:
+            mirror = generator_class.model_validate_json(response.text)
+        except Exception as exc:
+            # e.g. a torch.load failure; raise XoptError so sync_for_dump() can
+            # fall back to the last pulled copy instead of breaking the dump
+            raise XoptError(
+                f"failed to rebuild the remote generator state locally: {exc}"
+            ) from exc
         # `data` is excluded from the remote state dump; reuse our own synced cache
         mirror.data = self.data
         self.generator = mirror

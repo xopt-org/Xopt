@@ -151,10 +151,13 @@ def suggest(session_id: str, request: SuggestRequest) -> SuggestResponse:
     try:
         with _locked_session(session_id) as generator:
             points = generator.suggest(request.num_points)
-    except Exception:
+    except HTTPException:
+        # e.g. unknown session; don't turn it into a generic 500
+        raise
+    except Exception as exc:
         logger.exception("generator.suggest failed")
         raise HTTPException(
-            status_code=500, detail="generator failed to produce points"
+            status_code=500, detail=f"generator failed to produce points: {exc}"
         )
     return SuggestResponse(points=points)
 
@@ -164,6 +167,8 @@ def ingest(session_id: str, request: IngestRequest) -> None:
     try:
         with _locked_session(session_id) as generator:
             generator.ingest(request.results)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("generator.ingest failed")
         raise HTTPException(status_code=400, detail=f"failed to ingest results: {exc}")
