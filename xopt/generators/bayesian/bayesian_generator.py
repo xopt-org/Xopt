@@ -114,7 +114,8 @@ class BayesianGenerator(Generator, ABC):
         The optimizer used to optimize the acquisition function in Bayesian Optimization.
 
     max_travel_distances : Optional[List[float]]
-        The limits for travel distances between points in normalized space.
+        Maximum travel distance for each variable between optimization steps, specified as a
+        fraction of each variable's total range.
 
     fixed_features : Optional[Dict[str, float]]
         The fixed features used in Bayesian Optimization.
@@ -176,7 +177,7 @@ class BayesianGenerator(Generator, ABC):
     )
     max_travel_distances: Optional[List[float]] = Field(
         None,
-        description="limits for travel distance between points in normalized space",
+        description="max travel distance for each variable between optimization steps, as fraction of each variable's range",
     )
     fixed_features: Optional[Dict[str, float]] = Field(
         None, description="fixed features used in Bayesian optimization"
@@ -1141,7 +1142,7 @@ class BayesianGenerator(Generator, ABC):
         optimization should be generated based on the maximum travel distances
         specified. The region is centered around the last observation in the
         optimization space. The `max_travel_distances` parameter should be a list of
-        maximum travel distances for each variable.
+        maximum travel distances specified as a fraction of the total range for each variable.
 
         """
         if len(self.max_travel_distances) != bounds.shape[-1]:
