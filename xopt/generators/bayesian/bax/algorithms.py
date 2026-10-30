@@ -176,7 +176,13 @@ class GridScanAlgorithm(Algorithm, ABC):
 
         dim = len(bounds[0])
         linspace_list = [
-            torch.linspace(bounds.T[i][0], bounds.T[i][1], self.n_mesh_points)
+            torch.linspace(
+                bounds.T[i][0],
+                bounds.T[i][1],
+                self.n_mesh_points,
+                device=bounds.device,
+                dtype=bounds.dtype,
+            )
             for i in range(dim)
         ]
 

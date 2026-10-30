@@ -41,6 +41,12 @@ readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
+remote = [
+  "requests",
+  "fastapi",
+  "uvicorn",
+  "cloudpickle",
+]
 dev = [
   "pytest",
   "pytest-cov",
@@ -57,6 +63,10 @@ dev = [
   "libensemble",
   "nbconvert",
   "pre-commit",
+  "requests",
+  "fastapi",
+  "uvicorn",
+  "httpx",
 ]
 doc = [
   "mkdocs",
@@ -99,6 +109,9 @@ testpaths = ["xopt/tests"]
 
 [tool.coverage.run]
 data_file = "/tmp/.coverage"
+parallel = true
+patch = ["subprocess"]
+sigterm = true
 
 [tool.setuptools_scm]
 version_file = "xopt/_version.py"

@@ -469,6 +469,18 @@ def test_process_and_encode_decode_torch_module():
     assert isinstance(decoded, torch.nn.Module)
 
 
+@pytest.mark.skipif(torch.cuda.is_available(), reason="checks the CPU-only client path")
+def test_decode_torch_module_maps_cuda_tensors_to_cpu(monkeypatch):
+    # tag the storages as CUDA while saving, as a GPU server would; without
+    # `map_location` loading this on a CPU-only machine raises a RuntimeError
+    monkeypatch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")
+    encoded = encode_torch_module(DummyTorchModule())
+    monkeypatch.undo()
+
+    decoded = decode_torch_module("base64:" + encoded)
+    assert all(p.device.type == "cpu" for p in decoded.parameters())
+
+
 def test_xoptbasemodel_to_json_yaml(tmp_path):
     class M(XoptBaseModel):
         a: int = 1
