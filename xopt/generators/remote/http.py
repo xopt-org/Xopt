@@ -5,6 +5,7 @@ import logging
 import warnings
 from typing import Any, ClassVar, Optional
 
+import numpy as np
 import pandas as pd
 import requests
 from pydantic import (
@@ -21,6 +22,32 @@ from xopt.generator import Generator
 from xopt.generators import get_generator_dynamic
 
 logger = logging.getLogger(__name__)
+
+
+def _records_json(key: str, data: Optional[pd.DataFrame]) -> str:
+    """JSON body `{key: rows}` with the rows of `data` as records. Floats are
+    emitted with `repr`, so values round-trip exactly; `DataFrame.to_json`
+    rounds to 10 decimal places, which turns an emittance of 1e-9 into 0 on the
+    server. NaN and inf are kept as JSON tokens, which the server's parser
+    accepts (`requests`' own `json=` rejects them)."""
+    rows = [] if data is None else data.to_dict(orient="records")
+    return json.dumps({key: rows}, default=_scalar)
+
+
+def _scalar(value: Any) -> Any:
+    # numpy values and timestamps from DataFrame.to_dict that json can't handle
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if value is pd.NA or value is pd.NaT:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    if hasattr(value, "item"):
+        return value.item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+_JSON_HEADERS = {"Content-Type": "application/json"}
 
 
 def _error_detail(response: requests.Response) -> str:
@@ -77,6 +104,7 @@ class HTTPGenerator(Generator):
         description="bearer token sent as the Authorization header; "
         "excluded from serialized output so it never lands in dump files",
         exclude=True,
+        repr=False,
     )
     timeout: float = Field(
         default=30.0, description="timeout in seconds for suggest/ingest requests"
@@ -132,6 +160,17 @@ class HTTPGenerator(Generator):
 
         return data
 
+    @model_validator(mode="after")
+    def _check_vocs_match(self) -> "HTTPGenerator":
+        # Xopt validates inputs against the outer vocs while the server optimizes
+        # with the inner one; a dump holds both, so an edit to one of them would
+        # otherwise go unnoticed
+        if self.vocs != self.generator.vocs:
+            raise ValueError(
+                "`vocs` of the HTTPGenerator and of the wrapped generator differ"
+            )
+        return self
+
     @field_serializer("generator")
     def _serialize_generator(
         self, value: Generator, info: FieldSerializationInfo
@@ -141,21 +180,33 @@ class HTTPGenerator(Generator):
         # Dump `value` itself so subclass fields (e.g. UCB `beta`) are kept.
         return {"name": value.name} | value.model_dump(mode=info.mode)
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        if self.api_key:
-            self._http.headers["Authorization"] = f"Bearer {self.api_key}"
+    def __deepcopy__(self, memo: dict) -> "HTTPGenerator":
+        # Xopt deepcopies its generator on construction; the copy must not share
+        # the original's session, or both would ingest into one remote generator
+        # and finalize() on either would close it for both
+        private = self.__pydantic_private__
+        http, private["_http"] = private["_http"], None
+        try:
+            copied = super().__deepcopy__(memo)
+        finally:
+            private["_http"] = http
+        copied._session_id = None
+        copied._http = requests.Session()
+        return copied
 
     def __setattr__(self, name: str, value: Any) -> None:
-        super().__setattr__(name, value)
         # Xopt.reset_data()/remove_data() assign `generator.data` directly, bypassing
         # add_data(); mirror that full replacement remotely (unless we triggered it).
+        # Push first so a failed request leaves the local data unchanged.
         if (
             name == "data"
             and not getattr(self, "_syncing", False)
             and getattr(self, "_session_id", None) is not None
         ):
+            if value is not None and not isinstance(value, pd.DataFrame):
+                value = pd.DataFrame(value)
             self._push_full_data(value)
+        super().__setattr__(name, value)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url.rstrip('/')}{path}"
@@ -163,9 +214,17 @@ class HTTPGenerator(Generator):
     def _request(
         self, method: str, path: str, *, timeout: Optional[float] = None, **kwargs: Any
     ) -> requests.Response:
+        # set per request so `api_key` assigned after construction takes effect
+        headers = dict(kwargs.pop("headers", None) or {})
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         try:
             response = self._http.request(
-                method, self._url(path), timeout=timeout or self.timeout, **kwargs
+                method,
+                self._url(path),
+                timeout=timeout or self.timeout,
+                headers=headers,
+                **kwargs,
             )
             response.raise_for_status()
         except requests.HTTPError as exc:
@@ -189,8 +248,27 @@ class HTTPGenerator(Generator):
                 "/sessions",
                 json={"generator_name": self.generator.name, "state": state},
             )
-            self._session_id = response.json()["session_id"]
+            self._start_session(response.json()["session_id"])
         return self._session_id
+
+    def _start_session(self, session_id: str) -> None:
+        """Adopt a newly created session and give it the client's data. `data`
+        is not part of the generator state, so a new session (first use, after
+        finalize(), or on a deepcopy) would otherwise start empty. If the push
+        fails the session is dropped again, so the next call retries from
+        scratch instead of continuing against a server missing the data."""
+        self._session_id = session_id
+        if self.data is None or len(self.data) == 0:
+            return
+        try:
+            self._push_full_data(self.data)
+        except XoptError:
+            self._session_id = None
+            try:
+                self._request("DELETE", f"/sessions/{session_id}")
+            except XoptError:
+                pass
+            raise
 
     def generate(self, n_candidates: int) -> list[dict]:
         session_id = self._ensure_session()
@@ -206,9 +284,8 @@ class HTTPGenerator(Generator):
         self._request(
             "POST",
             f"/sessions/{session_id}/ingest",
-            # route through pandas' JSON encoder first so numpy scalar dtypes
-            # survive the plain json.dumps() requests uses internally
-            json={"results": json.loads(new_data.to_json(orient="records"))},
+            data=_records_json("results", new_data),
+            headers=_JSON_HEADERS,
         )
         self._syncing = True
         try:
@@ -217,11 +294,11 @@ class HTTPGenerator(Generator):
             self._syncing = False
 
     def _push_full_data(self, data: Optional[pd.DataFrame]) -> None:
-        records = [] if data is None else json.loads(data.to_json(orient="records"))
         self._request(
             "PUT",
             f"/sessions/{self._session_id}/data",
-            json={"data": records},
+            data=_records_json("data", data),
+            headers=_JSON_HEADERS,
         )
 
     def finalize(self) -> None:
@@ -259,15 +336,16 @@ class HTTPGenerator(Generator):
         generator_class = get_generator_dynamic(self.generator.name)
         try:
             mirror = generator_class.model_validate_json(response.text)
+            # `data` is excluded from the remote state dump; reuse our own synced cache
+            mirror.data = self.data
+            self.generator = mirror
         except Exception as exc:
-            # e.g. a torch.load failure; raise XoptError so sync_for_dump() can
-            # fall back to the last pulled copy instead of breaking the dump
+            # e.g. a torch.load failure, or a validator on assignment; raise
+            # XoptError so sync_for_dump() can fall back to the last pulled copy
+            # instead of breaking the dump
             raise XoptError(
                 f"failed to rebuild the remote generator state locally: {exc}"
             ) from exc
-        # `data` is excluded from the remote state dump; reuse our own synced cache
-        mirror.data = self.data
-        self.generator = mirror
         return mirror
 
     def __getattr__(self, name: str) -> Any:

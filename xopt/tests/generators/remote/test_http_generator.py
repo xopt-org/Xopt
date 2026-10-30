@@ -150,6 +150,27 @@ RANDOM_VOCS = VOCS(
     objectives={"y1": "MINIMIZE"},
 )
 
+
+@pytest.fixture
+def in_process_server(monkeypatch):
+    """The JSON server app in this process, so a test can read the server's
+    session state. Yields (server module, HTTPGenerator wired to it)."""
+    from fastapi.testclient import TestClient
+
+    from xopt.generators.remote import server
+
+    monkeypatch.setenv(AUTH_TOKEN_ENV_VAR, SERVER_TOKEN)
+    generator = HTTPGenerator(
+        base_url="http://testserver",
+        api_key=SERVER_TOKEN,
+        generator=RandomGenerator(vocs=RANDOM_VOCS),
+    )
+    with TestClient(server.app) as client:
+        generator._http = client
+        yield server, generator
+        generator.finalize()
+
+
 BO_VOCS = VOCS(
     variables={"x": [0.0, 1.0]},
     objectives={"y": "MINIMIZE"},
@@ -242,6 +263,141 @@ class TestHTTPGeneratorRandom:
         mirror = generator.pull()
         assert len(mirror.data) == 1
         assert mirror.data.iloc[0]["x1"] == pytest.approx(0.5)
+        generator.finalize()
+
+    def test_failed_replace_leaves_local_data_unchanged(self, server_url):
+        generator = HTTPGenerator(
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+        )
+        generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])
+        before = generator.data.copy()
+
+        generator.base_url = "http://127.0.0.1:1"
+        with pytest.raises(XoptError):
+            generator.data = pd.DataFrame({"x1": [0.5], "x2": [0.5], "y1": [3.0]})
+        # client and server must still agree: the replacement never happened
+        pd.testing.assert_frame_equal(generator.data, before)
+
+        generator.base_url = server_url
+        generator.finalize()
+
+    def test_data_reaches_server_exactly(self, in_process_server):
+        """Floats, NaN, inf, numpy ints, bools, strings and array cells survive
+        the trip. `DataFrame.to_json` rounds to 10 decimal places, which turned
+        small values such as an emittance of 1e-9 into 0 on the server."""
+        server, generator = in_process_server
+        sent = pd.DataFrame(
+            {
+                "x1": [1.2345678901234567e-12, 0.12345678901234567, -0.0],
+                "x2": [5e-324, 0.2, 0.3],
+                "y1": [np.inf, 7.0, np.nan],
+                "xopt_error": [False, False, True],
+                "xopt_error_str": [None, None, "boom"],
+                "n": np.array([1, 2, 3], dtype=np.int64),
+                "arr": [np.array([1.0, 2.0]), np.array([3.0]), np.array([])],
+            }
+        )
+
+        def remote():
+            # the server's own frame, not the client's mirror of it
+            return server._sessions[generator._session_id].generator.data
+
+        def check(remote_data, expected):
+            for col in ("x1", "x2", "y1"):
+                assert np.array_equal(
+                    remote_data[col].to_numpy(dtype=float),
+                    expected[col].to_numpy(dtype=float),
+                    equal_nan=True,
+                ), col
+            assert np.signbit(remote_data["x1"].iloc[-1]) == np.signbit(
+                expected["x1"].iloc[-1]
+            )
+            assert remote_data["xopt_error"].tolist() == expected["xopt_error"].tolist()
+            # None arrives as NaN on both sides; compare the strings only
+            assert [v for v in remote_data["xopt_error_str"] if isinstance(v, str)] == [
+                v for v in expected["xopt_error_str"] if isinstance(v, str)
+            ]
+            assert remote_data["n"].tolist() == expected["n"].tolist()
+            assert [list(a) for a in remote_data["arr"]] == [
+                list(a) for a in expected["arr"]
+            ]
+
+        # ingest appends, assigning data replaces: check both paths
+        generator.add_data(sent.iloc[:2])
+        check(remote(), sent.iloc[:2])
+        generator.data = sent
+        check(remote(), sent)
+
+    def test_new_session_receives_existing_data(self, in_process_server):
+        """A session created after finalize(), or for a deepcopy, starts from
+        the data the client already holds."""
+        import copy
+
+        server, generator = in_process_server
+        generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])
+        generator.finalize()
+
+        generator.ingest([{"x1": 0.3, "x2": 0.4, "y1": 2.0}])
+        remote = server._sessions[generator._session_id].generator.data
+        assert len(remote) == 2
+        assert remote["y1"].tolist() == [1.0, 2.0]
+
+        copied = copy.deepcopy(generator)
+        copied._http = generator._http
+        copied.ingest([{"x1": 0.5, "x2": 0.6, "y1": 3.0}])
+        assert copied._session_id != generator._session_id
+        remote = server._sessions[copied._session_id].generator.data
+        assert remote["y1"].tolist() == [1.0, 2.0, 3.0]
+        copied.finalize()
+
+    def test_failed_initial_push_drops_the_session(self, in_process_server):
+        """If the client's data can't be sent to a new session, the session is
+        not kept: otherwise later calls would run against a server missing it."""
+        server, generator = in_process_server
+        generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])
+        generator.finalize()
+
+        real_push = generator._push_full_data
+        calls = []
+
+        def failing_push(data):
+            calls.append(data)
+            raise XoptError("simulated network failure")
+
+        generator._push_full_data = failing_push
+        with pytest.raises(XoptError, match="simulated"):
+            generator.generate(1)
+        assert generator._session_id is None
+        assert len(server._sessions) == 0, "orphaned session left on the server"
+
+        generator._push_full_data = real_push
+        generator.ingest([{"x1": 0.3, "x2": 0.4, "y1": 2.0}])
+        remote = server._sessions[generator._session_id].generator.data
+        assert remote["y1"].tolist() == [1.0, 2.0]
+
+    def test_server_refuses_remote_generator_names(self, server_url):
+        """A wrapper running on the server would make it call arbitrary hosts."""
+        inner = HTTPGenerator(
+            base_url="http://127.0.0.1:1",
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+        )
+        outer = HTTPGenerator(
+            base_url=server_url, api_key=SERVER_TOKEN, generator=inner
+        )
+        with pytest.raises(XoptError, match="'http' cannot run on the server"):
+            outer.generate(1)
+
+    def test_api_key_assigned_after_construction_is_used(self, server_url):
+        generator = HTTPGenerator(
+            base_url=server_url,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+        )
+        with pytest.raises(XoptError, match="401"):
+            generator.generate(1)
+        generator.api_key = SERVER_TOKEN
+        assert len(generator.generate(1)) == 1
         generator.finalize()
 
     def test_unknown_generator_name_raises(self, server_url):
@@ -818,7 +974,38 @@ def test_http_generator_api_key_not_serialized():
 
     assert "secret-token" not in X.yaml()
     assert "secret-token" not in generator.to_json()
-    assert generator._http.headers["Authorization"] == "Bearer secret-token"
+    # a notebook displaying the wrapper, or a logged exception, must not show it
+    assert "secret-token" not in repr(generator)
+    assert "secret-token" not in repr(X)
+
+
+def test_http_generator_deepcopy_does_not_share_session():
+    """Xopt deepcopies its generator; the copy must get its own session, or
+    finalize() on one would close the other's."""
+    import copy
+
+    generator = HTTPGenerator(
+        base_url="http://127.0.0.1:1",
+        generator=RandomGenerator(vocs=RANDOM_VOCS),
+        api_key="secret-token",
+    )
+    generator._session_id = "live-session"
+
+    copied = copy.deepcopy(generator)
+    assert copied._session_id is None
+    assert copied._http is not generator._http
+    assert copied.api_key == "secret-token"
+    assert generator._session_id == "live-session"
+
+
+def test_http_generator_rejects_mismatched_vocs():
+    other = VOCS(variables={"x1": [0.0, 2.0]}, objectives={"y1": "MINIMIZE"})
+    with pytest.raises(ValueError, match="vocs.*differ"):
+        HTTPGenerator(
+            base_url="http://127.0.0.1:1",
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+            vocs=other,
+        )
 
 
 @pytest.mark.parametrize("wrapper", [HTTPGenerator, CloudpickleHTTPGenerator])

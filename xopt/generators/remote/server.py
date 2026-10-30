@@ -7,6 +7,7 @@ reference implementation: sessions live in memory and are lost on restart.
 
 import logging
 import os
+import secrets
 import threading
 import uuid
 from contextlib import asynccontextmanager, contextmanager
@@ -15,12 +16,12 @@ from typing import Iterator
 from typing import Any, Optional
 
 import pandas as pd
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from xopt.generator import Generator
-from xopt.generators import get_generator_dynamic
+from xopt.generators import all_generator_names, get_generator_dynamic
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,9 @@ def _require_auth(authorization: Optional[str] = Header(default=None)) -> None:
         raise HTTPException(
             status_code=503, detail=f"server has no {AUTH_TOKEN_ENV_VAR} configured"
         )
-    if authorization != f"Bearer {token}":
+    # compare bytes: compare_digest rejects non-ASCII str, which would be a 500
+    expected = f"Bearer {token}".encode()
+    if not secrets.compare_digest((authorization or "").encode(), expected):
         raise HTTPException(status_code=401, detail="invalid or missing bearer token")
 
 
@@ -94,6 +97,10 @@ async def _lifespan(application: FastAPI):
         )
     yield
 
+
+# the session routes live on a router so other apps (the cloudpickle server) can
+# include them without sharing, and mutating, this module's `app`
+router = APIRouter()
 
 app = FastAPI(
     title="Xopt HTTPGenerator reference server",
@@ -122,8 +129,15 @@ def _locked_session(session_id: str) -> Iterator[Generator]:
         yield session.generator
 
 
-@app.post("/sessions", response_model=SessionResponse)
+@router.post("/sessions", response_model=SessionResponse)
 def create_session(request: CreateSessionRequest) -> SessionResponse:
+    # a remote wrapper running here would make this server send requests, with
+    # a caller-chosen URL and token, to hosts only it can reach
+    if request.generator_name in all_generator_names["remote"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"generator {request.generator_name!r} cannot run on the server",
+        )
     try:
         # restrict construction to the existing registry, never an arbitrary import path
         generator_class = get_generator_dynamic(request.generator_name)
@@ -146,7 +160,7 @@ def create_session(request: CreateSessionRequest) -> SessionResponse:
     return SessionResponse(session_id=session_id)
 
 
-@app.post("/sessions/{session_id}/suggest", response_model=SuggestResponse)
+@router.post("/sessions/{session_id}/suggest", response_model=SuggestResponse)
 def suggest(session_id: str, request: SuggestRequest) -> SuggestResponse:
     try:
         with _locked_session(session_id) as generator:
@@ -162,7 +176,7 @@ def suggest(session_id: str, request: SuggestRequest) -> SuggestResponse:
     return SuggestResponse(points=points)
 
 
-@app.post("/sessions/{session_id}/ingest", status_code=204)
+@router.post("/sessions/{session_id}/ingest", status_code=204)
 def ingest(session_id: str, request: IngestRequest) -> None:
     try:
         with _locked_session(session_id) as generator:
@@ -174,20 +188,26 @@ def ingest(session_id: str, request: IngestRequest) -> None:
         raise HTTPException(status_code=400, detail=f"failed to ingest results: {exc}")
 
 
-@app.put("/sessions/{session_id}/data", status_code=204)
+@router.put("/sessions/{session_id}/data", status_code=204)
 def replace_data(session_id: str, request: ReplaceDataRequest) -> None:
-    with _locked_session(session_id) as generator:
-        generator.data = pd.DataFrame(request.data)
+    try:
+        with _locked_session(session_id) as generator:
+            generator.data = pd.DataFrame(request.data)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("replacing generator data failed")
+        raise HTTPException(status_code=400, detail=f"failed to replace data: {exc}")
 
 
-@app.get("/sessions/{session_id}/state")
+@router.get("/sessions/{session_id}/state")
 def get_state(session_id: str) -> Response:
     with _locked_session(session_id) as generator:
         state_json = generator.to_json(serialize_torch=True, serialize_inline=True)
     return Response(content=state_json, media_type="application/json")
 
 
-@app.delete("/sessions/{session_id}", status_code=204)
+@router.delete("/sessions/{session_id}", status_code=204)
 def delete_session(session_id: str) -> None:
     with _lock:
         session = _sessions.pop(session_id, None)
@@ -201,6 +221,9 @@ def delete_session(session_id: str) -> None:
                 finalize()
             except Exception:
                 logger.exception("generator.finalize failed")
+
+
+app.include_router(router)
 
 
 def main() -> None:

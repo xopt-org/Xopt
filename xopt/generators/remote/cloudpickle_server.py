@@ -18,15 +18,11 @@ from contextlib import asynccontextmanager
 import cloudpickle
 import torch
 from types import SimpleNamespace
-from fastapi import HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from xopt.generator import Generator
 from xopt.generators.remote import server as upstream
-
-# Extend the *same* FastAPI app so standard HTTPGenerator clients continue to
-# use the unchanged upstream API. Import this module when starting Uvicorn.
-app = upstream.app
 
 
 def _require_cloudpickle_token_on_startup() -> None:
@@ -40,19 +36,22 @@ def _require_cloudpickle_token_on_startup() -> None:
         )
 
 
-# Validate when the ASGI application starts, not when this module is imported.
-# Preserve the upstream application's lifespan for future compatibility.
-_upstream_lifespan = app.router.lifespan_context
-
-
 @asynccontextmanager
 async def _cloudpickle_lifespan(application):
     _require_cloudpickle_token_on_startup()
-    async with _upstream_lifespan(application) as state:
-        yield state
+    async with upstream._lifespan(application):
+        yield
 
 
-app.router.lifespan_context = _cloudpickle_lifespan
+# A separate app that includes the upstream routes, so importing this module
+# does not add the unpickling endpoints to `xopt.generators.remote.server:app`.
+# Standard HTTPGenerator clients work against it unchanged.
+app = FastAPI(
+    title="Xopt HTTPGenerator reference server (with cloudpickle)",
+    dependencies=[Depends(upstream._require_auth)],
+    lifespan=_cloudpickle_lifespan,
+)
+app.include_router(upstream.router)
 
 
 class PicklePayload(BaseModel):

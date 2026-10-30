@@ -209,7 +209,10 @@ fig, ax = X.generator.visualize_model()
 fig.savefig("model.png")
 ```
 
-`X.data` is always local. `api_key` is never written to dump files.
+`X.data` is always local. Numeric values reach the server exactly, including
+NaN and inf from failed evaluations. Timestamps arrive as ISO strings. `api_key`
+is never written to dump files and does not appear when the generator is
+displayed.
 
 **Dumps and the server's state.** The client holds a copy of the generator
 that is only as recent as the last `pull()`. To keep dumps in step with the
@@ -336,6 +339,8 @@ cell for the variable name. The same code works as a script.
   plain text over unencrypted HTTP. Do not expose either server publicly.
 - The client also unpickles whatever the server returns from `pull()`, so only
   connect to servers you trust.
+- The server refuses to run `http` and `cloudpickle_http` generators itself,
+  so a client cannot make it send requests to other hosts.
 - For reproducible results, record the Xopt version and the versions of your
   own packages on both client and server.
 
