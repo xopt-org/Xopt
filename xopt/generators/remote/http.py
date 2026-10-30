@@ -226,16 +226,17 @@ class HTTPGenerator(Generator):
                 headers=headers,
                 **kwargs,
             )
-            response.raise_for_status()
-        except requests.HTTPError as exc:
-            # include the server's reason (e.g. "unknown generator 'foo'"); the
-            # HTTPError message itself is only the status line and URL
-            raise XoptError(
-                f"HTTPGenerator request to {path!r} failed "
-                f"({exc.response.status_code}): {_error_detail(exc.response)}"
-            ) from exc
         except requests.RequestException as exc:
             raise XoptError(f"HTTPGenerator request to {path!r} failed: {exc}") from exc
+        # checked here rather than with raise_for_status() so the message carries
+        # the server's reason (e.g. "unknown generator 'foo'"), and so a client
+        # that only mimics the response (status_code, json(), text, reason)
+        # behaves the same
+        if response.status_code >= 400:
+            raise XoptError(
+                f"HTTPGenerator request to {path!r} failed "
+                f"({response.status_code}): {_error_detail(response)}"
+            )
         return response
 
     def _ensure_session(self) -> str:

@@ -234,5 +234,5 @@ def main() -> None:
     uvicorn.run(app, host=host, port=port)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
