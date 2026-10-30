@@ -128,10 +128,13 @@ def _uvicorn_subprocess(*, auth_token=None):
             process.stderr.close()
 
 
+SERVER_TOKEN = "module-test-token"
+
+
 @pytest.fixture(scope="module")
 def server_url():
     """Normal upstream HTTP server, one independent process per test module."""
-    with _uvicorn_subprocess() as url:
+    with _uvicorn_subprocess(auth_token=SERVER_TOKEN) as url:
         yield url
 
 
@@ -146,6 +149,27 @@ RANDOM_VOCS = VOCS(
     variables={"x1": [0.0, 1.0], "x2": [0.0, 1.0]},
     objectives={"y1": "MINIMIZE"},
 )
+
+
+@pytest.fixture
+def in_process_server(monkeypatch):
+    """The JSON server app in this process, so a test can read the server's
+    session state. Yields (server module, HTTPGenerator wired to it)."""
+    from fastapi.testclient import TestClient
+
+    from xopt.generators.remote import server
+
+    monkeypatch.setenv(AUTH_TOKEN_ENV_VAR, SERVER_TOKEN)
+    generator = HTTPGenerator(
+        base_url="http://testserver",
+        api_key=SERVER_TOKEN,
+        generator=RandomGenerator(vocs=RANDOM_VOCS),
+    )
+    with TestClient(server.app) as client:
+        generator._http = client
+        yield server, generator
+        generator.finalize()
+
 
 BO_VOCS = VOCS(
     variables={"x": [0.0, 1.0]},
@@ -170,10 +194,40 @@ class _UnregisteredGenerator(Generator):
         return []
 
 
+@pytest.mark.parametrize("token", [None, "", "   "])
+def test_server_refuses_startup_without_token(token):
+    with pytest.raises(RuntimeError, match=AUTH_TOKEN_ENV_VAR):
+        with _uvicorn_subprocess(auth_token=token):
+            pass
+
+
+def test_server_rejects_missing_or_wrong_token(server_url):
+    body = {"generator_name": "random", "state": {}}
+    assert requests.post(server_url + "/sessions", json=body).status_code == 401
+    wrong = {"Authorization": "Bearer wrong-token"}
+    assert (
+        requests.post(server_url + "/sessions", json=body, headers=wrong).status_code
+        == 401
+    )
+
+
+def test_server_rejects_requests_if_token_missing_at_request_time(monkeypatch):
+    from fastapi import HTTPException
+
+    from xopt.generators.remote.server import _require_auth
+
+    monkeypatch.delenv(AUTH_TOKEN_ENV_VAR, raising=False)
+    with pytest.raises(HTTPException) as exc:
+        _require_auth(authorization=None)
+    assert exc.value.status_code == 503
+
+
 class TestHTTPGeneratorRandom:
     def test_suggest_within_bounds(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         points = generator.generate(5)
         assert len(points) == 5
@@ -184,7 +238,9 @@ class TestHTTPGeneratorRandom:
 
     def test_ingest_updates_local_cache(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         results = pd.DataFrame({"x1": [0.1, 0.2], "x2": [0.3, 0.4], "y1": [1.0, 2.0]})
         generator.ingest(results.to_dict(orient="records"))
@@ -194,7 +250,9 @@ class TestHTTPGeneratorRandom:
 
     def test_full_replace_updates_remote_mirror(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         # create a session first
         generator.generate(1)
@@ -207,22 +265,161 @@ class TestHTTPGeneratorRandom:
         assert mirror.data.iloc[0]["x1"] == pytest.approx(0.5)
         generator.finalize()
 
+    def test_failed_replace_leaves_local_data_unchanged(self, server_url):
+        generator = HTTPGenerator(
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+        )
+        generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])
+        before = generator.data.copy()
+
+        generator.base_url = "http://127.0.0.1:1"
+        with pytest.raises(XoptError):
+            generator.data = pd.DataFrame({"x1": [0.5], "x2": [0.5], "y1": [3.0]})
+        # client and server must still agree: the replacement never happened
+        pd.testing.assert_frame_equal(generator.data, before)
+
+        generator.base_url = server_url
+        generator.finalize()
+
+    def test_data_reaches_server_exactly(self, in_process_server):
+        """Floats, NaN, inf, numpy ints, bools, strings and array cells survive
+        the trip. `DataFrame.to_json` rounds to 10 decimal places, which turned
+        small values such as an emittance of 1e-9 into 0 on the server."""
+        server, generator = in_process_server
+        sent = pd.DataFrame(
+            {
+                "x1": [1.2345678901234567e-12, 0.12345678901234567, -0.0],
+                "x2": [5e-324, 0.2, 0.3],
+                "y1": [np.inf, 7.0, np.nan],
+                "xopt_error": [False, False, True],
+                "xopt_error_str": [None, None, "boom"],
+                "n": np.array([1, 2, 3], dtype=np.int64),
+                "arr": [np.array([1.0, 2.0]), np.array([3.0]), np.array([])],
+            }
+        )
+
+        def remote():
+            # the server's own frame, not the client's mirror of it
+            return server._sessions[generator._session_id].generator.data
+
+        def check(remote_data, expected):
+            for col in ("x1", "x2", "y1"):
+                assert np.array_equal(
+                    remote_data[col].to_numpy(dtype=float),
+                    expected[col].to_numpy(dtype=float),
+                    equal_nan=True,
+                ), col
+            assert np.signbit(remote_data["x1"].iloc[-1]) == np.signbit(
+                expected["x1"].iloc[-1]
+            )
+            assert remote_data["xopt_error"].tolist() == expected["xopt_error"].tolist()
+            # None arrives as NaN on both sides; compare the strings only
+            assert [v for v in remote_data["xopt_error_str"] if isinstance(v, str)] == [
+                v for v in expected["xopt_error_str"] if isinstance(v, str)
+            ]
+            assert remote_data["n"].tolist() == expected["n"].tolist()
+            assert [list(a) for a in remote_data["arr"]] == [
+                list(a) for a in expected["arr"]
+            ]
+
+        # ingest appends, assigning data replaces: check both paths
+        generator.add_data(sent.iloc[:2])
+        check(remote(), sent.iloc[:2])
+        generator.data = sent
+        check(remote(), sent)
+
+    def test_new_session_receives_existing_data(self, in_process_server):
+        """A session created after finalize(), or for a deepcopy, starts from
+        the data the client already holds."""
+        import copy
+
+        server, generator = in_process_server
+        generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])
+        generator.finalize()
+
+        generator.ingest([{"x1": 0.3, "x2": 0.4, "y1": 2.0}])
+        remote = server._sessions[generator._session_id].generator.data
+        assert len(remote) == 2
+        assert remote["y1"].tolist() == [1.0, 2.0]
+
+        copied = copy.deepcopy(generator)
+        copied._http = generator._http
+        copied.ingest([{"x1": 0.5, "x2": 0.6, "y1": 3.0}])
+        assert copied._session_id != generator._session_id
+        remote = server._sessions[copied._session_id].generator.data
+        assert remote["y1"].tolist() == [1.0, 2.0, 3.0]
+        copied.finalize()
+
+    def test_failed_initial_push_drops_the_session(self, in_process_server):
+        """If the client's data can't be sent to a new session, the session is
+        not kept: otherwise later calls would run against a server missing it."""
+        server, generator = in_process_server
+        generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])
+        generator.finalize()
+
+        real_push = generator._push_full_data
+        calls = []
+
+        def failing_push(data):
+            calls.append(data)
+            raise XoptError("simulated network failure")
+
+        generator._push_full_data = failing_push
+        with pytest.raises(XoptError, match="simulated"):
+            generator.generate(1)
+        assert generator._session_id is None
+        assert len(server._sessions) == 0, "orphaned session left on the server"
+
+        generator._push_full_data = real_push
+        generator.ingest([{"x1": 0.3, "x2": 0.4, "y1": 2.0}])
+        remote = server._sessions[generator._session_id].generator.data
+        assert remote["y1"].tolist() == [1.0, 2.0]
+
+    def test_server_refuses_remote_generator_names(self, server_url):
+        """A wrapper running on the server would make it call arbitrary hosts."""
+        inner = HTTPGenerator(
+            base_url="http://127.0.0.1:1",
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+        )
+        outer = HTTPGenerator(
+            base_url=server_url, api_key=SERVER_TOKEN, generator=inner
+        )
+        with pytest.raises(XoptError, match="'http' cannot run on the server"):
+            outer.generate(1)
+
+    def test_api_key_assigned_after_construction_is_used(self, server_url):
+        generator = HTTPGenerator(
+            base_url=server_url,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+        )
+        with pytest.raises(XoptError, match="401"):
+            generator.generate(1)
+        generator.api_key = SERVER_TOKEN
+        assert len(generator.generate(1)) == 1
+        generator.finalize()
+
     def test_unknown_generator_name_raises(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=_UnregisteredGenerator(vocs=RANDOM_VOCS),
         )
-        with pytest.raises(XoptError):
+        # the server's reason must reach the user, not just "400 Client Error"
+        with pytest.raises(XoptError, match="unknown generator 'not_a_real_generator'"):
             generator.generate(1)
 
     def test_unknown_session_raises(self, server_url):
         generator = HTTPGenerator(
-            base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
+            base_url=server_url,
+            api_key=SERVER_TOKEN,
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
         )
         generator.generate(1)
         # force a bogus session id to simulate an expired/unknown session
         generator._session_id = "does-not-exist"
-        with pytest.raises(XoptError):
+        with pytest.raises(XoptError, match="unknown session 'does-not-exist'"):
             generator.generate(1)
 
     def test_auth_required(self, authenticated_server_url):
@@ -231,7 +428,7 @@ class TestHTTPGeneratorRandom:
         unauthenticated = HTTPGenerator(
             base_url=server_url, generator=RandomGenerator(vocs=RANDOM_VOCS)
         )
-        with pytest.raises(XoptError):
+        with pytest.raises(XoptError, match="401.*invalid or missing bearer token"):
             unauthenticated.generate(1)
 
         authenticated = HTTPGenerator(
@@ -257,6 +454,7 @@ class TestHTTPGeneratorExtraMethods:
     def test_visualize_model_passthrough(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=ExpectedImprovementGenerator(vocs=BO_VOCS),
         )
 
@@ -277,6 +475,7 @@ class TestHTTPGeneratorExtraMethods:
     def test_passthrough_reflects_latest_remote_state(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=ExpectedImprovementGenerator(vocs=BO_VOCS),
         )
 
@@ -297,6 +496,7 @@ class TestHTTPGeneratorExtraMethods:
     def test_mirror_serializes_with_http_generator(self, server_url):
         generator = HTTPGenerator(
             base_url=server_url,
+            api_key=SERVER_TOKEN,
             generator=ExpectedImprovementGenerator(vocs=BO_VOCS),
         )
 
@@ -329,7 +529,9 @@ class TestHTTPGeneratorBax:
         bax_generator = BaxGenerator(vocs=fractional_vocs, algorithm=algorithm)
         bax_generator.gp_constructor.use_low_noise_prior = True
 
-        generator = HTTPGenerator(base_url=server_url, generator=bax_generator)
+        generator = HTTPGenerator(
+            base_url=server_url, api_key=SERVER_TOKEN, generator=bax_generator
+        )
 
         # Verify fractional BAX bounds survive the HTTP round-trip.
         remote_generator = generator.generator
@@ -388,7 +590,9 @@ class TestHTTPGeneratorPriorMean:
             vocs=vocs, gp_constructor=gp_constructor
         )
 
-        generator = HTTPGenerator(base_url=server_url, generator=bo_generator)
+        generator = HTTPGenerator(
+            base_url=server_url, api_key=SERVER_TOKEN, generator=bo_generator
+        )
 
         train_x = np.array([0.2, 0.5, 0.6])
         data = pd.DataFrame(
@@ -730,6 +934,281 @@ def test_http_generator_rejects_generator_without_name():
 
     with pytest.raises(ValueError, match="must include a 'name' key"):
         HTTPGenerator._resolve_generator({"generator": {}})
+
+
+def test_http_generator_yaml_inherits_top_level_vocs():
+    from xopt import Xopt
+
+    X = Xopt.from_yaml(
+        """
+        generator:
+          name: http
+          base_url: http://127.0.0.1:8002
+          generator:
+            name: upper_confidence_bound
+            beta: 0.1
+        evaluator:
+          function: xopt.resources.test_functions.sinusoid_1d.evaluate_sinusoid
+        vocs:
+          variables: {x1: [0, 6.28]}
+          objectives: {y1: MINIMIZE}
+        """
+    )
+
+    assert isinstance(X.generator, HTTPGenerator)
+    assert X.generator.generator.vocs.variable_names == ["x1"]
+
+
+def test_http_generator_api_key_not_serialized():
+    from xopt import Xopt
+    from xopt.evaluator import Evaluator
+    from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid
+
+    vocs = VOCS(variables={"x1": [0, 6.28]}, objectives={"y1": "MINIMIZE"})
+    generator = HTTPGenerator(
+        base_url="http://127.0.0.1:8002",
+        generator=RandomGenerator(vocs=vocs),
+        api_key="secret-token",
+    )
+    X = Xopt(generator=generator, evaluator=Evaluator(function=evaluate_sinusoid))
+
+    assert "secret-token" not in X.yaml()
+    assert "secret-token" not in generator.to_json()
+    # a notebook displaying the wrapper, or a logged exception, must not show it
+    assert "secret-token" not in repr(generator)
+    assert "secret-token" not in repr(X)
+
+
+def test_http_generator_deepcopy_does_not_share_session():
+    """Xopt deepcopies its generator; the copy must get its own session, or
+    finalize() on one would close the other's."""
+    import copy
+
+    generator = HTTPGenerator(
+        base_url="http://127.0.0.1:1",
+        generator=RandomGenerator(vocs=RANDOM_VOCS),
+        api_key="secret-token",
+    )
+    generator._session_id = "live-session"
+
+    copied = copy.deepcopy(generator)
+    assert copied._session_id is None
+    assert copied._http is not generator._http
+    assert copied.api_key == "secret-token"
+    assert generator._session_id == "live-session"
+
+
+def test_http_generator_rejects_mismatched_vocs():
+    other = VOCS(variables={"x1": [0.0, 2.0]}, objectives={"y1": "MINIMIZE"})
+    with pytest.raises(ValueError, match="vocs.*differ"):
+        HTTPGenerator(
+            base_url="http://127.0.0.1:1",
+            generator=RandomGenerator(vocs=RANDOM_VOCS),
+            vocs=other,
+        )
+
+
+@pytest.mark.parametrize("wrapper", [HTTPGenerator, CloudpickleHTTPGenerator])
+def test_remote_generator_xopt_dump_round_trip(wrapper):
+    from xopt import Xopt
+    from xopt.evaluator import Evaluator
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid
+
+    vocs = VOCS(variables={"x1": [0, 6.28]}, objectives={"y1": "MINIMIZE"})
+    X = Xopt(
+        generator=wrapper(
+            base_url="http://127.0.0.1:8002",
+            generator=UpperConfidenceBoundGenerator(vocs=vocs, beta=0.3),
+            api_key="secret-token",
+        ),
+        evaluator=Evaluator(function=evaluate_sinusoid),
+    )
+
+    reloaded = Xopt.from_yaml(X.yaml())
+
+    assert type(reloaded.generator) is wrapper
+    assert isinstance(reloaded.generator.generator, UpperConfidenceBoundGenerator)
+    assert reloaded.generator.generator.beta == 0.3
+    assert reloaded.generator.api_key is None
+
+
+def _turbo_xopt(base_url, tmp_path, **wrapper_kwargs):
+    from xopt import Xopt
+    from xopt.evaluator import Evaluator
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.resources.test_functions.sinusoid_1d import evaluate_sinusoid
+
+    vocs = VOCS(variables={"x1": [0, 6.28]}, objectives={"y1": "MINIMIZE"})
+    return Xopt(
+        generator=HTTPGenerator(
+            base_url=base_url,
+            generator=UpperConfidenceBoundGenerator(
+                vocs=vocs, turbo_controller="optimize"
+            ),
+            **wrapper_kwargs,
+        ),
+        evaluator=Evaluator(function=evaluate_sinusoid),
+        xopt_dump_file=str(tmp_path / "dump.yaml"),
+    )
+
+
+def _dumped_turbo_center(tmp_path):
+    import yaml
+
+    config = yaml.safe_load((tmp_path / "dump.yaml").read_text())
+    return config["generator"]["generator"]["turbo_controller"]["center_x"]
+
+
+class TestHTTPGeneratorPullOnDump:
+    def test_automatic_dump_matches_server_state(self, server_url, tmp_path):
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN)
+        X.random_evaluate(3)
+        X.step()
+
+        # TuRBO state only changes server-side; the dump must still include it
+        center = _dumped_turbo_center(tmp_path)
+        assert center is not None
+        assert center == X.generator.generator.turbo_controller.center_x
+
+        X.generator.finalize()
+
+    def test_pull_on_dump_disabled_keeps_last_copy(self, server_url, tmp_path):
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN, pull_on_dump=False)
+        X.random_evaluate(3)
+        X.step()
+
+        assert _dumped_turbo_center(tmp_path) is None
+
+        X.generator.finalize()
+
+    def test_unreachable_server_warns_and_still_dumps(self, server_url, tmp_path):
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN)
+        X.random_evaluate(3)
+        X.step()
+
+        X.generator.base_url = "http://127.0.0.1:1"
+        (tmp_path / "dump.yaml").unlink()
+        with pytest.warns(UserWarning, match="could not pull"):
+            X.dump()
+        assert (tmp_path / "dump.yaml").exists()
+
+        X.generator._session_id = None
+
+    def test_checkpoint_restores_into_new_session_and_continues(
+        self, server_url, tmp_path
+    ):
+        """Full recovery: dump, lose the server session, reload the dump into a
+        new session and keep optimizing with the TuRBO state intact."""
+        import yaml
+
+        from xopt import Xopt
+
+        X = _turbo_xopt(server_url, tmp_path, api_key=SERVER_TOKEN)
+        X.random_evaluate(3)
+        X.step()
+        X.step()
+        n_before = len(X.data)
+        old_session = X.generator._session_id
+
+        config = yaml.safe_load((tmp_path / "dump.yaml").read_text())
+        dumped_turbo = config["generator"]["generator"]["turbo_controller"]
+        assert dumped_turbo["center_x"] is not None
+
+        # the original session is gone for good
+        X.generator.finalize()
+        X.generator._session_id = old_session
+        with pytest.raises(XoptError, match="unknown session"):
+            X.generator.generate(1)
+        X.generator._session_id = None
+
+        # loading contacts the server, so the token has to be in place first
+        with pytest.raises(XoptError, match="401"):
+            Xopt.from_dict(yaml.safe_load((tmp_path / "dump.yaml").read_text()))
+        config["generator"]["api_key"] = SERVER_TOKEN
+        X2 = Xopt.from_dict(config)
+
+        assert len(X2.data) == n_before
+        assert X2.generator._session_id not in (None, old_session)
+        turbo_keys = ("center_x", "length", "best_value")
+        local_turbo = X2.generator.generator.turbo_controller
+        remote_turbo = X2.generator.pull().turbo_controller
+        for key in turbo_keys:
+            assert getattr(local_turbo, key) == dumped_turbo[key]
+            assert getattr(remote_turbo, key) == dumped_turbo[key]
+
+        X2.step()
+        assert len(X2.data) == n_before + 1
+        assert _dumped_turbo_center(tmp_path) is not None
+
+        X2.generator.finalize()
+
+
+class _FakeResponse:
+    def __init__(self, text):
+        self.text = text
+
+
+@pytest.mark.skipif(torch.cuda.is_available(), reason="checks the CPU-only client path")
+def test_pull_maps_cuda_model_to_cpu(monkeypatch):
+    """A model fitted on a GPU server must load on a CPU-only client."""
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+    from xopt.generators.remote import server
+
+    remote = UpperConfidenceBoundGenerator(vocs=BO_VOCS)
+    remote.add_data(pd.DataFrame({"x": [0.1, 0.5, 0.9], "y": [1.0, 0.2, 0.7]}))
+    remote.train_model()
+
+    # the server serializes the state with the storages tagged as CUDA
+    session_id = "cuda-state"
+    with server._lock:
+        server._sessions[session_id] = server.GeneratorSession(remote)
+    monkeypatch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")
+    try:
+        state_json = server.get_state(session_id).body.decode()
+    finally:
+        monkeypatch.undo()
+        with server._lock:
+            server._sessions.pop(session_id, None)
+    assert "base64:" in state_json
+
+    client = HTTPGenerator(
+        base_url="http://127.0.0.1:1",
+        generator=UpperConfidenceBoundGenerator(vocs=BO_VOCS),
+    )
+    client._session_id = "cuda-state"
+    monkeypatch.setattr(
+        client, "_request", lambda *args, **kwargs: _FakeResponse(state_json)
+    )
+
+    mirror = client.pull()
+    assert mirror.model is not None
+    assert all(p.device.type == "cpu" for p in mirror.model.parameters())
+    assert all(b.device.type == "cpu" for b in mirror.model.buffers())
+
+
+def test_pull_reconstruction_failure_is_xopt_error(monkeypatch):
+    """Any failure while rebuilding the pulled state is an XoptError, so
+    `sync_for_dump()` falls back to the last copy instead of breaking the dump."""
+    client = HTTPGenerator(
+        base_url="http://127.0.0.1:1",
+        generator=RandomGenerator(vocs=RANDOM_VOCS),
+    )
+    client._session_id = "whatever"
+    monkeypatch.setattr(
+        client, "_request", lambda *args, **kwargs: _FakeResponse('{"vocs": 1}')
+    )
+
+    with pytest.raises(XoptError, match="failed to rebuild"):
+        client.pull()
+    with pytest.warns(UserWarning, match="could not pull"):
+        client.sync_for_dump()
 
 
 def test_http_generator_unknown_private_attribute_raises():

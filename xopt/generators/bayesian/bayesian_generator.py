@@ -64,7 +64,7 @@ from xopt.generators.bayesian.utils import (
 )
 from xopt.generators.bayesian.visualize import visualize_generator_model
 from xopt.numerical_optimizer import GridOptimizer, LBFGSOptimizer, NumericalOptimizer
-from xopt.pydantic import decode_torch_module
+from xopt.pydantic import decode_torch_module, load_torch_module
 from xopt.vocs import (
     ContextualVariable,
     convert_numpy_to_inputs,
@@ -257,7 +257,7 @@ class BayesianGenerator(Generator, ABC):
             if value.startswith("base64:"):
                 value = decode_torch_module(value)
             elif os.path.exists(value):
-                value = torch.load(value, weights_only=False)
+                value = load_torch_module(value)
             else:
                 raise XoptError(f"cannot load torch module from {value}")
         return value

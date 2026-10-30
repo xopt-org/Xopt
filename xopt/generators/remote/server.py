@@ -7,25 +7,27 @@ reference implementation: sessions live in memory and are lost on restart.
 
 import logging
 import os
+import secrets
 import threading
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from typing import Iterator
 from typing import Any, Optional
 
 import pandas as pd
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from xopt.generator import Generator
-from xopt.generators import get_generator_dynamic
+from xopt.generators import all_generator_names, get_generator_dynamic
 
 logger = logging.getLogger(__name__)
 
-# bearer token required of callers when set; the server is open if unset, which
-# is only appropriate on a trusted/loopback network
+# bearer token required of all callers. The server refuses to start without
+# it: session creation unpickles torch modules from the client's config, so an
+# open server would let anyone who can reach the port run code on this host.
 AUTH_TOKEN_ENV_VAR = "XOPT_HTTP_GENERATOR_TOKEN"
 
 
@@ -66,17 +68,44 @@ class ReplaceDataRequest(BaseModel):
     data: list[dict[str, Any]]
 
 
-def _require_auth(authorization: Optional[str] = Header(default=None)) -> None:
+def _configured_token() -> Optional[str]:
     token = os.environ.get(AUTH_TOKEN_ENV_VAR)
+    if token is None or not token.strip():
+        return None
+    return token
+
+
+def _require_auth(authorization: Optional[str] = Header(default=None)) -> None:
+    token = _configured_token()
+    # fail closed if the app is served without the startup check (e.g. mounted
+    # inside another app, whose lifespan does not run this one's)
     if token is None:
-        return
-    if authorization != f"Bearer {token}":
+        raise HTTPException(
+            status_code=503, detail=f"server has no {AUTH_TOKEN_ENV_VAR} configured"
+        )
+    # compare bytes: compare_digest rejects non-ASCII str, which would be a 500
+    expected = f"Bearer {token}".encode()
+    if not secrets.compare_digest((authorization or "").encode(), expected):
         raise HTTPException(status_code=401, detail="invalid or missing bearer token")
 
+
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    if _configured_token() is None:
+        raise RuntimeError(
+            f"HTTPGenerator server requires a nonempty {AUTH_TOKEN_ENV_VAR}"
+        )
+    yield
+
+
+# the session routes live on a router so other apps (the cloudpickle server) can
+# include them without sharing, and mutating, this module's `app`
+router = APIRouter()
 
 app = FastAPI(
     title="Xopt HTTPGenerator reference server",
     dependencies=[Depends(_require_auth)],
+    lifespan=_lifespan,
 )
 
 
@@ -100,8 +129,15 @@ def _locked_session(session_id: str) -> Iterator[Generator]:
         yield session.generator
 
 
-@app.post("/sessions", response_model=SessionResponse)
+@router.post("/sessions", response_model=SessionResponse)
 def create_session(request: CreateSessionRequest) -> SessionResponse:
+    # a remote wrapper running here would make this server send requests, with
+    # a caller-chosen URL and token, to hosts only it can reach
+    if request.generator_name in all_generator_names["remote"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"generator {request.generator_name!r} cannot run on the server",
+        )
     try:
         # restrict construction to the existing registry, never an arbitrary import path
         generator_class = get_generator_dynamic(request.generator_name)
@@ -124,43 +160,54 @@ def create_session(request: CreateSessionRequest) -> SessionResponse:
     return SessionResponse(session_id=session_id)
 
 
-@app.post("/sessions/{session_id}/suggest", response_model=SuggestResponse)
+@router.post("/sessions/{session_id}/suggest", response_model=SuggestResponse)
 def suggest(session_id: str, request: SuggestRequest) -> SuggestResponse:
     try:
         with _locked_session(session_id) as generator:
             points = generator.suggest(request.num_points)
-    except Exception:
+    except HTTPException:
+        # e.g. unknown session; don't turn it into a generic 500
+        raise
+    except Exception as exc:
         logger.exception("generator.suggest failed")
         raise HTTPException(
-            status_code=500, detail="generator failed to produce points"
+            status_code=500, detail=f"generator failed to produce points: {exc}"
         )
     return SuggestResponse(points=points)
 
 
-@app.post("/sessions/{session_id}/ingest", status_code=204)
+@router.post("/sessions/{session_id}/ingest", status_code=204)
 def ingest(session_id: str, request: IngestRequest) -> None:
     try:
         with _locked_session(session_id) as generator:
             generator.ingest(request.results)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("generator.ingest failed")
         raise HTTPException(status_code=400, detail=f"failed to ingest results: {exc}")
 
 
-@app.put("/sessions/{session_id}/data", status_code=204)
+@router.put("/sessions/{session_id}/data", status_code=204)
 def replace_data(session_id: str, request: ReplaceDataRequest) -> None:
-    with _locked_session(session_id) as generator:
-        generator.data = pd.DataFrame(request.data)
+    try:
+        with _locked_session(session_id) as generator:
+            generator.data = pd.DataFrame(request.data)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("replacing generator data failed")
+        raise HTTPException(status_code=400, detail=f"failed to replace data: {exc}")
 
 
-@app.get("/sessions/{session_id}/state")
+@router.get("/sessions/{session_id}/state")
 def get_state(session_id: str) -> Response:
     with _locked_session(session_id) as generator:
         state_json = generator.to_json(serialize_torch=True, serialize_inline=True)
     return Response(content=state_json, media_type="application/json")
 
 
-@app.delete("/sessions/{session_id}", status_code=204)
+@router.delete("/sessions/{session_id}", status_code=204)
 def delete_session(session_id: str) -> None:
     with _lock:
         session = _sessions.pop(session_id, None)
@@ -176,6 +223,9 @@ def delete_session(session_id: str) -> None:
                 logger.exception("generator.finalize failed")
 
 
+app.include_router(router)
+
+
 def main() -> None:
     import uvicorn
 
@@ -184,5 +234,5 @@ def main() -> None:
     uvicorn.run(app, host=host, port=port)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
