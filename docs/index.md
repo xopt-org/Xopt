@@ -42,6 +42,7 @@ Currenty **Xopt** provides:
     - [`extremum_seeking`](examples/sequential/extremum_seeking.ipynb) Extremum seeking time-dependent optimization
     - [`rcds`](examples/sequential/rcds.ipynb) Robust Conjugate Direction Search (RCDS)
     - [`neldermead`](examples/sequential/neldermead.ipynb) Nelder-Mead Simplex
+    - [`scipy`](examples/sequential/scipy.ipynb) Scipy-based optimization algorithms (Powell, L-BFGS-B, etc.)
 - Sampling algorithms:
     - `random` Uniform random sampling
 - Convenient YAML/JSON based input format
