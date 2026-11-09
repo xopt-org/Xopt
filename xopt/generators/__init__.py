@@ -28,6 +28,7 @@ all_generator_names = {
     "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
     "rcds": {"rcds"},
+    "rl": {"rl_policy"},
 }
 
 
@@ -127,6 +128,11 @@ def get_generator_dynamic(name: str) -> type[Generator]:
 
         generators[name] = RCDSGenerator
         return RCDSGenerator
+    elif name in all_generator_names["rl"]:
+        from xopt.generators.rl_generator import RLGenerator
+
+        generators[name] = RLGenerator
+        return RLGenerator
     raise KeyError
 
 
