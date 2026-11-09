@@ -248,6 +248,20 @@ def encode_torch_module(module):
     return encoded_bytes.decode("ascii")
 
 
+def torch_map_location():
+    """
+    `map_location` for `torch.load`: keep tensors on the device they were saved on
+    when it is available, otherwise map them to the CPU. Needed to load modules
+    saved on a GPU (e.g. by a remote generator server) on a CPU-only machine.
+    """
+    return None if torch.cuda.is_available() else "cpu"
+
+
+def load_torch_module(f):
+    """`torch.load` for pickled modules, mapped to the CPU if CUDA is unavailable."""
+    return torch.load(f, map_location=torch_map_location(), weights_only=False)
+
+
 def decode_torch_module(modulestr: str):
     import base64
     import gzip
@@ -257,7 +271,7 @@ def decode_torch_module(modulestr: str):
     decoded = base64.standard_b64decode(base64str)
     decompressed = gzip.decompress(decoded)
     bytestream = io.BytesIO(decompressed)
-    module = torch.load(bytestream, weights_only=False)
+    module = load_torch_module(bytestream)
     return module
 
 
@@ -277,7 +291,7 @@ class XoptBaseModel(BaseModel):
                 if os.path.exists(value):
                     extension = value.split(".")[-1]
                     if extension == "pt":
-                        data[key] = torch.load(value, weights_only=False)
+                        data[key] = load_torch_module(value)
         return data
 
     # Note that this function still returns a dict, NOT a string. Pydantic will handle

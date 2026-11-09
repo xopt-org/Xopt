@@ -115,6 +115,13 @@ def visualize_virtual_objective(
     objective_lower = torch.nanquantile(objective_values, q=0.025, dim=0).flatten()
     objective_std = (objective_upper - objective_lower) / 4
 
+    # Matplotlib consumes CPU arrays, even when model evaluation uses CUDA.
+    x = x.detach().cpu()
+    objective_med = objective_med.detach().cpu()
+    objective_lower = objective_lower.detach().cpu()
+    objective_upper = objective_upper.detach().cpu()
+    objective_std = objective_std.detach().cpu()
+
     figsize = (4 * dim_x, 3.7)
     fig, ax = plt.subplots(
         nrows=1, ncols=dim_x, sharex=True, sharey=True, figsize=figsize

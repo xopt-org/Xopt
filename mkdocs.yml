@@ -69,6 +69,11 @@ nav:
             - RCDS: examples/sequential/rcds.ipynb
         - Other:
             - Latin Hypercube: examples/other/latin_hypercube.ipynb
+        - Remote Generators:
+            - User Guide: examples/remote_generator/http_generator_guide.md
+            - UCB via HTTP: examples/remote_generator/http_generator_ucb.ipynb
+            - BAX via HTTP: examples/remote_generator/http_generator_bax.ipynb
+            - Custom model via HTTP: examples/remote_generator/http_generator_custom_model.ipynb
         - Developer:
             - Benchmarking & Profiling: examples/developer/benchmarking.md
 
@@ -78,6 +83,7 @@ nav:
       - Evaluator: api/evaluator.md
       - Generators:
           - Base generator class: api/generators.md
+          - Remote generators: examples/remote_generator/http_generator_guide.md
           - Bayesian generators:
               - Bayesian Generator Class: api/generators/bayesian/bayesian_generator.md
               - Time-Dependent Bayesian Generators: api/generators/bayesian/time_dependent.md

@@ -30,7 +30,7 @@ from torch.optim import Adam
 from xopt.generators.bayesian.base_model import ModelConstructor
 from xopt.generators.bayesian.models.prior_mean import CustomMean
 from xopt.generators.bayesian.utils import get_training_data, get_training_data_batched
-from xopt.pydantic import XoptBaseModel, decode_torch_module
+from xopt.pydantic import XoptBaseModel, decode_torch_module, load_torch_module
 
 DECODERS = {"torch.float32": torch.float32, "torch.float64": torch.float64}
 MIN_INFERRED_NOISE_LEVEL = 1e-4
@@ -254,7 +254,7 @@ class StandardModelConstructor(ModelConstructor):
                     if val.startswith("base64:"):
                         value[key] = decode_torch_module(val)
                     elif os.path.exists(val):
-                        value[key] = torch.load(val, weights_only=False)
+                        value[key] = load_torch_module(val)
 
         return value
 
