@@ -1,6 +1,7 @@
 import torch
 
 from xopt.generators.bayesian.bax_generator import BaxGenerator
+from xopt.generators.bayesian.baxus import BAxUSGenerator
 from xopt.generators.bayesian.bayesian_exploration import BayesianExplorationGenerator
 from xopt.generators.bayesian.bayesian_generator import BayesianGenerator
 from xopt.generators.bayesian.expected_improvement import (
@@ -35,6 +36,7 @@ __all__ = [
     "TDExpectedImprovementGenerator",
     "MGGPOGenerator",
     "BaxGenerator",
+    "BAxUSGenerator",
     "BayesianGenerator",
     "TimeDependentBayesianGenerator",
     "TurboController",

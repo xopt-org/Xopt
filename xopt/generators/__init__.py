@@ -24,6 +24,7 @@ all_generator_names = {
         "expected_improvement",
         "multi_fidelity",
         "bax",
+        "baxus",
     },
     "ga": {"cnsga", "nsga2"},
     "es": {"extremum_seeking"},
@@ -90,6 +91,7 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             UpperConfidenceBoundGenerator,
         )
         from xopt.generators.bayesian.bax_generator import BaxGenerator
+        from xopt.generators.bayesian.baxus import BAxUSGenerator
 
         registered_generators: list[type[Generator]] = [
             UpperConfidenceBoundGenerator,
@@ -99,6 +101,7 @@ def get_generator_dynamic(name: str) -> type[Generator]:
             ExpectedImprovementGenerator,
             MultiFidelityGenerator,
             BaxGenerator,
+            BAxUSGenerator,
         ]
         for gen in registered_generators:
             generators[gen.name] = gen
