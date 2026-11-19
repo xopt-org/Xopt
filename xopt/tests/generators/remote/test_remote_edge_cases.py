@@ -196,6 +196,7 @@ def test_server_reports_generator_failures(in_process):
 def test_server_reports_unknown_session_on_every_route(in_process):
     srv, generator = in_process
     generator._session_id = "no-such-session"
+    generator.recover_session = False
     try:
         with pytest.raises(XoptError, match="404.*unknown session"):
             generator.ingest([{"x1": 0.1, "x2": 0.2, "y1": 1.0}])

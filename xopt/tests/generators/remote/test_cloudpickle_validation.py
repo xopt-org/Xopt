@@ -55,3 +55,21 @@ def test_cloudpickle_server_rejects_non_generator_payload():
 
     assert exc.value.status_code == 400
     assert "payload is not an Xopt Generator" in exc.value.detail
+
+
+def test_cloudpickle_client_cannot_push():
+    from gest_api.vocs import VOCS
+
+    from xopt.generators.random import RandomGenerator
+
+    vocs = VOCS(variables={"x": [0.0, 1.0]}, objectives={"y": "MINIMIZE"})
+    client = CloudpickleHTTPGenerator(
+        base_url="http://127.0.0.1:1", generator=RandomGenerator(vocs=vocs)
+    )
+    with pytest.raises(NotImplementedError, match="cannot push"):
+        client.push()
+    # the edit warning must not tell cloudpickle users to call push()
+    assert "push()" not in client._apply_edit_hint()
+    assert "finalize()" in client._apply_edit_hint()
+    # a recovered cloudpickle session is recreated from the pickled copy
+    assert client._session_state() == {}

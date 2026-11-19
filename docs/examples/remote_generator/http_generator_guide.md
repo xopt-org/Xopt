@@ -144,19 +144,57 @@ client.
 
 ## 4. Working with the remote generator
 
+The server owns the generator and the client owns the data.
+
 - `X.step()`, `X.random_evaluate()` and `X.data` behave as usual. New data is
-  sent to the server and candidates come back.
+  sent to the server and candidates come back. The server's copy of the data
+  matches the client generator's: when the server can't be reached, the step
+  fails with an error and neither copy gains the row.
 - **Inspecting the model.** `pull()` returns a local copy of the server's
-  generator, including the fitted model. Methods that aren't part of the remote
-  interface, such as `X.generator.visualize_model()`, do this automatically.
-  The copy is a snapshot. Changing it does not affect the server, and you need
-  to pull again after more steps. Plotting and any model evaluation on the copy
-  run on the client.
+  generator, including the fitted model. Attributes that only the wrapped
+  generator has, such as `X.generator.visualize_model()` or
+  `X.generator.model`, pull once per step and then reuse the copy. Plotting and
+  model evaluation on the copy run on the client.
+- **Changing a setting mid-run.** The copy is read-only. Assigning to it, for
+  example `X.generator.generator.beta = 0.5`, changes nothing on the server and
+  the next step warns, once per edit. `X.generator.push()` sends the copy's
+  configuration to the server, which keeps its data, drops the fitted model and
+  retrains on the next step. The configuration includes optimizer state such as
+  a TuRBO trust region, so `push()` warns when the copy has not been pulled
+  since the last step: pull first to keep that state. Assigning a whole new
+  generator to `X.generator.generator` is treated the same way as an edit.
+  `CloudpickleHTTPGenerator` does not support `push()`.
 - **Ending a session.** Call `X.generator.finalize()` to free the session on
   the server. The server keeps running for other sessions.
 - **Errors.** A failed request raises `XoptError` with the HTTP status and the
-  server's message, e.g. `unknown session '...'` after a server restart, or
-  `invalid or missing bearer token`.
+  server's message, e.g. `invalid or missing bearer token`. When the server's
+  generator rejects data, the client raises `DataError`, so `Xopt(strict=False)`
+  warns and continues the same way it does with a local generator. When the
+  outcome of sending data is unknown (a timeout or a server error), the client
+  replaces the server's data with its own instead of retrying, so no row is
+  counted twice.
+
+### Server restarts
+
+Sessions live in the server's memory. After a restart (a crash, a redeploy, a
+pod eviction) the server no longer knows the client's session. The client
+notices on its next request, creates a new session from the configuration the
+server last had and all of the client's data, warns, and carries on. Field
+edits that were not pushed stay pending. A whole generator assigned to
+`X.generator.generator` and not yet pushed is used as is, since the server
+never had an earlier version of it. The warning says which state it resumed
+from:
+
+- after a `pull()` or `push()`, including the automatic pull before a dump
+  with `pull_on_dump=True`, the state the server had at that point, including
+  a TuRBO trust region,
+- otherwise the initial configuration, in which case state the server built up
+  since is lost and the warning says so.
+
+`recover_session=False` on the wrapper raises `XoptError` instead. The client
+recreates the session at most once per request, so a server that forgets the
+new session as well (a second process behind the same address) produces an
+error instead of a loop.
 
 ## Notebooks, scripts, and YAML
 
@@ -222,9 +260,12 @@ generators that carry state between steps, such as TuRBO trust regions.
 
 - If the server can't be reached within `dump_pull_timeout` (default 10 s),
   the dump is still written from the last pulled copy, with a warning.
-- Set `pull_on_dump=False` on the wrapper to skip the pull, e.g. if pulling a
-  large fitted model after every step is too slow. Dumps then contain the last
-  pulled copy.
+- The pull leaves out the fitted model unless `X.serialize_torch` is `True`,
+  since the dump drops it anyway. Custom kernels and prior means are
+  configuration and are always included.
+- Set `pull_on_dump=False` on the wrapper to skip the pull. Dumps then contain
+  the last pulled copy, and so does the session recreated after a server
+  restart (see [Server restarts](#server-restarts)).
 - **`X.yaml()`, `X.json()` and displaying `X` in a notebook do not pull.** They
   show the last pulled copy, which can be out of date. Call
   `X.generator.pull()` first if you need the current state, or save with
@@ -343,6 +384,77 @@ cell for the variable name. The same code works as a script.
   so a client cannot make it send requests to other hosts.
 - For reproducible results, record the Xopt version and the versions of your
   own packages on both client and server.
+
+## Deploying the server
+
+The server is one Python process holding every session in memory. These
+facts apply to any deployment (a workstation, Docker, Kubernetes):
+
+- Run one process (`uvicorn --workers 1`, one replica). A second process has
+  its own, empty session table, so requests routed to it fail with
+  `unknown session`.
+- A restart drops every session. Clients recreate theirs on the next request
+  (see [Server restarts](#server-restarts)), so a restart costs a warning, not
+  the optimization.
+- `GET /health` needs no token and returns `status`, `xopt_version`,
+  `cuda_available`, `sessions` and `max_sessions`. Use it for liveness and
+  readiness probes.
+- `XOPT_HTTP_MAX_SESSIONS` (default 64) caps live sessions. Session creation
+  beyond it returns `503` with the count. Sessions are not expired
+  automatically, so a client that exits without `finalize()` keeps its session
+  until the cap or a restart. `GET /sessions` (with the token) lists sessions
+  with `generator_name`, `created_at`, `last_used_at` and `n_data`, and
+  `DELETE /sessions/{id}` removes one.
+- Any proxy in front of the server needs a read timeout at least as long as
+  the client's `timeout` (default 300 s), because a GP fit on a shared machine
+  can take minutes, and a body limit large enough for the initial state of a
+  generator with custom torch modules.
+- `use_cuda=True` on a server without a GPU falls back to the CPU. The server
+  says so in the response that creates the session, and the client raises it
+  as a `UserWarning`.
+
+Sessions are server-local, so the server can't be scaled past one process
+without either routing each client to the same process or keeping sessions
+outside process memory. Both are open items below. The deployment itself
+(images, manifests, network) belongs to the deployment repository.
+
+## Limitations and next steps
+
+Known gaps, each with what fails today and what is missing.
+
+- **Session expiry.** Sessions leak when a client exits without `finalize()`.
+  Missing: an idle timeout on the server (with a policy for what "idle" means
+  for a notebook left open overnight).
+- **Per-user access.** One token for everyone, and any holder can list and
+  delete any session. Missing: per-user tokens and session ownership.
+- **Scaling past one process.** Missing: session-affinity routing or a shared
+  session store. Alternatively, one process per session.
+- **GPU sharing.** Sessions on one server share its GPU with no coordination.
+  Missing: a per-server concurrency limit or one session per GPU.
+- **Bayesian generators with `custom_objective`.** Rejected at wrap time. The
+  objective is sent as a base64 torch module and only the `model` field has a
+  decoder, so the server fails to rebuild the generator. Missing: a decoder for
+  every torch module field in `XoptBaseModel`.
+- **Multi-fidelity generators.** A custom `cost_function` is rejected at wrap
+  time: the field is excluded from serialization, so the server would use the
+  default without any error. With the default cost function the server fails
+  to rebuild the generator from its own serialized state (`'dict' object has
+  no attribute 'variables'`), which is a serialization problem in
+  `MultiFidelityGenerator` itself. Missing: that fix, and a decision upstream
+  on serializing `cost_function` by import path, as evaluators are.
+- **Sequential and evolutionary generators** (extremum seeking, RCDS,
+  Nelder-Mead, scipy, NSGA2). Rejected at wrap time. Reloading a dump feeds the data back through `ingest`
+  as new observations, which they reject or double-count, and part of their
+  state lives in private attributes that are never serialized. Missing: a
+  `set_data` path from client to server, and that state in serializable fields.
+- **dtypes on the server.** Nullable `Int64`/`boolean` columns with NA and
+  datetime columns change dtype on the server (values are preserved). Dump
+  files have the same 10-decimal rounding of `data` that the wire format used
+  to have. That comes from Xopt's `DataFrame.to_json` and is a separate issue.
+- **Fields the server never sees.** `supports_*` flags, MOBO
+  `pareto_front_history`, BAX `algorithm_results` and TuRBO's private success
+  and failure counters are excluded from serialization. They exist on the
+  server but are not in `pull()` copies or dumps.
 
 ## Running the tests
 
