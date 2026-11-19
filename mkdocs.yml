@@ -43,6 +43,7 @@ nav:
                 - Fast model evaluation: examples/single_objective_bayes_opt/fast_model_eval.ipynb
                 - Hessian kernel: examples/single_objective_bayes_opt/hessian_kernel.ipynb
                 - Contextual Bayesian optimization: examples/single_objective_bayes_opt/contextual_bo.ipynb
+                - Meta-learned surrogates (Meta-LSQ): examples/single_objective_bayes_opt/meta_lsq.ipynb
             - Trust Region Bayesian Optimization:
                 - Basic example: examples/trust_region_bo/turbo_basics.ipynb
                 - Optimization: examples/trust_region_bo/turbo_optimize.ipynb
@@ -97,6 +98,7 @@ nav:
                   - Base Model Constructor: api/generators/bayesian/models/base_model_constructor.md
                   - Standard Model Constructor: api/generators/bayesian/models/standard_model_constructor.md
                   - Time Dependent Model Constructor: api/generators/bayesian/models/time_dependent_model_constructor.md
+                  - Meta-LSQ Model Constructor: api/generators/bayesian/models/meta_lsq_model_constructor.md
               - Utilities: api/generators/bayesian/utils.md
           - Genetic generators:
               - CNSGA: api/generators/ga/cnsga.md

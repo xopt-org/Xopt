@@ -41,6 +41,7 @@ from xopt.generators.bayesian.custom_botorch.log_acquisition_function import (
     LogAcquisitionFunction,
 )
 from xopt.generators.bayesian.models.approximate import ApproximateModelConstructor
+from xopt.generators.bayesian.models.meta_lsq import MetaLSQModelConstructor
 from xopt.generators.bayesian.models.standard import (
     BatchedModelConstructor,
     StandardModelConstructor,
@@ -271,6 +272,7 @@ class BayesianGenerator(Generator, ABC):
             "batched": BatchedModelConstructor,
             "time_dependent": TimeDependentModelConstructor,
             "approximate": ApproximateModelConstructor,
+            "meta_lsq": MetaLSQModelConstructor,
         }
         if value is None:
             value = StandardModelConstructor()
