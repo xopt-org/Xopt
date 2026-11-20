@@ -164,6 +164,9 @@ class StandardModelConstructor(ModelConstructor):
         description="specify if inputs should be transformed inside the gp "
         "model, can optionally specify a dict of specifications",
     )
+    saas_outputs: List[str] = Field(
+        [], description="list of output names to apply SAAS priors to"
+    )
     custom_noise_prior: Optional[Prior] = Field(
         None,
         description="specify custom noise prior for the GP likelihood, "
@@ -368,6 +371,31 @@ class StandardModelConstructor(ModelConstructor):
                 "covar_module": covar_module,
                 "mean_module": mean_module,
             }
+
+            # handle saas model construction
+            if outcome_name in self.saas_outputs:
+                if kwargs.pop("covar_module", None) is not None:
+                    warnings.warn(
+                        f"Covariance module specified for output {outcome_name} will be overwritten by SAAS model construction."
+                    )
+                if kwargs.pop("mean_module", None) is not None:
+                    warnings.warn(
+                        f"Mean module specified for output {outcome_name} will be overwritten by SAAS model construction."
+                    )
+                models.append(
+                    self.build_map_saas_gp(
+                        train_X.to(**tkwargs),
+                        train_Y.to(**tkwargs),
+                        train_Yvar.to(**tkwargs) if train_Yvar is not None else None,
+                        train=False,
+                        **kwargs,
+                    )
+                )
+
+                # add in likelihood if needed
+                # if models[-1].likelihood is None:
+                #    models[-1].likelihood = self.get_likelihood()
+                continue
 
             if train_Yvar is None:
                 # train basic single-task-gp model
