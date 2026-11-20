@@ -12,13 +12,12 @@ ONLY suitable for trusted, isolated clients; do not expose it publicly.
 import base64
 import io
 import pickle
-import uuid
 from contextlib import asynccontextmanager
 
 import cloudpickle
 import torch
 from types import SimpleNamespace
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from xopt.generator import Generator
@@ -48,10 +47,13 @@ async def _cloudpickle_lifespan(application):
 # Standard HTTPGenerator clients work against it unchanged.
 app = FastAPI(
     title="Xopt HTTPGenerator reference server (with cloudpickle)",
-    dependencies=[Depends(upstream._require_auth)],
     lifespan=_cloudpickle_lifespan,
 )
 app.include_router(upstream.router)
+app.include_router(upstream.health_router)
+
+# the cloudpickle routes need the token like the upstream ones
+router = APIRouter(dependencies=[Depends(upstream._require_auth)])
 
 
 class PicklePayload(BaseModel):
@@ -60,7 +62,7 @@ class PicklePayload(BaseModel):
     payload: str
 
 
-@app.post("/sessions/cloudpickle", response_model=upstream.SessionResponse)
+@router.post("/sessions/cloudpickle", response_model=upstream.SessionResponse)
 def create_cloudpickle_session(request: PicklePayload):
     """Deserialize a trusted generator and register it as an upstream session.
 
@@ -81,17 +83,12 @@ def create_cloudpickle_session(request: PicklePayload):
             status_code=400, detail=f"invalid generator payload: {exc}"
         ) from exc
 
-    session_id = str(uuid.uuid4())
-    # Integration tradeoff: reuse upstream's private session registry and lock
-    # to preserve its lifecycle and other endpoints. These private attributes
-    # may change in future upstream releases and should be revisited before
-    # merging this functionality into Xopt proper.
-    with upstream._lock:
-        upstream._sessions[session_id] = upstream.GeneratorSession(obj)
+    # the same registry, lock and session cap as the upstream routes
+    session_id = upstream._register_session(obj, getattr(obj, "name", ""))
     return upstream.SessionResponse(session_id=session_id)
 
 
-@app.get("/sessions/{session_id}/state/cloudpickle")
+@router.get("/sessions/{session_id}/state/cloudpickle")
 def get_cloudpickle_state(session_id: str):
     """Return the current generator, including notebook-local class definitions.
 
@@ -127,3 +124,6 @@ def get_cloudpickle_state(session_id: str):
         # The snapshot is independent of the live GPU generator.
         payload = base64.b64encode(cloudpickle.dumps(snapshot)).decode("ascii")
         return {"payload": payload}
+
+
+app.include_router(router)

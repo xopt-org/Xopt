@@ -36,15 +36,35 @@ class CloudpickleHTTPGenerator(UpstreamHTTPGenerator):
             response = self._request(
                 "POST", "/sessions/cloudpickle", json={"payload": payload}
             )
-            self._start_session(response.json()["session_id"])
+            body = response.json()
+            self._start_session(body["session_id"], body.get("warnings", ()))
         return self._session_id
 
-    def pull(self, timeout: Optional[float] = None) -> Generator:
-        """Refresh the local mirror from the server's latest generator state."""
-        session_id = self._ensure_session()
-        response = self._request(
+    def push(self) -> None:
+        raise NotImplementedError(
+            "CloudpickleHTTPGenerator cannot push a configuration; finalize() and "
+            "create a new generator instead"
+        )
+
+    def _apply_edit_hint(self) -> str:
+        return (
+            "CloudpickleHTTPGenerator cannot push changes; call `pull()` to discard "
+            "it, or finalize() and create a new generator"
+        )
+
+    def _session_state(self) -> dict:
+        # the cloudpickle session is created from the live object, not a state
+        # dict; recovery resends the current copy
+        return {}
+
+    def pull(
+        self, timeout: Optional[float] = None, include_model: bool = True
+    ) -> Generator:
+        """Refresh the local mirror from the server's latest generator state.
+        The cloudpickle snapshot always includes the model."""
+        response = self._call(
             "GET",
-            f"/sessions/{session_id}/state/cloudpickle",
+            "/sessions/{}/state/cloudpickle",
             timeout=timeout or self.state_timeout,
         )
         # This endpoint is trusted for the same reason as session creation:
@@ -58,10 +78,17 @@ class CloudpickleHTTPGenerator(UpstreamHTTPGenerator):
             # Preserve upstream's local-data ownership semantics. The generator
             # model/state is remote; the client's collected data remains local.
             mirror.data = self.data
-            self.generator = mirror
+            self._updating_mirror = True
+            try:
+                self.generator = mirror
+            finally:
+                self._updating_mirror = False
         except Exception as exc:
             # XoptError lets sync_for_dump() fall back to the last pulled copy
             raise XoptError(
                 f"failed to rebuild the remote generator state locally: {exc}"
             ) from exc
+        self._synced_state = None  # recreated from the pickled copy instead
+        self._synced_at_step = self._steps
+        self._full_pull_step = self._steps
         return mirror

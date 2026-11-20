@@ -700,7 +700,7 @@ class Xopt(XoptBaseModel):
             )
 
         fname = os.path.expanduser(os.path.expandvars(fname))
-        self.generator.sync_for_dump()
+        self.generator.sync_for_dump(include_model=self.serialize_torch)
         with open(fname, "w") as f:
             f.write(self.yaml(**kwargs))
         logger.debug(f"Dumped state to YAML file: {fname}")

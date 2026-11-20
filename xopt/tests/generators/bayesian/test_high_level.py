@@ -214,10 +214,7 @@ class TestHighLevel:
 
         X2.step()
 
-    @pytest.fixture(scope="module", autouse=True)
-    def clean_up(self):
-        yield
-        files = ["dump.yml", "mobo_model.pt", "dump_inline.yml", "generator_model.pt"]
-        for f in files:
-            if os.path.exists(f):
-                os.remove(f)
+    @pytest.fixture(autouse=True)
+    def isolated_working_directory(self, tmp_path, monkeypatch):
+        """Isolate each test's generated serialization artifacts."""
+        monkeypatch.chdir(tmp_path)

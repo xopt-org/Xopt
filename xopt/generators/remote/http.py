@@ -17,8 +17,8 @@ from pydantic import (
     model_validator,
 )
 
-from xopt.errors import XoptError
-from xopt.generator import Generator
+from xopt.errors import DataError, XoptError
+from xopt.generator import Generator, StateOwner
 from xopt.generators import get_generator_dynamic
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,33 @@ def _scalar(value: Any) -> Any:
 _JSON_HEADERS = {"Content-Type": "application/json"}
 
 
+def _body(key: str, data: Optional[pd.DataFrame]) -> dict[str, Any]:
+    """`requests` kwargs for a JSON body of records."""
+    return {"data": _records_json(key, data), "headers": _JSON_HEADERS}
+
+
+def _config_state(generator: Generator) -> dict[str, Any]:
+    """The generator's state with torch modules inline but without the fitted
+    `model`: what `push()` sends and what a recovered session is built from.
+    Custom kernels and prior means are configuration and stay in."""
+    state = json.loads(generator.to_json(serialize_torch=True, serialize_inline=True))
+    state.pop("model", None)
+    return state
+
+
+def _fingerprint(generator: Generator) -> str:
+    """The settings of `generator` as a string, to detect local edits that were
+    not pushed. Torch modules are left out: pickling them fails for classes
+    defined in a notebook (which only cloudpickle can send), and an edit to a
+    kernel's hyperparameters is not a configuration change."""
+    return generator.to_json(serialize_torch=False)
+
+
+class _TransientError(XoptError):
+    """A request whose outcome is unknown or that the server could not handle
+    (timeout, connection error, 5xx). Safe to repair with an idempotent PUT."""
+
+
 def _error_detail(response: requests.Response) -> str:
     """The server's error message: FastAPI's `detail`, else the response body."""
     try:
@@ -57,8 +84,59 @@ def _error_detail(response: requests.Response) -> str:
     except (ValueError, AttributeError):
         detail = None
     if detail is None:
-        detail = response.text.strip() or response.reason
+        detail = response.text.strip() or getattr(response, "reason", None) or ""
     return str(detail)[:500]
+
+
+class RemoteSessionLost(XoptError):
+    """The server no longer knows the client's session (restart, eviction, or
+    deleted by hand). `HTTPGenerator` recovers from this by creating a new one."""
+
+
+def _raise_for_response(path: str, response: requests.Response) -> None:
+    """Translate an error response into the exception a local generator would
+    have raised: `DataError` when the server tagged one, `RemoteSessionLost`
+    for an unknown session, `XoptError` otherwise."""
+    status = response.status_code
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    detail = body.get("detail") if isinstance(body, dict) else None
+    if isinstance(detail, dict) and detail.get("type") == "DataError":
+        raise DataError(detail.get("message", ""))
+    message = (
+        f"HTTPGenerator request to {path!r} failed ({status}): "
+        f"{_error_detail(response)}"
+    )
+    if status == 404 and "unknown session" in str(detail):
+        raise RemoteSessionLost(message)
+    if status >= 500:
+        raise _TransientError(message)
+    raise XoptError(message)
+
+
+def _reject_unsupported(generator: Generator) -> None:
+    """Refuse generators whose state would be silently altered by the trip to
+    the server. See the user guide, "Limitations and next steps"."""
+    if isinstance(generator, StateOwner):
+        raise ValueError(
+            f"{type(generator).__name__} cannot run remotely yet: reloading a dump "
+            "re-ingests its data and its private state is not serialized"
+        )
+    if getattr(generator, "custom_objective", None) is not None:
+        raise ValueError(
+            "a generator with `custom_objective` cannot run remotely yet: the "
+            "server has no decoder for that field"
+        )
+    cost_function = getattr(generator, "cost_function", None)
+    if cost_function is not None:
+        default = type(generator).model_fields["cost_function"].default
+        if cost_function is not default:
+            raise ValueError(
+                "a custom `cost_function` cannot run remotely yet: the field is "
+                "not serialized, so the server would use the default"
+            )
 
 
 _SUPPORTS_FLAGS = (
@@ -77,19 +155,21 @@ class HTTPGenerator(Generator):
     Generator that proxies `suggest`/`ingest` to a wrapped generator running
     in a session on a remote `xopt.generators.remote.server` instance.
 
-    `generator` holds the (already-instantiated) generator to run remotely. Its
-    full state is sent to the server when the session is created, and never by
-    sending a pickled object over the wire - the server reconstructs an instance
-    of the same class (looked up by `generator.name` in the local registry) from
-    that state.
+    The server owns the generator. `generator` holds the configuration sent
+    when the session is created and, after `pull()`, a read-only copy of the
+    server's state including the fitted model. The server reconstructs the
+    class by `generator.name` from its registry; no pickled object crosses
+    the wire. Assigning a field on the copy warns, because it changes nothing
+    on the server until `push()` sends it.
 
-    Methods/attributes not defined on this class (e.g. `visualize_model` on a
-    wrapped BO generator) fall back to the `generator` field, which is replaced
-    with a fresh, read-only reconstruction of the remote generator's full state
-    (pulled via `pull()`) on every such access. Because `generator` is a regular
-    field, serializing `HTTPGenerator` itself also captures that latest mirrored
-    state. Calling a state-mutating method on the mirror has no effect on the
-    remote session.
+    The client owns the data. `data` is pushed to the server on every
+    `add_data` and whenever it is replaced, and a new session always starts
+    from the data the client holds. If the server forgets the session (a
+    restart), the next call recreates it from the last pulled copy and the
+    local data, with a warning.
+
+    Attributes of the wrapped generator class that this class lacks, such as
+    `visualize_model`, resolve against a fresh `pull()`.
     """
 
     name: ClassVar[str] = "http"
@@ -107,7 +187,14 @@ class HTTPGenerator(Generator):
         repr=False,
     )
     timeout: float = Field(
-        default=30.0, description="timeout in seconds for suggest/ingest requests"
+        default=300.0,
+        description="timeout in seconds for suggest/ingest requests; a GP fit on "
+        "a shared server can take minutes",
+    )
+    recover_session: bool = Field(
+        default=True,
+        description="when the server no longer knows the session, create a new "
+        "one from the last pulled state and the local data instead of raising",
     )
     state_timeout: float = Field(
         default=120.0,
@@ -128,6 +215,19 @@ class HTTPGenerator(Generator):
     _session_id: Optional[str] = PrivateAttr(default=None)
     _http: requests.Session = PrivateAttr(default_factory=requests.Session)
     _syncing: bool = PrivateAttr(default=False)
+    # set while `generator` is replaced by this class, so the assignment warning
+    # in `_warn_on_mirror_edit` only fires for user edits
+    _updating_mirror: bool = PrivateAttr(default=False)
+    _steps: int = PrivateAttr(default=0)
+    # step count at the last pull that included the model; delegated attribute
+    # access reuses the mirror while this equals `_steps`
+    _full_pull_step: Optional[int] = PrivateAttr(default=None)
+    # the configuration the server is known to have: set by pull() and push(),
+    # used to recreate a lost session and to describe what it resumed from
+    _synced_state: Optional[dict[str, Any]] = PrivateAttr(default=None)
+    _synced_at_step: Optional[int] = PrivateAttr(default=None)
+    _fingerprint: Optional[str] = PrivateAttr(default=None)
+    _recovering: bool = PrivateAttr(default=False)
 
     @model_validator(mode="before")
     @classmethod
@@ -169,6 +269,9 @@ class HTTPGenerator(Generator):
             raise ValueError(
                 "`vocs` of the HTTPGenerator and of the wrapped generator differ"
             )
+        _reject_unsupported(self.generator)
+        if self._fingerprint is None:
+            self._fingerprint = _fingerprint(self.generator)
         return self
 
     @field_serializer("generator")
@@ -207,6 +310,16 @@ class HTTPGenerator(Generator):
                 value = pd.DataFrame(value)
             self._push_full_data(value)
         super().__setattr__(name, value)
+        if name == "generator" and not getattr(self, "_updating_mirror", False):
+            # a new local configuration, not yet on the server: it is what a new
+            # session is built from, and until pushed the live session differs
+            self._full_pull_step = None
+            self._synced_state = None
+            self._synced_at_step = None
+            if self._fingerprint is not None and self._session_id is not None:
+                self._fingerprint = ""  # differs from any real fingerprint
+            else:
+                self._fingerprint = _fingerprint(value)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url.rstrip('/')}{path}"
@@ -227,42 +340,99 @@ class HTTPGenerator(Generator):
                 **kwargs,
             )
         except requests.RequestException as exc:
-            raise XoptError(f"HTTPGenerator request to {path!r} failed: {exc}") from exc
+            raise _TransientError(
+                f"HTTPGenerator request to {path!r} failed: {exc}"
+            ) from exc
         # checked here rather than with raise_for_status() so the message carries
         # the server's reason (e.g. "unknown generator 'foo'"), and so a client
         # that only mimics the response (status_code, json(), text, reason)
         # behaves the same
         if response.status_code >= 400:
-            raise XoptError(
-                f"HTTPGenerator request to {path!r} failed "
-                f"({response.status_code}): {_error_detail(response)}"
-            )
+            _raise_for_response(path, response)
         return response
+
+    def _call(
+        self, method: str, path_template: str, **kwargs: Any
+    ) -> requests.Response:
+        """A request against the session, created on demand. If the server has
+        forgotten the session, recreate it and retry once."""
+        session_id = self._ensure_session()
+        try:
+            return self._request(method, path_template.format(session_id), **kwargs)
+        except RemoteSessionLost as exc:
+            if not self.recover_session or self._recovering:
+                raise
+            self._session_id = None
+            warnings.warn(
+                f"the remote generator session is gone ({exc}); recreating it "
+                f"from {self._synced_description()} and the local data"
+            )
+            self._recovering = True
+            try:
+                session_id = self._ensure_session()
+                return self._request(method, path_template.format(session_id), **kwargs)
+            finally:
+                self._recovering = False
+
+    def _synced_description(self) -> str:
+        if self._synced_at_step is None:
+            return (
+                "the initial configuration (nothing pulled or pushed since; state "
+                "the server built up, such as a TuRBO trust region, is lost)"
+            )
+        return f"the state synced after step {self._synced_at_step}"
+
+    def _warn_if_mirror_edited(self) -> None:
+        if (
+            self._fingerprint is not None
+            and _fingerprint(self.generator) != self._fingerprint
+        ):
+            warnings.warn(
+                "the local copy of the remote generator was changed but not sent to "
+                f"the server; {self._apply_edit_hint()}"
+            )
+            # warn once per edit
+            self._fingerprint = _fingerprint(self.generator)
+
+    def _apply_edit_hint(self) -> str:
+        return "call `push()` to apply the change, or `pull()` to discard it"
+
+    def _session_state(self) -> dict[str, Any]:
+        """The configuration a new session is built from: what the server last
+        had, when known, so unpushed local edits do not slip in on recovery."""
+        if self._synced_state is not None:
+            return self._synced_state
+        return json.loads(
+            self.generator.to_json(serialize_torch=True, serialize_inline=True)
+        )
 
     def _ensure_session(self) -> str:
         if self._session_id is None:
-            state = json.loads(
-                self.generator.to_json(serialize_torch=True, serialize_inline=True)
-            )
+            state = self._session_state()
             response = self._request(
                 "POST",
                 "/sessions",
                 json={"generator_name": self.generator.name, "state": state},
             )
-            self._start_session(response.json()["session_id"])
+            body = response.json()
+            self._start_session(body["session_id"], body.get("warnings", ()))
         return self._session_id
 
-    def _start_session(self, session_id: str) -> None:
+    def _start_session(self, session_id: str, server_warnings=()) -> None:
         """Adopt a newly created session and give it the client's data. `data`
         is not part of the generator state, so a new session (first use, after
         finalize(), or on a deepcopy) would otherwise start empty. If the push
         fails the session is dropped again, so the next call retries from
         scratch instead of continuing against a server missing the data."""
+        for message in server_warnings:
+            warnings.warn(f"remote generator server: {message}")
         self._session_id = session_id
         if self.data is None or len(self.data) == 0:
             return
         try:
-            self._push_full_data(self.data)
+            self._request(
+                "PUT", f"/sessions/{session_id}/data", **_body("data", self.data)
+            )
         except XoptError:
             self._session_id = None
             try:
@@ -272,35 +442,61 @@ class HTTPGenerator(Generator):
             raise
 
     def generate(self, n_candidates: int) -> list[dict]:
-        session_id = self._ensure_session()
-        response = self._request(
-            "POST",
-            f"/sessions/{session_id}/suggest",
-            json={"num_points": n_candidates},
+        self._warn_if_mirror_edited()
+        response = self._call(
+            "POST", "/sessions/{}/suggest", json={"num_points": n_candidates}
         )
+        self._steps += 1
         return response.json()["points"]
 
     def add_data(self, new_data: pd.DataFrame) -> None:
-        session_id = self._ensure_session()
-        self._request(
-            "POST",
-            f"/sessions/{session_id}/ingest",
-            data=_records_json("results", new_data),
-            headers=_JSON_HEADERS,
-        )
+        self._warn_if_mirror_edited()
+        try:
+            self._call("POST", "/sessions/{}/ingest", **_body("results", new_data))
+        except _TransientError as exc:
+            # the ingest may or may not have been applied (e.g. a timeout), so
+            # don't retry it: replace the server's data with what the client
+            # will hold, which gives the same result either way
+            logger.warning("ingest failed (%s); replacing the remote data instead", exc)
+            combined = (
+                new_data
+                if self.data is None
+                else pd.concat([self.data, new_data], ignore_index=True)
+            )
+            self._push_full_data(combined)
         self._syncing = True
         try:
             super().add_data(new_data)
         finally:
             self._syncing = False
+        self._full_pull_step = None
 
     def _push_full_data(self, data: Optional[pd.DataFrame]) -> None:
-        self._request(
-            "PUT",
-            f"/sessions/{self._session_id}/data",
-            data=_records_json("data", data),
-            headers=_JSON_HEADERS,
-        )
+        self._call("PUT", "/sessions/{}/data", **_body("data", data))
+
+    def push(self) -> None:
+        """Send the local configuration (`generator`) to the server's session.
+        The server keeps its data, drops the fitted model and retrains on the
+        next step. With no session yet, the configuration is sent when the
+        session is created, so there is nothing to do."""
+        self._fingerprint = _fingerprint(self.generator)
+        if self._session_id is None:
+            return
+        if self._steps and self._synced_at_step != self._steps:
+            # the copy may predate state the server built up (a TuRBO trust
+            # region, acquisition history); pushing it would roll that back
+            warnings.warn(
+                "push() sends the local copy's optimizer state as well as its "
+                "settings; the copy was not pulled after the last step, so state "
+                "the server built up since is replaced by the copy's"
+            )
+        state = _config_state(self.generator)
+        response = self._call("PUT", "/sessions/{}/state", json={"state": state})
+        for message in response.json().get("warnings", ()):
+            warnings.warn(f"remote generator server: {message}")
+        self._synced_state = state
+        self._synced_at_step = self._steps
+        self._full_pull_step = None
 
     def finalize(self) -> None:
         if self._session_id is None:
@@ -312,12 +508,12 @@ class HTTPGenerator(Generator):
         finally:
             self._session_id = None
 
-    def sync_for_dump(self) -> None:
+    def sync_for_dump(self, include_model: bool = True) -> None:
         # with no session there is no remote state newer than the local copy
         if not self.pull_on_dump or self._session_id is None:
             return
         try:
-            self.pull(timeout=self.dump_pull_timeout)
+            self.pull(timeout=self.dump_pull_timeout, include_model=include_model)
         except XoptError as exc:
             warnings.warn(
                 "could not pull the remote generator state before dumping; "
@@ -325,13 +521,16 @@ class HTTPGenerator(Generator):
                 f"be out of date: {exc}"
             )
 
-    def pull(self, timeout: Optional[float] = None) -> Generator:
-        """Fetch the remote generator's full state, rebuild it locally, and store
-        it in `self.generator`. `timeout` defaults to `state_timeout`."""
-        session_id = self._ensure_session()
-        response = self._request(
+    def pull(
+        self, timeout: Optional[float] = None, include_model: bool = True
+    ) -> Generator:
+        """Fetch the remote generator's state, rebuild it locally and store it
+        in `generator`. `include_model=False` leaves out the fitted model,
+        which can be large. `timeout` defaults to `state_timeout`."""
+        response = self._call(
             "GET",
-            f"/sessions/{session_id}/state",
+            "/sessions/{}/state",
+            params={"include_model": "true" if include_model else "false"},
             timeout=timeout or self.state_timeout,
         )
         generator_class = get_generator_dynamic(self.generator.name)
@@ -339,7 +538,11 @@ class HTTPGenerator(Generator):
             mirror = generator_class.model_validate_json(response.text)
             # `data` is excluded from the remote state dump; reuse our own synced cache
             mirror.data = self.data
-            self.generator = mirror
+            self._updating_mirror = True
+            try:
+                self.generator = mirror
+            finally:
+                self._updating_mirror = False
         except Exception as exc:
             # e.g. a torch.load failure, or a validator on assignment; raise
             # XoptError so sync_for_dump() can fall back to the last pulled copy
@@ -347,6 +550,11 @@ class HTTPGenerator(Generator):
             raise XoptError(
                 f"failed to rebuild the remote generator state locally: {exc}"
             ) from exc
+        self._synced_state = _config_state(mirror)
+        self._synced_at_step = self._steps
+        self._fingerprint = _fingerprint(mirror)
+        # a copy without the model does not stand in for a full pull
+        self._full_pull_step = self._steps if include_model else None
         return mirror
 
     def __getattr__(self, name: str) -> Any:
@@ -356,9 +564,22 @@ class HTTPGenerator(Generator):
             return super().__getattr__(name)
         except AttributeError:
             pass
-        if name.startswith("_"):
+        # only names the wrapped class defines are delegated, so `hasattr`
+        # probes and attributes of this class that failed internally never
+        # reach the server
+        # `generator` is missing on a model_construct()ed instance
+        wrapped = self.__dict__.get("generator")
+        if (
+            name.startswith("_")
+            or wrapped is None
+            or hasattr(type(self), name)
+            or not (hasattr(type(wrapped), name) or name in type(wrapped).model_fields)
+        ):
             raise AttributeError(name)
-        # always pull fresh rather than reusing the previous `self.generator`,
-        # otherwise a mirror cached from an earlier access would silently go
-        # stale as more data is ingested
-        return getattr(self.pull(), name)
+        if self._session_id is None:
+            # nothing on the server is newer than the local configuration
+            return getattr(self.generator, name)
+        # one pull per step: reuse the mirror until the server's state moved on
+        if self._full_pull_step != self._steps:
+            self.pull()
+        return getattr(self.generator, name)

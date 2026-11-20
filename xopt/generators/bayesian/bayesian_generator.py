@@ -533,12 +533,24 @@ class BayesianGenerator(Generator, ABC):
         # get input bounds
         variable_bounds = self.get_model_input_bounds(data)
 
+        # Resolve the effective device using the existing Xopt policy.
+        tkwargs = self.tkwargs
+
+        # Protect concurrent first-use CUDA linear algebra initialization
+        # against PyTorch issue #90613. CPU workloads skip this operation.
+        # The initialization lock is released before model fitting begins.
+        from xopt.generators.bayesian.cuda_utils import (
+            ensure_cuda_linalg_initialized,
+        )
+
+        ensure_cuda_linalg_initialized(tkwargs["device"])
+
         _model = self.gp_constructor.build_model(
             self.model_input_names,
             self.model_output_names,
             data,
             variable_bounds,
-            **self.tkwargs,
+            **tkwargs,
         )
 
         if update_internal:

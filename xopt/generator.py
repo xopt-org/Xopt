@@ -180,11 +180,13 @@ class Generator(XoptBaseModel, BaseGenerator, ABC):
     def ingest(self, results: List[dict]) -> None:
         self.add_data(pd.DataFrame(results))
 
-    def sync_for_dump(self) -> None:
+    def sync_for_dump(self, include_model: bool = True) -> None:
         """
         Called by `Xopt.dump()` before writing the dump file. Generators whose
         state lives elsewhere (e.g. on a remote server) can refresh their local
-        copy here. Does nothing by default.
+        copy here. `include_model` is `Xopt.serialize_torch`: when False the
+        dump leaves out torch modules, so a fitted model need not be fetched.
+        Does nothing by default.
         """
         pass
 
