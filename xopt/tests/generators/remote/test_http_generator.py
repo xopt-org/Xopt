@@ -1,29 +1,28 @@
 """HTTPGenerator remote integration and cloudpickle regression tests.
 
-All 14 tests live in the original upstream regression-test location.
+STANDARD HTTP TRANSPORT
+    Exercises the Xopt HTTP server, including independent sessions,
+    data synchronization, authentication, state recovery, checkpointing,
+    model serialization, and remote Bayesian optimization.
 
-UPSTREAM HTTP TRANSPORT (12 tests)
-    Uses the normal Xopt server in an independent Uvicorn subprocess.
-    Covers HTTP sessions, data mirroring, authentication, random/UCB-related
-    behavior, BAX, and an importable module-level PyTorch prior.
+CLOUDPICKLE TRANSPORT
+    Exercises the optional transport for notebook-local Python classes,
+    custom PyTorch models, and generator-state serialization.
 
-EXPERIMENTAL CLOUDPICKLE TRANSPORT (2 tests)
-    Uses the opt-in cloudpickle server in a separate Uvicorn subprocess.
-    The negative control checks that standard transport rejects a local
-    (not importable) notebook-style PyTorch class. The positive control
-    checks cloudpickle round-trip, candidate generation, and prior values.
+CONCURRENT APPLICATIONS
+    Exercises six independent Xopt applications sharing one backend,
+    using UCB, BAX, and expected improvement. Covers CPU, CUDA,
+    mixed CPU/CUDA execution, session isolation, and session lifecycle.
 
-Important scope: subprocesses run on the SAME machine and can share installed
-packages. These tests do NOT prove cross-host Docker isolation. The next
-integration milestone must run a backend without the scientist's source files.
+Test scope:
+    Client and server subprocesses run on the same machine.
+    Cross-host deployment and container isolation require separate
+    integration testing.
 
-Requirements for the two experimental tests:
-    python -m pip install -e ".[remote]"
+Run from the repository root:
+    uv run pytest xopt/tests/generators/remote/test_http_generator.py -v
 
-Run from repository root:
-    python -m pytest xopt/tests/generators/remote/test_http_generator.py -v -s --no-cov
-
-SECURITY: Never expose the cloudpickle deserialization endpoint to untrusted
+SECURITY: Never expose cloudpickle deserialization endpoints to untrusted
 clients; deserialization can execute arbitrary Python code.
 """
 
@@ -31,6 +30,7 @@ import json
 import os
 import socket
 import subprocess
+import tempfile
 import sys
 import time
 from types import SimpleNamespace
@@ -95,39 +95,53 @@ def _uvicorn_subprocess(*, auth_token=None):
         "--log-level",
         "warning",
     ]
-    process = subprocess.Popen(
-        command,
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        # Wait for a real HTTP response, not merely an open socket.
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            if process.poll() is not None:
-                error = process.stderr.read()
-                raise RuntimeError(f"Uvicorn exited during startup:\n{error}")
-            try:
-                response = requests.get(url + "/openapi.json", timeout=0.3)
-                response.raise_for_status()
-                break
-            except (requests.RequestException, OSError):
-                time.sleep(0.1)
-        else:
-            raise RuntimeError(f"Uvicorn did not become ready at {url}")
-        yield url
-    finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
-        if process.stderr is not None:
-            process.stderr.close()
+    # Use a unique, platform-independent diagnostic log.
+    # File redirection also prevents unread subprocess pipes
+    # from blocking the server.
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        prefix="xopt-uvicorn-",
+        suffix=".log",
+        encoding="utf-8",
+        delete=False,
+    ) as log_file:
+        log_path = log_file.name
+        print(f"Server diagnostic log: {log_path}")
+
+        process = subprocess.Popen(
+            command,
+            env=env,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        try:
+            # Wait for a real HTTP response, not merely an open socket.
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    with open(
+                        log_path, encoding="utf-8", errors="replace"
+                    ) as error_file:
+                        error = error_file.read()
+                    raise RuntimeError(f"Uvicorn exited during startup:\n{error}")
+                try:
+                    response = requests.get(url + "/openapi.json", timeout=0.3)
+                    response.raise_for_status()
+                    break
+                except (requests.RequestException, OSError):
+                    time.sleep(0.1)
+            else:
+                raise RuntimeError(f"Uvicorn did not become ready at {url}")
+            yield url
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
 
 
 SERVER_TOKEN = "module-test-token"
@@ -1899,3 +1913,235 @@ def test_http_generator_unknown_private_attribute_raises():
 
     with pytest.raises(AttributeError, match="_missing_attribute"):
         getattr(generator, "_missing_attribute")
+
+
+@pytest.mark.parametrize("mode", ["cpu", "cuda", "mixed"])
+def test_concurrent_independent_xopt_sessions(mode):
+    """Exercise six independent Xopt applications over real HTTP.
+
+    Each application owns its evaluator, observations, HTTPGenerator,
+    and backend session. All sessions share one server process.
+
+    No explicit CUDA warmup is performed. Bayesian Generators handle
+    first-use CUDA initialization automatically.
+
+    Scientific workloads match the local concurrency regression test.
+    """
+    if mode != "cpu" and not torch.cuda.is_available():
+        pytest.skip("CUDA is unavailable")
+
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from xopt import Xopt, Evaluator
+    from xopt.generators.bayesian.upper_confidence_bound import (
+        UpperConfidenceBoundGenerator,
+    )
+
+    workers = 6
+
+    def advance(applications, n_steps):
+        """Start independent optimization loops concurrently."""
+        barrier = Barrier(len(applications))
+
+        def optimize(X):
+            barrier.wait(timeout=60)
+
+            for _ in range(n_steps):
+                X.step()
+
+        with ThreadPoolExecutor(max_workers=len(applications)) as pool:
+            futures = [pool.submit(optimize, X) for X in applications]
+
+            for future in futures:
+                future.result(timeout=300)
+
+    with _uvicorn_subprocess(auth_token=SERVER_TOKEN) as url:
+        headers = {"Authorization": f"Bearer {SERVER_TOKEN}"}
+        applications = []
+        specifications = []
+
+        def health():
+            response = requests.get(f"{url}/health", timeout=10)
+            response.raise_for_status()
+            return response.json()
+
+        def sessions():
+            response = requests.get(
+                f"{url}/sessions",
+                headers=headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            return {item["session_id"]: item for item in response.json()["sessions"]}
+
+        def build_application(index):
+            algorithm = ["ucb", "bax", "ei"][index % 3]
+            output = f"y_{index}"
+            target = (index + 1) / 7.0
+
+            use_cuda = mode == "cuda" or (mode == "mixed" and index >= 3)
+
+            def evaluate(inputs):
+                x = float(inputs["x"])
+                return {output: (x - target) ** 2 + index}
+
+            if algorithm == "bax":
+                vocs = VOCS(
+                    variables={"x": [0.0, 1.0]},
+                    observables=[output],
+                )
+
+                generator = BaxGenerator(
+                    vocs=vocs,
+                    use_cuda=use_cuda,
+                    algorithm=GridOptimize(
+                        observable_names_ordered=[output],
+                        n_mesh_points=20,
+                    ),
+                )
+            else:
+                vocs = VOCS(
+                    variables={"x": [0.0, 1.0]},
+                    objectives={output: "MINIMIZE"},
+                )
+
+                generator_class = (
+                    UpperConfidenceBoundGenerator
+                    if algorithm == "ucb"
+                    else ExpectedImprovementGenerator
+                )
+
+                generator = generator_class(
+                    vocs=vocs,
+                    use_cuda=use_cuda,
+                )
+
+            X = Xopt(
+                generator=HTTPGenerator(
+                    base_url=url,
+                    api_key=SERVER_TOKEN,
+                    generator=generator,
+                ),
+                evaluator=Evaluator(function=evaluate),
+            )
+
+            applications.append(X)
+
+            specifications.append((index, algorithm, output, target, use_cuda))
+
+        def verify(index, expected_rows):
+            X = applications[index]
+
+            _, algorithm, output, target, use_cuda = specifications[index]
+
+            assert X.n_data == expected_rows
+
+            x = X.data["x"].to_numpy()
+            y = X.data[output].to_numpy()
+
+            assert np.all((x >= 0.0) & (x <= 1.0))
+
+            np.testing.assert_allclose(
+                y,
+                (x - target) ** 2 + index,
+                rtol=1e-10,
+                atol=1e-12,
+            )
+
+            for other in range(workers):
+                if other != index:
+                    assert f"y_{other}" not in X.data.columns
+
+            # Retrieve and verify the remotely trained model.
+            remote = X.generator.pull()
+
+            assert remote.model is not None
+            assert remote.use_cuda == use_cuda
+
+            devices = {parameter.device.type for parameter in remote.model.parameters()}
+
+            expected_device = "cuda" if use_cuda else "cpu"
+
+            assert devices == {expected_device}
+
+            session_id = X.generator._session_id
+            assert sessions()[session_id]["n_data"] == expected_rows
+
+            print(
+                f"Xopt {index + 1}: "
+                f"algorithm={algorithm.upper()}, "
+                f"model_devices={devices}, "
+                f"observations={expected_rows}, "
+                f"session={session_id}, PASS"
+            )
+
+        print(f"HTTP execution mode: {mode}")
+        print(f"Client PyTorch: {torch.__version__}")
+        print(f"Client intra-op: {torch.get_num_threads()}")
+        print(f"Client inter-op: {torch.get_num_interop_threads()}")
+
+        try:
+            assert health()["sessions"] == 0
+
+            if mode != "cpu":
+                assert health()["cuda_available"] is True
+
+            for index in range(workers):
+                build_application(index)
+
+            for X in applications:
+                X.evaluate_data(pd.DataFrame({"x": [0.1, 0.3, 0.6, 0.9]}))
+
+            session_ids = {X.generator._session_id for X in applications}
+
+            assert None not in session_ids
+            assert len(session_ids) == workers
+            assert set(sessions()) == session_ids
+            assert health()["sessions"] == workers
+
+            print("Six independent backend sessions created.")
+
+            # Match the local test: four initial observations
+            # followed by five optimization steps per application.
+            advance(applications, n_steps=5)
+
+            for index in range(workers):
+                verify(index, expected_rows=9)
+
+            print("ALL SIX HTTP XOPT APPLICATIONS PASSED")
+            print("Baseline observations: 54")
+
+            # Additional HTTP-specific lifecycle validation.
+            # Terminating one session must not affect the others.
+            terminated_id = applications[0].generator._session_id
+
+            applications[0].generator.finalize()
+
+            assert terminated_id not in sessions()
+            assert set(sessions()) == session_ids - {terminated_id}
+            assert health()["sessions"] == 5
+
+            print("Selective session termination: PASS")
+
+            # Verify that the remaining five applications continue.
+            advance(applications[1:], n_steps=2)
+
+            for index in range(1, workers):
+                verify(index, expected_rows=11)
+
+            assert applications[0].n_data == 9
+            assert health()["status"] == "ok"
+
+            print("Remaining five sessions continued: PASS")
+            print("Total observations including lifecycle test: 64")
+
+        finally:
+            for X in applications:
+                X.generator.finalize()
+
+        assert sessions() == {}
+        assert health()["sessions"] == 0
+        assert health()["status"] == "ok"
+
+        print("All backend sessions cleaned up: PASS")
